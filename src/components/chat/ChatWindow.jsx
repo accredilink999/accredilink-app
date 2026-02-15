@@ -456,7 +456,7 @@ export default function ChatWindow({ conversation, currentUserId, currentUserNam
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-[#efeae2]" style={{ colorScheme: 'light' }}>
+    <div className="flex-1 flex flex-col bg-[#efeae2] min-w-0 overflow-x-hidden">
       {/* ── Header ── */}
       <div className="bg-[#f0f2f5] border-b border-slate-200 px-3 py-2 flex items-center gap-3 z-10">
         <Button variant="ghost" size="icon" onClick={onBack} className="lg:hidden h-9 w-9">
@@ -612,9 +612,9 @@ export default function ChatWindow({ conversation, currentUserId, currentUserNam
       )}
 
       {/* ── Input bar ── */}
-      <div className="bg-[#f0f2f5] px-3 py-2">
-        <form onSubmit={handleSend} className="flex items-end gap-2">
-          <div className="flex items-center gap-1">
+      <div className="bg-[#f0f2f5] px-3 py-2 max-w-full">
+        <form onSubmit={handleSend} className="flex items-end gap-2 max-w-full">
+          <div className="flex items-center gap-1 flex-shrink-0">
             <Popover open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
               <PopoverTrigger asChild>
                 <button type="button" className="p-2 hover:bg-slate-200 rounded-full transition-colors">
@@ -648,7 +648,7 @@ export default function ChatWindow({ conversation, currentUserId, currentUserNam
             </button>
           </div>
 
-          <div className="flex-1 bg-white rounded-lg border border-slate-200 px-3 py-2">
+          <div className="flex-1 min-w-0 bg-white rounded-lg border border-slate-200 px-3 py-2">
             <input
               ref={inputRef}
               value={message}

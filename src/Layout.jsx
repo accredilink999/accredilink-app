@@ -409,37 +409,10 @@ export default function Layout({ children, currentPageName }) {
       document.head.appendChild(themeColorMeta);
     }
 
-    const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    
-    const handleDarkModeChange = (e) => {
-      if (e.matches) {
-        document.documentElement.classList.add('dark');
-        document.documentElement.style.colorScheme = 'dark';
-        themeColorMeta.content = '#0f172a'; // Dark slate background
-      } else {
-        document.documentElement.classList.remove('dark');
-        document.documentElement.style.colorScheme = 'light';
-        themeColorMeta.content = '#ffffff'; // White background
-      }
-    };
-
-    // Set initial preference
-    if (darkModeQuery.matches) {
-      document.documentElement.classList.add('dark');
-      document.documentElement.style.colorScheme = 'dark';
-      themeColorMeta.content = '#0f172a';
-    } else {
-      document.documentElement.classList.remove('dark');
-      document.documentElement.style.colorScheme = 'light';
-      themeColorMeta.content = '#ffffff';
-    }
-
-    // Listen for changes
-    darkModeQuery.addEventListener('change', handleDarkModeChange);
-
-    return () => {
-      darkModeQuery.removeEventListener('change', handleDarkModeChange);
-    };
+    // Force light mode — app is designed for light/teal theme only
+    document.documentElement.classList.remove('dark');
+    document.documentElement.style.colorScheme = 'light';
+    themeColorMeta.content = '#ffffff';
   }, []);
 
 
@@ -915,7 +888,7 @@ export default function Layout({ children, currentPageName }) {
       )}
 
       {/* Main Content — scrolls internally to prevent browser chrome from appearing */}
-                   <main className="flex-1 overflow-y-auto lg:pb-0" style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', paddingBottom: 'calc(5rem + env(safe-area-inset-bottom))' }}>
+                   <main className="flex-1 overflow-y-auto overflow-x-hidden lg:pb-0" style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', paddingBottom: 'calc(5rem + env(safe-area-inset-bottom))' }}>
                                      {/* App Update Banner */}
                                      <AppUpdateBanner />
                                      <GpsWarningBanner />
