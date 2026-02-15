@@ -55,6 +55,10 @@
 	<string>Accredilink uses Face ID for quick and secure login</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Accredilink needs camera access for document scanning and photos</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Accredilink needs microphone access for voice notes and audio messages</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Accredilink uses speech recognition for voice-to-text</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Accredilink uses your location for clock in/out verification</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
