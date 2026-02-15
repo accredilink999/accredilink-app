@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import Avatar from '@/components/ui/Avatar';
 import StatusBadge from '@/components/ui/StatusBadge';
 import CallManager from '@/components/rota/CallManager';
+import ShiftSittingLogs from '@/components/rota/ShiftSittingLogs';
 import ShiftSwapRequest from '@/components/rota/ShiftSwapRequest';
 import { Clock, MapPin, Calendar, User, Trash2, Play, Square, RefreshCw, Edit2, Save, X, Car, FileText, CheckCircle, AlertCircle } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
@@ -47,7 +48,7 @@ const SIT_IN_NAMES = new Set(['Sit In L', 'Sit In E', 'Sit In FD']);
 export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId, isEditMode = false }) {
   const queryClient = useQueryClient();
   const isSitIn = SIT_IN_NAMES.has(shift?.shift_name);
-  const [activeTab, setActiveTab] = useState(isSitIn ? 'details' : 'calls');
+  const [activeTab, setActiveTab] = useState(isSitIn ? 'sitting-logs' : 'calls');
   const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
   const [clockOffShiftConfirm, setClockOffShiftConfirm] = useState(false);
   const [shiftSummaryOpen, setShiftSummaryOpen] = useState(false);
@@ -606,7 +607,8 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             {isSitIn ? (
-              <TabsList className="grid w-full grid-cols-1">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="sitting-logs">Sitting Logs</TabsTrigger>
                 <TabsTrigger value="details">Details</TabsTrigger>
               </TabsList>
             ) : (
@@ -616,6 +618,30 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
                 </TabsTrigger>
                 <TabsTrigger value="details">Details</TabsTrigger>
               </TabsList>
+            )}
+
+            {/* Sitting Logs tab for sit-in shifts */}
+            {isSitIn && (
+              <TabsContent value="sitting-logs" className="space-y-4 mt-4">
+                <ShiftSittingLogs
+                  shift={currentShift}
+                  isMyShift={isMyShift}
+                  isAdmin={isAdmin}
+                />
+                {/* Clock Off button at bottom of sitting logs */}
+                {canClockOff && (
+                  <div className="mt-4 p-3 rounded-lg bg-slate-50">
+                    <Button
+                      onClick={() => setShiftSummaryOpen(true)}
+                      disabled={clockOffMutation.isPending}
+                      className="w-full min-h-[48px] touch-manipulation text-base bg-red-600 hover:bg-red-700"
+                    >
+                      <Square className="w-4 h-4 mr-2" />
+                      Clock Off Shift
+                    </Button>
+                  </div>
+                )}
+              </TabsContent>
             )}
 
             {!isSitIn && (
@@ -713,19 +739,7 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
                   )}
               </Card>
 
-              {/* Sit-in shifts: show clock off directly in details tab */}
-              {isSitIn && canClockOff && (
-                <div className="mt-4 p-3 rounded-lg bg-slate-50">
-                  <Button
-                    onClick={() => setShiftSummaryOpen(true)}
-                    disabled={clockOffMutation.isPending}
-                    className="w-full min-h-[48px] touch-manipulation text-base bg-red-600 hover:bg-red-700"
-                  >
-                    <Square className="w-4 h-4 mr-2" />
-                    Clock Off Shift
-                  </Button>
-                </div>
-              )}
+              {/* Clock off button kept in Sitting Logs tab for sit-in shifts */}
              </TabsContent>
           </Tabs>
 

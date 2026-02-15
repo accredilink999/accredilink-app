@@ -200,7 +200,7 @@ export default function HealthcareLogManager({ serviceUser, logType = 'communica
                 className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-semibold"
               >
                 <FileText className="w-4 h-4 mr-2" />
-                Generate Daily Log
+                Create End of Shift Report
               </Button>
               <Dialog open={pastLogsOpen} onOpenChange={setPastLogsOpen}>
                 <DialogTrigger asChild>
