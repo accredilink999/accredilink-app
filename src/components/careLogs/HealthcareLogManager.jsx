@@ -12,6 +12,7 @@ import { Plus, Trash2, Calendar, User, History, FileText } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import DailyReportViewer from './DailyReportViewer';
 import SpeechButton from '@/components/ui/SpeechButton';
+import { toast } from 'sonner';
 
 export default function HealthcareLogManager({ serviceUser, logType = 'communication' }) {
    const queryClient = useQueryClient();
@@ -77,6 +78,11 @@ export default function HealthcareLogManager({ serviceUser, logType = 'communica
             notes: ''
           });
           setIsAdding(false);
+          toast.success('Sitting log saved');
+        },
+        onError: (err) => {
+          console.error('Failed to save sitting log:', err);
+          toast.error('Failed to save sitting log: ' + (err.message || 'Unknown error'));
         },
       });
 
@@ -261,11 +267,18 @@ export default function HealthcareLogManager({ serviceUser, logType = 'communica
             </div>
             <div>
                <label className="text-sm font-medium text-slate-700 mb-1 block">Staff Member</label>
-               <Input
-                 placeholder="Enter staff member name"
-                 value={formData.visitor_name}
-                 onChange={(e) => setFormData({...formData, visitor_name: e.target.value})}
-               />
+               <Select value={formData.visitor_name} onValueChange={(value) => setFormData({...formData, visitor_name: value})}>
+                 <SelectTrigger>
+                   <SelectValue placeholder="Select staff member" />
+                 </SelectTrigger>
+                 <SelectContent>
+                   {staffList.map(staff => (
+                     <SelectItem key={staff.id} value={staff.full_name || staff.email}>
+                       {staff.full_name || staff.email}
+                     </SelectItem>
+                   ))}
+                 </SelectContent>
+               </Select>
              </div>
           </div>
           <div className={logType === 'sitting' ? 'md:col-span-2' : ''}>
@@ -302,8 +315,8 @@ export default function HealthcareLogManager({ serviceUser, logType = 'communica
             </div>
           </div>
           <div className="flex gap-2">
-            <Button onClick={handleSubmit} disabled={createMutation.isPending} className="flex-1">
-              Save
+            <Button onClick={handleSubmit} disabled={logType === 'sitting' ? createSittingLogMutation.isPending : createMutation.isPending} className="flex-1">
+              {(logType === 'sitting' ? createSittingLogMutation.isPending : createMutation.isPending) ? 'Saving...' : logType === 'sitting' ? 'Save Sitting Log' : 'Save'}
             </Button>
             <Button variant="outline" onClick={() => setIsAdding(false)} className="flex-1">
               Cancel

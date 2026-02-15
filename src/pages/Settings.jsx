@@ -617,7 +617,7 @@ function AppInfoCard({ userEmail }) {
 
   const latestVersion = latestInfo?.version;
   const downloadUrl = latestInfo?.file_url;
-  const hasUpdate = isNative && isUpdateAvailable(APP_VERSION, latestVersion);
+  const hasUpdate = isUpdateAvailable(APP_VERSION, latestVersion);
 
   return (
     <Card className="p-5 bg-white border-0 shadow-sm">
@@ -630,7 +630,7 @@ function AppInfoCard({ userEmail }) {
           <span className="text-slate-500">Installed version</span>
           <span className="text-slate-900 font-medium">{APP_VERSION}</span>
         </div>
-        {isNative && latestVersion && (
+        {latestVersion && (
           <div className="flex justify-between items-center">
             <span className="text-slate-500">Latest version</span>
             <span className={hasUpdate ? 'text-teal-600 font-medium' : 'text-slate-900 font-medium'}>
@@ -638,20 +638,18 @@ function AppInfoCard({ userEmail }) {
             </span>
           </div>
         )}
-        {isNative && (
-          <div className="flex justify-between items-center">
-            <span className="text-slate-500">Status</span>
-            {hasUpdate ? (
-              <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
-                Update available
-              </span>
-            ) : (
-              <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full">
-                Up to date
-              </span>
-            )}
-          </div>
-        )}
+        <div className="flex justify-between items-center">
+          <span className="text-slate-500">Status</span>
+          {hasUpdate ? (
+            <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+              Update available
+            </span>
+          ) : (
+            <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full">
+              Up to date
+            </span>
+          )}
+        </div>
         <div className="flex justify-between items-center">
           <span className="text-slate-500">Platform</span>
           <span className="text-slate-900 capitalize">{platform}</span>

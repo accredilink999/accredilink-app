@@ -54,8 +54,8 @@ export default function AppUpdateChecker() {
     }
   }, [latestVersion]);
 
-  // Only show on native, only when update exists, only if not dismissed
-  if (!isNativePlatform() || !updateAvailable || dismissed || !downloadUrl) {
+  // Show update popup for all users when an update exists
+  if (!updateAvailable || dismissed || !downloadUrl) {
     return null;
   }
 

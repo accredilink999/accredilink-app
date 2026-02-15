@@ -10,6 +10,7 @@ const OFFLINE_ENABLED_TABLES = new Set([
   'shifts',
   'shift_calls',
   'healthcare_logs',
+  'sitting_logs',
   'incidents',
   'medication_administrations',
   'chat_messages',
@@ -296,6 +297,7 @@ export const entities = {
   ClientCall:                  buildEntity('client_calls'),
   CareLog:                     buildEntity('care_logs'),
   HealthcareLog:               buildEntity('healthcare_logs'),
+  SittingLog:                  buildEntity('sitting_logs'),
 
   // Notifications
   Notification:                buildEntity('notifications'),
