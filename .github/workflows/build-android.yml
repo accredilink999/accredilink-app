@@ -1,7 +1,12 @@
-name: Build Android APK
+name: Build & Release Android APK
 
 on:
-  workflow_dispatch:  # Manual trigger from GitHub Actions tab
+  workflow_dispatch:
+    inputs:
+      release_notes:
+        description: 'Release notes (shown to users in update popup)'
+        required: false
+        default: ''
 
 jobs:
   build:
@@ -19,6 +24,14 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # Read current version from appVersion.js
+      - name: Get app version
+        id: version
+        run: |
+          VERSION=$(grep -oP "APP_VERSION = '\K[^']+" src/lib/appVersion.js)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "App version: $VERSION"
 
       - name: Build web app
         run: npm run build
@@ -43,14 +56,97 @@ jobs:
         working-directory: android
         run: ./gradlew assembleRelease
 
-      - name: Upload debug APK
+      # Upload APK to Supabase storage
+      - name: Upload APK to Supabase storage
+        id: upload
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          APK_PATH="android/app/build/outputs/apk/debug/app-debug.apk"
+          STORAGE_PATH="apk/accredilink-v${VERSION}.apk"
+          PUBLIC_URL="${SUPABASE_URL}/storage/v1/object/public/uploads/${STORAGE_PATH}"
+          APK_SIZE=$(wc -c < "$APK_PATH")
+
+          echo "Uploading APK to Supabase storage..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+            -H "Authorization: Bearer ${SUPABASE_KEY}" \
+            -H "Content-Type: application/vnd.android.package-archive" \
+            -H "x-upsert: true" \
+            --data-binary @"$APK_PATH" \
+            "${SUPABASE_URL}/storage/v1/object/uploads/${STORAGE_PATH}")
+
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo "✓ Upload successful"
+          else
+            echo "✗ Upload failed (HTTP ${HTTP_CODE})"
+            exit 1
+          fi
+
+          echo "public_url=$PUBLIC_URL" >> "$GITHUB_OUTPUT"
+          echo "apk_size=$APK_SIZE" >> "$GITHUB_OUTPUT"
+
+      # Update system setting to trigger update popup for all users
+      - name: Update app_download_android setting
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          PUBLIC_URL="${{ steps.upload.outputs.public_url }}"
+          APK_SIZE="${{ steps.upload.outputs.apk_size }}"
+          NOTES="${{ github.event.inputs.release_notes }}"
+          NOW=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
+
+          # Build the JSON value
+          SETTING_VALUE=$(jq -n \
+            --arg ver "$VERSION" \
+            --arg url "$PUBLIC_URL" \
+            --arg name "Accredilink-v${VERSION}.apk" \
+            --argjson size "$APK_SIZE" \
+            --arg now "$NOW" \
+            --arg notes "${NOTES:-Version ${VERSION}}" \
+            '{version: $ver, file_url: $url, filename: $name, filesize: $size, updated_at: $now, notes: $notes}')
+
+          ESCAPED=$(echo "$SETTING_VALUE" | jq -Rs '.')
+
+          echo "Updating system setting..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PATCH \
+            -H "Authorization: Bearer ${SUPABASE_KEY}" \
+            -H "apikey: ${SUPABASE_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=representation" \
+            "${SUPABASE_URL}/rest/v1/system_settings?setting_key=eq.app_download_android" \
+            -d "{\"setting_value\": ${ESCAPED}}")
+
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo "✓ System setting updated — users will see update popup"
+          else
+            echo "✗ Setting update failed (HTTP ${HTTP_CODE})"
+            exit 1
+          fi
+
+      # Also save as GitHub artifact
+      - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: accredilink-debug
+          name: accredilink-debug-v${{ steps.version.outputs.version }}
           path: android/app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Upload release APK
+      - name: Upload release APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: accredilink-release
+          name: accredilink-release-v${{ steps.version.outputs.version }}
           path: android/app/build/outputs/apk/release/app-release-unsigned.apk
+
+      - name: Summary
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "## Release v${VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **APK**: [Download](${{ steps.upload.outputs.public_url }})" >> $GITHUB_STEP_SUMMARY
+          echo "- **Size**: $(( ${{ steps.upload.outputs.apk_size }} / 1024 / 1024 ))MB" >> $GITHUB_STEP_SUMMARY
+          echo "- **Notes**: ${{ github.event.inputs.release_notes }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All users will now see the update popup on their next page load." >> $GITHUB_STEP_SUMMARY
