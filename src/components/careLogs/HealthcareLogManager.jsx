@@ -176,7 +176,11 @@ export default function HealthcareLogManager({ serviceUser, logType = 'communica
     food_drink: 'Food & Drink Log',
     mood: 'Mood Log',
     concerns: 'Concerns Log',
-    compliments: 'Complements & Complaints Log'
+    compliments: 'Complements & Complaints Log',
+    healthcare_visit: 'Healthcare Visit',
+    social_care_call: 'Social Care Call',
+    appointment: 'Appointment',
+    social_care_outing: 'Social Care Outing',
   } : {
     healthcare_professional: 'Healthcare Professional',
     social_worker: 'Social Worker',
@@ -254,6 +258,10 @@ export default function HealthcareLogManager({ serviceUser, logType = 'communica
                       <SelectItem value="mood">Mood Log</SelectItem>
                       <SelectItem value="concerns">Concerns Log</SelectItem>
                       <SelectItem value="compliments">Complements & Complaints Log</SelectItem>
+                      <SelectItem value="healthcare_visit">Healthcare Visit</SelectItem>
+                      <SelectItem value="social_care_call">Social Care Call</SelectItem>
+                      <SelectItem value="appointment">Appointment</SelectItem>
+                      <SelectItem value="social_care_outing">Social Care Outing</SelectItem>
                     </>
                   ) : (
                     <>
@@ -341,7 +349,7 @@ export default function HealthcareLogManager({ serviceUser, logType = 'communica
                if (log.is_daily_report) return true;
 
                // If this is an individual sitting log, hide it if a report exists for that day
-               if (log.visit_type !== 'healthcare_professional' && ['food_drink', 'mood', 'concerns', 'compliments'].includes(log.visit_type)) {
+               if (log.visit_type !== 'healthcare_professional' && ['food_drink', 'mood', 'concerns', 'compliments', 'healthcare_visit', 'social_care_call', 'appointment', 'social_care_outing'].includes(log.visit_type)) {
                  const logDate = new Date(log.visit_date).toISOString().split('T')[0];
                  return !dailyReportDates.includes(logDate);
                }

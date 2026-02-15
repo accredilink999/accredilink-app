@@ -26,6 +26,10 @@ const VISIT_TYPE_LABELS = {
   mood: 'Mood',
   concerns: 'Concerns',
   compliments: 'Compliments & Complaints',
+  healthcare_visit: 'Healthcare Visit',
+  social_care_call: 'Social Care Call',
+  appointment: 'Appointment',
+  social_care_outing: 'Social Care Outing',
 };
 
 export default function ShiftSittingLogs({ shift, isMyShift, isAdmin }) {
@@ -195,6 +199,10 @@ export default function ShiftSittingLogs({ shift, isMyShift, isAdmin }) {
                 <SelectItem value="mood">Mood Log</SelectItem>
                 <SelectItem value="concerns">Concerns Log</SelectItem>
                 <SelectItem value="compliments">Compliments & Complaints Log</SelectItem>
+                <SelectItem value="healthcare_visit">Healthcare Visit</SelectItem>
+                <SelectItem value="social_care_call">Social Care Call</SelectItem>
+                <SelectItem value="appointment">Appointment</SelectItem>
+                <SelectItem value="social_care_outing">Social Care Outing</SelectItem>
               </SelectContent>
             </Select>
           </div>
