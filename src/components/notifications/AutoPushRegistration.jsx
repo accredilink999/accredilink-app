@@ -18,6 +18,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
 import { initFirebaseMessaging, requestFCMToken } from '@/lib/firebaseMessaging';
 import { Bell, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -32,6 +33,13 @@ function isNativePlatform() {
 function getPlatform() {
   if (!isNativePlatform()) return 'web';
   return window.Capacitor?.getPlatform?.() === 'ios' ? 'ios' : 'android';
+}
+
+/** Save APNS token directly to the profiles table for iOS */
+async function saveApnsToken(token) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from('profiles').update({ apns_device_token: token }).eq('id', user.id);
 }
 
 /**
@@ -67,8 +75,13 @@ async function requestAllNativePermissions() {
           reject(err);
         });
       });
-      await base44.functions.invoke('manageFirebaseSubscription', { firebaseToken: token, platform });
-      console.log('[AutoPerms] Native FCM token saved');
+      if (platform === 'ios') {
+        await saveApnsToken(token);
+        console.log('[AutoPerms] iOS APNS token saved');
+      } else {
+        await base44.functions.invoke('manageFirebaseSubscription', { firebaseToken: token, platform });
+        console.log('[AutoPerms] Native FCM token saved');
+      }
     }
   } catch (e) {
     console.warn('[AutoPerms] Push setup failed:', e?.message || e);
@@ -121,8 +134,13 @@ async function silentTokenRefresh() {
           reject(err);
         });
       });
-      await base44.functions.invoke('manageFirebaseSubscription', { firebaseToken: token, platform });
-      console.log('[AutoPush] Native token refreshed');
+      if (platform === 'ios') {
+        await saveApnsToken(token);
+        console.log('[AutoPush] iOS APNS token refreshed');
+      } else {
+        await base44.functions.invoke('manageFirebaseSubscription', { firebaseToken: token, platform });
+        console.log('[AutoPush] Native token refreshed');
+      }
     } else {
       const messaging = await initFirebaseMessaging();
       if (!messaging) return;
