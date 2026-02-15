@@ -456,7 +456,7 @@ export default function ChatWindow({ conversation, currentUserId, currentUserNam
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-[#efeae2] min-w-0 overflow-x-hidden">
+    <div className="flex-1 flex flex-col bg-[#efeae2] min-w-0 overflow-hidden" style={{ maxWidth: '100%' }}>
       {/* ── Header ── */}
       <div className="bg-[#f0f2f5] border-b border-slate-200 px-3 py-2 flex items-center gap-3 z-10">
         <Button variant="ghost" size="icon" onClick={onBack} className="lg:hidden h-9 w-9">

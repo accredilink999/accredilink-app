@@ -895,7 +895,7 @@ export default function Layout({ children, currentPageName }) {
                                      <AnimatePresence mode="wait">
                                        <motion.div 
                                          key={currentPageName}
-                                         className="p-2 md:p-3 lg:p-4"
+                                         className={currentPageName === 'Chat' ? 'p-0 md:p-3 lg:p-4' : 'p-2 md:p-3 lg:p-4'}
                                          initial={{ opacity: 0, y: 10 }}
                                          animate={{ opacity: 1, y: 0 }}
                                          exit={{ opacity: 0, y: -10 }}

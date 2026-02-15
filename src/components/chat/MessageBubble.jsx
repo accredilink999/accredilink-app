@@ -119,14 +119,14 @@ const MessageBubble = React.memo(({
   const timeString = format(new Date(message.created_date || message.created_at), 'HH:mm');
 
   return (
-    <div className={cn("flex gap-1.5 mb-0.5 px-2 relative group", isOwn ? "justify-end" : "justify-start")}>
+    <div className={cn("flex gap-1.5 mb-0.5 px-2 relative group max-w-full overflow-hidden", isOwn ? "justify-end" : "justify-start")}>
       {/* Avatar for others */}
       {!isOwn && isGroup && showAvatar && (
         <Avatar name={senderName} size="xs" className="mt-auto mb-1 flex-shrink-0" src={senderPhotoUrl} />
       )}
       {!isOwn && isGroup && !showAvatar && <div className="w-6 flex-shrink-0" />}
 
-      <div className={cn("max-w-[80%] sm:max-w-[65%] relative")}>
+      <div className={cn("max-w-[75%] sm:max-w-[65%] relative min-w-0")}>
         {/* Sender name in groups */}
         {!isOwn && isGroup && showSenderName && (
           <p className="text-xs font-semibold px-1 mb-0.5" style={{ color: getNameColor(senderName) }}>
@@ -215,7 +215,7 @@ const MessageBubble = React.memo(({
           {/* Message content */}
           {(!message.attachment_url || message.attachment_type === 'audio' || (message.content && message.content !== '🎤 Voice Note')) && (
             <div className="flex items-end gap-2">
-              <p className="text-[14.2px] leading-[19px] whitespace-pre-wrap break-words text-slate-900 flex-1">
+              <p className="text-[14.2px] leading-[19px] whitespace-pre-wrap break-words text-slate-900 flex-1" style={{ overflowWrap: 'anywhere' }}>
                 {message.attachment_type === 'audio' ? null : message.content}
               </p>
               {/* Time + read receipt inline */}
