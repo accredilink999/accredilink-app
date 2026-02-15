@@ -127,12 +127,9 @@ jobs:
             <key>teamID</key>
             <string>${{ secrets.APPLE_TEAM_ID }}</string>
             <key>signingStyle</key>
-            <string>manual</string>
-            <key>provisioningProfiles</key>
-            <dict>
-              <key>com.carecallai.app</key>
-              <string>${{ secrets.PROVISIONING_PROFILE_NAME }}</string>
-            </dict>
+            <string>automatic</string>
+            <key>signingCertificate</key>
+            <string>Apple Distribution</string>
             <key>uploadBitcode</key>
             <false/>
             <key>uploadSymbols</key>
