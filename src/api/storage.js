@@ -53,8 +53,8 @@ export async function createSignedUrl({ path, expiresIn = 3600 }) {
  * Returns the plain-text reply string.
  */
 async function InvokeLLM(options) {
-  const { prompt, messages, systemPrompt } = options || {}
-  const result = await invokeFunction('invokeLLM', { prompt, messages, systemPrompt })
+  const { prompt, messages, systemPrompt, includeAppContext } = options || {}
+  const result = await invokeFunction('invokeLLM', { prompt, messages, systemPrompt, includeAppContext })
   return result?.reply ?? ''
 }
 

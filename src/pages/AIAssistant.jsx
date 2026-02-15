@@ -10,9 +10,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import PageHeader from '@/components/ui/PageHeader';
 import Avatar from '@/components/ui/Avatar';
 import ReactMarkdown from 'react-markdown';
-import { 
-  Bot, 
-  Send, 
+import useSpeechToText from '@/hooks/useSpeechToText';
+import {
+  Bot,
+  Send,
   Loader2,
   Sparkles,
   MessageSquare,
@@ -51,12 +52,11 @@ export default function AIAssistant() {
    const [input, setInput] = useState('');
    const [isLoading, setIsLoading] = useState(false);
    const [confirmDialog, setConfirmDialog] = useState(null);
-   const [isListening, setIsListening] = useState(false);
    const [showDocumentDialog, setShowDocumentDialog] = useState(false);
    const [selectedDocType, setSelectedDocType] = useState(null);
    const [docInput, setDocInput] = useState('');
    const messagesEndRef = useRef(null);
-   const recognitionRef = useRef(null);
+   const pendingSpeechRef = useRef(null);
 
    const { data: user } = useQuery({
      queryKey: ['currentUser'],
@@ -98,39 +98,23 @@ export default function AIAssistant() {
     return () => unsubscribe();
   }, [currentConversation?.id]);
 
-  // Setup voice recognition
+  // Speech-to-text hook (Web Speech API + Whisper fallback)
+  const { isListening, toggleListening } = useSpeechToText({
+    onResult: (transcript) => {
+      setInput(transcript);
+      pendingSpeechRef.current = transcript;
+    },
+    lang: 'en-GB',
+  });
+
+  // Auto-send when speech result arrives
   useEffect(() => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = false;
-      recognitionRef.current.lang = 'en-US';
-
-      recognitionRef.current.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        setInput(transcript);
-        setIsListening(false);
-        setTimeout(() => {
-          sendMessage(transcript);
-        }, 100);
-      };
-
-      recognitionRef.current.onerror = () => {
-        setIsListening(false);
-      };
-
-      recognitionRef.current.onend = () => {
-        setIsListening(false);
-      };
+    if (pendingSpeechRef.current) {
+      const text = pendingSpeechRef.current;
+      pendingSpeechRef.current = null;
+      setTimeout(() => sendMessage(text), 100);
     }
-
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
-    };
-  }, []);
+  }, [input]);
 
   // Scroll to bottom
   useEffect(() => {
@@ -262,20 +246,6 @@ export default function AIAssistant() {
     setDocInput('');
   };
 
-  const toggleListening = () => {
-    if (!recognitionRef.current) {
-      alert('Speech recognition is not supported in your browser');
-      return;
-    }
-
-    if (isListening) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    } else {
-      recognitionRef.current.start();
-      setIsListening(true);
-    }
-  };
 
 
 

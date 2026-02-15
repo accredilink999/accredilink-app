@@ -9,17 +9,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Send, Loader2, AlertCircle, CheckCircle2, Clock, Plus, Trash2, Users as UsersIcon, Mic, MicOff, Bot } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import useSpeechToText from '@/hooks/useSpeechToText';
 
 export default function AIAdminAssistant() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('chat');
-  const [isListening, setIsListening] = useState(false);
   const [showTeamDialog, setShowTeamDialog] = useState(false);
   const [teamName, setTeamName] = useState('');
   const [teamDesc, setTeamDesc] = useState('');
-  const recognitionRef = React.useRef(null);
+  const pendingSpeechRef = React.useRef(null);
   const queryClient = useQueryClient();
 
   const { data: user } = useQuery({
@@ -208,54 +208,25 @@ export default function AIAdminAssistant() {
     checkIncidentKeywords();
   }, [allIncidents, user]);
 
+  // Speech-to-text hook (Web Speech API + Whisper fallback)
+  const { isListening, toggleListening } = useSpeechToText({
+    onResult: (transcript) => {
+      setInput(transcript);
+      pendingSpeechRef.current = transcript;
+    },
+    lang: 'en-GB',
+  });
+
+  // Auto-submit when speech result arrives
   React.useEffect(() => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = false;
-      recognitionRef.current.lang = 'en-US';
-
-      recognitionRef.current.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        setInput(transcript);
-        setIsListening(false);
-        setTimeout(() => {
-          const form = document.querySelector('form');
-          if (form) form.requestSubmit();
-        }, 100);
-      };
-
-      recognitionRef.current.onerror = () => {
-        setIsListening(false);
-      };
-
-      recognitionRef.current.onend = () => {
-        setIsListening(false);
-      };
+    if (pendingSpeechRef.current) {
+      pendingSpeechRef.current = null;
+      setTimeout(() => {
+        const form = document.querySelector('form');
+        if (form) form.requestSubmit();
+      }, 100);
     }
-
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
-    };
-  }, []);
-
-  const toggleListening = () => {
-    if (!recognitionRef.current) {
-      alert('Speech recognition is not supported in your browser');
-      return;
-    }
-
-    if (isListening) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    } else {
-      recognitionRef.current.start();
-      setIsListening(true);
-    }
-  };
+  }, [input]);
 
 
 

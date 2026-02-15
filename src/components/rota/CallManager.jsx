@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
 import { ShiftCallApi } from '@/api/rotaApi';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -277,18 +278,33 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift }) {
   });
 
   const deleteCallMutation = useMutation({
-    mutationFn: (callId) => ShiftCallApi.delete(callId),
-    onSuccess: (_, callId) => {
+    mutationFn: async (callId) => {
+      // First unlink any care logs that reference this shift call
+      // (to avoid foreign key constraint violations)
+      const { data: linkedLogs } = await supabase
+        .from('care_logs')
+        .select('id')
+        .eq('shift_call_id', callId);
+      if (linkedLogs && linkedLogs.length > 0) {
+        await supabase
+          .from('care_logs')
+          .update({ shift_call_id: null })
+          .eq('shift_call_id', callId);
+      }
+      return ShiftCallApi.delete(callId);
+    },
+    onMutate: (callId) => {
+      setFreshCalls(prev => prev.filter(c => c.id !== callId));
+    },
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] });
-      // Play audible notification sound
-      try {
-        const audio = new Audio('data:audio/wav;base64,UklGRlwFAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YTgFAACAgICAgICAgICAgICAgICAgH+Af4CAgH+Af4CAf4B/gICBgYKDhIaHiImKi4yNjo6PkJGRkpOTlJSUlJSUk5OSkZGQj46NjIuKiYiHhoWEg4KBgH9/fn59fHx7e3p6enp6ent7fH19fn+AgYKDhIWGh4iJiouMjY6Pj5CRkZKSk5OTk5OTk5KSkZCPjo2Mi4qJiIeGhYSDgoGAf35+fXx8e3t6enp6enp7e3x9fX5/gIGCg4SFhoeIiYqLjI2Oj4+QkZGSkpOTk5OTk5OSkpGQj46NjIuKiYiHhoWEg4KBgH9+fn18fHt7enp6');
-        audio.volume = 0.5;
-        audio.play().catch(() => {});
-      } catch {}
       toast.success('Call deleted', { duration: 3000 });
     },
-    onError: (err) => {
+    onError: (err, callId) => {
+      // Revert optimistic delete
+      setFreshCalls(calls);
+      queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] });
+      console.error('Delete call error:', err);
       toast.error(err.message || 'Failed to delete call');
     },
   });
@@ -347,8 +363,18 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift }) {
     onMutate: ({ callId, status }) => {
       setFreshCalls(prev => prev.map(c => c.id === callId ? { ...c, status } : c));
     },
-    onSuccess: () => {
+    onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] });
+      if (status === 'missed') {
+        toast.success('Marked as Not Home');
+      }
+    },
+    onError: (err, { callId }) => {
+      // Revert optimistic update
+      setFreshCalls(calls);
+      queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] });
+      console.error('Update status error:', err);
+      toast.error(err.message || 'Failed to update call status');
     },
   });
 

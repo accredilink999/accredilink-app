@@ -8,20 +8,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Trash2, Calendar, User, Mic, History, FileText } from 'lucide-react';
+import { Plus, Trash2, Calendar, User, History, FileText } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import DailyReportViewer from './DailyReportViewer';
+import SpeechButton from '@/components/ui/SpeechButton';
 
 export default function HealthcareLogManager({ serviceUser, logType = 'communication' }) {
    const queryClient = useQueryClient();
    const [isAdding, setIsAdding] = useState(false);
-   const [isRecording, setIsRecording] = useState(false);
    const [deleteConfirmId, setDeleteConfirmId] = useState(null);
    const [selectedReport, setSelectedReport] = useState(null);
    const [reportViewerOpen, setReportViewerOpen] = useState(false);
    const [pastLogsOpen, setPastLogsOpen] = useState(false);
    const [selectedPastDate, setSelectedPastDate] = useState('');
-   const recognitionRef = React.useRef(null);
   const [formData, setFormData] = useState({
     visit_type: 'healthcare_professional',
     visitor_name: '',
@@ -41,51 +40,6 @@ export default function HealthcareLogManager({ serviceUser, logType = 'communica
 
   const isAdmin = currentUser?.role === 'admin' || currentUser?.job_title === 'admin' || currentUser?.job_title === 'manager';
 
-  const startRecording = (fieldName) => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    let fullTranscript = '';
-    
-    recognition.onresult = (event) => {
-      let interimTranscript = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          fullTranscript += transcript + ' ';
-        } else {
-          interimTranscript += transcript;
-        }
-      }
-      
-      setFormData(prev => ({
-        ...prev,
-        [fieldName]: fullTranscript + interimTranscript
-      }));
-    };
-    
-    recognition.onend = () => {
-      setFormData(prev => ({
-        ...prev,
-        [fieldName]: fullTranscript.trim()
-      }));
-      setIsRecording(false);
-    };
-    
-    recognition.onerror = () => {
-      setIsRecording(false);
-    };
-    
-    recognitionRef.current = recognition;
-    recognition.start();
-    setIsRecording(true);
-  };
-
-  const stopRecording = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-    }
-    setIsRecording(false);
-  };
 
   const { data: logs = [] } = useQuery({
       queryKey: [logType === 'sitting' ? 'sittingLogs' : 'healthcareLogs', serviceUser?.id],
@@ -332,17 +286,10 @@ export default function HealthcareLogManager({ serviceUser, logType = 'communica
                 className="h-24 flex-1"
               />
               <div className="flex flex-col gap-2">
-                <Button
-                  type="button"
-                  onMouseDown={() => startRecording('notes')}
-                  onMouseUp={stopRecording}
-                  onTouchStart={() => startRecording('notes')}
-                  onTouchEnd={stopRecording}
-                  className={`h-12 px-3 text-white transition-colors ${isRecording ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-500 hover:bg-blue-600'}`}
-                  title="Hold to record, release to stop"
-                >
-                  <Mic className="w-5 h-5" />
-                </Button>
+                <SpeechButton
+                  onResult={(text) => setFormData(prev => ({ ...prev, notes: (prev.notes || '') + ' ' + text }))}
+                  className="h-12 px-3"
+                />
                 <Button
                   type="button"
                   onClick={() => setFormData({...formData, notes: ''})}

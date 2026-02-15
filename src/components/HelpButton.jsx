@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { supabase } from '@/api/supabaseClient';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
+import useSpeechToText from '@/hooks/useSpeechToText';
 import { toast } from 'sonner';
 import {
   HelpCircle,
@@ -28,16 +29,24 @@ const REPORT_TYPES = [
   { id: 'suggestion', label: 'Suggestion', icon: Lightbulb, color: 'text-amber-500' },
 ];
 
-const HELP_SYSTEM_PROMPT = `You are MikeAI, a friendly and concise help assistant for Accredi-Care, a care management app used by domiciliary care staff and administrators. You help users with:
+const HELP_SYSTEM_PROMPT = `You are MikeAI, a friendly and knowledgeable AI assistant for Accredilink (also known as Accredi-Care), a care management app used by domiciliary care staff and administrators.
+
+You have LIVE ACCESS to the app's data including staff lists, client lists, upcoming shifts, pending leave requests, recent incidents, and expiring training. Use this data to give specific, accurate answers.
+
+You help users with:
+- Answering questions about staff, clients, shifts, rotas, and schedules using real data
 - Navigating the app (shifts, rotas, care logs, client calls, chat, settings)
 - Understanding features (how to clock on/off, submit care logs, view rotas, manage medications)
 - Troubleshooting common issues (login problems, missing data, sync issues, notification problems)
 - Explaining how the rota system works (creating shifts, assigning staff, sit-in shifts)
 - Helping with care log submissions, daily reports, and compliance questions
+- Providing summaries of pending leave, incidents, training compliance, and staffing
 
-Keep responses SHORT (2-3 sentences max). Be warm, professional and helpful. Introduce yourself as MikeAI when appropriate.
+When answering questions about data (e.g. "who is working tomorrow", "how many clients do we have", "any pending leave requests"), use the LIVE APP DATA provided in context. Give specific names, dates, and numbers.
+
+Keep responses concise but complete. Be warm, professional and helpful. Introduce yourself as MikeAI when appropriate.
 If you genuinely cannot resolve the issue or it sounds like a technical bug, suggest the user submit a formal bug report using the button below.
-Never make up features that don't exist. The user is currently on: PAGE_PLACEHOLDER`;
+Never make up data - only reference what's in the live context. The user is currently on: PAGE_PLACEHOLDER`;
 
 const AI_GREETING = "Hey there! I'm MikeAI, your Accredi-Care assistant. How can I help you today? You can type or tap the mic to speak.";
 
@@ -57,11 +66,10 @@ export default function HelpButton() {
   const [isLoading, setIsLoading] = useState(false);
 
   // Voice state
-  const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const recognitionRef = useRef(null);
   const chatEndRef = useRef(null);
   const maleVoiceRef = useRef(null);
+  const pendingSpeechRef = useRef(null);
 
   // Bug report state
   const [reportType, setReportType] = useState('bug');
@@ -101,38 +109,28 @@ export default function HelpButton() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
-  // Set up Speech Recognition
+  // Speech-to-text hook (works everywhere — Web Speech API + Whisper fallback)
+  const { isListening, toggleListening } = useSpeechToText({
+    onResult: (transcript) => {
+      setInput(transcript);
+      // Auto-send after speech input
+      pendingSpeechRef.current = transcript;
+    },
+    lang: 'en-GB',
+  });
+
+  // Send message when speech result arrives (needs to be in useEffect to access latest handleSendMessage)
   useEffect(() => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = false;
-      recognitionRef.current.lang = 'en-GB';
-
-      recognitionRef.current.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        setInput(transcript);
-        setIsListening(false);
-        // Auto-send after speech input
-        setTimeout(() => {
-          handleSendMessage(transcript);
-        }, 200);
-      };
-
-      recognitionRef.current.onerror = () => {
-        setIsListening(false);
-      };
-
-      recognitionRef.current.onend = () => {
-        setIsListening(false);
-      };
+    if (pendingSpeechRef.current) {
+      const text = pendingSpeechRef.current;
+      pendingSpeechRef.current = null;
+      setTimeout(() => handleSendMessage(text), 200);
     }
+  }, [input]);
 
+  // Cleanup speech synthesis on unmount
+  useEffect(() => {
     return () => {
-      if (recognitionRef.current) {
-        try { recognitionRef.current.stop(); } catch {}
-      }
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
@@ -143,21 +141,6 @@ export default function HelpButton() {
   if (isOnChatPage) {
     return null;
   }
-
-  const toggleListening = () => {
-    if (!recognitionRef.current) {
-      toast.error('Speech recognition is not supported in your browser');
-      return;
-    }
-
-    if (isListening) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    } else {
-      recognitionRef.current.start();
-      setIsListening(true);
-    }
-  };
 
   const speakText = (text) => {
     if (!('speechSynthesis' in window)) return;
@@ -204,6 +187,7 @@ export default function HelpButton() {
       const response = await base44.integrations.Core.InvokeLLM({
         systemPrompt,
         messages: chatHistory,
+        includeAppContext: true,
       });
 
       if (!response || response.trim() === '') {

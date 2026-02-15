@@ -9,12 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Plus, Trash2, Mic, X } from 'lucide-react';
+import { Loader2, Plus, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import MARChart from '@/components/medications/MARChart';
 import { createPageUrl } from '@/utils';
 import CareLogViewer from './CareLogViewer';
 import { notifyAdminsOfActivity } from '@/utils/adminNotifications';
+import SpeechButton from '@/components/ui/SpeechButton';
 
 export default function CareLogForm({ shift, serviceUser, open, onClose, callId }) {
   const queryClient = useQueryClient();
@@ -68,10 +69,8 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId 
     timestamp: new Date().toISOString()
     });
 
-  const [isRecording, setIsRecording] = useState(false);
   const [showMARPopup, setShowMARPopup] = useState(false);
   const [expandedMedicationOutcome, setExpandedMedicationOutcome] = useState(false);
-  const recognitionRef = React.useRef(null);
 
   const { data: staffMembers = [] } = useQuery({
     queryKey: ['staffMembers'],
@@ -327,51 +326,6 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId 
 
 
 
-  const startRecording = (fieldName) => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    let fullTranscript = '';
-    
-    recognition.onresult = (event) => {
-      let interimTranscript = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          fullTranscript += transcript + ' ';
-        } else {
-          interimTranscript += transcript;
-        }
-      }
-      
-      setFormData(prev => ({
-        ...prev,
-        [fieldName]: fullTranscript + interimTranscript
-      }));
-    };
-    
-    recognition.onend = () => {
-      setFormData(prev => ({
-        ...prev,
-        [fieldName]: fullTranscript.trim()
-      }));
-      setIsRecording(false);
-    };
-    
-    recognition.onerror = () => {
-      setIsRecording(false);
-    };
-    
-    recognitionRef.current = recognition;
-    recognition.start();
-    setIsRecording(true);
-  };
-
-  const stopRecording = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-    }
-    setIsRecording(false);
-  };
 
   const handleSubmit = () => {
     const requiredFields = {
@@ -539,17 +493,10 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId 
                       className="flex-1"
                     />
                     <div className="flex flex-col gap-2">
-                      <Button
-                         type="button"
-                         onMouseDown={() => startRecording('personal_care_description')}
-                         onMouseUp={stopRecording}
-                         onTouchStart={() => startRecording('personal_care_description')}
-                         onTouchEnd={stopRecording}
-                         className={`h-12 px-3 text-white transition-colors ${isRecording ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-500 hover:bg-blue-600'}`}
-                         title="Hold to record, release to stop"
-                       >
-                         <Mic className="w-5 h-5" />
-                       </Button>
+                      <SpeechButton
+                         onResult={(text) => setFormData(prev => ({ ...prev, personal_care_description: (prev.personal_care_description || '') + ' ' + text }))}
+                         className="h-12 px-3"
+                       />
                        <Button
                          type="button"
                          onClick={() => setFormData({...formData, personal_care_description: ''})}
@@ -639,17 +586,10 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId 
                       className="flex-1"
                     />
                     <div className="flex flex-col gap-2">
-                      <Button
-                         type="button"
-                         onMouseDown={() => startRecording('catheter_care_description')}
-                         onMouseUp={stopRecording}
-                         onTouchStart={() => startRecording('catheter_care_description')}
-                         onTouchEnd={stopRecording}
-                         className={`h-12 px-3 text-white transition-colors ${isRecording ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-500 hover:bg-blue-600'}`}
-                         title="Hold to record, release to stop"
-                       >
-                         <Mic className="w-5 h-5" />
-                       </Button>
+                      <SpeechButton
+                         onResult={(text) => setFormData(prev => ({ ...prev, catheter_care_description: (prev.catheter_care_description || '') + ' ' + text }))}
+                         className="h-12 px-3"
+                       />
                        <Button
                          type="button"
                          onClick={() => setFormData({...formData, catheter_care_description: ''})}
@@ -695,17 +635,10 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId 
                       className="flex-1"
                     />
                     <div className="flex flex-col gap-2">
-                      <Button
-                         type="button"
-                         onMouseDown={() => startRecording('repositioned_description')}
-                         onMouseUp={stopRecording}
-                         onTouchStart={() => startRecording('repositioned_description')}
-                         onTouchEnd={stopRecording}
-                         className={`h-12 px-3 text-white transition-colors ${isRecording ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-500 hover:bg-blue-600'}`}
-                         title="Hold to record, release to stop"
-                       >
-                         <Mic className="w-5 h-5" />
-                       </Button>
+                      <SpeechButton
+                         onResult={(text) => setFormData(prev => ({ ...prev, repositioned_description: (prev.repositioned_description || '') + ' ' + text }))}
+                         className="h-12 px-3"
+                       />
                        <Button
                          type="button"
                          onClick={() => setFormData({...formData, repositioned_description: ''})}
@@ -751,17 +684,10 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId 
                       className="flex-1"
                     />
                     <div className="flex flex-col gap-2">
-                      <Button
-                         type="button"
-                         onMouseDown={() => startRecording('skincare_description')}
-                         onMouseUp={stopRecording}
-                         onTouchStart={() => startRecording('skincare_description')}
-                         onTouchEnd={stopRecording}
-                         className={`h-12 px-3 text-white transition-colors ${isRecording ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-500 hover:bg-blue-600'}`}
-                         title="Hold to record, release to stop"
-                       >
-                         <Mic className="w-5 h-5" />
-                       </Button>
+                      <SpeechButton
+                         onResult={(text) => setFormData(prev => ({ ...prev, skincare_description: (prev.skincare_description || '') + ' ' + text }))}
+                         className="h-12 px-3"
+                       />
                        <Button
                          type="button"
                          onClick={() => setFormData({...formData, skincare_description: ''})}
@@ -807,17 +733,10 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId 
                       className="flex-1"
                     />
                     <div className="flex flex-col gap-2">
-                      <Button
-                         type="button"
-                         onMouseDown={() => startRecording('skin_integrity_description')}
-                         onMouseUp={stopRecording}
-                         onTouchStart={() => startRecording('skin_integrity_description')}
-                         onTouchEnd={stopRecording}
-                         className={`h-12 px-3 text-white transition-colors ${isRecording ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-500 hover:bg-blue-600'}`}
-                         title="Hold to record, release to stop"
-                       >
-                         <Mic className="w-5 h-5" />
-                       </Button>
+                      <SpeechButton
+                         onResult={(text) => setFormData(prev => ({ ...prev, skin_integrity_description: (prev.skin_integrity_description || '') + ' ' + text }))}
+                         className="h-12 px-3"
+                       />
                        <Button
                          type="button"
                          onClick={() => setFormData({...formData, skin_integrity_description: ''})}
@@ -1057,17 +976,10 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId 
                         className="flex-1"
                       />
                       <div className="flex flex-col gap-2">
-                        <Button
-                           type="button"
-                           onMouseDown={() => startRecording('medication_concerns_details')}
-                           onMouseUp={stopRecording}
-                           onTouchStart={() => startRecording('medication_concerns_details')}
-                           onTouchEnd={stopRecording}
-                           className={`h-12 px-3 text-white transition-colors ${isRecording ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-500 hover:bg-blue-600'}`}
-                           title="Hold to record, release to stop"
-                         >
-                           <Mic className="w-5 h-5" />
-                         </Button>
+                        <SpeechButton
+                           onResult={(text) => setFormData(prev => ({ ...prev, medication_concerns_details: (prev.medication_concerns_details || '') + ' ' + text }))}
+                           className="h-12 px-3"
+                         />
                          <Button
                            type="button"
                            onClick={() => setFormData({...formData, medication_concerns_details: ''})}
@@ -1117,17 +1029,10 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId 
                       className="flex-1"
                     />
                     <div className="flex flex-col gap-2">
-                      <Button
-                        type="button"
-                        onMouseDown={() => startRecording('further_concerns_details')}
-                        onMouseUp={stopRecording}
-                        onTouchStart={() => startRecording('further_concerns_details')}
-                        onTouchEnd={stopRecording}
-                        className={`h-12 px-3 text-white transition-colors ${isRecording ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-500 hover:bg-blue-600'}`}
-                        title="Hold to record, release to stop"
-                      >
-                        <Mic className="w-5 h-5" />
-                      </Button>
+                      <SpeechButton
+                        onResult={(text) => setFormData(prev => ({ ...prev, further_concerns_details: (prev.further_concerns_details || '') + ' ' + text }))}
+                        className="h-12 px-3"
+                      />
                       <Button
                         type="button"
                         onClick={() => setFormData({...formData, further_concerns_details: ''})}
@@ -1195,17 +1100,10 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId 
                   className="flex-1"
                 />
                 <div className="flex flex-col gap-2">
-                  <Button
-                    type="button"
-                    onMouseDown={() => startRecording('extended_notes')}
-                    onMouseUp={stopRecording}
-                    onTouchStart={() => startRecording('extended_notes')}
-                    onTouchEnd={stopRecording}
-                    className={`h-12 px-3 text-white transition-colors ${isRecording ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-500 hover:bg-blue-600'}`}
-                    title="Hold to record, release to stop"
-                  >
-                    <Mic className="w-5 h-5" />
-                  </Button>
+                  <SpeechButton
+                    onResult={(text) => setFormData(prev => ({ ...prev, extended_notes: (prev.extended_notes || '') + ' ' + text }))}
+                    className="h-12 px-3"
+                  />
                   <Button
                     type="button"
                     onClick={() => setFormData({...formData, extended_notes: ''})}

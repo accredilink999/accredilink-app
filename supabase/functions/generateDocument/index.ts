@@ -3,7 +3,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
+const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY')
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -27,9 +27,9 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (!OPENAI_API_KEY) {
+    if (!GROQ_API_KEY) {
       return Response.json(
-        { error: 'OPENAI_API_KEY secret not configured.' },
+        { error: 'GROQ_API_KEY secret not configured.' },
         { status: 500 }
       )
     }
@@ -45,18 +45,18 @@ Deno.serve(async (req) => {
 
     const prompt = prompts[type] ?? prompts.sop
 
-    const openAiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'llama-3.3-70b-versatile',
         messages: [
           {
             role: 'system',
-            content: 'You are a professional care management document writer. Return a JSON object with keys: title (string), content (string), sections (array of {heading, body}).',
+            content: 'You are a professional care management document writer. Return a JSON object with keys: title (string), content (string), sections (array of {heading, body}). Return ONLY valid JSON, no markdown fences.',
           },
           { role: 'user', content: prompt },
         ],
@@ -66,13 +66,13 @@ Deno.serve(async (req) => {
       }),
     })
 
-    if (!openAiRes.ok) {
-      const errText = await openAiRes.text()
-      throw new Error(`OpenAI error: ${errText}`)
+    if (!groqRes.ok) {
+      const errText = await groqRes.text()
+      throw new Error(`Groq error: ${errText}`)
     }
 
-    const openAiData = await openAiRes.json()
-    const parsed = JSON.parse(openAiData.choices?.[0]?.message?.content ?? '{}')
+    const groqData = await groqRes.json()
+    const parsed = JSON.parse(groqData.choices?.[0]?.message?.content ?? '{}')
 
     const docTitle = parsed.title ?? `Generated ${type?.replace('_', ' ')} document`
     const docContent = parsed.content ?? ''
