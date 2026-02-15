@@ -2,44 +2,28 @@
 # ──────────────────────────────────────────────────────────────────────
 # release-android.sh
 #
-# Automated Android APK release pipeline:
+# Simple release trigger:
 #   1. Bumps version in src/lib/appVersion.js
-#   2. Builds web assets
-#   3. Syncs Capacitor
-#   4. Builds Android APK
-#   5. Uploads APK to Supabase storage
-#   6. Updates the app_download_android system setting
-#   → All users see the update popup with direct download
+#   2. Commits and pushes to GitHub
+#   3. GitHub Actions auto-triggers → builds APK → uploads to Supabase
+#      → updates system setting → all users see update popup
 #
 # Usage:
-#   ./scripts/release-android.sh 1.2.0
-#   ./scripts/release-android.sh 1.2.0 "Bug fixes and new features"
+#   ./scripts/release-android.sh 1.2.0 "Fixed login, added dark mode"
 #
-# Requirements:
-#   - Node.js, npm, Java 17+, Android SDK
-#   - curl, jq
-#   - SUPABASE_URL and SUPABASE_SERVICE_KEY env vars (or uses defaults)
+# Requirements: git, gh CLI (optional, for triggering with release notes)
 # ──────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
-# ── Config ────────────────────────────────────────────────────────────
-SUPABASE_URL="${SUPABASE_URL:-https://edaifkkkqwgavxkgozwi.supabase.co}"
-SUPABASE_KEY="${SUPABASE_SERVICE_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkYWlma2trcXdnYXZ4a2dvendpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MDc2MjY5MCwiZXhwIjoyMDg2MzM4NjkwfQ.CQBzbO_gfga1Bx_gScOiJOF3p0q466ck7cL4FN3B-TY}"
-STORAGE_BUCKET="uploads"
-APK_FOLDER="apk"
-SETTING_ID="57e5c39f-0b0e-46fb-814f-35776642aeb5"
-
-# ── Args ──────────────────────────────────────────────────────────────
 NEW_VERSION="${1:-}"
-RELEASE_NOTES="${2:-}"
+RELEASE_NOTES="${2:-Version ${NEW_VERSION}}"
 
 if [ -z "$NEW_VERSION" ]; then
   echo "Usage: $0 <version> [release-notes]"
-  echo "  e.g. $0 1.2.0 \"Bug fixes and improvements\""
+  echo "  e.g. $0 1.2.0 \"Fixed login bug, added dark mode\""
   exit 1
 fi
 
-# Validate semver format
 if ! echo "$NEW_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
   echo "Error: Version must be in semver format (e.g. 1.2.0)"
   exit 1
@@ -48,133 +32,55 @@ fi
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR"
 
+echo ""
 echo "═══════════════════════════════════════════════════════════"
-echo " Accredilink Android Release v${NEW_VERSION}"
+echo " Accredilink Release v${NEW_VERSION}"
 echo "═══════════════════════════════════════════════════════════"
 
-# ── Step 1: Bump version ─────────────────────────────────────────────
+# Step 1: Bump version
 echo ""
-echo "► Step 1/6: Bumping version to ${NEW_VERSION}..."
+echo "► Bumping version to ${NEW_VERSION}..."
+sed -i "s/export const APP_VERSION = '.*'/export const APP_VERSION = '${NEW_VERSION}'/" src/lib/appVersion.js
+echo "  ✓ Updated src/lib/appVersion.js"
 
-VERSION_FILE="src/lib/appVersion.js"
-sed -i "s/export const APP_VERSION = '.*'/export const APP_VERSION = '${NEW_VERSION}'/" "$VERSION_FILE"
-echo "  ✓ Updated ${VERSION_FILE}"
-
-# Also bump android/app/build.gradle versionName
-GRADLE_FILE="android/app/build.gradle"
-if [ -f "$GRADLE_FILE" ]; then
-  sed -i "s/versionName \".*\"/versionName \"${NEW_VERSION}\"/" "$GRADLE_FILE"
-  # Bump versionCode (increment by 1)
-  CURRENT_CODE=$(grep -oP 'versionCode \K[0-9]+' "$GRADLE_FILE")
-  NEW_CODE=$((CURRENT_CODE + 1))
-  sed -i "s/versionCode ${CURRENT_CODE}/versionCode ${NEW_CODE}/" "$GRADLE_FILE"
-  echo "  ✓ Updated ${GRADLE_FILE} (versionCode ${NEW_CODE})"
-fi
-
-# ── Step 2: Build web assets ─────────────────────────────────────────
+# Step 2: Commit and push
 echo ""
-echo "► Step 2/6: Building web assets..."
-npm run build
-echo "  ✓ Web build complete"
+echo "► Committing and pushing..."
+git add src/lib/appVersion.js
+git commit -m "Release v${NEW_VERSION}
 
-# ── Step 3: Sync Capacitor ───────────────────────────────────────────
+${RELEASE_NOTES}"
+git push origin master
+echo "  ✓ Pushed to GitHub"
+
+# Step 3: GitHub Actions auto-triggers (appVersion.js changed)
+# Also trigger workflow_dispatch with release notes for the popup
 echo ""
-echo "► Step 3/6: Syncing Capacitor..."
-npx cap sync android
-echo "  ✓ Capacitor synced"
-
-# ── Step 4: Build APK ────────────────────────────────────────────────
-echo ""
-echo "► Step 4/6: Building Android APK..."
-cd android
-./gradlew assembleDebug
-cd ..
-
-APK_PATH="android/app/build/outputs/apk/debug/app-debug.apk"
-if [ ! -f "$APK_PATH" ]; then
-  echo "Error: APK not found at ${APK_PATH}"
-  exit 1
-fi
-
-APK_SIZE=$(wc -c < "$APK_PATH")
-echo "  ✓ APK built ($(( APK_SIZE / 1024 / 1024 ))MB)"
-
-# ── Step 5: Upload to Supabase storage ───────────────────────────────
-echo ""
-echo "► Step 5/6: Uploading APK to Supabase storage..."
-
-STORAGE_PATH="${APK_FOLDER}/accredilink-v${NEW_VERSION}.apk"
-PUBLIC_URL="${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${STORAGE_PATH}"
-
-# Try to upload (upsert with x-upsert header)
-UPLOAD_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-  -H "Authorization: Bearer ${SUPABASE_KEY}" \
-  -H "Content-Type: application/vnd.android.package-archive" \
-  -H "x-upsert: true" \
-  --data-binary @"$APK_PATH" \
-  "${SUPABASE_URL}/storage/v1/object/${STORAGE_BUCKET}/${STORAGE_PATH}")
-
-HTTP_CODE=$(echo "$UPLOAD_RESPONSE" | tail -1)
-UPLOAD_BODY=$(echo "$UPLOAD_RESPONSE" | sed '$d')
-
-if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
-  echo "  ✓ Uploaded to ${PUBLIC_URL}"
+echo "► Triggering GitHub Actions with release notes..."
+if command -v gh &>/dev/null || [ -f "/c/Program Files/GitHub CLI/gh.exe" ]; then
+  GH_CMD="${GH_CMD:-gh}"
+  if [ -f "/c/Program Files/GitHub CLI/gh.exe" ]; then
+    GH_CMD="/c/Program Files/GitHub CLI/gh.exe"
+  fi
+  "$GH_CMD" workflow run "Build & Release Android APK" \
+    -R accredilink999/accredilink-app \
+    -f "release_notes=${RELEASE_NOTES}" 2>/dev/null && \
+    echo "  ✓ Workflow triggered with notes" || \
+    echo "  ⚠ Could not trigger workflow (auto-trigger from push will still run)"
 else
-  echo "  ✗ Upload failed (HTTP ${HTTP_CODE}): ${UPLOAD_BODY}"
-  exit 1
+  echo "  ⚠ gh CLI not found — workflow will auto-trigger from push"
 fi
 
-# ── Step 6: Update system setting ────────────────────────────────────
-echo ""
-echo "► Step 6/6: Updating app_download_android setting..."
-
-NOW=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
-SETTING_JSON=$(cat <<ENDJSON
-{
-  "version": "${NEW_VERSION}",
-  "file_url": "${PUBLIC_URL}",
-  "filename": "Accredilink-v${NEW_VERSION}.apk",
-  "filesize": ${APK_SIZE},
-  "updated_at": "${NOW}",
-  "notes": "${RELEASE_NOTES:-Version ${NEW_VERSION}}"
-}
-ENDJSON
-)
-
-# Escape for JSON string value
-ESCAPED_JSON=$(echo "$SETTING_JSON" | jq -c '.' | jq -Rs '.')
-
-UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X PATCH \
-  -H "Authorization: Bearer ${SUPABASE_KEY}" \
-  -H "apikey: ${SUPABASE_KEY}" \
-  -H "Content-Type: application/json" \
-  -H "Prefer: return=representation" \
-  "${SUPABASE_URL}/rest/v1/system_settings?id=eq.${SETTING_ID}" \
-  -d "{\"setting_value\": ${ESCAPED_JSON}}")
-
-HTTP_CODE=$(echo "$UPDATE_RESPONSE" | tail -1)
-
-if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
-  echo "  ✓ System setting updated — all users will see update popup"
-else
-  echo "  ✗ Setting update failed (HTTP ${HTTP_CODE})"
-  echo "  Response: $(echo "$UPDATE_RESPONSE" | sed '$d')"
-  exit 1
-fi
-
-# ── Done ─────────────────────────────────────────────────────────────
 echo ""
 echo "═══════════════════════════════════════════════════════════"
-echo " Release v${NEW_VERSION} complete!"
+echo " Release v${NEW_VERSION} triggered!"
 echo "═══════════════════════════════════════════════════════════"
 echo ""
-echo " APK:     ${PUBLIC_URL}"
-echo " Version: ${NEW_VERSION}"
-echo " Notes:   ${RELEASE_NOTES:-Version ${NEW_VERSION}}"
+echo " GitHub Actions will now:"
+echo "   1. Build the APK"
+echo "   2. Upload to Supabase storage"
+echo "   3. Update the system setting"
+echo "   4. All users see the update popup"
 echo ""
-echo " All users will now see the update popup on their next"
-echo " page load (or within 30 minutes of cached check)."
-echo ""
-echo " Don't forget to commit & push the version bump:"
-echo "   git add -A && git commit -m 'Release v${NEW_VERSION}' && git push"
+echo " Track progress: https://github.com/accredilink999/accredilink-app/actions"
 echo ""

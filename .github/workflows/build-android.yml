@@ -1,12 +1,19 @@
 name: Build & Release Android APK
 
 on:
+  # Manual trigger with optional release notes
   workflow_dispatch:
     inputs:
       release_notes:
         description: 'Release notes (shown to users in update popup)'
         required: false
         default: ''
+
+  # Auto-trigger when appVersion.js is changed on master
+  push:
+    branches: [master]
+    paths:
+      - 'src/lib/appVersion.js'
 
 jobs:
   build:
@@ -32,6 +39,23 @@ jobs:
           VERSION=$(grep -oP "APP_VERSION = '\K[^']+" src/lib/appVersion.js)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "App version: $VERSION"
+
+      # Read release notes from commit message if not provided via workflow_dispatch
+      - name: Get release notes
+        id: notes
+        run: |
+          if [ -n "${{ github.event.inputs.release_notes }}" ]; then
+            echo "notes=${{ github.event.inputs.release_notes }}" >> "$GITHUB_OUTPUT"
+          else
+            # Extract notes from commit message (lines after first line)
+            COMMIT_BODY=$(git log -1 --pretty=%b)
+            if [ -n "$COMMIT_BODY" ]; then
+              echo "notes=$COMMIT_BODY" >> "$GITHUB_OUTPUT"
+            else
+              COMMIT_MSG=$(git log -1 --pretty=%s)
+              echo "notes=$COMMIT_MSG" >> "$GITHUB_OUTPUT"
+            fi
+          fi
 
       - name: Build web app
         run: npm run build
@@ -96,7 +120,7 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           PUBLIC_URL="${{ steps.upload.outputs.public_url }}"
           APK_SIZE="${{ steps.upload.outputs.apk_size }}"
-          NOTES="${{ github.event.inputs.release_notes }}"
+          NOTES="${{ steps.notes.outputs.notes }}"
           NOW=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
 
           # Build the JSON value
@@ -147,6 +171,6 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **APK**: [Download](${{ steps.upload.outputs.public_url }})" >> $GITHUB_STEP_SUMMARY
           echo "- **Size**: $(( ${{ steps.upload.outputs.apk_size }} / 1024 / 1024 ))MB" >> $GITHUB_STEP_SUMMARY
-          echo "- **Notes**: ${{ github.event.inputs.release_notes }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Notes**: ${{ steps.notes.outputs.notes }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "All users will now see the update popup on their next page load." >> $GITHUB_STEP_SUMMARY
