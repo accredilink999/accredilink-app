@@ -237,7 +237,7 @@ export default function Chat() {
   };
 
   return (
-    <div className="space-y-0">
+    <div className="space-y-0" style={{ colorScheme: 'light' }}>
       <div
         className="flex bg-white rounded-none lg:rounded-xl shadow-lg border border-slate-200 overflow-hidden"
         style={{ height: 'calc(100dvh - 12rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))' }}
