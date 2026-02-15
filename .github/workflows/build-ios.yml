@@ -110,44 +110,25 @@ jobs:
           echo -n "$API_KEY_BASE64" | base64 --decode > ~/private_keys/AuthKey_${API_KEY_ID}.p8
           echo "API Key installed at ~/private_keys/AuthKey_${API_KEY_ID}.p8"
 
-      - name: Export IPA
-        env:
-          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          PROFILE_NAME: ${{ secrets.PROVISIONING_PROFILE_NAME }}
-          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          API_KEY_ISSUER: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER }}
+      - name: Create IPA from archive
         run: |
-          PP_UUID=$(security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | grep -A1 UUID | grep string | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
-          echo "Using profile UUID: $PP_UUID"
+          echo "Archive contents:"
+          ls -la $RUNNER_TEMP/App.xcarchive/Products/Applications/
 
-          printf '%s\n' \
-            '<?xml version="1.0" encoding="UTF-8"?>' \
-            '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
-            '<plist version="1.0">' \
-            '<dict>' \
-            '  <key>method</key>' \
-            '  <string>app-store-connect</string>' \
-            '  <key>signingStyle</key>' \
-            '  <string>automatic</string>' \
-            '  <key>teamID</key>' \
-            "  <string>${TEAM_ID}</string>" \
-            '  <key>uploadBitcode</key>' \
-            '  <false/>' \
-            '  <key>uploadSymbols</key>' \
-            '  <true/>' \
-            '</dict>' \
-            '</plist>' > $RUNNER_TEMP/ExportOptions.plist
+          mkdir -p $RUNNER_TEMP/export/Payload
+          cp -r $RUNNER_TEMP/App.xcarchive/Products/Applications/App.app $RUNNER_TEMP/export/Payload/
 
-          echo "ExportOptions.plist:"
-          cat $RUNNER_TEMP/ExportOptions.plist
+          echo "Verifying code signature:"
+          codesign -vvv --deep $RUNNER_TEMP/export/Payload/App.app
 
-          xcodebuild -exportArchive \
-            -archivePath $RUNNER_TEMP/App.xcarchive \
-            -exportOptionsPlist $RUNNER_TEMP/ExportOptions.plist \
-            -exportPath $RUNNER_TEMP/export \
-            -authenticationKeyPath ~/private_keys/AuthKey_${API_KEY_ID}.p8 \
-            -authenticationKeyID "$API_KEY_ID" \
-            -authenticationKeyIssuerID "$API_KEY_ISSUER"
+          echo "Embedded provisioning profile:"
+          ls -la $RUNNER_TEMP/export/Payload/App.app/embedded.mobileprovision || echo "No embedded profile found"
+
+          cd $RUNNER_TEMP/export
+          zip -r App.ipa Payload
+
+          echo "IPA created:"
+          ls -la $RUNNER_TEMP/export/App.ipa
 
       - name: Upload to TestFlight
         env:
