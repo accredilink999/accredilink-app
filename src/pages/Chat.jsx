@@ -237,10 +237,10 @@ export default function Chat() {
   };
 
   return (
-    <div className="space-y-0 w-full overflow-hidden" style={{ maxWidth: '100%' }}>
+    <div className="space-y-0 w-full overflow-hidden" style={{ maxWidth: '100vw' }}>
       <div
         className="flex bg-white rounded-none lg:rounded-xl shadow-lg border border-slate-200 overflow-hidden w-full"
-        style={{ height: 'calc(100dvh - 12rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))', maxWidth: '100%' }}
+        style={{ height: 'calc(100dvh - 12rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))', maxWidth: '100vw' }}
       >
         {/* ── Sidebar ── */}
         <div className={`w-full lg:w-[400px] border-r border-slate-200 flex flex-col bg-white ${selectedConversation ? 'hidden lg:flex' : 'flex'}`}>
