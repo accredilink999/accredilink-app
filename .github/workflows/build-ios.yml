@@ -118,8 +118,20 @@ jobs:
           mkdir -p $RUNNER_TEMP/export/Payload
           cp -r $RUNNER_TEMP/App.xcarchive/Products/Applications/App.app $RUNNER_TEMP/export/Payload/
 
-          echo "Verifying code signature:"
-          codesign -vvv --deep $RUNNER_TEMP/export/Payload/App.app
+          echo "App bundle contents:"
+          ls -la $RUNNER_TEMP/export/Payload/App.app/
+
+          echo "Checking for nested bundles with duplicate IDs:"
+          find $RUNNER_TEMP/export/Payload/App.app -name "Info.plist" -exec grep -l "com.carecallai.app" {} \; || echo "No duplicates found"
+
+          # Remove PlugIns directory if present (can cause bundle ID collisions)
+          if [ -d "$RUNNER_TEMP/export/Payload/App.app/PlugIns" ]; then
+            echo "Removing PlugIns directory"
+            rm -rf "$RUNNER_TEMP/export/Payload/App.app/PlugIns"
+          fi
+
+          echo "Checking for Frameworks directory:"
+          ls -la $RUNNER_TEMP/export/Payload/App.app/Frameworks/ 2>/dev/null || echo "No Frameworks directory"
 
           echo "Embedded provisioning profile:"
           ls -la $RUNNER_TEMP/export/Payload/App.app/embedded.mobileprovision || echo "No embedded profile found"
