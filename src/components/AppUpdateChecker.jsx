@@ -10,6 +10,7 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { APP_VERSION, isUpdateAvailable } from '@/lib/appVersion';
+import { openExternalUrl } from '@/lib/openExternalUrl';
 import { Download, X, Copy, Check } from 'lucide-react';
 
 function isNativePlatform() {
@@ -64,18 +65,7 @@ export default function AppUpdateChecker() {
   };
 
   const handleDownload = () => {
-    // Try multiple approaches to open the URL
-    // 1. Try iframe approach (triggers download in some WebViews)
-    const iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    iframe.src = downloadUrl;
-    document.body.appendChild(iframe);
-    setTimeout(() => document.body.removeChild(iframe), 5000);
-
-    // 2. Also try location.href as fallback
-    setTimeout(() => {
-      window.location.href = downloadUrl;
-    }, 1000);
+    openExternalUrl(downloadUrl);
   };
 
   const handleCopyLink = async () => {

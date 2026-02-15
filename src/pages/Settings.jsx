@@ -49,6 +49,7 @@ import {
       } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { APP_VERSION, isUpdateAvailable } from '@/lib/appVersion';
+import { openExternalUrl } from '@/lib/openExternalUrl';
 import {
   isBiometricSupported,
   isBiometricEnabled,
@@ -223,7 +224,7 @@ function InstallAppSection() {
       {apkAvailable && isAndroid && (
         <div className="mt-3 pt-3 border-t border-slate-100">
           <Button
-            onClick={() => window.open(apkUrlSetting.setting_value, '_blank')}
+            onClick={() => openExternalUrl(apkUrlSetting.setting_value)}
             variant="outline"
             className="w-full border-green-300 text-green-700 hover:bg-green-50 min-h-[44px]"
           >
@@ -662,7 +663,7 @@ function AppInfoCard({ userEmail }) {
         {hasUpdate && downloadUrl && (
           <div className="space-y-2 mt-2">
             <button
-              onClick={() => window.location.href = downloadUrl}
+              onClick={() => openExternalUrl(downloadUrl)}
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-colors"
             >
               <Download className="w-4 h-4" />
@@ -796,7 +797,7 @@ function AndroidAppManager() {
           <p className="text-sm font-medium text-slate-700 mb-2">Staff download link</p>
           <p className="text-xs text-slate-500 mb-2">Staff will see a download button in their Settings page under "Install App".</p>
           <Button
-            onClick={() => window.open(apkSetting.setting_value, '_blank')}
+            onClick={() => openExternalUrl(apkSetting.setting_value)}
             variant="outline"
             size="sm"
             className="text-green-700 border-green-300"
