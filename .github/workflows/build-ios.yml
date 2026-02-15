@@ -102,37 +102,39 @@ jobs:
             MARKETING_VERSION="1.0.1"
 
       - name: Export IPA
+        env:
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          PROFILE_NAME: ${{ secrets.PROVISIONING_PROFILE_NAME }}
         run: |
           PP_UUID=$(security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | grep -A1 UUID | grep string | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
           echo "Using profile UUID: $PP_UUID"
 
-          cat > $RUNNER_TEMP/ExportOptions.plist <<EOFPLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>method</key>
-  <string>app-store-connect</string>
-  <key>destination</key>
-  <string>upload</string>
-  <key>signingStyle</key>
-  <string>manual</string>
-  <key>signingCertificate</key>
-  <string>Apple Distribution</string>
-  <key>teamID</key>
-  <string>${{ secrets.APPLE_TEAM_ID }}</string>
-  <key>provisioningProfiles</key>
-  <dict>
-    <key>com.carecallai.app</key>
-    <string>${{ secrets.PROVISIONING_PROFILE_NAME }}</string>
-  </dict>
-  <key>uploadBitcode</key>
-  <false/>
-  <key>uploadSymbols</key>
-  <true/>
-</dict>
-</plist>
-EOFPLIST
+          printf '%s\n' \
+            '<?xml version="1.0" encoding="UTF-8"?>' \
+            '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
+            '<plist version="1.0">' \
+            '<dict>' \
+            '  <key>method</key>' \
+            '  <string>app-store-connect</string>' \
+            '  <key>destination</key>' \
+            '  <string>upload</string>' \
+            '  <key>signingStyle</key>' \
+            '  <string>manual</string>' \
+            '  <key>signingCertificate</key>' \
+            '  <string>Apple Distribution</string>' \
+            '  <key>teamID</key>' \
+            "  <string>${TEAM_ID}</string>" \
+            '  <key>provisioningProfiles</key>' \
+            '  <dict>' \
+            '    <key>com.carecallai.app</key>' \
+            "    <string>${PROFILE_NAME}</string>" \
+            '  </dict>' \
+            '  <key>uploadBitcode</key>' \
+            '  <false/>' \
+            '  <key>uploadSymbols</key>' \
+            '  <true/>' \
+            '</dict>' \
+            '</plist>' > $RUNNER_TEMP/ExportOptions.plist
 
           echo "ExportOptions.plist:"
           cat $RUNNER_TEMP/ExportOptions.plist
