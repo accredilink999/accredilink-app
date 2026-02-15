@@ -1,0 +1,33 @@
+-- 005_service_users_extended.sql — Add missing columns to service_users table
+
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS postcode TEXT;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS emergency_contact_name TEXT;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS emergency_contact_phone TEXT;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS emergency_contact_relationship TEXT;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS gp_name TEXT;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS gp_phone TEXT;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS mobility_level TEXT DEFAULT 'independent';
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS communication_needs TEXT;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS key_safe_code TEXT;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS preferences TEXT;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS allergies TEXT;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS dietary_requirements TEXT;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS risk_assessments TEXT;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS quick_reference TEXT;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS what_matters_to_me TEXT;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS brief_history TEXT;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS medical_history TEXT;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS dna_cpr_in_place TEXT;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS assistance_equipment TEXT;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS emergency_shutoff_water TEXT;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS emergency_shutoff_electricity TEXT;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS emergency_shutoff_gas TEXT;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS pets_in_property TEXT;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS personal_plan_aims TEXT;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS risk_management TEXT;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS person_centred_plan TEXT;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS care_plan_date DATE;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS plan_completed_by TEXT;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS plan_review_date DATE;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS risk_assessment_rows TEXT;
+ALTER TABLE service_users ADD COLUMN IF NOT EXISTS risk_assessment_files JSONB DEFAULT '[]';

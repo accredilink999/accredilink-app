@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="UTF-8" />
+
+    <!-- PWA manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Favicon -->
+    <link rel="icon" href="/favicon.png" sizes="48x48" type="image/png" />
+    <link rel="icon" href="/pwa-192x192.png" sizes="192x192" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
+
+    <!-- Viewport — disable zoom for app-like feel -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+
+    <!-- Theme -->
+    <meta name="theme-color" content="#0f766e" />
+    <meta name="background-color" content="#ffffff" />
+
+    <!-- App meta -->
+    <meta name="description" content="Care Call AI - Intelligent care management platform" />
+    <meta name="application-name" content="Care Call AI" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- iOS PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="CareCall" />
+
+    <!-- Windows / Edge tile -->
+    <meta name="msapplication-TileColor" content="#0f766e" />
+    <meta name="msapplication-TileImage" content="/pwa-192x192.png" />
+
+    <!-- Open Graph (for sharing links) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Care Call AI" />
+    <meta property="og:description" content="Intelligent care management platform" />
+    <meta property="og:image" content="/pwa-512x512.png" />
+
+    <title>Care Call AI</title>
+
+    <style>
+      /* Prevent document-level scroll so mobile browser chrome stays hidden */
+      html, body, #root {
+        height: 100%;
+        height: 100dvh;
+        overflow: hidden;
+        overscroll-behavior: none;
+        -webkit-overflow-scrolling: touch;
+        position: fixed;
+        width: 100%;
+        top: 0;
+        left: 0;
+      }
+
+      /* ── Splash screen ─────────────────────────────────────────── */
+      #splash {
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(160deg, #0f766e 0%, #0d9488 50%, #14b8a6 100%);
+        transition: opacity 0.5s ease, visibility 0.5s ease;
+      }
+      #splash.splash-hidden {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+      #splash .splash-logo {
+        width: 180px;
+        height: auto;
+        border-radius: 20px;
+        animation: splash-pop 0.6s ease-out;
+        filter: drop-shadow(0 4px 20px rgba(0,0,0,0.15));
+      }
+      #splash .splash-tagline {
+        margin-top: 24px;
+        font-family: system-ui, -apple-system, sans-serif;
+        font-size: 14px;
+        font-weight: 400;
+        color: rgba(255,255,255,0.8);
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        animation: splash-fade-up 0.6s ease-out 0.2s both;
+      }
+      #splash .splash-loader {
+        margin-top: 36px;
+        animation: splash-fade-up 0.6s ease-out 0.35s both;
+      }
+      #splash .splash-loader-ring {
+        width: 36px;
+        height: 36px;
+        border: 3px solid rgba(255,255,255,0.2);
+        border-top-color: #ffffff;
+        border-radius: 50%;
+        animation: splash-spin 0.8s linear infinite;
+      }
+
+      @keyframes splash-pop {
+        0% { transform: scale(0.5); opacity: 0; }
+        80% { transform: scale(1.05); }
+        100% { transform: scale(1); opacity: 1; }
+      }
+      @keyframes splash-fade-up {
+        0% { transform: translateY(12px); opacity: 0; }
+        100% { transform: translateY(0); opacity: 1; }
+      }
+      @keyframes splash-spin {
+        to { transform: rotate(360deg); }
+      }
+
+      /* ── Update banner ───────────────────────────────────────── */
+      #update-banner {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 99998;
+        background: linear-gradient(135deg, #0f766e, #0d9488);
+        color: #fff;
+        padding: 12px 20px;
+        font-family: system-ui, -apple-system, sans-serif;
+        font-size: 14px;
+        text-align: center;
+        cursor: pointer;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+        animation: update-slide-down 0.4s ease-out;
+        -webkit-tap-highlight-color: transparent;
+      }
+      #update-banner.show { display: block; }
+      #update-banner span { text-decoration: underline; font-weight: 600; }
+      @keyframes update-slide-down {
+        from { transform: translateY(-100%); }
+        to { transform: translateY(0); }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Splash screen — visible instantly, hidden when React is ready -->
+    <div id="splash">
+      <img class="splash-logo" src="/logo.png" alt="Accredilink" />
+      <div class="splash-tagline">Intelligent Care Management</div>
+      <div class="splash-loader"><div class="splash-loader-ring"></div></div>
+    </div>
+
+    <!-- Update banner — shown when a new version is detected -->
+    <div id="update-banner" onclick="window.location.reload()">
+      Update available — <span>tap here to refresh</span>
+    </div>
+
+    <div id="root"></div>
+
+    <script>
+      // ── Silent cache clear + SW update detection ─────────────────────
+      (function(){
+        // 0. Nuclear cache clear via URL param: ?clear-cache=1
+        //    Send this link to users with stale PWA installs
+        if (location.search.indexOf('clear-cache=1') !== -1) {
+          // Unregister all service workers
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+              regs.forEach(function(r) { r.unregister(); });
+            });
+          }
+          // Clear all Cache API entries
+          if ('caches' in window) {
+            caches.keys().then(function(names) {
+              return Promise.all(names.map(function(n) { return caches.delete(n); }));
+            });
+          }
+          // Clear localStorage/sessionStorage
+          try { localStorage.clear(); } catch(e) {}
+          try { sessionStorage.clear(); } catch(e) {}
+          // Reload without the param after a short delay
+          setTimeout(function() {
+            location.replace(location.origin + location.pathname);
+          }, 1500);
+          return; // Stop further init — we're about to reload
+        }
+
+        // 1. Clear all Cache API entries (SW caches)
+        if ('caches' in window) {
+          caches.keys().then(function(names) {
+            names.forEach(function(name) { caches.delete(name); });
+          });
+        }
+
+        // 2. Show update banner
+        function showUpdateBanner() {
+          var banner = document.getElementById('update-banner');
+          if (banner) banner.classList.add('show');
+        }
+
+        // 3. Register SW and listen for updates
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(function(reg) {
+            // Check for updates immediately
+            reg.update();
+
+            // Listen for new SW installing
+            reg.addEventListener('updatefound', function() {
+              var newWorker = reg.installing;
+              if (!newWorker) return;
+
+              newWorker.addEventListener('statechange', function() {
+                // New SW is installed and waiting (or already activated via skipWaiting)
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  // There's a new version ready — show the banner
+                  showUpdateBanner();
+                }
+              });
+            });
+
+            // Also check: if there's already a waiting worker on load
+            if (reg.waiting && navigator.serviceWorker.controller) {
+              showUpdateBanner();
+            }
+
+            // Periodic update check every 3 minutes (catches deploys while app is open)
+            setInterval(function() {
+              reg.update();
+            }, 3 * 60 * 1000);
+          });
+
+          // If the controlling SW changes (another tab triggered update), reload
+          navigator.serviceWorker.addEventListener('controllerchange', function() {
+            if (!window.__swReloading) {
+              window.__swReloading = true;
+              window.location.reload();
+            }
+          });
+        }
+
+        // 4. Expose function React calls when it's ready to show
+        window.__splashReady = false;
+        window.hideSplash = function() {
+          if (window.__splashReady) return;
+          window.__splashReady = true;
+          var el = document.getElementById('splash');
+          if (el) {
+            el.classList.add('splash-hidden');
+            setTimeout(function() { el.remove(); }, 600);
+          }
+        };
+
+        // 5. Safety net: hide splash after 6s even if JS fails to load
+        setTimeout(function() { window.hideSplash(); }, 6000);
+      })();
+    </script>
+
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

@@ -1,0 +1,41 @@
+-- Add extended care log form columns
+-- These support the full CareLogForm.jsx fields
+
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS welfare_impression_on_arrival TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS personal_care TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS personal_care_description TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS continence_care_provided TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS continence_care_monitoring JSONB DEFAULT '[]';
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS catheter_care_provided TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS catheter_care_description TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS repositioned_on_visit TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS repositioned_description TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS skincare_provided TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS skincare_description TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS skin_integrity_concerns TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS skin_integrity_description TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS food_offered TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS food_accepted TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS food_given TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS food_outcome TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS drinks_offered TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS drinks_accepted TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS drinks_given TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS drinks_outcome TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS add_medication_round TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS medication_round_outcome TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS medication_concerns TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS medication_concerns_details TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS healthcare_visit_required TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS healthcare_visit_type TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS staff_grade TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS double_handed_call TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS staff_1 TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS staff_2 TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS extended_notes TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS further_concerns TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS further_concerns_details TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS duration_minutes INTEGER;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS timestamp TIMESTAMPTZ;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS shift_end_time TEXT;
+ALTER TABLE care_logs ADD COLUMN IF NOT EXISTS branch TEXT;

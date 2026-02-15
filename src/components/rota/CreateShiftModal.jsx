@@ -1,0 +1,548 @@
+import React, { useState, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
+import { ShiftTypeApi } from '@/api/shiftTypeApi';
+import { ShiftApi, ShiftCallApi } from '@/api/rotaApi';
+import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Card } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { format, addDays, eachDayOfInterval } from 'date-fns';
+import { Calendar, Clock, Copy, Users } from 'lucide-react';
+
+// Sit-in shift types — no client calls, only clock on/off
+const SIT_IN_NAMES = new Set(['Sit In L', 'Sit In E', 'Sit In FD']);
+
+function timeToMinutes(t) {
+  if (!t) return 0;
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + (m || 0);
+}
+
+export default function CreateShiftModal({ open, onClose, selectedDate, selectedAreaId }) {
+  const queryClient = useQueryClient();
+  const [tab, setTab] = useState('staff');
+  const [shiftDate, setShiftDate] = useState(selectedDate);
+  const [selectedRotaAreaId, setSelectedRotaAreaId] = useState(selectedAreaId || '');
+  const [useMultipleDays, setUseMultipleDays] = useState(false);
+  const [endDate, setEndDate] = useState('');
+  const [shiftsToCreate, setShiftsToCreate] = useState([]);
+  const [formData, setFormData] = useState({
+      shift_name: '',
+      staff_id: '',
+      service_user_id: '',
+      start_time: '09:00',
+      end_time: '17:00',
+      visit_details: '',
+    });
+
+  const { data: staff = [] } = useQuery({
+    queryKey: ['staff'],
+    queryFn: async () => {
+      try {
+        const users = await base44.entities.User.list('full_name', 500);
+        return users
+          .filter(u => u.is_active !== false)
+          .map(u => ({
+            ...u,
+            displayName: u.staff_full_name || u.full_name || u.email?.split('@')[0] || 'Unknown'
+          }))
+          .sort((a, b) => a.displayName.localeCompare(b.displayName));
+      } catch (error) {
+        console.error('Error fetching staff:', error);
+        return [];
+      }
+    },
+  });
+
+  const { data: serviceUsers = [] } = useQuery({
+    queryKey: ['serviceUsers'],
+    queryFn: async () => {
+      const result = await base44.entities.ServiceUser.list();
+      console.log('[CreateShift] Service users loaded:', result.length, result.slice(0, 2).map(s => ({ id: s.id, name: s.full_name, area_id: s.area_id, status: s.status, call_times: s.call_times?.length })));
+      return result;
+    },
+  });
+
+  const { data: shiftTypes = [], error: shiftTypesError } = useQuery({
+    queryKey: ['shiftTypes'],
+    queryFn: async () => {
+      console.log('[CreateShiftModal] Fetching shift types...');
+      const result = await ShiftTypeApi.filter({ is_active: true });
+      console.log('[CreateShiftModal] Shift types result:', result?.length, result);
+      return result;
+    },
+  });
+  if (shiftTypesError) console.error('[CreateShiftModal] Shift types error:', shiftTypesError);
+
+  const { data: rotaAreas = [] } = useQuery({
+    queryKey: ['rotaAreas'],
+    queryFn: () => base44.entities.RotaArea.filter({ is_active: true }, 'name'),
+  });
+
+  const { data: callTypesData = [] } = useQuery({
+    queryKey: ['callTypes'],
+    queryFn: () => base44.entities.CallType.filter({ is_active: true }, 'sort_order'),
+  });
+
+  // Helper: get default tasks for a call type name
+  const getDefaultTasks = (typeName) => {
+    const ct = callTypesData.find(c => c.name === typeName);
+    if (!ct?.default_tasks?.length) return [];
+    return ct.default_tasks.map(text => ({ text, completed: false }));
+  };
+
+  // Compute matching virtual calls for the current form selection
+  // One call_time entry = one visit = one ShiftCall
+  // Only matches service users whose area matches the selected rota area
+  const getMatchingCallsForShift = (areaId, startTime, endTime) => {
+    if (!serviceUsers.length || !startTime || !endTime) {
+      console.log('[CreateShift] getMatchingCalls bail: serviceUsers=', serviceUsers.length, 'start=', startTime, 'end=', endTime);
+      return [];
+    }
+    // Require a valid area — don't auto-assign across all areas
+    if (!areaId || areaId === 'default') {
+      console.log('[CreateShift] getMatchingCalls bail: no valid area, areaId=', areaId);
+      return [];
+    }
+    const shiftStart = timeToMinutes(startTime);
+    const shiftEnd = timeToMinutes(endTime);
+    const calls = [];
+
+    console.log('[CreateShift] Matching calls: area=', areaId, 'window=', startTime, '-', endTime, 'serviceUsers=', serviceUsers.length);
+
+    for (const su of serviceUsers) {
+      if (!su.call_times || su.call_times.length === 0) continue;
+      if (su.status !== 'active') continue;
+      // Check both area_id and rota_area_id (entities layer adds aliases)
+      const suArea = su.area_id || su.rota_area_id;
+      if (suArea !== areaId) continue;
+      for (const ct of su.call_times) {
+        const callStart = timeToMinutes(ct.time);
+        const callDuration = parseInt(ct.duration) || 30;
+        const callEnd = callStart + callDuration;
+        if (callStart >= shiftStart && callEnd <= shiftEnd) {
+          // One call_time entry = one visit = one ShiftCall
+          const types = (ct.types && Array.isArray(ct.types)) ? ct.types : (ct.type ? [ct.type] : ['Visit']);
+          calls.push({
+            service_user_id: su.id,
+            service_user_name: su.full_name,
+            service_user_address: su.address,
+            scheduled_time: ct.time,
+            duration_minutes: callDuration,
+            call_type: types[0] || 'Visit',
+            call_types: types,
+            notes: ct.notes || '',
+          });
+        }
+      }
+    }
+    console.log('[CreateShift] Matched', calls.length, 'calls');
+    return calls;
+  };
+
+  // Preview count for the current form state (skip for sit-in shifts)
+  const previewCalls = useMemo(() => {
+    if (tab !== 'staff') return [];
+    if (SIT_IN_NAMES.has(formData.shift_name)) return [];
+    return getMatchingCallsForShift(
+      selectedRotaAreaId || selectedAreaId,
+      formData.start_time,
+      formData.end_time
+    );
+  }, [serviceUsers, selectedRotaAreaId, selectedAreaId, formData.start_time, formData.end_time, formData.shift_name, tab]);
+
+  const createShiftMutation = useMutation({
+    mutationFn: async (shiftsData) => {
+       console.log('[CreateShift] Creating shifts:', shiftsData.map(s => ({ date: s.date, area: s.rota_area_id, times: s.start_time + '-' + s.end_time })));
+       console.log('[CreateShift] Service users available:', serviceUsers.length);
+       const shifts = [];
+       let totalCalls = 0;
+       for (const shiftData of shiftsData) {
+         const shift = await ShiftApi.create(shiftData);
+         shifts.push(shift);
+
+         // Sit-in shifts don't get client calls
+         if (SIT_IN_NAMES.has(shiftData.shift_name)) {
+           console.log('[CreateShift] Sit-in shift, skipping call auto-assign');
+           continue;
+         }
+
+         // Auto-create ShiftCall records from matching service user call_times
+         const matchingCalls = getMatchingCallsForShift(
+           shiftData.rota_area_id,
+           shiftData.start_time,
+           shiftData.end_time
+         );
+         console.log('[CreateShift] Shift', shift.id, 'area:', shiftData.rota_area_id, '→', matchingCalls.length, 'matching calls');
+
+         for (const call of matchingCalls) {
+           try {
+             await ShiftCallApi.create({
+               shift_id: shift.id,
+               service_user_id: call.service_user_id,
+               service_user_name: call.service_user_name,
+               service_user_address: call.service_user_address,
+               scheduled_time: call.scheduled_time,
+               call_time: call.scheduled_time,
+               duration_minutes: call.duration_minutes,
+               call_type: call.call_type,
+               call_types: call.call_types || [call.call_type],
+               tasks: getDefaultTasks(call.call_type),
+               call_date: shiftData.date,
+               status: 'pending',
+               notes: call.notes || '',
+             });
+             totalCalls++;
+           } catch (callError) {
+             console.error('[CreateShift] Failed to create call:', call.service_user_name, call.scheduled_time, callError);
+           }
+         }
+       }
+       console.log('[CreateShift] Done. Total calls auto-assigned:', totalCalls);
+       return { shifts, totalCalls };
+     },
+    onSuccess: ({ shifts, totalCalls }) => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      queryClient.invalidateQueries({ queryKey: ['shift-calls'] });
+      const callMsg = totalCalls > 0 ? ` with ${totalCalls} call${totalCalls !== 1 ? 's' : ''} auto-assigned` : '';
+      toast.success(`${shifts.length} shift${shifts.length !== 1 ? 's' : ''} created${callMsg}`);
+      setShiftsToCreate([]);
+      setTimeout(() => onClose(), 100);
+    },
+    onError: (error) => {
+      console.error('Failed to create shifts:', error);
+      toast.error('Failed: ' + (error.message || 'Failed to create shifts'));
+    }
+  });
+
+  const handleAddShift = () => {
+    if (tab === 'client' && !formData.service_user_id) return;
+
+    const staffMember = staff.find(s => s.id === formData.staff_id);
+    const serviceUser = serviceUsers.find(s => s.id === formData.service_user_id);
+    const areaId = selectedRotaAreaId || selectedAreaId || 'default';
+
+    let dates = [format(shiftDate, 'yyyy-MM-dd')];
+    if (useMultipleDays && endDate) {
+      const startDate = new Date(shiftDate);
+      const end = new Date(endDate);
+      dates = eachDayOfInterval({ start: startDate, end }).map(d => format(d, 'yyyy-MM-dd'));
+    }
+
+    // Count matching calls for preview (skip for sit-in shifts)
+    const matchCount = (tab === 'staff' && !SIT_IN_NAMES.has(formData.shift_name))
+      ? getMatchingCallsForShift(areaId, formData.start_time, formData.end_time).length
+      : 0;
+
+    const newShifts = dates.map(date => ({
+      ...(formData.shift_name && { shift_name: formData.shift_name }),
+      ...(tab === 'staff' ? {
+        ...(formData.staff_id && { staff_id: formData.staff_id, staff_name: staffMember?.displayName }),
+      } : {
+        service_user_id: formData.service_user_id,
+        service_user_name: serviceUser?.full_name,
+      }),
+      date,
+      start_time: formData.start_time,
+      end_time: formData.end_time,
+      visit_details: formData.visit_details || 'Follow Care Plans & Citizens Wishes at all times',
+      status: 'scheduled',
+      rota_area_id: areaId,
+      _matchingCalls: matchCount, // preview only, stripped before create
+    }));
+
+    setShiftsToCreate([...shiftsToCreate, ...newShifts]);
+
+    setFormData({
+      ...formData,
+      shift_name: '',
+      start_time: '09:00',
+      end_time: '17:00',
+      visit_details: '',
+    });
+    setShiftDate(selectedDate);
+    setEndDate('');
+    setUseMultipleDays(false);
+  };
+
+  const handleRemoveShift = (index) => {
+    setShiftsToCreate(shiftsToCreate.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = () => {
+    if (shiftsToCreate.length === 0) {
+      handleAddShift();
+      return;
+    }
+    // Strip preview-only fields before sending to mutation
+    const cleaned = shiftsToCreate
+      .filter(s => s !== undefined)
+      .map(({ _matchingCalls, ...rest }) => rest);
+    createShiftMutation.mutate(cleaned);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Add to Rota</DialogTitle>
+        </DialogHeader>
+
+        <Tabs value={tab} onValueChange={() => { setTab(tab === 'staff' ? 'client' : 'staff'); }} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+             <TabsTrigger value="staff">Staff Shift</TabsTrigger>
+             <TabsTrigger value="client">One Off Visit</TabsTrigger>
+           </TabsList>
+
+          <TabsContent value="staff" className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Rota Area</Label>
+              <Select value={selectedRotaAreaId} onValueChange={setSelectedRotaAreaId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select rota area" />
+                </SelectTrigger>
+                <SelectContent>
+                  {rotaAreas.map((area) => (
+                    <SelectItem key={area.id} value={area.id}>
+                      {area.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Shift Date</Label>
+              <Input
+                type="date"
+                value={shiftDate ? format(shiftDate, 'yyyy-MM-dd') : ''}
+                onChange={(e) => setShiftDate(e.target.value ? new Date(e.target.value) : new Date())}
+              />
+            </div>
+
+
+
+            <div className="space-y-2">
+              <Label>Shift Name (Optional)</Label>
+              <Select
+                value={formData.shift_name}
+                onValueChange={(value) => {
+                  const selectedType = shiftTypes.find(t => t.name === value);
+                  setFormData({ 
+                    ...formData, 
+                    shift_name: value,
+                    start_time: selectedType?.start_time || formData.start_time,
+                    end_time: selectedType?.end_time || formData.end_time
+                  });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select or leave blank" />
+                </SelectTrigger>
+                <SelectContent>
+                  {shiftTypes.map((type) => (
+                    <SelectItem key={type.id} value={type.name}>
+                      {type.name} {type.start_time && type.end_time && `(${type.start_time}-${type.end_time})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Staff Member</Label>
+              <Select
+                value={formData.staff_id}
+                onValueChange={(value) => setFormData({ ...formData, staff_id: value })}
+              >
+                <SelectTrigger>
+                    {formData.staff_id ? <span>{staff.find(s => s.id === formData.staff_id)?.displayName}</span> : <SelectValue placeholder="Select staff member" />}
+                  </SelectTrigger>
+                  <SelectContent>
+                    {staff.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.displayName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Start Time</Label>
+                <Input
+                  type="time"
+                  value={formData.start_time}
+                  onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>End Time</Label>
+                <Input
+                  type="time"
+                  value={formData.end_time}
+                  onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {/* Live preview of auto-matched calls */}
+            {previewCalls.length > 0 && (
+              <div className="bg-teal-50 border border-teal-200 rounded-lg p-3">
+                <p className="text-sm text-teal-800 font-medium flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  {previewCalls.length} client call{previewCalls.length !== 1 ? 's' : ''} will be auto-assigned
+                </p>
+                <p className="text-xs text-teal-600 mt-1">
+                  Based on active clients in this area with call times within {formData.start_time}–{formData.end_time}. You can edit calls after the shift is created.
+                </p>
+              </div>
+            )}
+
+          </TabsContent>
+
+          <TabsContent value="client" className="space-y-4 py-4">
+            {selectedDate && (
+              <p className="text-sm text-slate-500 flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                {format(selectedDate, 'EEEE, d MMMM yyyy')}
+              </p>
+            )}
+
+            <div className="space-y-2">
+              <Label>Rota Area</Label>
+              <Select value={selectedRotaAreaId} onValueChange={setSelectedRotaAreaId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select rota area" />
+                </SelectTrigger>
+                <SelectContent>
+                  {rotaAreas.map((area) => (
+                    <SelectItem key={area.id} value={area.id}>
+                      {area.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Service User / Client</Label>
+              <Select
+                value={formData.service_user_id}
+                onValueChange={(value) => setFormData({ ...formData, service_user_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select client" />
+                </SelectTrigger>
+                <SelectContent>
+                  {serviceUsers.filter(s => s.status === 'active').map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.full_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+               <div className="space-y-2">
+                 <Label>Start Time</Label>
+                 <Input
+                   type="time"
+                   value={formData.start_time}
+                   onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                 />
+               </div>
+               <div className="space-y-2">
+                 <Label>End Time</Label>
+                 <Input
+                   type="time"
+                   value={formData.end_time}
+                   onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                 />
+               </div>
+             </div>
+
+            <div className="space-y-2">
+              <Label>Visit Details</Label>
+              <Textarea
+                placeholder="Enter details about the visit..."
+                value={formData.visit_details}
+                onChange={(e) => setFormData({ ...formData, visit_details: e.target.value })}
+                className="min-h-24"
+              />
+            </div>
+            </TabsContent>
+        </Tabs>
+
+        {shiftsToCreate.length > 0 && (
+          <div className="border-t pt-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-base font-semibold">Shifts to Create ({shiftsToCreate.length})</Label>
+            </div>
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {[...shiftsToCreate].sort((a, b) => {
+                if (a.date !== b.date) return a.date.localeCompare(b.date);
+                return a.start_time.localeCompare(b.start_time);
+              }).map((shift, idx) => (
+                <Card key={idx} className="p-3 flex items-center justify-between bg-slate-50">
+                  <div className="text-sm flex-1">
+                    <p className="font-medium text-slate-900">
+                      {shift.staff_name || shift.service_user_name}
+                      {shift.shift_name && <span className="text-teal-600 ml-2">({shift.shift_name})</span>}
+                    </p>
+                    <p className="text-xs text-slate-600">
+                      {format(new Date(shift.date), 'dd/MM/yyyy')} • {shift.start_time} - {shift.end_time}
+                    </p>
+                    {shift._matchingCalls > 0 && (
+                      <p className="text-xs text-teal-600 mt-1 flex items-center gap-1">
+                        <Users className="w-3 h-3" />
+                        {shift._matchingCalls} client call{shift._matchingCalls !== 1 ? 's' : ''} will be auto-assigned
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRemoveShift(idx)}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 flex-shrink-0"
+                  >
+                    Remove
+                  </Button>
+                  </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleAddShift}
+            disabled={!formData.start_time || !formData.end_time || (tab === 'client' && !formData.service_user_id) || (useMultipleDays && !endDate)}
+            variant="outline"
+          >
+            Add Shift
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={shiftsToCreate.length === 0 || createShiftMutation.isPending}
+            className="bg-teal-600 hover:bg-teal-700"
+          >
+            {createShiftMutation.isPending ? 'Creating...' : `Create ${shiftsToCreate.length} Shift${shiftsToCreate.length !== 1 ? 's' : ''}`}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
