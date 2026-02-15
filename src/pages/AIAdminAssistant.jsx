@@ -10,6 +10,7 @@ import { Send, Loader2, AlertCircle, CheckCircle2, Clock, Plus, Trash2, Users as
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import useSpeechToText from '@/hooks/useSpeechToText';
+import SpeakButton from '@/components/ui/SpeakButton';
 
 export default function AIAdminAssistant() {
   const [messages, setMessages] = useState([]);
@@ -307,14 +308,21 @@ Provide helpful, actionable insights and recommendations.`,
                     key={idx}
                     className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
-                    <div
-                      className={`max-w-xs px-4 py-2 rounded-lg ${
-                        msg.role === 'user'
-                          ? 'bg-slate-800 text-white'
-                          : 'bg-slate-100 text-slate-900'
-                      }`}
-                    >
-                      <p className="text-sm">{msg.content}</p>
+                    <div>
+                      <div
+                        className={`max-w-xs px-4 py-2 rounded-lg ${
+                          msg.role === 'user'
+                            ? 'bg-slate-800 text-white'
+                            : 'bg-slate-100 text-slate-900'
+                        }`}
+                      >
+                        <p className="text-sm">{msg.content}</p>
+                      </div>
+                      {msg.role !== 'user' && msg.content && (
+                        <div className="flex items-center mt-1">
+                          <SpeakButton text={msg.content} />
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))

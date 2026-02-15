@@ -11,6 +11,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import Avatar from '@/components/ui/Avatar';
 import ReactMarkdown from 'react-markdown';
 import useSpeechToText from '@/hooks/useSpeechToText';
+import SpeakButton from '@/components/ui/SpeakButton';
 import {
   Bot,
   Send,
@@ -366,6 +367,11 @@ export default function AIAssistant() {
                         </div>
                       )}
                     </div>
+                    {message.role !== 'user' && message.content && (
+                      <div className="flex items-center mt-1">
+                        <SpeakButton text={message.content} />
+                      </div>
+                    )}
 
                     {message.tool_calls?.length > 0 && (
                       <div className="mt-1 md:mt-2 space-y-0.5">
