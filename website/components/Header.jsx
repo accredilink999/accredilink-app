@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
+import WelshDragon from './WelshDragon';
 
 const navLinks = [
   { href: '/', label: 'Home' },
@@ -24,9 +26,14 @@ export default function Header() {
         <div className="flex items-center justify-between h-16 sm:h-20">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3 flex-shrink-0">
-            <div className="w-10 h-10 rounded-lg bg-welsh-red flex items-center justify-center">
-              <span className="text-white font-bold text-lg">A</span>
-            </div>
+            <Image
+              src="/images/logo.png"
+              alt="Accredilink Logo"
+              width={40}
+              height={40}
+              className="w-10 h-10 rounded-lg object-contain"
+            />
+            <WelshDragon className="w-7 h-7 text-welsh-red" />
             <div className="hidden sm:block">
               <p className="font-bold text-slate-900 text-sm leading-tight">Accredilink</p>
               <p className="text-[11px] text-slate-500 leading-tight">Community Response Taskforce</p>

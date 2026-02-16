@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import Image from 'next/image';
+import WelshDragon from './WelshDragon';
 
 const serviceLinks = [
   { href: '/services/domiciliary-care', label: 'Domiciliary Care' },
@@ -27,9 +29,14 @@ export default function Footer() {
           {/* Company */}
           <div className="sm:col-span-2 lg:col-span-1">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-lg bg-welsh-red flex items-center justify-center">
-                <span className="text-white font-bold text-lg">A</span>
-              </div>
+              <Image
+                src="/images/logo.png"
+                alt="Accredilink Logo"
+                width={40}
+                height={40}
+                className="w-10 h-10 rounded-lg object-contain"
+              />
+              <WelshDragon className="w-7 h-7 text-welsh-red" />
               <div>
                 <p className="font-bold text-white text-sm leading-tight">Accredilink</p>
                 <p className="text-[11px] text-slate-400 leading-tight">Community Response Taskforce</p>
