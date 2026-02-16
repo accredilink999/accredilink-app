@@ -11,12 +11,11 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { isUpdateAvailable } from '@/lib/appVersion';
 import { openExternalUrl } from '@/lib/openExternalUrl';
-import { Download, X, Copy, Check, Loader2 } from 'lucide-react';
+import { Download, X, Copy, Check, Share2 } from 'lucide-react';
 
 export default function AppUpdateChecker() {
   const [dismissed, setDismissed] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [downloading, setDownloading] = useState(false);
   const [installedVersion, setInstalledVersion] = useState(null);
 
   const native = !!window.Capacitor?.isNativePlatform?.();
@@ -91,14 +90,10 @@ export default function AppUpdateChecker() {
   };
 
   const handleDownload = async () => {
-    setDownloading(true);
     try {
       await openExternalUrl(downloadUrl);
     } catch (e) {
       console.warn('[UpdateChecker] Download failed:', e);
-    } finally {
-      // Keep spinner for a bit so user sees it worked
-      setTimeout(() => setDownloading(false), 3000);
     }
   };
 
@@ -159,34 +154,26 @@ export default function AppUpdateChecker() {
               <>
                 <button
                   onClick={handleDownload}
-                  disabled={downloading}
-                  className="w-full px-4 py-2.5 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:bg-teal-400 transition-colors flex items-center justify-center gap-2"
+                  className="w-full px-4 py-3 text-sm font-semibold text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-colors flex items-center justify-center gap-2"
                 >
-                  {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                  {downloading ? 'Downloading APK...' : 'Download Update'}
+                  <Share2 className="w-4 h-4" />
+                  Open Download Link in Chrome
                 </button>
+                <p className="text-xs text-slate-500 text-center">
+                  Tap above, then select <strong>Chrome</strong> from the share menu
+                </p>
                 <div className="relative flex items-center py-1">
                   <div className="flex-grow border-t border-slate-200" />
-                  <span className="flex-shrink mx-3 text-xs text-slate-400">or</span>
+                  <span className="flex-shrink mx-3 text-xs text-slate-400">or copy manually</span>
                   <div className="flex-grow border-t border-slate-200" />
                 </div>
                 <button
                   onClick={handleCopyLink}
-                  className="w-full px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                  className="w-full px-4 py-2.5 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors flex items-center justify-center gap-2"
                 >
-                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                  {copied ? 'Link Copied! Open Chrome to paste' : 'Copy Link & Open in Chrome'}
+                  {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                  {copied ? 'Copied! Paste in Chrome' : 'Copy Download Link'}
                 </button>
-                {copied && (
-                  <p className="text-xs text-green-600 text-center font-medium">
-                    Open Chrome browser, paste the link in the address bar, and press Go
-                  </p>
-                )}
-                {!copied && (
-                  <p className="text-xs text-slate-400 text-center">
-                    If download doesn't start, copy the link and paste in Chrome
-                  </p>
-                )}
               </>
             )}
             {ios && (
