@@ -31,6 +31,7 @@ export default function ChatWindow({ conversation, currentUserId, currentUserNam
   const [showAddMembersDialog, setShowAddMembersDialog] = useState(false);
   const [selectedNewMembers, setSelectedNewMembers] = useState([]);
   const [showMembersDialog, setShowMembersDialog] = useState(false);
+  const [editingMessage, setEditingMessage] = useState(null);
 
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
@@ -293,6 +294,22 @@ export default function ChatWindow({ conversation, currentUserId, currentUserNam
     },
   });
 
+  // ── Edit message ──
+  const editMessageMutation = useMutation({
+    mutationFn: async ({ messageId, content }) => {
+      await base44.entities.ChatMessage.update(messageId, {
+        content,
+        is_edited: true,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chatMessages', conversation.id] });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      setEditingMessage(null);
+      setMessage('');
+    },
+  });
+
   // ── Add members ──
   const addMembersMutation = useMutation({
     mutationFn: async (newMemberIds) => {
@@ -341,8 +358,16 @@ export default function ChatWindow({ conversation, currentUserId, currentUserNam
   // ── Send handlers ──
   const handleSend = async (e) => {
     e.preventDefault();
-    if (!message.trim() || sendMessageMutation.isPending) return;
+    if (!message.trim()) return;
 
+    // If editing, update the existing message
+    if (editingMessage) {
+      if (editMessageMutation.isPending) return;
+      editMessageMutation.mutate({ messageId: editingMessage.id, content: message.trim() });
+      return;
+    }
+
+    if (sendMessageMutation.isPending) return;
     const user = await base44.auth.me();
     sendMessageMutation.mutate({
       conversation_id: conversation.id,
@@ -568,8 +593,15 @@ export default function ChatWindow({ conversation, currentUserId, currentUserNam
                 setMessageToDelete(msgId);
                 setDeleteMessageDialogOpen(true);
               }}
+              onEdit={(msg) => {
+                setEditingMessage(msg);
+                setMessage(msg.content || '');
+                setReplyTo(null);
+                setTimeout(() => inputRef.current?.focus(), 50);
+              }}
               onReply={(msg) => {
                 setReplyTo(msg);
+                setEditingMessage(null);
                 inputRef.current?.focus();
               }}
               onForward={() => {}}
@@ -606,6 +638,19 @@ export default function ChatWindow({ conversation, currentUserId, currentUserNam
             <p className="text-sm text-slate-600 truncate">{replyTo.content}</p>
           </div>
           <button onClick={() => setReplyTo(null)} className="p-1 hover:bg-slate-200 rounded-full transition-colors">
+            <X className="w-5 h-5 text-slate-500" />
+          </button>
+        </div>
+      )}
+
+      {/* ── Edit bar ── */}
+      {editingMessage && (
+        <div className="bg-[#f0f2f5] border-t border-slate-200 px-4 py-2 flex items-center gap-3">
+          <div className="flex-1 border-l-4 border-blue-500 bg-white rounded px-3 py-2">
+            <p className="text-xs font-semibold text-blue-600">Editing message</p>
+            <p className="text-sm text-slate-600 truncate">{editingMessage.content}</p>
+          </div>
+          <button onClick={() => { setEditingMessage(null); setMessage(''); }} className="p-1 hover:bg-slate-200 rounded-full transition-colors">
             <X className="w-5 h-5 text-slate-500" />
           </button>
         </div>

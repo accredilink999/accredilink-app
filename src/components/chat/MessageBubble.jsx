@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { cn } from "@/lib/utils";
 import { format } from 'date-fns';
-import { Check, CheckCheck, Reply, Forward, Copy, Trash2, X } from 'lucide-react';
+import { Check, CheckCheck, Reply, Forward, Copy, Trash2, Pencil, X } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Avatar from '@/components/ui/Avatar';
 import VoiceNotePlayer from './VoiceNotePlayer';
@@ -18,6 +18,7 @@ const MessageBubble = React.memo(({
   senderPhotoUrl,
   isAdmin,
   onDelete,
+  onEdit,
   onReply,
   onForward,
   currentUserId,
@@ -223,6 +224,7 @@ const MessageBubble = React.memo(({
                 "text-[11px] flex items-center gap-0.5 flex-shrink-0 translate-y-1",
                 isOwn ? "text-[#667781]" : "text-[#667781]"
               )}>
+                {message.is_edited && <span className="italic mr-1">edited</span>}
                 {timeString}
                 {isOwn && (
                   isRead ? (
@@ -311,6 +313,9 @@ const MessageBubble = React.memo(({
             <ContextMenuItem icon={Reply} label="Reply" onClick={() => { onReply?.(message); setShowContextMenu(false); }} />
             <ContextMenuItem icon={Forward} label="Forward" onClick={() => { onForward?.(message); setShowContextMenu(false); }} />
             <ContextMenuItem icon={Copy} label="Copy" onClick={handleCopy} />
+            {isOwn && !message.attachment_url && (
+              <ContextMenuItem icon={Pencil} label="Edit" onClick={() => { onEdit?.(message); setShowContextMenu(false); }} />
+            )}
             {canDelete && (
               <ContextMenuItem
                 icon={Trash2}

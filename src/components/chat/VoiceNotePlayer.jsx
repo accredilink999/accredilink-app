@@ -64,14 +64,12 @@ export default function VoiceNotePlayer({ url, isOwn }) {
 
       <button
         onClick={togglePlay}
-        className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
-          isOwn ? 'bg-white/30 hover:bg-white/40' : 'bg-[#00a884] hover:bg-[#008f72]'
-        }`}
+        className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-colors bg-[#00a884] hover:bg-[#008f72]"
       >
         {isPlaying ? (
-          <Pause className={`w-4 h-4 ${isOwn ? 'text-white' : 'text-white'} fill-current`} />
+          <Pause className="w-4 h-4 text-white fill-current" />
         ) : (
-          <Play className={`w-4 h-4 ${isOwn ? 'text-white' : 'text-white'} fill-current ml-0.5`} />
+          <Play className="w-4 h-4 text-white fill-current ml-0.5" />
         )}
       </button>
 
@@ -95,8 +93,8 @@ export default function VoiceNotePlayer({ url, isOwn }) {
                 key={i}
                 className={`w-[3px] rounded-full transition-colors ${
                   isPlayed
-                    ? isOwn ? 'bg-white/80' : 'bg-[#00a884]'
-                    : isOwn ? 'bg-white/30' : 'bg-[#c5c5c5]'
+                    ? isOwn ? 'bg-[#00a884]' : 'bg-[#00a884]'
+                    : isOwn ? 'bg-[#9e9e9e]' : 'bg-[#c5c5c5]'
                 }`}
                 style={{ height: `${height}px` }}
               />
@@ -106,16 +104,12 @@ export default function VoiceNotePlayer({ url, isOwn }) {
 
         {/* Time + speed */}
         <div className="flex items-center justify-between">
-          <span className={`text-[11px] ${isOwn ? 'text-white/70' : 'text-[#667781]'}`}>
+          <span className={`text-[11px] ${isOwn ? 'text-[#667781]' : 'text-[#667781]'}`}>
             {formatTime(isPlaying ? currentTime : duration)}
           </span>
           <button
             onClick={cycleSpeed}
-            className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${
-              isOwn
-                ? 'bg-white/20 text-white/80 hover:bg-white/30'
-                : 'bg-[#e9edef] text-[#54656f] hover:bg-[#dfe5e7]'
-            }`}
+            className="text-[11px] font-bold px-1.5 py-0.5 rounded bg-[#e9edef] text-[#54656f] hover:bg-[#dfe5e7]"
           >
             {playbackRate}x
           </button>
