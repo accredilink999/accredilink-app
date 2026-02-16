@@ -816,8 +816,8 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                          Check Out (Sit-In)
                        </Button>
                      )}
-                     {/* Sitting Log button — visible after acceptance + check-in */}
-                     {(isAccepted || isPartnerAccepted) && call.clock_in_time && (isMyShift || isAdmin) && call.status !== 'completed' && sitinLogCallId !== call.id && (
+                     {/* Sitting Log button — visible after acceptance */}
+                     {(isAccepted || isPartnerAccepted) && (isMyShift || isAdmin) && sitinLogCallId !== call.id && (
                        <Button
                          size="sm"
                          onClick={() => {
