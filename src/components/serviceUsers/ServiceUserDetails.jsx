@@ -106,6 +106,7 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
   const [editingCallIdx, setEditingCallIdx] = useState(null);
   const [newCall, setNewCall] = useState({ time: '09:00', duration: 30, types: [], notes: '' });
   const [isCallTypeManagerOpen, setIsCallTypeManagerOpen] = useState(false);
+  const callFormRef = React.useRef(null);
 
   useEffect(() => {
     if (serviceUser?.call_times) {
@@ -182,6 +183,10 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
     const call = callTimesLocal[idx];
     setNewCall({ time: call.time, duration: call.duration, types: normalizeTypes(call), notes: call.notes || '' });
     setEditingCallIdx(idx);
+    // Scroll to the edit form so it's visible on mobile
+    setTimeout(() => {
+      callFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
   const handleDeleteCall = (idx) => {
@@ -490,7 +495,7 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
 
             {/* Admin: Add/Edit call time form */}
             {isAdmin && (
-              <Card className="p-4 bg-slate-50">
+              <Card ref={callFormRef} className={`p-4 ${editingCallIdx !== null ? 'bg-amber-50 border-amber-300 border-2' : 'bg-slate-50'}`}>
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="font-semibold text-slate-900 text-sm">
                     {editingCallIdx !== null ? 'Edit Call Time' : 'Add Call Time'}
