@@ -9,8 +9,10 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.webkit.CookieManager;
+import android.webkit.GeolocationPermissions;
 import android.webkit.PermissionRequest;
 import android.webkit.URLUtil;
+import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebView;
 import android.widget.Toast;
@@ -56,23 +58,33 @@ public class MainActivity extends BridgeActivity {
             }
         });
 
-        // Override WebChromeClient to auto-grant microphone permission to WebView
+        // Save Capacitor's default WebChromeClient and wrap it
+        // so we add mic + geolocation handling without breaking anything
+        final WebChromeClient capacitorClient = getBridge().getWebView().getWebChromeClient();
+
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
-                // Auto-grant audio/video capture permissions to the WebView
-                // (the Android runtime permission is already requested above)
-                runOnUiThread(() -> {
-                    String[] resources = request.getResources();
-                    for (String resource : resources) {
-                        if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource) ||
-                            PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource)) {
-                            request.grant(resources);
-                            return;
-                        }
-                    }
-                    request.deny();
-                });
+                // Auto-grant all WebView permission requests (mic, camera, etc.)
+                runOnUiThread(() -> request.grant(request.getResources()));
+            }
+
+            @Override
+            public void onGeolocationPermissionsShowPrompt(String origin,
+                    GeolocationPermissions.Callback callback) {
+                // Auto-grant geolocation to the app's web content
+                callback.invoke(origin, true, false);
+            }
+
+            // Delegate file chooser to Capacitor's handler (for file uploads)
+            @Override
+            public boolean onShowFileChooser(WebView webView,
+                    ValueCallback<Uri[]> filePathCallback,
+                    FileChooserParams fileChooserParams) {
+                if (capacitorClient != null) {
+                    return capacitorClient.onShowFileChooser(webView, filePathCallback, fileChooserParams);
+                }
+                return super.onShowFileChooser(webView, filePathCallback, fileChooserParams);
             }
         });
     }
