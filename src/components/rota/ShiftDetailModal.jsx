@@ -869,6 +869,7 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
                  isAdmin={isAdmin}
                  isMyShift={isMyShift}
                  sameDayShifts={sameDayShifts}
+                 userId={userId}
                />
                {/* Bottom Clock Off button — visible after calls, prominent when all done */}
                {canClockOff && (

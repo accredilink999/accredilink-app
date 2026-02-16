@@ -48,7 +48,7 @@ function parseSitinMeta(call) {
   }
 }
 
-export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayShifts = [] }) {
+export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayShifts = [], userId }) {
   const queryClient = useQueryClient();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAddClientCallsOpen, setIsAddClientCallsOpen] = useState(false);
@@ -489,10 +489,12 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
   const acceptSitinMutation = useMutation({
     mutationFn: async (call) => {
       const meta = parseSitinMeta(call);
+      // Use the logged-in user's ID, not the viewed shift's staff_id
+      const acceptorId = userId || shift?.staff_id;
       const updatedNotes = JSON.stringify({
         ...meta,
         accepted: true,
-        accepted_by: shift?.staff_id,
+        accepted_by: acceptorId,
         accepted_at: new Date().toISOString(),
       });
       const updatedCall = await ShiftCallApi.update(call.id, {
@@ -554,7 +556,8 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
     },
     onMutate: (call) => {
       const meta = parseSitinMeta(call);
-      const updatedNotes = JSON.stringify({ ...meta, accepted: true, accepted_by: shift?.staff_id, accepted_at: new Date().toISOString() });
+      const acceptorId = userId || shift?.staff_id;
+      const updatedNotes = JSON.stringify({ ...meta, accepted: true, accepted_by: acceptorId, accepted_at: new Date().toISOString() });
       setFreshCalls(prev => prev.map(c => c.id === call.id ? { ...c, notes: updatedNotes } : c));
     },
     onSuccess: () => {
@@ -620,7 +623,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                const meta = parseSitinMeta(call);
                const isAccepted = meta?.accepted === true;
                const isPartnerAccepted = meta?.partner_accepted === true;
-               const acceptedByMe = meta?.accepted_by === shift?.staff_id;
+               const acceptedByMe = meta?.accepted_by === shift?.staff_id || meta?.accepted_by === userId;
                const iAccepted = isAccepted && acceptedByMe;
                const partnerDidIt = isPartnerAccepted && !acceptedByMe;
                const canSitinClockIn = iAccepted && (isMyShift || isAdmin) && !call.clock_in_time && call.status !== 'completed';
