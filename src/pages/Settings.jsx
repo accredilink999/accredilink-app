@@ -597,6 +597,17 @@ function AppInfoCard({ userEmail }) {
     ? (window.Capacitor?.getPlatform?.() === 'ios' ? 'ios' : 'android')
     : 'web';
 
+  // On native, show the actual installed APK/IPA version (not the Vercel JS version)
+  const [nativeVersion, setNativeVersion] = useState(null);
+  useEffect(() => {
+    if (isNative) {
+      import('@capacitor/app').then(({ App }) =>
+        App.getInfo().then(info => setNativeVersion(info.version))
+      ).catch(() => {});
+    }
+  }, [isNative]);
+  const displayVersion = nativeVersion || APP_VERSION;
+
   const { data: latestInfo } = useQuery({
     queryKey: ['app_download_version_check'],
     queryFn: async () => {
@@ -617,7 +628,7 @@ function AppInfoCard({ userEmail }) {
 
   const latestVersion = latestInfo?.version;
   const downloadUrl = latestInfo?.file_url;
-  const hasUpdate = isUpdateAvailable(APP_VERSION, latestVersion);
+  const hasUpdate = isUpdateAvailable(displayVersion, latestVersion);
 
   return (
     <Card className="p-5 bg-white border-0 shadow-sm">
@@ -628,7 +639,7 @@ function AppInfoCard({ userEmail }) {
       <div className="space-y-3 text-sm">
         <div className="flex justify-between items-center">
           <span className="text-slate-500">Installed version</span>
-          <span className="text-slate-900 font-medium">{APP_VERSION}</span>
+          <span className="text-slate-900 font-medium">{displayVersion}</span>
         </div>
         {latestVersion && (
           <div className="flex justify-between items-center">

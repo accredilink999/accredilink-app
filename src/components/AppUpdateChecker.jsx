@@ -1,18 +1,19 @@
 /**
  * AppUpdateChecker
  *
- * Shows an update popup for ALL users when a newer version exists.
- * - Android native: Download APK button
- * - Web / PWA: Hard refresh button (clears cache + reloads)
- * - iOS native: TestFlight reminder (Apple handles the push)
+ * Shows an update popup when a newer APK exists.
+ * - On native (Capacitor): reads the INSTALLED app version from the native
+ *   binary via @capacitor/app, NOT from the JS bundle (which is always latest
+ *   since it loads from Vercel).
+ * - On web/PWA: no-op — web users always get the latest code from Vercel.
  */
 
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { APP_VERSION, isUpdateAvailable } from '@/lib/appVersion';
+import { isUpdateAvailable } from '@/lib/appVersion';
 import { openExternalUrl } from '@/lib/openExternalUrl';
-import { Download, X, Copy, Check, RefreshCw, Apple } from 'lucide-react';
+import { Download, X, Copy, Check } from 'lucide-react';
 
 function isNativePlatform() {
   return window.Capacitor?.isNativePlatform?.() === true;
@@ -26,10 +27,37 @@ function isIOS() {
   return window.Capacitor?.getPlatform?.() === 'ios';
 }
 
+/** Get the INSTALLED native app version from the APK/IPA binary */
+async function getNativeVersion() {
+  try {
+    const { App } = await import('@capacitor/app');
+    const info = await App.getInfo();
+    return info.version; // versionName from build.gradle / CFBundleShortVersionString
+  } catch {
+    return null;
+  }
+}
+
 export default function AppUpdateChecker() {
   const [dismissed, setDismissed] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  const [installedVersion, setInstalledVersion] = useState(null);
+
+  const native = isNativePlatform();
+  const android = isAndroid();
+  const ios = isIOS();
+
+  // Web users always get the latest from Vercel — no update check needed
+  if (!native) return null;
+
+  // Get the native installed version on mount
+  useEffect(() => {
+    if (native) {
+      getNativeVersion().then(v => {
+        if (v) setInstalledVersion(v);
+      });
+    }
+  }, [native]);
 
   const { data: latestInfo } = useQuery({
     queryKey: ['app_download_android_check'],
@@ -46,18 +74,17 @@ export default function AppUpdateChecker() {
         return null;
       }
     },
-    staleTime: 1000 * 60 * 30, // cache 30 min
+    staleTime: 1000 * 60 * 30,
   });
 
   const latestVersion = latestInfo?.version;
   const downloadUrl = latestInfo?.file_url;
   const releaseNotes = latestInfo?.notes;
-  const updateAvailable = isUpdateAvailable(APP_VERSION, latestVersion);
 
-  const native = isNativePlatform();
-  const android = isAndroid();
-  const ios = isIOS();
-  const isWeb = !native;
+  // Compare INSTALLED native version against latest in database
+  const updateAvailable = installedVersion && latestVersion
+    ? isUpdateAvailable(installedVersion, latestVersion)
+    : false;
 
   // Check if user already dismissed this version
   useEffect(() => {
@@ -69,7 +96,6 @@ export default function AppUpdateChecker() {
     }
   }, [latestVersion]);
 
-  // For Android native, need a download URL. For web/PWA, just need a version.
   if (!updateAvailable || dismissed) return null;
   if (android && !downloadUrl) return null;
 
@@ -99,26 +125,6 @@ export default function AppUpdateChecker() {
     }
   };
 
-  const handleHardRefresh = async () => {
-    setRefreshing(true);
-    try {
-      // Clear service worker caches
-      if ('caches' in window) {
-        const names = await caches.keys();
-        await Promise.all(names.map(name => caches.delete(name)));
-      }
-      // Unregister service workers so fresh code loads
-      if ('serviceWorker' in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(registrations.map(r => r.unregister()));
-      }
-    } catch {
-      // Continue even if cache clearing fails
-    }
-    // Force full page reload
-    window.location.reload(true);
-  };
-
   return (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 fade-in duration-200">
@@ -127,12 +133,12 @@ export default function AppUpdateChecker() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                {isWeb ? <RefreshCw className="w-5 h-5" /> : <Download className="w-5 h-5" />}
+                <Download className="w-5 h-5" />
               </div>
               <div>
                 <h2 className="font-bold text-lg">Update Available</h2>
                 <p className="text-teal-100 text-sm">
-                  v{APP_VERSION} &rarr; v{latestVersion}
+                  v{installedVersion} &rarr; v{latestVersion}
                 </p>
               </div>
             </div>
@@ -148,7 +154,6 @@ export default function AppUpdateChecker() {
 
         {/* Body */}
         <div className="p-5 space-y-4">
-          {/* Release notes - always show if available */}
           {releaseNotes && (
             <div className="bg-slate-50 rounded-lg p-3">
               <p className="text-xs font-medium text-slate-500 mb-1">What's new in v{latestVersion}</p>
@@ -163,7 +168,7 @@ export default function AppUpdateChecker() {
           )}
 
           <div className="space-y-2">
-            {/* Android native — download APK */}
+            {/* Android — download APK */}
             {android && (
               <>
                 <button
@@ -187,32 +192,13 @@ export default function AppUpdateChecker() {
               </>
             )}
 
-            {/* iOS native — TestFlight handles updates */}
+            {/* iOS — TestFlight */}
             {ios && (
-              <>
-                <div className="bg-blue-50 rounded-lg p-3 text-center">
-                  <p className="text-sm text-blue-700">
-                    Updates are delivered through TestFlight. Check for an update notification from Apple, or open the TestFlight app to install the latest version.
-                  </p>
-                </div>
-              </>
-            )}
-
-            {/* Web / PWA — hard refresh */}
-            {isWeb && (
-              <>
-                <button
-                  onClick={handleHardRefresh}
-                  disabled={refreshing}
-                  className="w-full px-4 py-2.5 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-                  {refreshing ? 'Refreshing...' : 'Refresh to Update'}
-                </button>
-                <p className="text-xs text-slate-400 text-center">
-                  This will clear your cache and reload the app with the latest version
+              <div className="bg-blue-50 rounded-lg p-3 text-center">
+                <p className="text-sm text-blue-700">
+                  Updates are delivered through TestFlight. Check for an update notification from Apple, or open the TestFlight app to install the latest version.
                 </p>
-              </>
+              </div>
             )}
 
             <button
