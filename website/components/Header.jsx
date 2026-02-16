@@ -4,7 +4,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import WelshDragon from './WelshDragon';
 
 const navLinks = [
   { href: '/', label: 'Home' },
@@ -23,20 +22,26 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-slate-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 sm:h-20">
+        <div className="flex items-center justify-between h-20 sm:h-24">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3 flex-shrink-0">
             <Image
               src="/images/logo.png"
               alt="Accredilink Logo"
-              width={40}
-              height={40}
-              className="w-10 h-10 rounded-lg object-contain"
+              width={56}
+              height={56}
+              className="w-14 h-14 rounded-lg object-contain"
             />
-            <WelshDragon className="w-7 h-7 text-welsh-red" />
+            <Image
+              src="/images/welsh-dragon.jpg"
+              alt="Welsh Dragon"
+              width={48}
+              height={48}
+              className="w-12 h-12 rounded-lg object-contain"
+            />
             <div className="hidden sm:block">
-              <p className="font-bold text-slate-900 text-sm leading-tight">Accredilink</p>
-              <p className="text-[11px] text-slate-500 leading-tight">Community Response Taskforce</p>
+              <p className="font-bold text-slate-900 text-base leading-tight">Accredilink</p>
+              <p className="text-xs text-slate-500 leading-tight">Community Response Taskforce</p>
             </div>
           </Link>
 
