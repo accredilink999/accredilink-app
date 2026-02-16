@@ -155,16 +155,28 @@ export default function AppUpdateChecker() {
                   <Download className="w-4 h-4" />
                   Download Update
                 </button>
+                <div className="relative flex items-center py-1">
+                  <div className="flex-grow border-t border-slate-200" />
+                  <span className="flex-shrink mx-3 text-xs text-slate-400">or</span>
+                  <div className="flex-grow border-t border-slate-200" />
+                </div>
                 <button
                   onClick={handleCopyLink}
-                  className="w-full px-4 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors flex items-center justify-center gap-2"
+                  className="w-full px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
                 >
-                  {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
-                  {copied ? 'Link Copied!' : 'Copy Download Link'}
+                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  {copied ? 'Link Copied! Open Chrome to paste' : 'Copy Link & Open in Chrome'}
                 </button>
-                <p className="text-xs text-slate-400 text-center">
-                  If download doesn't start, copy the link and open in Chrome
-                </p>
+                {copied && (
+                  <p className="text-xs text-green-600 text-center font-medium">
+                    Open Chrome browser, paste the link in the address bar, and press Go
+                  </p>
+                )}
+                {!copied && (
+                  <p className="text-xs text-slate-400 text-center">
+                    If download doesn't start, copy the link and paste in Chrome
+                  </p>
+                )}
               </>
             )}
             {ios && (

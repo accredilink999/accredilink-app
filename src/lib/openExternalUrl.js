@@ -1,18 +1,31 @@
 /**
  * Opens a URL in the system browser (Chrome/Safari) instead of the WebView.
- * Essential for APK downloads which don't work inside Capacitor WebViews.
+ * Tries multiple approaches for Capacitor Android compatibility.
  */
-export function openExternalUrl(url) {
+export async function openExternalUrl(url) {
   const isCapacitor = window.Capacitor?.isNativePlatform?.();
-  const isAndroid = window.Capacitor?.getPlatform?.() === 'android';
 
-  if (isCapacitor && isAndroid) {
-    // On Android Capacitor, use intent URL to open in Chrome
-    const schemeUrl = url.replace(/^https?:\/\//, '');
-    const scheme = url.startsWith('https') ? 'https' : 'http';
-    window.location.href = `intent://${schemeUrl}#Intent;scheme=${scheme};action=android.intent.action.VIEW;end`;
+  if (isCapacitor) {
+    // Try @capacitor/browser plugin first (cleanest approach)
+    try {
+      const { Browser } = await import('@capacitor/browser');
+      await Browser.open({ url, windowName: '_system' });
+      return;
+    } catch {
+      // Plugin not installed, try fallback
+    }
+
+    // Fallback: create a hidden <a> tag and click it
+    // This often triggers the system's download/browser handler
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => document.body.removeChild(a), 100);
   } else {
-    // iOS or web — just open in new tab/window
     window.open(url, '_blank');
   }
 }
