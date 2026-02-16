@@ -62,24 +62,48 @@ export async function getServiceUserLocations(serviceUserIds, addressFallbacks) 
 /**
  * Geocode an address string to { latitude, longitude } using OpenStreetMap Nominatim.
  * Free, no API key required. Rate limited to 1 request per second.
+ * Tries progressively simpler queries if the full address fails
+ * (handles rural Welsh addresses like "Crud Yr Awel, Henrdrewydd, Denbigh").
  */
 export async function geocodeAddress(address) {
   if (!address || address.trim().length < 5) return null;
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`;
-    const res = await fetch(url, {
-      headers: { 'User-Agent': 'AccredilinkApp/1.0' },
-    });
-    if (!res.ok) return null;
-    const results = await res.json();
-    if (results && results.length > 0) {
-      return {
-        latitude: parseFloat(results[0].lat),
-        longitude: parseFloat(results[0].lon),
-      };
+
+  // Build search variants: full address, then progressively drop the first part
+  const clean = address.replace(/,\s*$/, '').trim();
+  const parts = clean.split(/,\s*/);
+  const variants = [clean];
+  // Try dropping leading parts (e.g. house name) to get to the area
+  for (let i = 1; i < parts.length; i++) {
+    variants.push(parts.slice(i).join(', '));
+  }
+  // Also try just the last part + postcode-like suffix if present
+  const postcodeMatch = clean.match(/[A-Z]{1,2}\d{1,2}\s*\d[A-Z]{2}/i);
+  if (postcodeMatch) {
+    variants.push(postcodeMatch[0]);
+  }
+
+  for (const query of variants) {
+    if (query.length < 3) continue;
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
+      const res = await fetch(url, {
+        headers: { 'User-Agent': 'AccredilinkApp/1.0' },
+      });
+      if (!res.ok) continue;
+      const results = await res.json();
+      if (results && results.length > 0) {
+        return {
+          latitude: parseFloat(results[0].lat),
+          longitude: parseFloat(results[0].lon),
+        };
+      }
+    } catch (e) {
+      console.warn('Geocode failed for:', query, e);
     }
-  } catch (e) {
-    console.warn('Geocode failed for:', address, e);
+    // Rate limit between attempts
+    if (variants.indexOf(query) < variants.length - 1) {
+      await new Promise(r => setTimeout(r, 1100));
+    }
   }
   return null;
 }
