@@ -17,7 +17,7 @@ import CareLogViewer from './CareLogViewer';
 import { notifyAdminsOfActivity } from '@/utils/adminNotifications';
 import SpeechButton from '@/components/ui/SpeechButton';
 
-export default function CareLogForm({ shift, serviceUser, open, onClose, callId }) {
+export default function CareLogForm({ shift, serviceUser, open, onClose, callId, scheduledTime }) {
   const queryClient = useQueryClient();
   const [submittedCareLog, setSubmittedCareLog] = useState(null);
   
@@ -202,7 +202,7 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId 
         staff_id: user?.id || shift.staff_id,
         staff_name: user?.full_name || shift.staff_name,
         visit_date: shift.date,
-        visit_time: shift.start_time,
+        visit_time: scheduledTime || shift.start_time,
         shift_end_time: shift.end_time || '',
         status: 'submitted',
         submitted_at: new Date().toISOString(),

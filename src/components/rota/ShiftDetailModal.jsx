@@ -1221,6 +1221,7 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
               shift={shift}
               serviceUser={{ id: summaryLogCall.service_user_id, full_name: summaryLogCall.service_user_name }}
               open={!!summaryLogCall}
+              scheduledTime={summaryLogCall.scheduled_time}
               onClose={() => {
                 setSummaryLogCall(null);
                 // Re-fetch care logs so the summary updates

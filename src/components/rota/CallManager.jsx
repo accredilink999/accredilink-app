@@ -23,7 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import SpeechButton from '@/components/ui/SpeechButton';
-import { Clock, MapPin, CheckCircle, AlertCircle, Play, Square, Plus, Edit, Trash2, FileText, Car, ListChecks, ArrowRightLeft, ClipboardList, User } from 'lucide-react';
+import { Clock, MapPin, CheckCircle, AlertCircle, Play, Square, Plus, Edit, Trash2, FileText, Car, ListChecks, ClipboardList, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { notifyAdminsOfActivity } from '@/utils/adminNotifications';
 import { toast } from 'sonner';
@@ -57,8 +57,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
   const [editingCall, setEditingCall] = useState(null);
   const [careLogCall, setCareLogCall] = useState(null);
   const [clockOutConfirmCall, setClockOutConfirmCall] = useState(null);
-  const [handoverCall, setHandoverCall] = useState(null);
-  const [handoverStaffId, setHandoverStaffId] = useState('');
+  const [notMyCallConfirm, setNotMyCallConfirm] = useState(null);
   const [driveToCallConfirm, setDriveToCallConfirm] = useState(null);
   const [taskWarningCall, setTaskWarningCall] = useState(null);
   const [newTaskText, setNewTaskText] = useState({});
@@ -474,93 +473,23 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
     },
   });
 
-  // Compute unique handover staff from same-day shifts
-  const handoverCandidates = sameDayShifts.filter(s =>
-    s.staff_id && s.staff_id !== shift?.staff_id && s.status !== 'cancelled'
-  );
-  const uniqueHandoverStaff = [];
-  const seenStaffIds = new Set();
-  for (const s of handoverCandidates) {
-    if (!seenStaffIds.has(s.staff_id)) {
-      seenStaffIds.add(s.staff_id);
-      uniqueHandoverStaff.push(s);
-    }
-  }
-
-  const handoverCallMutation = useMutation({
-    mutationFn: async () => {
-      if (!handoverCall || !handoverStaffId) throw new Error('Missing call or staff');
-      const targetShift = sameDayShifts.find(s => s.staff_id === handoverStaffId && s.status !== 'cancelled');
-      if (!targetShift) throw new Error('No valid shift found for selected staff member');
-
-      const targetStaffName = targetShift.staff_name;
-
-      // Check if the target shift already has a call for the same service user at the same time
-      const existingCalls = await ShiftCallApi.filter({ shift_id: targetShift.id });
-      const isDuplicate = existingCalls.some(c =>
-        c.service_user_id === handoverCall.service_user_id &&
-        c.scheduled_time === handoverCall.scheduled_time
-      );
-
-      if (!isDuplicate) {
-        // Create the call on the target shift
-        await ShiftCallApi.create({
-          shift_id: targetShift.id,
-          service_user_id: handoverCall.service_user_id,
-          service_user_name: handoverCall.service_user_name,
-          service_user_address: handoverCall.service_user_address,
-          scheduled_time: handoverCall.scheduled_time,
-          call_time: handoverCall.scheduled_time,
-          duration_minutes: handoverCall.duration_minutes,
-          call_type: handoverCall.call_type,
-          call_types: handoverCall.call_types,
-          tasks: handoverCall.tasks,
-          call_date: handoverCall.call_date,
-          status: 'pending',
-          notes: handoverCall.notes || '',
-        });
-      }
-
-      // Remove the call from the current shift
-      await ShiftCallApi.delete(handoverCall.id);
-
-      // Send push notification to the receiving staff member
-      await base44.functions.invoke('createNotification', {
-        recipient_ids: [handoverStaffId],
-        type: 'shift_activity',
-        title: `Call handed over to you`,
-        message: `${shift?.staff_name || 'A colleague'} has handed over ${handoverCall.service_user_name}'s call to your shift.`,
-        priority: 'high',
-        action_url: '/Rota',
-        send_push: true,
-      }).catch(e => console.warn('Handover notification failed:', e));
-
-      // Notify admins
-      notifyAdminsOfActivity({
-        title: `Call handover: ${handoverCall.service_user_name}`,
-        message: `${shift?.staff_name || 'Staff'} handed over ${handoverCall.service_user_name}'s call to ${targetStaffName}.`,
-        excludeUserId: shift?.staff_id,
-      });
-
-      return { clientName: handoverCall.service_user_name, targetName: targetStaffName };
+  const notMyCallMutation = useMutation({
+    mutationFn: async (call) => {
+      await ShiftCallApi.delete(call.id);
+      return call.service_user_name;
     },
-    onMutate: () => {
-      // Optimistic: remove the call from the local list immediately
-      if (handoverCall) {
-        setFreshCalls(prev => prev.filter(c => c.id !== handoverCall.id));
-      }
+    onMutate: (call) => {
+      setFreshCalls(prev => prev.filter(c => c.id !== call.id));
     },
-    onSuccess: (result) => {
+    onSuccess: (clientName) => {
       queryClient.invalidateQueries({ queryKey: ['shift-calls'] });
-      toast.success(`${result.clientName}'s call handed over to ${result.targetName}`);
-      setHandoverCall(null);
-      setHandoverStaffId('');
+      toast.success(`${clientName} removed from your shift`);
+      setNotMyCallConfirm(null);
     },
     onError: (err) => {
-      // Revert optimistic removal
       setFreshCalls(calls);
       queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] });
-      toast.error('Handover failed: ' + (err.message || 'Unknown error'));
+      toast.error('Failed to remove call: ' + (err.message || 'Unknown error'));
     },
   });
 
@@ -1155,15 +1084,14 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                         Care Log
                       </Button>
                     )}
-                  {uniqueHandoverStaff.length > 0 && (
+                  {(isMyShift || isAdmin) && call.status !== 'completed' && (
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => { setHandoverCall(call); setHandoverStaffId(''); }}
+                      onClick={() => setNotMyCallConfirm(call)}
                       className="w-full min-h-[44px] px-4 touch-manipulation"
                     >
-                      <ArrowRightLeft className="w-3 h-3 mr-1" />
-                      Hand Call Over
+                      Not My Call
                     </Button>
                   )}
                   {(isMyShift || isAdmin) && !hasCarLog && call.status !== 'completed' && (
@@ -1217,6 +1145,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
           open={!!careLogCall}
           onClose={() => setCareLogCall(null)}
           callId={careLogCall.id}
+          scheduledTime={careLogCall.scheduled_time}
         />
       )}
 
@@ -1243,42 +1172,23 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Hand Call Over dialog */}
-      <AlertDialog open={!!handoverCall} onOpenChange={(open) => { if (!open) { setHandoverCall(null); setHandoverStaffId(''); } }}>
+      {/* Not My Call confirmation dialog */}
+      <AlertDialog open={!!notMyCallConfirm} onOpenChange={(open) => !open && setNotMyCallConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Hand Call Over</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3">
-                <p>Hand over <strong>{handoverCall?.service_user_name}</strong>'s call to another staff member working today.</p>
-                <Select value={handoverStaffId} onValueChange={setHandoverStaffId}>
-                  <SelectTrigger className="text-sm">
-                    <SelectValue placeholder="Select staff member..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {uniqueHandoverStaff.map(s => (
-                      <SelectItem key={s.staff_id} value={s.staff_id}>
-                        {s.staff_name} ({s.start_time} - {s.end_time})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {handoverStaffId && (
-                  <p className="text-xs text-slate-500">
-                    The selected staff member and admins will be notified.
-                  </p>
-                )}
-              </div>
+            <AlertDialogTitle>Remove This Call?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove <strong>{notMyCallConfirm?.service_user_name}</strong> from your shift. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex gap-3">
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => handoverCallMutation.mutate()}
-              disabled={!handoverStaffId || handoverCallMutation.isPending}
-              className="bg-amber-500 hover:bg-amber-600"
+              onClick={() => notMyCallMutation.mutate(notMyCallConfirm)}
+              disabled={notMyCallMutation.isPending}
+              className="bg-red-600 hover:bg-red-700"
             >
-              {handoverCallMutation.isPending ? 'Handing over...' : 'Confirm Handover'}
+              {notMyCallMutation.isPending ? 'Removing...' : 'Remove Call'}
             </AlertDialogAction>
           </div>
         </AlertDialogContent>
