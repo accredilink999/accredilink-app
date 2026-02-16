@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 
 export const metadata = {
   title: 'How to Arrange Domiciliary Care in Wales: A Complete Guide | Accredilink',
@@ -19,6 +20,12 @@ export default function HowToArrangeDomiciliaryCareInWales() {
           <h1 className="text-3xl sm:text-4xl font-bold text-white leading-tight">How to Arrange Domiciliary Care in Wales: A Complete Guide</h1>
         </div>
       </section>
+
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-10 mb-8">
+        <div className="relative h-64 sm:h-80 rounded-2xl overflow-hidden shadow-lg">
+          <Image src="/images/hero-care.jpg" alt="Care services in Wales" fill className="object-cover" />
+        </div>
+      </div>
 
       <article className="py-16 sm:py-20 bg-white">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 prose prose-slate prose-lg">

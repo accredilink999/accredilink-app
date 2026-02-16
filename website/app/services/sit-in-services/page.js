@@ -26,6 +26,7 @@ export default function SitInServices() {
         'Regular or one-off bookings available',
       ]}
       whoIsItFor="Sit-in services are ideal for family carers who need to leave the house for a few hours but don't want their loved one to be alone. It's perfect for doctor's appointments, work commitments, social events, or simply taking time to recharge."
+      imageSrc="/images/sitin-services.jpg"
     />
   );
 }

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 
 const services = [
   {
@@ -114,42 +115,47 @@ export default function Home() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_rgba(22,101,52,0.15),transparent_50%)]" />
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28 lg:py-36">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/10 backdrop-blur rounded-full text-sm text-white/80 mb-6">
-              <svg className="w-4 h-4 text-welsh-green-light" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812z" clipRule="evenodd" />
-              </svg>
-              Regulated by Care Inspectorate Wales
-            </div>
-
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight tracking-tight">
-              Compassionate Care,{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-green-400">
-                Right at Home
-              </span>
-            </h1>
-
-            <p className="mt-6 text-lg sm:text-xl text-slate-300 leading-relaxed max-w-2xl">
-              Professional domiciliary care, emergency response, and specialist support services
-              across Denbighshire, Conwy, and Wrexham. Our trained team is here for you and your family.
-            </p>
-
-            <div className="mt-8 flex flex-col sm:flex-row gap-4">
-              <Link
-                href="/contact"
-                className="inline-flex items-center justify-center px-6 py-3.5 bg-welsh-red text-white font-semibold rounded-xl hover:bg-welsh-red-light transition-colors text-base"
-              >
-                Get in Touch
-                <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/10 backdrop-blur rounded-full text-sm text-white/80 mb-6">
+                <svg className="w-4 h-4 text-welsh-green-light" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812z" clipRule="evenodd" />
                 </svg>
-              </Link>
-              <Link
-                href="/services"
-                className="inline-flex items-center justify-center px-6 py-3.5 bg-white/10 backdrop-blur text-white font-semibold rounded-xl hover:bg-white/20 transition-colors text-base border border-white/20"
-              >
-                Our Services
-              </Link>
+                Regulated by Care Inspectorate Wales
+              </div>
+
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight tracking-tight">
+                Compassionate Care,{' '}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-green-400">
+                  Right at Home
+                </span>
+              </h1>
+
+              <p className="mt-6 text-lg sm:text-xl text-slate-300 leading-relaxed max-w-2xl">
+                Professional domiciliary care, emergency response, and specialist support services
+                across Denbighshire, Conwy, and Wrexham. Our trained team is here for you and your family.
+              </p>
+
+              <div className="mt-8 flex flex-col sm:flex-row gap-4">
+                <Link
+                  href="/contact"
+                  className="inline-flex items-center justify-center px-6 py-3.5 bg-welsh-red text-white font-semibold rounded-xl hover:bg-welsh-red-light transition-colors text-base"
+                >
+                  Get in Touch
+                  <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                  </svg>
+                </Link>
+                <Link
+                  href="/services"
+                  className="inline-flex items-center justify-center px-6 py-3.5 bg-white/10 backdrop-blur text-white font-semibold rounded-xl hover:bg-white/20 transition-colors text-base border border-white/20"
+                >
+                  Our Services
+                </Link>
+              </div>
+            </div>
+            <div className="hidden lg:block relative h-96 rounded-2xl overflow-hidden">
+              <Image src="/images/hero-home.jpg" alt="Compassionate care services in North Wales" fill className="object-cover" />
             </div>
           </div>
         </div>
@@ -194,25 +200,34 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {strengths.map(item => (
-              <div key={item.title} className="flex gap-4 p-6 bg-white rounded-2xl border border-slate-200">
-                <div className="w-12 h-12 rounded-xl bg-green-50 text-welsh-green flex items-center justify-center flex-shrink-0">
-                  {item.icon}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
+            <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-8">
+              {strengths.map(item => (
+                <div key={item.title} className="flex gap-4 p-6 bg-white rounded-2xl border border-slate-200">
+                  <div className="w-12 h-12 rounded-xl bg-green-50 text-welsh-green flex items-center justify-center flex-shrink-0">
+                    {item.icon}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-slate-900 mb-1">{item.title}</h3>
+                    <p className="text-sm text-slate-600 leading-relaxed">{item.description}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-semibold text-slate-900 mb-1">{item.title}</h3>
-                  <p className="text-sm text-slate-600 leading-relaxed">{item.description}</p>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
+            <div className="lg:col-span-2 relative h-80 rounded-2xl overflow-hidden hidden lg:block">
+              <Image src="/images/why-choose-us.jpg" alt="Professional care team" fill className="object-cover" />
+            </div>
           </div>
         </div>
       </section>
 
       {/* Coverage Banner */}
-      <section className="py-16 sm:py-20 bg-gradient-to-r from-welsh-green to-welsh-green-light text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <section className="py-16 sm:py-20 relative overflow-hidden">
+        <div className="absolute inset-0">
+          <Image src="/images/welsh-landscape.jpg" alt="" fill className="object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-r from-welsh-green/90 to-welsh-green-light/90" />
+        </div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-white">
           <h2 className="text-3xl sm:text-4xl font-bold mb-4">Serving Our Community</h2>
           <p className="text-lg text-green-100 max-w-2xl mx-auto mb-8">
             We provide care services across Denbighshire, Conwy, and Wrexham.
@@ -236,27 +251,34 @@ export default function Home() {
 
       {/* CTA */}
       <section className="py-16 sm:py-20 bg-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">
-            Need Care Support?
-          </h2>
-          <p className="text-lg text-slate-600 mb-8 max-w-2xl mx-auto">
-            Get in touch to discuss your care needs. We offer free, no-obligation assessments
-            and can tailor our services to suit you and your family.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              href="/contact"
-              className="inline-flex items-center justify-center px-6 py-3.5 bg-welsh-red text-white font-semibold rounded-xl hover:bg-welsh-red-light transition-colors"
-            >
-              Get in Touch
-            </Link>
-            <Link
-              href="/services"
-              className="inline-flex items-center justify-center px-6 py-3.5 border-2 border-slate-200 text-slate-700 font-semibold rounded-xl hover:border-slate-300 hover:bg-slate-50 transition-colors"
-            >
-              View All Services
-            </Link>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div className="relative h-64 rounded-2xl overflow-hidden hidden lg:block">
+              <Image src="/images/testimonial.jpg" alt="Happy families we support" fill className="object-cover" />
+            </div>
+            <div className="text-center lg:text-left">
+              <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">
+                Need Care Support?
+              </h2>
+              <p className="text-lg text-slate-600 mb-8 max-w-2xl mx-auto lg:mx-0">
+                Get in touch to discuss your care needs. We offer free, no-obligation assessments
+                and can tailor our services to suit you and your family.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+                <Link
+                  href="/contact"
+                  className="inline-flex items-center justify-center px-6 py-3.5 bg-welsh-red text-white font-semibold rounded-xl hover:bg-welsh-red-light transition-colors"
+                >
+                  Get in Touch
+                </Link>
+                <Link
+                  href="/services"
+                  className="inline-flex items-center justify-center px-6 py-3.5 border-2 border-slate-200 text-slate-700 font-semibold rounded-xl hover:border-slate-300 hover:bg-slate-50 transition-colors"
+                >
+                  View All Services
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
       </section>

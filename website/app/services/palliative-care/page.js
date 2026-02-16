@@ -28,6 +28,7 @@ export default function PalliativeCare() {
         'Support through the final days and beyond',
       ]}
       whoIsItFor="Our palliative care is for individuals with a life-limiting illness who wish to remain at home during their final weeks or months. We also support the family — providing reassurance, practical help, and emotional support during an incredibly difficult time."
+      imageSrc="/images/palliative-care.jpg"
     />
   );
 }

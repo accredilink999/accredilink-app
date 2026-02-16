@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 
 export const metadata = {
   title: 'Meet the Team',
@@ -10,8 +11,12 @@ export default function MeetTheTeamPage() {
     <>
       {/* Header */}
       <section className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">
+        <div className="absolute inset-0">
+          <Image src="/images/meet-team.jpg" alt="The Accredilink team" fill className="object-cover opacity-20" />
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-900/80 via-slate-800/70 to-slate-900/80" />
+        </div>
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-welsh-red via-white to-welsh-green" />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28 relative">
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white">Meet the Team</h1>
           <p className="mt-4 text-lg text-slate-300 max-w-2xl leading-relaxed">
             A dedicated, local team committed to delivering outstanding care in our communities.
@@ -83,7 +88,7 @@ export default function MeetTheTeamPage() {
                 icon: '📚',
               },
             ].map(member => (
-              <div key={member.role} className="p-6 bg-white rounded-2xl border border-slate-200">
+              <div key={member.role} className="p-6 bg-white rounded-2xl border border-slate-200 border-t-4 border-t-welsh-red/60 hover:shadow-lg transition-shadow">
                 <span className="text-3xl mb-3 block">{member.icon}</span>
                 <h3 className="font-semibold text-slate-900 mb-2">{member.role}</h3>
                 <p className="text-sm text-slate-600 leading-relaxed">{member.description}</p>

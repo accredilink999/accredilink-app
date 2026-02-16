@@ -28,6 +28,7 @@ export default function EmergencyResponse() {
         'Available outside normal care hours',
       ]}
       whoIsItFor="Our emergency response service is for anyone who needs urgent care support — whether it's a fall at home, an unexpected health event, a sudden change in care needs, or a carer who is unable to attend. Local authorities and health boards also use our rapid response capability for urgent community care needs."
+      imageSrc="/images/emergency-response.jpg"
     />
   );
 }

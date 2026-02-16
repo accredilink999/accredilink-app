@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 
 export const metadata = {
   title: 'Areas We Cover',
@@ -36,10 +37,17 @@ export default function AreasPage() {
       <section className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-welsh-red via-white to-welsh-green" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 relative">
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white">Areas We Cover</h1>
-          <p className="mt-4 text-lg text-slate-300 max-w-2xl leading-relaxed">
-            We provide care services across three counties in North Wales — Denbighshire, Conwy, and Wrexham.
-          </p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div>
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white">Areas We Cover</h1>
+              <p className="mt-4 text-lg text-slate-300 max-w-2xl leading-relaxed">
+                We provide care services across three counties in North Wales — Denbighshire, Conwy, and Wrexham.
+              </p>
+            </div>
+            <div className="hidden lg:block relative h-72 rounded-2xl overflow-hidden">
+              <Image src="/images/welsh-landscape.jpg" alt="Beautiful North Wales landscape" fill className="object-cover" />
+            </div>
+          </div>
         </div>
       </section>
 
@@ -48,9 +56,19 @@ export default function AreasPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {areas.map(area => (
-              <div key={area.name} className={`rounded-2xl border-2 p-6 ${area.color}`}>
-                <h2 className="text-2xl font-bold mb-1">{area.name}</h2>
-                <p className="text-sm opacity-70 mb-4">{area.welsh}</p>
+              <div key={area.name} className={`rounded-2xl border-2 p-6 ${area.color} hover:shadow-lg hover:-translate-y-1 transition-all duration-300`}>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className={`w-10 h-10 rounded-xl ${area.dotColor} flex items-center justify-center`}>
+                    <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold">{area.name}</h2>
+                    <p className="text-sm opacity-70">{area.welsh}</p>
+                  </div>
+                </div>
                 <div className="space-y-2">
                   {area.towns.map(town => (
                     <div key={town} className="flex items-center gap-2.5">

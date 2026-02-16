@@ -26,6 +26,7 @@ export default function SocialCare() {
         'Advocacy and liaison with statutory services',
       ]}
       whoIsItFor="Our social care is for individuals who may be isolated, vulnerable, or in need of support to live independently in the community. This includes people with learning disabilities, mental health conditions, older adults at risk of loneliness, and anyone who needs help engaging with the world around them."
+      imageSrc="/images/social-care.jpg"
     />
   );
 }

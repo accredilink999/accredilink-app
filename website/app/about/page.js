@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 
 export const metadata = {
   title: 'About Us',
@@ -9,26 +10,32 @@ const values = [
   {
     title: 'Compassion',
     description: 'Every person we support is treated with genuine warmth, empathy, and kindness. Care is personal — and we never forget that.',
+    borderColor: 'border-l-welsh-red',
   },
   {
     title: 'Professionalism',
     description: 'Our staff are fully trained, DBS checked, and supported with ongoing professional development. We hold ourselves to the highest standards.',
+    borderColor: 'border-l-welsh-green',
   },
   {
     title: 'Community',
     description: 'We are rooted in the communities of North Wales. We know the people, the places, and what matters here. This is our home too.',
+    borderColor: 'border-l-amber-500',
   },
   {
     title: 'Responsiveness',
     description: 'With our own emergency care responders on shift, we can act quickly when it matters most. We don\'t just provide care — we respond.',
+    borderColor: 'border-l-blue-500',
   },
   {
     title: 'Dignity',
     description: 'Everyone deserves to be treated with respect and dignity, regardless of their circumstances. This principle is at the heart of everything we do.',
+    borderColor: 'border-l-purple-500',
   },
   {
     title: 'Excellence',
     description: 'We are committed to continuous improvement — in our care delivery, our training, and our service. Good enough is never enough.',
+    borderColor: 'border-l-teal-500',
   },
 ];
 
@@ -50,29 +57,34 @@ export default function AboutPage() {
       {/* Our Story */}
       <section className="py-16 sm:py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-3xl">
-            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-6">Who We Are</h2>
-            <div className="space-y-4 text-slate-600 leading-relaxed">
-              <p>
-                Accredilink Community Response Taskforce is a care provider based in Denbighshire, North Wales.
-                We deliver a wide range of care and support services across Denbighshire, Conwy, and Wrexham —
-                from daily domiciliary care to emergency response and professional training.
-              </p>
-              <p>
-                What makes us different is our integrated approach. We don't just provide routine care — we have
-                our own qualified emergency care responders on shift, trained in pre-hospital emergency care.
-                This means when something goes wrong, our team has the skills to respond immediately and effectively.
-              </p>
-              <p>
-                We are fully registered and regulated by <strong>Care Inspectorate Wales (CIW)</strong>,
-                and we are committed to meeting and exceeding the standards set out in the Regulation and
-                Inspection of Social Care (Wales) Act 2016.
-              </p>
-              <p>
-                Our team is local. We live in the communities we serve, and we understand the unique needs
-                of people in rural and semi-rural Wales. Whether it's navigating country lanes to reach a
-                remote farmhouse or providing Welsh-language care, we are equipped and committed.
-              </p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-6">Who We Are</h2>
+              <div className="space-y-4 text-slate-600 leading-relaxed">
+                <p>
+                  Accredilink Community Response Taskforce is a care provider based in Denbighshire, North Wales.
+                  We deliver a wide range of care and support services across Denbighshire, Conwy, and Wrexham —
+                  from daily domiciliary care to emergency response and professional training.
+                </p>
+                <p>
+                  What makes us different is our integrated approach. We don't just provide routine care — we have
+                  our own qualified emergency care responders on shift, trained in pre-hospital emergency care.
+                  This means when something goes wrong, our team has the skills to respond immediately and effectively.
+                </p>
+                <p>
+                  We are fully registered and regulated by <strong>Care Inspectorate Wales (CIW)</strong>,
+                  and we are committed to meeting and exceeding the standards set out in the Regulation and
+                  Inspection of Social Care (Wales) Act 2016.
+                </p>
+                <p>
+                  Our team is local. We live in the communities we serve, and we understand the unique needs
+                  of people in rural and semi-rural Wales. Whether it's navigating country lanes to reach a
+                  remote farmhouse or providing Welsh-language care, we are equipped and committed.
+                </p>
+              </div>
+            </div>
+            <div className="relative h-96 rounded-2xl overflow-hidden hidden lg:block">
+              <Image src="/images/about-team.jpg" alt="Our dedicated care team" fill className="object-cover" />
             </div>
           </div>
         </div>
@@ -91,12 +103,14 @@ export default function AboutPage() {
       </section>
 
       {/* Values */}
-      <section className="py-16 sm:py-20 bg-slate-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="py-16 sm:py-20 bg-slate-50 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-72 h-72 bg-welsh-red/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-welsh-green/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-8 text-center">Our Values</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {values.map(value => (
-              <div key={value.title} className="p-6 bg-white rounded-2xl border border-slate-200">
+              <div key={value.title} className={`p-6 bg-white rounded-2xl border border-slate-200 border-l-4 ${value.borderColor}`}>
                 <h3 className="font-semibold text-slate-900 mb-2">{value.title}</h3>
                 <p className="text-sm text-slate-600 leading-relaxed">{value.description}</p>
               </div>

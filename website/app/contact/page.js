@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -103,6 +104,10 @@ export default function ContactPage() {
                     <p className="text-sm text-slate-500">Emergency response available 24/7</p>
                   </div>
                 </div>
+              </div>
+
+              <div className="relative h-48 sm:h-56 rounded-2xl overflow-hidden shadow-lg mt-4">
+                <Image src="/images/contact.jpg" alt="Contact the Accredilink team" fill className="object-cover" />
               </div>
             </div>
 

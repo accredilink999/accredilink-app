@@ -28,6 +28,7 @@ export default function Training() {
         'Bespoke training packages for organisations',
       ]}
       whoIsItFor="Our training is for care workers, support staff, family carers, community groups, and organisations who want to upskill their teams. Whether you're new to care or looking to gain advanced emergency care skills, we offer courses at all levels. We can deliver training at your premises or ours."
+      imageSrc="/images/training.jpg"
     />
   );
 }

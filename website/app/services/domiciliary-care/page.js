@@ -28,6 +28,7 @@ export default function DomiciliaryCare() {
         'Support with appointments and outings',
       ]}
       whoIsItFor="Our domiciliary care is for anyone who needs support to continue living safely and comfortably at home. This includes older adults, people with disabilities, those recovering from illness or surgery, and anyone who needs extra help with daily activities. We tailor every care plan to the individual."
+      imageSrc="/images/domiciliary-care.jpg"
     />
   );
 }

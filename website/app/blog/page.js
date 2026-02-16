@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 
 export const metadata = {
   title: 'Blog | Care Guides, Advice & News',
@@ -55,8 +56,12 @@ export default function BlogPage() {
     <>
       {/* Header */}
       <section className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">
+        <div className="absolute inset-0">
+          <Image src="/images/blog-header.jpg" alt="Care blog header" fill className="object-cover opacity-20" />
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-900/80 via-slate-800/70 to-slate-900/80" />
+        </div>
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-welsh-red via-white to-welsh-green" />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28 relative">
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white">Blog</h1>
           <p className="mt-4 text-lg text-slate-300 max-w-2xl leading-relaxed">
             Guides, advice, and news about care services in Wales from the Accredilink team.
@@ -72,7 +77,7 @@ export default function BlogPage() {
               <Link
                 key={post.slug}
                 href={`/blog/${post.slug}`}
-                className="block p-6 rounded-2xl border border-slate-200 hover:border-welsh-red/30 hover:shadow-lg transition-all group"
+                className="block p-6 rounded-2xl border border-slate-200 hover:border-welsh-red/30 hover:shadow-lg transition-all group bg-white border-l-4 border-l-welsh-red/60 hover:border-l-welsh-red"
               >
                 <div className="flex items-center gap-3 mb-3">
                   <span className="px-2.5 py-1 bg-red-50 text-welsh-red text-xs font-medium rounded-full">{post.category}</span>

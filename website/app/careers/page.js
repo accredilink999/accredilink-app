@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 
 export const metadata = {
   title: 'Careers',
@@ -89,11 +90,18 @@ export default function CareersPage() {
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-welsh-red via-white to-welsh-green" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_rgba(22,101,52,0.15),transparent_50%)]" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 relative">
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white">Join Our Team</h1>
-          <p className="mt-4 text-lg text-slate-300 max-w-2xl leading-relaxed">
-            We're always looking for compassionate, dedicated people to join the Accredilink team.
-            Whether you're experienced or new to care, we'd love to hear from you.
-          </p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+            <div>
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white">Join Our Team</h1>
+              <p className="mt-4 text-lg text-slate-300 max-w-2xl leading-relaxed">
+                We're always looking for compassionate, dedicated people to join the Accredilink team.
+                Whether you're experienced or new to care, we'd love to hear from you.
+              </p>
+            </div>
+            <div className="relative h-64 sm:h-80 rounded-2xl overflow-hidden shadow-lg hidden lg:block">
+              <Image src="/images/careers.jpg" alt="Join the Accredilink care team" fill className="object-cover" />
+            </div>
+          </div>
         </div>
       </section>
 

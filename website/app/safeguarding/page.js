@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 
 export const metadata = {
   title: 'Safeguarding Policy',
@@ -9,7 +10,11 @@ export default function SafeguardingPage() {
   return (
     <>
       {/* Header */}
-      <section className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0">
+          <Image src="/images/safeguarding.jpg" alt="" fill className="object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-900/90 via-slate-800/90 to-slate-900/90" />
+        </div>
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-welsh-red via-white to-welsh-green" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 relative">
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white">Safeguarding</h1>

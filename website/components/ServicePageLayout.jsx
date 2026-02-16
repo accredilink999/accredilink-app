@@ -1,6 +1,7 @@
 import Link from 'next/link';
+import Image from 'next/image';
 
-export default function ServicePageLayout({ title, description, features, whoIsItFor, icon }) {
+export default function ServicePageLayout({ title, description, features, whoIsItFor, icon, imageSrc }) {
   return (
     <>
       {/* Header */}
@@ -28,6 +29,17 @@ export default function ServicePageLayout({ title, description, features, whoIsI
         </div>
       </section>
 
+      {/* Service Image */}
+      {imageSrc && (
+        <section className="py-8 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="relative h-64 sm:h-80 lg:h-96 rounded-2xl overflow-hidden shadow-lg">
+              <Image src={imageSrc} alt={title} fill className="object-cover" />
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* What's Included */}
       <section className="py-16 sm:py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -49,8 +61,21 @@ export default function ServicePageLayout({ title, description, features, whoIsI
       {whoIsItFor && (
         <section className="py-16 sm:py-20 bg-slate-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-4">Who Is This For?</h2>
-            <p className="text-lg text-slate-600 leading-relaxed max-w-3xl">{whoIsItFor}</p>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-4">Who Is This For?</h2>
+                <p className="text-lg text-slate-600 leading-relaxed">{whoIsItFor}</p>
+              </div>
+              {icon && (
+                <div className="flex justify-center lg:justify-end">
+                  <div className="w-48 h-48 sm:w-56 sm:h-56 rounded-3xl bg-gradient-to-br from-welsh-red/10 via-white to-welsh-green/10 border border-slate-200 shadow-sm flex items-center justify-center">
+                    <div className="text-welsh-red w-20 h-20 sm:w-24 sm:h-24 [&>svg]:w-full [&>svg]:h-full">
+                      {icon}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </section>
       )}

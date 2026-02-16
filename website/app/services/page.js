@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 
 export const metadata = {
   title: 'Our Services',
@@ -92,11 +93,18 @@ export default function ServicesPage() {
       <section className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-welsh-red via-white to-welsh-green" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 relative">
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white">Our Services</h1>
-          <p className="mt-4 text-lg text-slate-300 max-w-2xl leading-relaxed">
-            We offer a comprehensive range of care, support, and training services
-            across Denbighshire, Conwy, and Wrexham.
-          </p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div>
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white">Our Services</h1>
+              <p className="mt-4 text-lg text-slate-300 max-w-2xl leading-relaxed">
+                We offer a comprehensive range of care, support, and training services
+                across Denbighshire, Conwy, and Wrexham.
+              </p>
+            </div>
+            <div className="hidden lg:block relative h-72 rounded-2xl overflow-hidden">
+              <Image src="/images/services-overview.jpg" alt="Our care services" fill className="object-cover" />
+            </div>
+          </div>
         </div>
       </section>
 
@@ -108,9 +116,9 @@ export default function ServicesPage() {
               <Link
                 key={service.href}
                 href={service.href}
-                className="group flex gap-5 p-6 rounded-2xl border border-slate-200 hover:border-welsh-red/30 hover:shadow-lg transition-all duration-200"
+                className="group flex gap-5 p-6 rounded-2xl border border-slate-200 hover:border-welsh-red/30 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 bg-white"
               >
-                <div className={`w-14 h-14 rounded-2xl ${service.color} flex items-center justify-center flex-shrink-0`}>
+                <div className={`w-14 h-14 rounded-2xl ${service.color} flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform duration-300`}>
                   {service.icon}
                 </div>
                 <div className="flex-1">

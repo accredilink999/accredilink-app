@@ -26,6 +26,7 @@ export default function RespiteCare() {
         'Overnight and weekend availability',
       ]}
       whoIsItFor="Respite care is for family carers who need a break — whether for a few hours, a holiday, or during an emergency. It's also for the person being cared for, who benefits from fresh interaction and professional support. There's no minimum or maximum — we work around your needs."
+      imageSrc="/images/respite-care.jpg"
     />
   );
 }
