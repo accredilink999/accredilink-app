@@ -147,10 +147,20 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
   });
 
   // Fetch cached GPS locations for service users (fallback when staff GPS fails)
+  // Build address fallback map so clients with zero GPS history get geocoded via Nominatim
   const serviceUserIds = [...new Set(callsToDisplay.map(c => c.service_user_id).filter(Boolean))];
+  const addressFallbacks = React.useMemo(() => {
+    const map = new Map();
+    for (const c of callsToDisplay) {
+      if (c.service_user_id && c.service_user_address) {
+        map.set(c.service_user_id, c.service_user_address);
+      }
+    }
+    return map;
+  }, [callsToDisplay]);
   const { data: gpsLocationCache = new Map() } = useQuery({
     queryKey: ['gpsLocationCache', ...serviceUserIds],
-    queryFn: () => getServiceUserLocations(serviceUserIds),
+    queryFn: () => getServiceUserLocations(serviceUserIds, addressFallbacks),
     enabled: serviceUserIds.length > 0,
     staleTime: 5 * 60 * 1000, // cache for 5 minutes
   });
@@ -348,11 +358,17 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
             .filter(Boolean);
           let locationCache = gpsLocationCache;
           if (idsNeedingCache.length > 0) {
-            // Re-fetch to get latest data at calculation time
+            // Re-fetch with address fallbacks so Nominatim can geocode clients with no GPS history
+            const addrFallbacks = new Map();
+            for (const c of allShiftCalls) {
+              if (c.service_user_id && c.service_user_address) {
+                addrFallbacks.set(c.service_user_id, c.service_user_address);
+              }
+            }
             locationCache = await getServiceUserLocations([
               ...serviceUserIds,
               ...idsNeedingCache,
-            ]);
+            ], addrFallbacks);
           }
 
           const resolved = resolveCallCoordinates(droveCalls, locationCache)
@@ -1247,13 +1263,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
           <AlertDialogHeader>
             <AlertDialogTitle>Did you drive to this call?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will record your GPS location for mileage tracking purposes.
-              {driveToCallConfirm && !driveToCallConfirm.currentLocation && (
-                <span className="block mt-2 text-amber-600 font-medium">
-                  GPS location not available. Please enable Location Services in your device settings.
-                  Without GPS, fuel mileage cannot be automatically calculated.
-                </span>
-              )}
+              This will record mileage for fuel expense tracking.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex gap-3">

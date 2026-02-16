@@ -231,11 +231,20 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
     enabled: !!shift.date,
   });
 
-  // Fetch cached GPS locations for mileage fallback
+  // Fetch cached GPS locations for mileage fallback (with address geocoding for clients with no GPS history)
   const summaryServiceUserIds = [...new Set(calls.map(c => c.service_user_id).filter(Boolean))];
+  const summaryAddrFallbacks = React.useMemo(() => {
+    const map = new Map();
+    for (const c of calls) {
+      if (c.service_user_id && c.service_user_address) {
+        map.set(c.service_user_id, c.service_user_address);
+      }
+    }
+    return map;
+  }, [calls]);
   const { data: summaryGpsCache = new Map() } = useQuery({
     queryKey: ['gpsLocationCache', ...summaryServiceUserIds],
-    queryFn: () => getServiceUserLocations(summaryServiceUserIds),
+    queryFn: () => getServiceUserLocations(summaryServiceUserIds, summaryAddrFallbacks),
     enabled: summaryServiceUserIds.length > 0,
     staleTime: 5 * 60 * 1000,
   });

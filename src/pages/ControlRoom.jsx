@@ -1,18 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { base44 } from '@/api/base44Client';
 import { ShiftApi, ShiftCallApi } from '@/api/rotaApi';
 import { supabase } from '@/api/supabaseClient';
-import { calculateDistance } from '@/components/DistanceCalculator';
+import { getServiceUserLocations } from '@/lib/gpsCache';
 import { format } from 'date-fns';
 import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Navigation, Trash2, Search, Check, AlertCircle, ChevronDown, Edit, Loader2, Mail, Clock, Plus, Users, Shield } from 'lucide-react';
+import { MapPin, Navigation, Search, Check, AlertCircle, ChevronDown, Edit, Loader2, Mail, Clock, Plus, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -20,17 +20,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { isToday, parseISO } from 'date-fns';
 import CompanyLogoUploader from '@/components/CompanyLogoUploader';
 import EmailNotificationCenter from '@/components/admin/EmailNotificationCenter';
 import ShiftStatusOverview from '@/components/admin/ShiftStatusOverview';
 import ShiftReminderSettings from '@/components/admin/ShiftReminderSettings';
+import { Trash2 } from 'lucide-react';
 
 export default function ControlRoom() {
   const queryClient = useQueryClient();
-  const [tracking, setTracking] = useState(false);
-  const [userLocation, setUserLocation] = useState(null);
-  const [selectedMarker, setSelectedMarker] = useState(null);
   const [mapMaximized, setMapMaximized] = useState(false);
   const [activeTab, setActiveTab] = useState('tracking');
   const [showLogoUploader, setShowLogoUploader] = useState(false);
@@ -38,8 +35,6 @@ export default function ControlRoom() {
   const [expandedId, setExpandedId] = useState(null);
   const [editingAnnouncement, setEditingAnnouncement] = useState(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
-  const [distanceMarkers, setDistanceMarkers] = useState([]);
-  const [showMileageData, setShowMileageData] = useState(false);
   const mapRef = useRef(null);
 
   const { data: user } = useQuery({
@@ -48,18 +43,6 @@ export default function ControlRoom() {
   });
 
   const isAdmin = user?.role === 'admin' || user?.job_title === 'admin' || user?.job_title === 'manager' || user?.job_title === 'supervisor';
-
-  const { data: staffLocations = [] } = useQuery({
-    queryKey: ['staffLocations'],
-    queryFn: () => base44.entities.Location.list('-timestamp', 100),
-    refetchInterval: 3000,
-  });
-
-  const { data: mileageLocations = [] } = useQuery({
-    queryKey: ['mileageLocations'],
-    queryFn: () => base44.entities.Location.list('-timestamp', 500),
-    enabled: activeTab === 'tracking' && showMileageData,
-  });
 
   const { data: messages = [] } = useQuery({
     queryKey: ['messages'],
@@ -76,81 +59,68 @@ export default function ControlRoom() {
     queryFn: () => base44.entities.AnnouncementAcknowledgement.filter({}, '-acknowledged_at', 1000),
   });
 
-  const { data: trackingSettings = [] } = useQuery({
-    queryKey: ['trackingSettings'],
-    queryFn: () => base44.entities.SystemSettings.filter({ setting_key: 'gps_tracking_enabled' }),
-  });
-
-  // GPS tracking defaults to ON — admin can turn it off if needed
-  const globalTrackingEnabled = trackingSettings.length === 0 || trackingSettings[0]?.setting_value !== 'false';
-
-  // Fetch today's shifts that are in_progress (staff currently on shift)
+  // Fetch today's shifts (all, not just active)
   const todayStr = format(new Date(), 'yyyy-MM-dd');
-  const { data: activeShifts = [] } = useQuery({
-    queryKey: ['activeShiftsToday', todayStr],
-    queryFn: async () => {
-      const shifts = await ShiftApi.filter({ date: todayStr });
-      return shifts.filter(s => s.status === 'in_progress' || s.clock_in_time);
-    },
-    refetchInterval: 10000,
+  const { data: todayShifts = [] } = useQuery({
+    queryKey: ['todayShifts', todayStr],
+    queryFn: () => ShiftApi.filter({ date: todayStr }),
+    refetchInterval: 15000,
   });
 
-  // Fetch all shift_calls with GPS data for today's active shifts
-  const { data: gpsCallData = [] } = useQuery({
-    queryKey: ['gpsCallData', activeShifts.map(s => s.id).join(',')],
+  // Fetch ALL shift_calls for today's shifts
+  const { data: todayCalls = [] } = useQuery({
+    queryKey: ['todayCalls', todayShifts.map(s => s.id).join(',')],
     queryFn: async () => {
-      if (activeShifts.length === 0) return [];
+      if (todayShifts.length === 0) return [];
       const { data, error } = await supabase
         .from('shift_calls')
         .select('*')
-        .in('shift_id', activeShifts.map(s => s.id))
-        .not('checkin_latitude', 'is', null)
-        .order('clock_in_time', { ascending: true });
+        .in('shift_id', todayShifts.map(s => s.id))
+        .neq('call_type', 'sitin_cover');
       if (error) throw error;
       return data || [];
     },
-    enabled: activeShifts.length > 0,
+    enabled: todayShifts.length > 0,
     refetchInterval: 10000,
   });
 
-  // Group GPS call data by staff_id (from the shift)
-  const staffBreadcrumbs = React.useMemo(() => {
-    const byStaff = {};
-    for (const shift of activeShifts) {
-      if (!shift.staff_id) continue;
-      const shiftCalls = gpsCallData
-        .filter(c => c.shift_id === shift.id && c.checkin_latitude && c.checkin_longitude)
-        .sort((a, b) => new Date(a.clock_in_time) - new Date(b.clock_in_time));
-      if (shiftCalls.length === 0) continue;
-      if (!byStaff[shift.staff_id]) {
-        byStaff[shift.staff_id] = {
-          staff_id: shift.staff_id,
-          staff_name: shift.staff_name,
-          shift,
-          points: [],
-        };
-      }
-      for (const call of shiftCalls) {
-        byStaff[shift.staff_id].points.push({
-          lat: parseFloat(call.checkin_latitude),
-          lng: parseFloat(call.checkin_longitude),
-          time: call.clock_in_time,
-          service_user: call.service_user_name,
-          status: call.status,
-          drove: call.drove_to_call,
-          callId: call.id,
-        });
+  // Get unique service user IDs from today's calls
+  const clientIds = [...new Set(todayCalls.map(c => c.service_user_id).filter(Boolean))];
+
+  // Build address fallback map for geocoding new clients
+  const addressFallbacks = React.useMemo(() => {
+    const map = new Map();
+    for (const call of todayCalls) {
+      if (call.service_user_id && call.service_user_address && !map.has(call.service_user_id)) {
+        map.set(call.service_user_id, call.service_user_address);
       }
     }
-    return Object.values(byStaff);
-  }, [activeShifts, gpsCallData]);
+    return map;
+  }, [todayCalls]);
 
-  // Subscribe to shift_calls for real-time GPS updates on the map
+  // Fetch cached GPS locations for all clients on today's calls
+  const { data: clientLocations = new Map() } = useQuery({
+    queryKey: ['clientLocations', ...clientIds],
+    queryFn: () => getServiceUserLocations(clientIds, addressFallbacks),
+    enabled: clientIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Subscribe to shift_calls for real-time updates
   useEffect(() => {
-    const unsubscribe = ShiftCallApi.subscribe((event) => {
-      if (event.new?.checkin_latitude) {
-        queryClient.invalidateQueries({ queryKey: ['gpsCallData'] });
-      }
+    const unsubscribe = ShiftCallApi.subscribe(() => {
+      queryClient.invalidateQueries({ queryKey: ['todayCalls'] });
+    });
+    return unsubscribe;
+  }, [queryClient]);
+
+  // Subscribe to shift updates
+  useEffect(() => {
+    const unsubscribe = ShiftApi.subscribe(() => {
+      queryClient.invalidateQueries({ queryKey: ['todayShifts'] });
+      queryClient.invalidateQueries({ queryKey: ['shiftsToday'] });
+      queryClient.invalidateQueries({ queryKey: ['allShifts'] });
+      queryClient.invalidateQueries({ queryKey: ['shiftStatusData'] });
     });
     return unsubscribe;
   }, [queryClient]);
@@ -160,7 +130,6 @@ export default function ControlRoom() {
   const getAnnouncementStats = (announcementId) => {
     const acks = acknowledgements.filter(a => a.announcement_id === announcementId);
     const activeStaff = staff.filter(s => s.is_active);
-
     return {
       total: activeStaff.length,
       acknowledged: acks.length,
@@ -185,221 +154,183 @@ export default function ControlRoom() {
     },
   });
 
-  const deleteLocationMutation = useMutation({
-    mutationFn: (locationId) => base44.entities.Location.delete(locationId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['staffLocations'] });
-      setSelectedMarker(null);
-    },
-    onError: (error) => {
-      console.error('Error deleting location:', error);
-      queryClient.invalidateQueries({ queryKey: ['staffLocations'] });
-    },
-  });
+  // Build client markers with call status
+  const clientMarkers = React.useMemo(() => {
+    const byClient = {};
 
-  const toggleGlobalTrackingMutation = useMutation({
-    mutationFn: async (enabled) => {
-      if (trackingSettings[0]) {
-        return base44.entities.SystemSettings.update(trackingSettings[0].id, { 
-          setting_value: enabled ? 'true' : 'false' 
-        });
-      } else {
-        return base44.entities.SystemSettings.create({
-          setting_key: 'gps_tracking_enabled',
-          setting_value: enabled ? 'true' : 'false',
-          description: 'Controls GPS tracking for all staff members'
-        });
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trackingSettings'] });
-    },
-  });
+    for (const call of todayCalls) {
+      if (!call.service_user_id) continue;
+      const coords = clientLocations.get(call.service_user_id);
+      if (!coords) continue;
 
-  // Subscribe to real-time location updates
-  useEffect(() => {
-    const unsubscribe = base44.entities.Location.subscribe((event) => {
-      queryClient.invalidateQueries({ queryKey: ['staffLocations'] });
-    });
-    return unsubscribe;
-  }, [queryClient]);
+      // Find which shift this call belongs to (for staff name)
+      const shift = todayShifts.find(s => s.id === call.shift_id);
 
-  // Subscribe to real-time shift updates
-  useEffect(() => {
-    const unsubscribe = ShiftApi.subscribe((event) => {
-      queryClient.invalidateQueries({ queryKey: ['shiftsToday'] });
-      queryClient.invalidateQueries({ queryKey: ['allShifts'] });
-      queryClient.invalidateQueries({ queryKey: ['shiftStatusData'] });
-    });
-    return unsubscribe;
-  }, [queryClient]);
-
-  const updateLocationMutation = useMutation({
-   mutationFn: async (coords) => {
-     return base44.entities.Location.create({
-       staff_id: user.id,
-       staff_name: user.staff_full_name || user.gps_map_name || user.full_name,
-       latitude: coords.latitude,
-       longitude: coords.longitude,
-       accuracy: coords.accuracy,
-       timestamp: new Date().toISOString()
-     });
-   },
-   onSuccess: () => {
-     queryClient.invalidateQueries({ queryKey: ['staffLocations'] });
-   },
-  });
-
-  useEffect(() => {
-    if (!tracking || !user?.id) return;
-
-    const watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        const coords = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
+      if (!byClient[call.service_user_id]) {
+        byClient[call.service_user_id] = {
+          id: call.service_user_id,
+          name: call.service_user_name,
+          address: call.service_user_address,
+          lat: coords.latitude,
+          lng: coords.longitude,
+          calls: [],
         };
-        setUserLocation(coords);
-        updateLocationMutation.mutate(coords);
-      },
-      (error) => console.error('Geolocation error:', error),
-      { enableHighAccuracy: true, maximumAge: 0 }
-    );
-
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, [tracking, user?.id]);
-
-  const toggleGlobalTracking = () => {
-    toggleGlobalTrackingMutation.mutate(!globalTrackingEnabled);
-  };
-
-  const latestLocations = staffLocations.reduce((acc, loc) => {
-    // Only include locations from the last 5 minutes
-    const locationTime = new Date(loc.timestamp).getTime();
-    const now = new Date().getTime();
-    const fiveMinutesAgo = now - (5 * 60 * 1000);
-
-    if (locationTime > fiveMinutesAgo) {
-      if (!acc[loc.staff_id] || new Date(loc.timestamp) > new Date(acc[loc.staff_id].timestamp)) {
-        acc[loc.staff_id] = loc;
       }
-    }
-    return acc;
-  }, {});
 
-  // Calculate map center from breadcrumb data OR location data
-  const allPoints = staffBreadcrumbs.flatMap(s => s.points);
-  const locationPoints = Object.values(latestLocations);
-  const hasBreadcrumbs = allPoints.length > 0;
-  const hasLocations = locationPoints.length > 0;
-  const centerLat = hasBreadcrumbs
-    ? allPoints.reduce((sum, p) => sum + p.lat, 0) / allPoints.length
-    : hasLocations
-    ? locationPoints.reduce((sum, loc) => sum + loc.latitude, 0) / locationPoints.length
+      byClient[call.service_user_id].calls.push({
+        ...call,
+        staff_name: shift?.staff_name || 'Unknown',
+        shift_name: shift?.shift_name || '',
+      });
+    }
+
+    // Determine overall status for each client marker
+    return Object.values(byClient).map(client => {
+      const calls = client.calls.sort((a, b) => (a.scheduled_time || '').localeCompare(b.scheduled_time || ''));
+      const hasInProgress = calls.some(c => c.status === 'in_progress');
+      const allCompleted = calls.every(c => c.status === 'completed' || c.status === 'missed');
+      const latestCall = calls[calls.length - 1];
+
+      let markerStatus = 'pending';
+      let statusColor = '#10B981'; // green
+      if (hasInProgress) {
+        markerStatus = 'in_progress';
+        statusColor = '#F59E0B'; // amber
+      } else if (allCompleted) {
+        markerStatus = 'completed';
+        statusColor = '#10B981'; // green
+      }
+
+      return {
+        ...client,
+        calls,
+        markerStatus,
+        statusColor,
+        latestCall,
+        inProgressCall: calls.find(c => c.status === 'in_progress'),
+      };
+    });
+  }, [todayCalls, clientLocations, todayShifts]);
+
+  // Active staff: staff with shifts today who have activity in last hour
+  const activeStaffList = React.useMemo(() => {
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+    return todayShifts
+      .filter(s => s.staff_id && s.status !== 'cancelled')
+      .map(shift => {
+        const shiftCalls = todayCalls.filter(c => c.shift_id === shift.id);
+        const totalCalls = shiftCalls.length;
+        const completedCalls = shiftCalls.filter(c => c.status === 'completed').length;
+        const hasInProgress = shiftCalls.some(c => c.status === 'in_progress');
+
+        // Check for recent activity
+        const hasRecentActivity = shift.clock_in_time ||
+          shiftCalls.some(c =>
+            (c.clock_in_time && c.clock_in_time > oneHourAgo) ||
+            (c.clock_out_time && c.clock_out_time > oneHourAgo)
+          );
+
+        let statusLabel = 'Scheduled';
+        let statusColor = 'text-slate-500';
+        if (shift.status === 'completed') {
+          statusLabel = 'Completed';
+          statusColor = 'text-green-600';
+        } else if (hasInProgress) {
+          statusLabel = 'On Call';
+          statusColor = 'text-amber-600';
+        } else if (shift.status === 'in_progress' || shift.clock_in_time) {
+          statusLabel = 'On Shift';
+          statusColor = 'text-blue-600';
+        }
+
+        return {
+          ...shift,
+          totalCalls,
+          completedCalls,
+          statusLabel,
+          statusColor,
+          hasRecentActivity,
+        };
+      })
+      .filter(s => s.hasRecentActivity || s.status === 'in_progress' || s.clock_in_time)
+      .sort((a, b) => (a.staff_name || '').localeCompare(b.staff_name || ''));
+  }, [todayShifts, todayCalls]);
+
+  // Map center from client markers
+  const hasMarkers = clientMarkers.length > 0;
+  const centerLat = hasMarkers
+    ? clientMarkers.reduce((sum, m) => sum + m.lat, 0) / clientMarkers.length
     : 52.82;
-  const centerLng = hasBreadcrumbs
-    ? allPoints.reduce((sum, p) => sum + p.lng, 0) / allPoints.length
-    : hasLocations
-    ? locationPoints.reduce((sum, loc) => sum + loc.longitude, 0) / locationPoints.length
+  const centerLng = hasMarkers
+    ? clientMarkers.reduce((sum, m) => sum + m.lng, 0) / clientMarkers.length
     : -3.40;
 
-  const createMarkerIcon = (isCurrentUser) => {
+  // Lollipop icon with client name label
+  const createClientLollipop = (color, name, isInProgress) => {
+    const pulse = isInProgress ? 'animation:pulse 2s infinite;' : '';
+    const labelText = name.length > 15 ? name.substring(0, 14) + '...' : name;
     return L.divIcon({
-      className: 'custom-marker',
-      html: `<div style="background-color: ${isCurrentUser ? '#3B82F6' : '#EF4444'}; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; border: 3px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">📍</div>`,
-      iconSize: [32, 32],
-      iconAnchor: [16, 32],
-      popupAnchor: [0, -32]
+      className: 'client-lollipop',
+      html: `<div style="position:relative;display:flex;flex-direction:column;align-items:center;">
+        <div style="font-size:9px;font-weight:600;color:#334155;background:white;padding:1px 4px;border-radius:3px;box-shadow:0 1px 2px rgba(0,0,0,0.15);white-space:nowrap;margin-bottom:2px;max-width:100px;overflow:hidden;text-overflow:ellipsis;">${labelText}</div>
+        <div style="width:18px;height:18px;background:${color};border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3);${pulse}"></div>
+        <div style="width:2px;height:16px;background:${color};border-radius:1px;"></div>
+      </div>
+      <style>@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.7;transform:scale(1.15)}}</style>`,
+      iconSize: [80, 50],
+      iconAnchor: [40, 50],
+      popupAnchor: [0, -50],
     });
   };
 
-  const createLollipopIcon = (color = '#F97316') => {
-    return L.divIcon({
-      className: 'lollipop-marker',
-      html: `<div style="position:relative;width:14px;height:26px;">
-        <div style="width:14px;height:14px;background:${color};border-radius:50%;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);position:absolute;top:0;left:0;"></div>
-        <div style="width:2px;height:14px;background:${color};position:absolute;top:12px;left:6px;border-radius:1px;"></div>
-      </div>`,
-      iconSize: [14, 26],
-      iconAnchor: [7, 26],
-      popupAnchor: [0, -26]
-    });
-  };
-
-  const createLatestIcon = (color = '#10B981') => {
-    return L.divIcon({
-      className: 'latest-marker',
-      html: `<div style="width:36px;height:36px;background:${color};border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
-        <div style="width:10px;height:10px;background:white;border-radius:50%;"></div>
-      </div>`,
-      iconSize: [36, 36],
-      iconAnchor: [18, 18],
-      popupAnchor: [0, -18]
-    });
-  };
-
-  // Staff colors for breadcrumb trails
-  const staffColors = ['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#F97316'];
-
-  // Render breadcrumb layers for map (used in both normal and maximized view)
-  const renderBreadcrumbs = () => (
+  // Render client markers for map
+  const renderClientMarkers = () => (
     <>
-      {staffBreadcrumbs.map((staffData, sIdx) => {
-        const color = staffColors[sIdx % staffColors.length];
-        const points = staffData.points;
-        const latestPoint = points[points.length - 1];
-        const trailPositions = points.map(p => [p.lat, p.lng]);
+      {clientMarkers.map(client => (
+        <Marker
+          key={client.id}
+          position={[client.lat, client.lng]}
+          icon={createClientLollipop(client.statusColor, client.name, client.markerStatus === 'in_progress')}
+        >
+          <Popup>
+            <div className="text-sm p-2 w-56 space-y-2">
+              <p className="font-bold text-slate-900">{client.name}</p>
+              {client.address && (
+                <p className="text-xs text-slate-500">{client.address}</p>
+              )}
+              <div className="space-y-1.5 border-t border-slate-100 pt-2">
+                {client.calls.map((call, idx) => {
+                  const statusBg = call.status === 'in_progress' ? 'bg-amber-100 text-amber-700'
+                    : call.status === 'completed' ? 'bg-green-100 text-green-700'
+                    : call.status === 'missed' ? 'bg-red-100 text-red-700'
+                    : 'bg-slate-100 text-slate-600';
+                  const statusText = call.status === 'in_progress' ? 'In Progress'
+                    : call.status === 'completed' ? 'Completed'
+                    : call.status === 'missed' ? 'Not Home'
+                    : 'Pending';
 
-        return (
-          <React.Fragment key={staffData.staff_id}>
-            {/* Breadcrumb polyline trail */}
-            {trailPositions.length > 1 && (
-              <Polyline
-                positions={trailPositions}
-                pathOptions={{ color, weight: 3, opacity: 0.7, dashArray: '8, 6' }}
-              />
-            )}
-            {/* Lollipop markers for each check-in (except the latest) */}
-            {points.slice(0, -1).map((pt, idx) => (
-              <Marker
-                key={`breadcrumb-${staffData.staff_id}-${idx}`}
-                position={[pt.lat, pt.lng]}
-                icon={createLollipopIcon(color)}
-              >
-                <Popup>
-                  <div className="text-sm p-1 w-44">
-                    <p className="font-semibold text-xs">{staffData.staff_name}</p>
-                    <p className="text-xs text-slate-700">{pt.service_user}</p>
-                    <p className="text-xs text-slate-500">{pt.time ? format(new Date(pt.time), 'HH:mm') : ''}</p>
-                    {pt.drove && <p className="text-xs text-green-600">Drove to call</p>}
-                  </div>
-                </Popup>
-              </Marker>
-            ))}
-            {/* Latest position — large marker */}
-            {latestPoint && (
-              <Marker
-                key={`latest-${staffData.staff_id}`}
-                position={[latestPoint.lat, latestPoint.lng]}
-                icon={createLatestIcon(color)}
-              >
-                <Popup>
-                  <div className="text-sm p-2 w-48">
-                    <p className="font-bold">{staffData.staff_name}</p>
-                    <p className="text-xs text-slate-700">{latestPoint.service_user}</p>
-                    <p className="text-xs text-slate-500">Last check-in: {latestPoint.time ? format(new Date(latestPoint.time), 'HH:mm') : ''}</p>
-                    <p className="text-xs text-slate-500">{points.length} call{points.length !== 1 ? 's' : ''} tracked</p>
-                    {latestPoint.status === 'in_progress' && (
-                      <span className="inline-block mt-1 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Active</span>
-                    )}
-                  </div>
-                </Popup>
-              </Marker>
-            )}
-          </React.Fragment>
-        );
-      })}
+                  return (
+                    <div key={idx} className="text-xs space-y-0.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-slate-700">{call.scheduled_time || '—'}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${statusBg}`}>{statusText}</span>
+                      </div>
+                      <p className="text-slate-500">{call.staff_name}</p>
+                      {call.clock_in_time && (
+                        <p className="text-slate-400">In: {format(new Date(call.clock_in_time), 'HH:mm')}</p>
+                      )}
+                      {call.clock_out_time && (
+                        <p className="text-slate-400">Out: {format(new Date(call.clock_out_time), 'HH:mm')}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </Popup>
+        </Marker>
+      ))}
     </>
   );
 
@@ -407,84 +338,30 @@ export default function ControlRoom() {
     return (
       <div className="fixed inset-0 z-50 bg-white flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-slate-200">
-          <h1 className="text-xl font-bold text-slate-900">Control Room</h1>
-          <Button
-            variant="outline"
-            onClick={() => setMapMaximized(false)}
-            className="text-slate-600"
-          >
-            Minimize
-          </Button>
+          <h1 className="text-xl font-bold text-slate-900">Control Room — Live Map</h1>
+          <Button variant="outline" onClick={() => setMapMaximized(false)}>Minimize</Button>
         </div>
         <div className="flex-1 overflow-hidden">
           <MapContainer center={[centerLat, centerLng]} zoom={13} style={{ height: '100%', width: '100%' }} ref={mapRef}>
-            <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution='&copy; OpenStreetMap contributors'
-            />
-            {Object.values(latestLocations).map((location) => (
-              <Marker
-                key={location.staff_id}
-                position={[location.latitude, location.longitude]}
-                icon={createMarkerIcon(location.staff_id === user?.id)}
-                eventHandlers={{
-                  click: () => setSelectedMarker(location)
-                }}
-              >
-                <Popup>
-                  <div className="text-sm p-2 space-y-2 w-48">
-                    <p className="font-semibold">{location.staff_name}</p>
-                    <p className="text-xs text-slate-600">±{location.accuracy.toFixed(0)}m accuracy</p>
-                    <p className="text-xs text-slate-500">{new Date(location.timestamp).toLocaleTimeString()}</p>
-                    {isAdmin && (
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => deleteLocationMutation.mutate(location.id)}
-                        className="w-full mt-2"
-                      >
-                        <Trash2 className="w-3 h-3 mr-1" />
-                        Remove
-                      </Button>
-                    )}
-                  </div>
-                </Popup>
-              </Marker>
-            ))}
-            {renderBreadcrumbs()}
-            {showMileageData && mileageLocations.map((location) => (
-              <Marker
-                key={`mileage-${location.id}`}
-                position={[location.latitude, location.longitude]}
-                icon={createLollipopIcon()}
-              >
-                <Popup>
-                  <div className="text-sm p-2 space-y-1 w-40">
-                    <p className="font-semibold text-xs">{location.staff_name}</p>
-                    <p className="text-xs text-slate-500">{new Date(location.timestamp).toLocaleTimeString()}</p>
-                  </div>
-                </Popup>
-              </Marker>
-            ))}
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap contributors' />
+            {renderClientMarkers()}
           </MapContainer>
-          </div>
-          </div>
-          );
-          }
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <PageHeader 
-        title="Control Room" 
-        subtitle="Real-time GPS staff tracking & announcement logs"
+      <PageHeader
+        title="Control Room"
+        subtitle="Live client map & staff tracking"
         icon={Navigation}
         className="[&_h1]:text-slate-900 [&_svg]:text-slate-700 [&_svg]:fill-slate-700 flex-col sm:flex-row"
       >
         <div className="flex flex-wrap items-center gap-2">
           <Link to={createPageUrl('ClientManagement')}>
-            <Button 
-              className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white text-sm whitespace-nowrap shadow-md hover:shadow-lg transition-all"
-            >
+            <Button className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white text-sm whitespace-nowrap shadow-md hover:shadow-lg transition-all">
               <Users className="w-4 h-4 mr-2" />
               Clients
             </Button>
@@ -492,14 +369,12 @@ export default function ControlRoom() {
           {isAdmin && (
             <>
               <Link to={createPageUrl('RotaManagement')}>
-                <Button 
-                  className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white text-sm whitespace-nowrap shadow-md hover:shadow-lg transition-all"
-                >
+                <Button className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white text-sm whitespace-nowrap shadow-md hover:shadow-lg transition-all">
                   <Plus className="w-4 h-4 mr-2" />
                   Create
                 </Button>
               </Link>
-              <Button 
+              <Button
                 onClick={() => setShowLogoUploader(!showLogoUploader)}
                 className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-sm whitespace-nowrap shadow-md hover:shadow-lg transition-all"
               >
@@ -514,34 +389,22 @@ export default function ControlRoom() {
 
       {/* Tabs */}
       <div className="w-full grid grid-cols-2 sm:grid-cols-4 h-auto p-1 gap-1">
-        <button 
-          onClick={() => setActiveTab('tracking')}
-          className={`flex items-center justify-center sm:justify-start gap-1 flex-1 text-xs sm:text-sm py-2 sm:py-3 rounded-lg font-medium transition-all shadow-md hover:shadow-lg ${activeTab === 'tracking' ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white' : 'bg-gradient-to-r from-blue-400 to-blue-500 text-white hover:from-blue-500 hover:to-blue-600'}`}
-        >
+        <button onClick={() => setActiveTab('tracking')} className={`flex items-center justify-center sm:justify-start gap-1 flex-1 text-xs sm:text-sm py-2 sm:py-3 rounded-lg font-medium transition-all shadow-md hover:shadow-lg ${activeTab === 'tracking' ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white' : 'bg-gradient-to-r from-blue-400 to-blue-500 text-white hover:from-blue-500 hover:to-blue-600'}`}>
           <MapPin className="w-4 h-4 flex-shrink-0" />
           <span className="hidden sm:inline">Tracking</span>
           <span className="sm:hidden">Map</span>
         </button>
-        <button 
-          onClick={() => setActiveTab('shifts')}
-          className={`flex items-center justify-center sm:justify-start gap-1 flex-1 text-xs sm:text-sm py-2 sm:py-3 rounded-lg font-medium transition-all shadow-md hover:shadow-lg ${activeTab === 'shifts' ? 'bg-gradient-to-r from-red-500 to-red-600 text-white' : 'bg-gradient-to-r from-red-400 to-red-500 text-white hover:from-red-500 hover:to-red-600'}`}
-        >
+        <button onClick={() => setActiveTab('shifts')} className={`flex items-center justify-center sm:justify-start gap-1 flex-1 text-xs sm:text-sm py-2 sm:py-3 rounded-lg font-medium transition-all shadow-md hover:shadow-lg ${activeTab === 'shifts' ? 'bg-gradient-to-r from-red-500 to-red-600 text-white' : 'bg-gradient-to-r from-red-400 to-red-500 text-white hover:from-red-500 hover:to-red-600'}`}>
           <Clock className="w-4 h-4 flex-shrink-0" />
           <span className="hidden sm:inline">Today's Shifts</span>
           <span className="sm:hidden">Shifts</span>
         </button>
-        <button 
-          onClick={() => setActiveTab('announcements')}
-          className={`flex items-center justify-center sm:justify-start gap-1 flex-1 text-xs sm:text-sm py-2 sm:py-3 rounded-lg font-medium transition-all shadow-md hover:shadow-lg ${activeTab === 'announcements' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' : 'bg-gradient-to-r from-orange-400 to-orange-500 text-white hover:from-orange-500 hover:to-orange-600'}`}
-        >
+        <button onClick={() => setActiveTab('announcements')} className={`flex items-center justify-center sm:justify-start gap-1 flex-1 text-xs sm:text-sm py-2 sm:py-3 rounded-lg font-medium transition-all shadow-md hover:shadow-lg ${activeTab === 'announcements' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' : 'bg-gradient-to-r from-orange-400 to-orange-500 text-white hover:from-orange-500 hover:to-orange-600'}`}>
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
           <span className="hidden sm:inline">Announcements</span>
           <span className="sm:hidden">Announce</span>
         </button>
-        <button 
-          onClick={() => setActiveTab('email-settings')}
-          className={`flex items-center justify-center sm:justify-start gap-1 flex-1 text-xs sm:text-sm py-2 sm:py-3 rounded-lg font-medium transition-all shadow-md hover:shadow-lg ${activeTab === 'email-settings' ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white' : 'bg-gradient-to-r from-indigo-400 to-indigo-500 text-white hover:from-indigo-500 hover:to-indigo-600'}`}
-        >
+        <button onClick={() => setActiveTab('email-settings')} className={`flex items-center justify-center sm:justify-start gap-1 flex-1 text-xs sm:text-sm py-2 sm:py-3 rounded-lg font-medium transition-all shadow-md hover:shadow-lg ${activeTab === 'email-settings' ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white' : 'bg-gradient-to-r from-indigo-400 to-indigo-500 text-white hover:from-indigo-500 hover:to-indigo-600'}`}>
           <Mail className="w-4 h-4 flex-shrink-0" />
           <span className="hidden sm:inline">Email</span>
           <span className="sm:hidden">Mail</span>
@@ -549,108 +412,16 @@ export default function ControlRoom() {
       </div>
 
       {activeTab === 'tracking' && isAdmin && (
-      <div className="max-w-4xl">
-        {isAdmin && (
-          <Card className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 shadow-sm mb-4">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-              <div className="flex-1">
-                <h3 className="font-semibold text-slate-900 mb-1">Global GPS Tracking</h3>
-                <p className="text-xs text-slate-600">Control location tracking for all staff members</p>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                <Button
-                  onClick={toggleGlobalTracking}
-                  disabled={toggleGlobalTrackingMutation.isPending}
-                  className={`${globalTrackingEnabled ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'} text-white shadow-md w-full sm:w-auto`}
-                >
-                  {toggleGlobalTrackingMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : globalTrackingEnabled ? (
-                    <>
-                      <MapPin className="w-4 h-4 mr-2" />
-                      Stop All Tracking
-                    </>
-                  ) : (
-                    <>
-                      <Navigation className="w-4 h-4 mr-2" />
-                      Start All Tracking
-                    </>
-                  )}
-                </Button>
-                <Button
-                  onClick={() => setShowMileageData(!showMileageData)}
-                  className={`${showMileageData ? 'bg-orange-600 hover:bg-orange-700' : 'bg-slate-500 hover:bg-slate-600'} text-white shadow-md w-full sm:w-auto`}
-                >
-                  {showMileageData ? 'Hide Mileage Data' : 'Show Mileage Data'}
-                </Button>
-              </div>
-            </div>
-            <div className="mt-3 pt-3 border-t border-blue-200">
-              <p className="text-xs text-slate-600">
-                Status: {globalTrackingEnabled ? (
-                  <span className="text-green-700 font-medium">All staff tracking enabled</span>
-                ) : (
-                  <span className="text-red-700 font-medium">All staff tracking disabled</span>
-                )}
-              </p>
-            </div>
-          </Card>
-        )}
-
-        <Card className="p-0 bg-white border-0 shadow-sm overflow-hidden relative group h-[300px] mb-24 z-0">
-           <MapContainer center={[centerLat, centerLng]} zoom={13} style={{ height: '100%', width: '100%' }} ref={mapRef}>
-             <TileLayer
-               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-               attribution='&copy; OpenStreetMap contributors'
-             />
-             {Object.values(latestLocations).map((location) => (
-               <Marker
-                 key={location.staff_id}
-                 position={[location.latitude, location.longitude]}
-                 icon={createMarkerIcon(location.staff_id === user?.id)}
-                 eventHandlers={{
-                   click: () => setSelectedMarker(location)
-                 }}
-               >
-                 <Popup>
-                   <div className="text-sm p-2 space-y-2 w-48">
-                     <p className="font-semibold">{location.staff_name}</p>
-                     <p className="text-xs text-slate-600">±{location.accuracy.toFixed(0)}m accuracy</p>
-                     <p className="text-xs text-slate-500">{new Date(location.timestamp).toLocaleTimeString()}</p>
-                     {isAdmin && (
-                       <Button
-                         size="sm"
-                         variant="destructive"
-                         onClick={() => deleteLocationMutation.mutate(location.id)}
-                         className="w-full mt-2"
-                       >
-                         <Trash2 className="w-3 h-3 mr-1" />
-                         Remove
-                       </Button>
-                     )}
-                   </div>
-                 </Popup>
-               </Marker>
-             ))}
-             {renderBreadcrumbs()}
-             {showMileageData && mileageLocations.map((location) => (
-               <Marker
-                 key={`mileage-${location.id}`}
-                 position={[location.latitude, location.longitude]}
-                 icon={createLollipopIcon()}
-               >
-                 <Popup>
-                   <div className="text-sm p-2 space-y-1 w-40">
-                     <p className="font-semibold text-xs">{location.staff_name}</p>
-                     <p className="text-xs text-slate-500">{new Date(location.timestamp).toLocaleTimeString()}</p>
-                   </div>
-                 </Popup>
-               </Marker>
-             ))}
-           </MapContainer>
-          {Object.values(latestLocations).length === 0 && staffBreadcrumbs.length === 0 && (
+      <div className="max-w-4xl space-y-4">
+        {/* Map */}
+        <Card className="p-0 bg-white border-0 shadow-sm overflow-hidden relative group h-[350px] z-0">
+          <MapContainer center={[centerLat, centerLng]} zoom={13} style={{ height: '100%', width: '100%' }} ref={mapRef}>
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap contributors' />
+            {renderClientMarkers()}
+          </MapContainer>
+          {clientMarkers.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center bg-white/80">
-              <p className="text-slate-500 text-xs">No active staff on shift — check-in GPS data will appear here</p>
+              <p className="text-slate-500 text-xs">No client calls scheduled today — markers will appear when shifts have calls</p>
             </div>
           )}
           <button
@@ -664,90 +435,45 @@ export default function ControlRoom() {
           </button>
         </Card>
 
-        <Card className="p-4 bg-white border-0 shadow-sm overflow-hidden flex flex-col max-h-96">
-           <div className="space-y-3 mb-3">
-             <h3 className="font-semibold text-slate-900">Active Staff ({new Set([...Object.values(latestLocations).map(l => l.staff_id), ...staffBreadcrumbs.map(s => s.staff_id)]).size})</h3>
-             {distanceMarkers.length === 2 && (
-               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                 <p className="text-sm font-medium text-slate-900 mb-2">Distance Calculation</p>
-                 <p className="text-xs text-slate-600 mb-2">
-                   {distanceMarkers[0].staff_name} → {distanceMarkers[1].staff_name}
-                 </p>
-                 <p className="text-lg font-bold text-blue-600">
-                   {calculateDistance(distanceMarkers[0].latitude, distanceMarkers[0].longitude, distanceMarkers[1].latitude, distanceMarkers[1].longitude)} miles
-                 </p>
-                 <button
-                   onClick={() => setDistanceMarkers([])}
-                   className="text-xs text-blue-600 hover:text-blue-700 mt-2 underline"
-                 >
-                   Clear
-                 </button>
-               </div>
-             )}
-             {distanceMarkers.length === 1 && (
-               <p className="text-xs text-slate-500 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                 Click another marker to calculate distance
-               </p>
-             )}
-           </div>
-           <div className="space-y-2 overflow-y-auto flex-1">
-            {/* Location-tracked staff */}
-            {Object.values(latestLocations).sort((a, b) => a.staff_name.localeCompare(b.staff_name)).map((location) => (
-              <div key={location.staff_id} className={`flex items-center gap-2 p-2 rounded transition-colors cursor-pointer ${distanceMarkers.some(m => m.staff_id === location.staff_id) ? 'bg-blue-100 border border-blue-300' : 'bg-slate-50 hover:bg-slate-100'}`}>
-                <button
-                  onClick={() => {
-                    mapRef.current?.setCenter({ lat: location.latitude, lng: location.longitude });
-                    mapRef.current?.setZoom(16);
-                    setSelectedMarker(location);
-                    if (distanceMarkers.length < 2 && !distanceMarkers.some(m => m.staff_id === location.staff_id)) {
-                      setDistanceMarkers([...distanceMarkers, location]);
-                    }
-                  }}
-                  className="flex-1 flex items-center justify-between text-left cursor-pointer"
-                >
-                  <p className="text-sm font-medium text-slate-900">{location.staff_name}</p>
-                  <p className="text-xs text-slate-500">±{location.accuracy.toFixed(0)}m</p>
-                </button>
-                {isAdmin && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => deleteLocationMutation.mutate(location.id)}
-                    className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
-                )}
-              </div>
-            ))}
-            {/* Breadcrumb-tracked staff (from shift check-in GPS, not in Location table) */}
-            {staffBreadcrumbs
-              .filter(s => !latestLocations[s.staff_id])
-              .sort((a, b) => a.staff_name.localeCompare(b.staff_name))
-              .map((staffData) => {
-                const latest = staffData.points[staffData.points.length - 1];
-                const colorIdx = staffBreadcrumbs.indexOf(staffData);
-                const color = staffColors[colorIdx % staffColors.length];
-                return (
-                  <div key={`bc-${staffData.staff_id}`} className="flex items-center gap-2 p-2 rounded bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer">
-                    <button
-                      onClick={() => {
-                        if (mapRef.current && latest) {
-                          mapRef.current.setView([latest.lat, latest.lng], 16);
-                        }
-                      }}
-                      className="flex-1 flex items-center justify-between text-left cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: color }} />
-                        <p className="text-sm font-medium text-slate-900">{staffData.staff_name}</p>
-                      </div>
-                      <p className="text-xs text-slate-500">{staffData.points.length} check-in{staffData.points.length !== 1 ? 's' : ''}</p>
-                    </button>
-                  </div>
-                );
-              })}
+        {/* Map Legend */}
+        <div className="flex flex-wrap gap-3 px-1">
+          <div className="flex items-center gap-1.5 text-xs text-slate-600">
+            <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+            In Progress
           </div>
+          <div className="flex items-center gap-1.5 text-xs text-slate-600">
+            <div className="w-3 h-3 rounded-full bg-green-500"></div>
+            Completed / Pending
+          </div>
+          <div className="text-xs text-slate-400">
+            {clientMarkers.length} client{clientMarkers.length !== 1 ? 's' : ''} on map
+          </div>
+        </div>
+
+        {/* Active Staff List */}
+        <Card className="p-4 bg-white border-0 shadow-sm">
+          <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+            <Users className="w-4 h-4" />
+            Active Staff ({activeStaffList.length})
+          </h3>
+          {activeStaffList.length === 0 ? (
+            <p className="text-sm text-slate-500">No active staff in the last hour</p>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {activeStaffList.map(shift => (
+                <div key={shift.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-900 truncate">{shift.staff_name}</p>
+                    <p className="text-xs text-slate-500">{shift.shift_name} &middot; {shift.start_time}–{shift.end_time}</p>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <span className="text-xs text-slate-600">{shift.completedCalls}/{shift.totalCalls} calls</span>
+                    <span className={`text-xs font-medium ${shift.statusColor}`}>{shift.statusLabel}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </Card>
       </div>
       )}
@@ -783,7 +509,7 @@ export default function ControlRoom() {
           ).map((announcement) => {
             const stats = getAnnouncementStats(announcement.id);
             const isExpanded = expandedId === announcement.id;
-            const pendingStaff = staff.filter(s => 
+            const pendingStaff = staff.filter(s =>
               s.is_active && !stats.details.some(a => a.staff_id === s.id)
             );
 
