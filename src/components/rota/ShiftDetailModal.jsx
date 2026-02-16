@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { ShiftApi, ShiftCallApi } from '@/api/rotaApi';
+import { getServiceUserLocations, resolveCallCoordinates } from '@/lib/gpsCache';
 import CareLogForm from '@/components/careLogs/CareLogForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -230,6 +231,15 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
     enabled: !!shift.date,
   });
 
+  // Fetch cached GPS locations for mileage fallback
+  const summaryServiceUserIds = [...new Set(calls.map(c => c.service_user_id).filter(Boolean))];
+  const { data: summaryGpsCache = new Map() } = useQuery({
+    queryKey: ['gpsLocationCache', ...summaryServiceUserIds],
+    queryFn: () => getServiceUserLocations(summaryServiceUserIds),
+    enabled: summaryServiceUserIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Compute shift summary data for the checkout popup
   const getShiftSummary = () => {
     const regularCalls = calls.filter(c => c.call_type !== 'sitin_cover');
@@ -241,19 +251,19 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
     const droveCalls = regularCalls.filter(c => c.drove_to_call);
     const didNotDriveCalls = regularCalls.filter(c => c.drove_to_call === false);
 
-    // Calculate total mileage from GPS
-    const withGPS = regularCalls
-      .filter(c => c.drove_to_call && c.checkin_latitude && c.checkin_longitude)
+    // Calculate total mileage from GPS (with cached location fallback)
+    const droveCallsForMileage = regularCalls.filter(c => c.drove_to_call);
+    const resolvedForMileage = resolveCallCoordinates(droveCallsForMileage, summaryGpsCache)
       .sort((a, b) => {
         const tA = a.scheduled_time || '23:59';
         const tB = b.scheduled_time || '23:59';
         return tA.localeCompare(tB);
       });
     let totalMiles = 0;
-    for (let i = 1; i < withGPS.length; i++) {
+    for (let i = 1; i < resolvedForMileage.length; i++) {
       totalMiles += haversineMiles(
-        parseFloat(withGPS[i - 1].checkin_latitude), parseFloat(withGPS[i - 1].checkin_longitude),
-        parseFloat(withGPS[i].checkin_latitude), parseFloat(withGPS[i].checkin_longitude)
+        resolvedForMileage[i - 1].resolvedLat, resolvedForMileage[i - 1].resolvedLng,
+        resolvedForMileage[i].resolvedLat, resolvedForMileage[i].resolvedLng
       );
     }
 

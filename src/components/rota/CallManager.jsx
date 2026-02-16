@@ -3,6 +3,7 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { ShiftCallApi, ShiftApi } from '@/api/rotaApi';
+import { getServiceUserLocations, resolveCallCoordinates } from '@/lib/gpsCache';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -143,6 +144,15 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
     queryKey: ['allActiveServiceUsers'],
     queryFn: () => base44.entities.ServiceUser.filter({ status: 'active' }, 'full_name', 500),
     enabled: hasSitinCalls,
+  });
+
+  // Fetch cached GPS locations for service users (fallback when staff GPS fails)
+  const serviceUserIds = [...new Set(callsToDisplay.map(c => c.service_user_id).filter(Boolean))];
+  const { data: gpsLocationCache = new Map() } = useQuery({
+    queryKey: ['gpsLocationCache', ...serviceUserIds],
+    queryFn: () => getServiceUserLocations(serviceUserIds),
+    enabled: serviceUserIds.length > 0,
+    staleTime: 5 * 60 * 1000, // cache for 5 minutes
   });
 
   const VISIT_TYPE_LABELS = {
@@ -321,6 +331,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
 
       if (isLastCall && data.call_type !== 'sitin_cover') {
         // Calculate mileage from all shift_calls where drove_to_call=true
+        // Uses cached GPS locations as fallback when staff GPS is unavailable
         try {
           const allShiftCalls = await ShiftCallApi.filter(
             { shift_id: shift?.id },
@@ -328,25 +339,32 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
             100
           );
 
-          const droveCallsWithGPS = allShiftCalls
-            .filter(c => c.drove_to_call === true && c.checkin_latitude && c.checkin_longitude)
+          const droveCalls = allShiftCalls.filter(c => c.drove_to_call === true);
+
+          // Fetch cached locations for any calls missing GPS
+          const idsNeedingCache = droveCalls
+            .filter(c => !c.checkin_latitude || !c.checkin_longitude)
+            .map(c => c.service_user_id)
+            .filter(Boolean);
+          let locationCache = gpsLocationCache;
+          if (idsNeedingCache.length > 0) {
+            // Re-fetch to get latest data at calculation time
+            locationCache = await getServiceUserLocations([
+              ...serviceUserIds,
+              ...idsNeedingCache,
+            ]);
+          }
+
+          const resolved = resolveCallCoordinates(droveCalls, locationCache)
             .sort((a, b) => new Date(a.clock_in_time) - new Date(b.clock_in_time));
 
-          if (droveCallsWithGPS.length >= 2) {
+          if (resolved.length >= 2) {
             let totalMiles = 0;
-            for (let i = 0; i < droveCallsWithGPS.length - 1; i++) {
-              const lat1 = parseFloat(droveCallsWithGPS[i].checkin_latitude);
-              const lon1 = parseFloat(droveCallsWithGPS[i].checkin_longitude);
-              const lat2 = parseFloat(droveCallsWithGPS[i + 1].checkin_latitude);
-              const lon2 = parseFloat(droveCallsWithGPS[i + 1].checkin_longitude);
-              const R = 3959; // Earth radius in miles
-              const dLat = (lat2 - lat1) * Math.PI / 180;
-              const dLon = (lon2 - lon1) * Math.PI / 180;
-              const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                Math.sin(dLon / 2) * Math.sin(dLon / 2);
-              const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-              totalMiles += R * c;
+            for (let i = 0; i < resolved.length - 1; i++) {
+              totalMiles += haversineMiles(
+                resolved[i].resolvedLat, resolved[i].resolvedLng,
+                resolved[i + 1].resolvedLat, resolved[i + 1].resolvedLng
+              );
             }
 
             if (totalMiles > 0.1) {
@@ -439,17 +457,17 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
   };
 
   // Calculate miles driven from previous check-in to this check-in
+  // Uses cached historical GPS when live coordinates are unavailable
   const getMilesFromPrevious = (call, index) => {
-    if (!call.drove_to_call || !call.checkin_latitude || !call.checkin_longitude) return null;
-    // Find the previous call (by order) that has GPS coordinates
-    const sorted = callsToDisplay.filter(c => c.drove_to_call && c.checkin_latitude && c.checkin_longitude);
-    const myIdx = sorted.findIndex(c => c.id === call.id);
-    if (myIdx <= 0) return 0; // First driven call = 0 miles (starting point)
-    const prev = sorted[myIdx - 1];
-    return haversineMiles(
-      parseFloat(prev.checkin_latitude), parseFloat(prev.checkin_longitude),
-      parseFloat(call.checkin_latitude), parseFloat(call.checkin_longitude)
-    );
+    if (!call.drove_to_call) return null;
+    const droveCalls = callsToDisplay.filter(c => c.drove_to_call);
+    const resolved = resolveCallCoordinates(droveCalls, gpsLocationCache);
+    const myIdx = resolved.findIndex(c => c.id === call.id);
+    if (myIdx < 0) return null; // no coordinates available even with fallback
+    if (myIdx === 0) return 0; // first driven call = 0 miles (starting point)
+    const prev = resolved[myIdx - 1];
+    const curr = resolved[myIdx];
+    return haversineMiles(prev.resolvedLat, prev.resolvedLng, curr.resolvedLat, curr.resolvedLng);
   };
 
   const updateStatusMutation = useMutation({
