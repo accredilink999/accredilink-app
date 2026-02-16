@@ -1,12 +1,16 @@
 package com.carecallai.app;
 
 import android.Manifest;
-import android.content.Intent;
+import android.app.DownloadManager;
+import android.content.Context;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
+import android.webkit.CookieManager;
 import android.webkit.PermissionRequest;
+import android.webkit.URLUtil;
 import android.webkit.WebChromeClient;
 import android.webkit.WebView;
 import android.widget.Toast;
@@ -31,14 +35,24 @@ public class MainActivity extends BridgeActivity {
         // After the bridge is initialized, configure WebView
         WebView webView = getBridge().getWebView();
 
-        // Add download listener
+        // Download listener — uses Android DownloadManager to download APK files
         webView.setDownloadListener((url, userAgent, contentDisposition, mimetype, contentLength) -> {
             try {
-                Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(intent);
+                DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
+                String filename = URLUtil.guessFileName(url, contentDisposition, mimetype);
+                request.setTitle(filename);
+                request.setDescription("Downloading app update...");
+                request.setMimeType(mimetype);
+                String cookie = CookieManager.getInstance().getCookie(url);
+                if (cookie != null) request.addRequestHeader("Cookie", cookie);
+                request.addRequestHeader("User-Agent", userAgent);
+                request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename);
+                DownloadManager dm = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+                dm.enqueue(request);
+                Toast.makeText(this, "Downloading " + filename + "...", Toast.LENGTH_SHORT).show();
             } catch (Exception e) {
-                Toast.makeText(this, "Cannot open download link", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Download failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
 

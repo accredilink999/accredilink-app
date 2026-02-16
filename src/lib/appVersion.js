@@ -2,7 +2,7 @@
  * Single source of truth for the installed app version.
  * Bump this value whenever a new APK is built and uploaded.
  */
-export const APP_VERSION = '1.3.0';
+export const APP_VERSION = '1.4.0';
 
 /**
  * Compare two semver strings (e.g. "1.2.3").
