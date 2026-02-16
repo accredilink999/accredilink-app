@@ -74,7 +74,6 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
   const [currentShift, setCurrentShift] = useState(shift);
   const [summaryLogCall, setSummaryLogCall] = useState(null);
   const [sitInCoverRequired, setSitInCoverRequired] = useState('no');
-  const [showSitInTimePopup, setShowSitInTimePopup] = useState(false);
   const [sitInTimeOn, setSitInTimeOn] = useState('');
   const [sitInTimeOff, setSitInTimeOff] = useState('');
 
@@ -680,9 +679,7 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
                     value={sitInCoverRequired}
                     onValueChange={(value) => {
                       setSitInCoverRequired(value);
-                      if (value === 'yes' && !sitInTimeOn) {
-                        setShowSitInTimePopup(true);
-                      } else if (value === 'no') {
+                      if (value === 'no') {
                         setSitInTimeOn('');
                         setSitInTimeOff('');
                       }
@@ -696,20 +693,29 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
                       <SelectItem value="yes">Yes</SelectItem>
                     </SelectContent>
                   </Select>
-                  {sitInCoverRequired === 'yes' && sitInTimeOn && sitInTimeOff && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 mt-2">
-                      <p className="text-xs text-amber-800 font-medium">
-                        Sit-in cover: {sitInTimeOn} - {sitInTimeOff}
-                      </p>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="text-amber-700 h-6 px-2 text-xs"
-                        onClick={() => setShowSitInTimePopup(true)}
-                      >
-                        Edit Times
-                      </Button>
+                  {sitInCoverRequired === 'yes' && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-2 space-y-2">
+                      <p className="text-xs text-amber-800 font-medium">Sit-In Cover Times</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label className="text-xs text-amber-700">Time On</Label>
+                          <Input
+                            type="time"
+                            value={sitInTimeOn}
+                            onChange={(e) => setSitInTimeOn(e.target.value)}
+                            className="text-sm"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-amber-700">Time Off</Label>
+                          <Input
+                            type="time"
+                            value={sitInTimeOff}
+                            onChange={(e) => setSitInTimeOff(e.target.value)}
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1172,48 +1178,6 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
             />
           )}
 
-          {/* Sit-in Cover Time Popup (edit mode) */}
-          <AlertDialog open={showSitInTimePopup} onOpenChange={setShowSitInTimePopup}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Sit-In Cover Times</AlertDialogTitle>
-                <AlertDialogDescription asChild>
-                  <div className="space-y-4 pt-2">
-                    <div className="space-y-2">
-                      <Label>Time On</Label>
-                      <Input
-                        type="time"
-                        value={sitInTimeOn}
-                        onChange={(e) => setSitInTimeOn(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Time Off</Label>
-                      <Input
-                        type="time"
-                        value={sitInTimeOff}
-                        onChange={(e) => setSitInTimeOff(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <div className="flex gap-3">
-                <AlertDialogCancel onClick={() => {
-                  if (!sitInTimeOn || !sitInTimeOff) {
-                    setSitInCoverRequired('no');
-                  }
-                }}>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => setShowSitInTimePopup(false)}
-                  disabled={!sitInTimeOn || !sitInTimeOff}
-                  className="bg-teal-600 hover:bg-teal-700"
-                >
-                  Confirm
-                </AlertDialogAction>
-              </div>
-            </AlertDialogContent>
-          </AlertDialog>
-          </>
+</>
           );
           }
