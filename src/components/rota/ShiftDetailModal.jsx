@@ -396,6 +396,8 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
       // Handle sit-in cover call changes
       const existingSitinCall = calls.find(c => c.call_type === 'sitin_cover');
 
+      const pairedId = currentShift.paired_shift_id;
+
       if (sitInCoverRequired === 'yes' && sitInTimeOn && sitInTimeOff) {
         const durationMinutes = timeToMinutes(sitInTimeOff) - timeToMinutes(sitInTimeOn);
         const existingMeta = existingSitinCall ? (() => { try { return JSON.parse(existingSitinCall.notes || '{}'); } catch { return {}; } })() : {};
@@ -407,6 +409,19 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
           accepted_by: existingMeta.accepted_by || null,
           accepted_at: existingMeta.accepted_at || null,
         });
+        const callPayload = {
+          service_user_name: 'Sit-in Required On Shift',
+          service_user_address: '',
+          scheduled_time: sitInTimeOn,
+          call_time: sitInTimeOn,
+          duration_minutes: durationMinutes > 0 ? durationMinutes : 60,
+          call_type: 'sitin_cover',
+          call_types: ['sitin_cover'],
+          tasks: [],
+          call_date: shift.date,
+          status: 'pending',
+          notes: sitinNotes,
+        };
 
         if (existingSitinCall) {
           await ShiftCallApi.update(existingSitinCall.id, {
@@ -415,26 +430,43 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
             duration_minutes: durationMinutes > 0 ? durationMinutes : 60,
             notes: sitinNotes,
           });
+          // Sync update to paired shift
+          if (pairedId) {
+            const pairedCalls = await ShiftCallApi.filter({ shift_id: pairedId });
+            const pairedSitin = pairedCalls.find(c => c.call_type === 'sitin_cover');
+            if (pairedSitin) {
+              await ShiftCallApi.update(pairedSitin.id, {
+                scheduled_time: sitInTimeOn,
+                call_time: sitInTimeOn,
+                duration_minutes: durationMinutes > 0 ? durationMinutes : 60,
+                notes: sitinNotes,
+              });
+            } else {
+              await ShiftCallApi.create({ ...callPayload, shift_id: pairedId });
+            }
+          }
         } else {
-          await ShiftCallApi.create({
-            shift_id: shift.id,
-            service_user_name: 'Sit-in Required On Shift',
-            service_user_address: '',
-            scheduled_time: sitInTimeOn,
-            call_time: sitInTimeOn,
-            duration_minutes: durationMinutes > 0 ? durationMinutes : 60,
-            call_type: 'sitin_cover',
-            call_types: ['sitin_cover'],
-            tasks: [],
-            call_date: shift.date,
-            status: 'pending',
-            notes: sitinNotes,
-          });
+          await ShiftCallApi.create({ ...callPayload, shift_id: shift.id });
+          // Also create on paired shift
+          if (pairedId) {
+            const pairedCalls = await ShiftCallApi.filter({ shift_id: pairedId });
+            const pairedSitin = pairedCalls.find(c => c.call_type === 'sitin_cover');
+            if (!pairedSitin) {
+              await ShiftCallApi.create({ ...callPayload, shift_id: pairedId });
+            }
+          }
 
-          // Notify staff
-          if (shift.staff_id) {
+          // Notify staff + paired partner
+          const notifyIds = [shift.staff_id].filter(Boolean);
+          if (pairedId) {
+            try {
+              const pairedShiftData = await ShiftApi.filter({ id: pairedId });
+              if (pairedShiftData[0]?.staff_id) notifyIds.push(pairedShiftData[0].staff_id);
+            } catch {}
+          }
+          if (notifyIds.length > 0) {
             base44.functions.invoke('createNotification', {
-              recipient_ids: [shift.staff_id],
+              recipient_ids: notifyIds,
               type: 'shift_activity',
               title: 'Sit-In Cover Added',
               message: `A sit-in cover call has been added to your shift (${sitInTimeOn} - ${sitInTimeOff}).`,
@@ -452,12 +484,21 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
         }
       } else if (sitInCoverRequired === 'no' && existingSitinCall) {
         await ShiftCallApi.delete(existingSitinCall.id);
+        // Also remove from paired shift
+        if (pairedId) {
+          const pairedCalls = await ShiftCallApi.filter({ shift_id: pairedId });
+          const pairedSitin = pairedCalls.find(c => c.call_type === 'sitin_cover');
+          if (pairedSitin) await ShiftCallApi.delete(pairedSitin.id);
+        }
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       queryClient.invalidateQueries({ queryKey: ['shift', shift.id] });
       queryClient.invalidateQueries({ queryKey: ['shift-calls', shift.id] });
+      if (currentShift.paired_shift_id) {
+        queryClient.invalidateQueries({ queryKey: ['shift-calls', currentShift.paired_shift_id] });
+      }
       toast.success('Shift updated successfully');
       setEditMode(false);
       onClose();
