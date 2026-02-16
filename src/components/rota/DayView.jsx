@@ -128,14 +128,7 @@ export default function DayView({ currentDate, onShiftClick, onCreateShift, isAd
       ) : (
         <div className="space-y-2">
           {displayShifts.map(shift => {
-            const handleShiftClick = () => {
-              if (isAdmin) {
-                onShiftClick({ ...shift, _editMode: true });
-              } else {
-                onShiftClick(shift);
-              }
-            };
-            return <ShiftCard key={shift.id} shift={shift} onClick={handleShiftClick} />;
+            return <ShiftCard key={shift.id} shift={shift} onClick={() => onShiftClick(shift)} />;
           })}
         </div>
       )}

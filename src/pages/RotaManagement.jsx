@@ -275,7 +275,6 @@ export default function RotaManagement() {
           onClose={() => setSelectedShift(null)}
           isAdmin={isAdmin}
           userId={user?.id}
-          isEditMode={selectedShift?._editMode}
         />
       )}
 
