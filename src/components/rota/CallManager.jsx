@@ -714,8 +714,16 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                        <Button
                          size="sm"
                          variant="ghost"
-                         onClick={() => deleteCallMutation.mutate(call.id)}
-                         disabled={deleteCallMutation.isPending}
+                         onClick={() => {
+                           toast('Remove sit-in cover from this shift?', {
+                             action: {
+                               label: 'Remove',
+                               onClick: () => deleteCallMutation.mutate(call.id),
+                             },
+                             cancel: { label: 'Cancel' },
+                             duration: 5000,
+                           });
+                         }}
                          className="w-full min-h-[44px] px-4 touch-manipulation"
                        >
                          <Trash2 className="w-3 h-3" />
