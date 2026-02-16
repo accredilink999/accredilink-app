@@ -16,7 +16,7 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import CallManager from '@/components/rota/CallManager';
 import ShiftSittingLogs from '@/components/rota/ShiftSittingLogs';
 import ShiftSwapRequest from '@/components/rota/ShiftSwapRequest';
-import { Clock, MapPin, Calendar, User, Trash2, Play, Square, RefreshCw, Edit2, Save, X, Car, FileText, CheckCircle, AlertCircle } from 'lucide-react';
+import { Clock, MapPin, Calendar, User, Trash2, Play, Square, RefreshCw, Edit2, Save, X, Car, FileText, CheckCircle, AlertCircle, ArrowRightLeft } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from 'date-fns';
 import { notifyAdminsOfActivity } from '@/utils/adminNotifications';
@@ -67,6 +67,8 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
 
   const [currentShift, setCurrentShift] = useState(shift);
   const [summaryLogCall, setSummaryLogCall] = useState(null);
+  const [handoverStaffId, setHandoverStaffId] = useState('');
+  const [handoverConfirmOpen, setHandoverConfirmOpen] = useState(false);
 
   useEffect(() => {
     setCurrentShift(shift);
@@ -190,6 +192,112 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
       return logs;
     },
     enabled: !!shift.id,
+  });
+
+  // Fetch all shifts on the same day for handover staff dropdown
+  const { data: sameDayShifts = [] } = useQuery({
+    queryKey: ['sameDayShifts', shift.date],
+    queryFn: () => ShiftApi.filter({ date: shift.date }),
+    enabled: !!shift.date,
+  });
+
+  // Staff members working the same day (exclude current shift's staff)
+  const handoverCandidates = sameDayShifts.filter(s =>
+    s.staff_id && s.staff_id !== shift.staff_id &&
+    s.status !== 'cancelled'
+  );
+  // Dedupe by staff_id — pick the first shift per staff member
+  const uniqueHandoverStaff = [];
+  const seenStaffIds = new Set();
+  for (const s of handoverCandidates) {
+    if (!seenStaffIds.has(s.staff_id)) {
+      seenStaffIds.add(s.staff_id);
+      uniqueHandoverStaff.push(s);
+    }
+  }
+
+  const handoverMutation = useMutation({
+    mutationFn: async () => {
+      const targetShift = sameDayShifts.find(s => s.staff_id === handoverStaffId && s.status !== 'cancelled');
+      if (!targetShift) throw new Error('No valid shift found for selected staff member');
+
+      const targetStaffName = targetShift.staff_name;
+
+      // Copy pending/in_progress calls to the target shift
+      const callsToHandover = calls.filter(c => c.status === 'pending' || c.status === 'in_progress');
+      for (const call of callsToHandover) {
+        await ShiftCallApi.create({
+          shift_id: targetShift.id,
+          service_user_id: call.service_user_id,
+          service_user_name: call.service_user_name,
+          service_user_address: call.service_user_address,
+          scheduled_time: call.scheduled_time,
+          call_time: call.scheduled_time,
+          duration_minutes: call.duration_minutes,
+          call_type: call.call_type,
+          call_types: call.call_types,
+          tasks: call.tasks,
+          call_date: call.call_date,
+          status: 'pending',
+          notes: call.notes || '',
+        });
+      }
+
+      // For sitting shifts, copy sitting logs to the target shift
+      if (isSitIn) {
+        try {
+          const sittingLogs = await base44.entities.SittingLog.filter({ shift_id: shift.id }, '-created_at', 200);
+          const nonReportLogs = sittingLogs.filter(l => !l.is_daily_report);
+          for (const log of nonReportLogs) {
+            await base44.entities.SittingLog.create({
+              service_user_id: log.service_user_id,
+              service_user_name: log.service_user_name,
+              visit_type: log.visit_type,
+              visitor_name: log.visitor_name,
+              visit_date: log.visit_date,
+              notes: log.notes,
+              recorded_by: log.recorded_by,
+              recorded_by_name: log.recorded_by_name,
+              shift_id: targetShift.id,
+            });
+          }
+        } catch (e) {
+          console.warn('Sitting log handover failed:', e);
+        }
+      }
+
+      // Send push notification to the receiving staff member
+      await base44.functions.invoke('createNotification', {
+        recipient_ids: [handoverStaffId],
+        type: 'shift_activity',
+        title: `Calls handed over to you`,
+        message: `${currentShift.staff_name} has handed over ${callsToHandover.length} client call${callsToHandover.length !== 1 ? 's' : ''}${isSitIn ? ' and sitting logs' : ''} to your shift.`,
+        priority: 'high',
+        action_url: '/Rota',
+        send_push: true,
+      }).catch(e => console.warn('Handover notification failed:', e));
+
+      // Notify admins
+      notifyAdminsOfActivity({
+        title: `Call handover: ${currentShift.staff_name}`,
+        message: `${currentShift.staff_name} handed over ${callsToHandover.length} call${callsToHandover.length !== 1 ? 's' : ''} to ${targetStaffName}.`,
+        excludeUserId: shift.staff_id,
+      });
+
+      return { count: callsToHandover.length, targetName: targetStaffName };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['shift-calls'] });
+      queryClient.invalidateQueries({ queryKey: ['shiftSittingLogs'] });
+      queryClient.invalidateQueries({ queryKey: ['sameDayShifts', shift.date] });
+      toast.success(`${result.count} call${result.count !== 1 ? 's' : ''} handed over to ${result.targetName}`);
+      setHandoverStaffId('');
+      setHandoverConfirmOpen(false);
+    },
+    onError: (err) => {
+      toast.error('Handover failed: ' + (err.message || 'Unknown error'));
+      setHandoverConfirmOpen(false);
+    },
   });
 
   // Compute shift summary data for the checkout popup
@@ -602,6 +710,38 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
                 )}
               </div>
             )}
+
+            {/* Handover Calls — visible on all shifts */}
+            {uniqueHandoverStaff.length > 0 && (
+              <div className="mt-4 pt-3 border-t border-slate-200">
+                <p className="text-xs font-semibold text-slate-700 mb-2 flex items-center gap-1.5">
+                  <ArrowRightLeft className="w-3.5 h-3.5" />
+                  {isSitIn ? 'Handover Sitting Logs' : 'Handover Calls'}
+                </p>
+                <div className="flex gap-2">
+                  <Select value={handoverStaffId} onValueChange={setHandoverStaffId}>
+                    <SelectTrigger className="flex-1 text-sm">
+                      <SelectValue placeholder="Select staff..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {uniqueHandoverStaff.map(s => (
+                        <SelectItem key={s.staff_id} value={s.staff_id}>
+                          {s.staff_name} ({s.start_time} - {s.end_time})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    onClick={() => setHandoverConfirmOpen(true)}
+                    disabled={!handoverStaffId || handoverMutation.isPending}
+                    className="bg-amber-500 hover:bg-amber-600 text-white min-h-[44px] px-4 touch-manipulation flex-shrink-0"
+                  >
+                    <ArrowRightLeft className="w-4 h-4 mr-1" />
+                    {handoverMutation.isPending ? 'Sending...' : 'Handover'}
+                  </Button>
+                </div>
+              </div>
+            )}
           </Card>
 
           {/* Tabs */}
@@ -651,6 +791,7 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
                  calls={calls}
                  isAdmin={isAdmin}
                  isMyShift={isMyShift}
+                 sameDayShifts={sameDayShifts}
                />
                {/* Bottom Clock Off button — visible after calls, prominent when all done */}
                {canClockOff && (
@@ -981,6 +1122,39 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
              className="bg-red-600 hover:bg-red-700"
            >
              {deleteShiftMutation.isPending ? 'Deleting...' : 'Delete Shift'}
+           </AlertDialogAction>
+          </div>
+          </AlertDialogContent>
+          </AlertDialog>
+
+          {/* Handover Confirmation Dialog */}
+          <AlertDialog open={handoverConfirmOpen} onOpenChange={setHandoverConfirmOpen}>
+          <AlertDialogContent>
+          <AlertDialogHeader>
+           <AlertDialogTitle>Confirm Handover</AlertDialogTitle>
+           <AlertDialogDescription>
+             {(() => {
+               const pendingCalls = calls.filter(c => c.status === 'pending' || c.status === 'in_progress');
+               const targetName = uniqueHandoverStaff.find(s => s.staff_id === handoverStaffId)?.staff_name || 'selected staff';
+               return (
+                 <>
+                   This will copy <strong>{pendingCalls.length} pending call{pendingCalls.length !== 1 ? 's' : ''}</strong>
+                   {isSitIn ? ' and all sitting logs' : ''} to <strong>{targetName}</strong>'s shift today.
+                   <br /><br />
+                   {targetName} and all admins will be notified.
+                 </>
+               );
+             })()}
+           </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-3">
+           <AlertDialogCancel>Cancel</AlertDialogCancel>
+           <AlertDialogAction
+             onClick={() => handoverMutation.mutate()}
+             disabled={handoverMutation.isPending}
+             className="bg-amber-500 hover:bg-amber-600"
+           >
+             {handoverMutation.isPending ? 'Handing over...' : 'Confirm Handover'}
            </AlertDialogAction>
           </div>
           </AlertDialogContent>

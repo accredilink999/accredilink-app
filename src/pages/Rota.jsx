@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { ShiftApi } from '@/api/rotaApi';
 import { format, startOfMonth, startOfWeek, addDays, isSameDay } from 'date-fns';
 import { usePullToRefresh } from '@/components/hooks/usePullToRefresh';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -21,7 +22,8 @@ export default function Rota() {
   const urlParams = new URLSearchParams(window.location.search);
   const viewParam = urlParams.get('view');
   const filterParam = urlParams.get('filter');
-  
+  const autoShiftId = urlParams.get('autoShift');
+
   const [view, setView] = useState(viewParam || 'day');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedShift, setSelectedShift] = useState(null);
@@ -32,6 +34,7 @@ export default function Rota() {
   const [isCreateAreaOpen, setIsCreateAreaOpen] = useState(false);
   const [showMyShiftsOnly, setShowMyShiftsOnly] = useState(filterParam === 'myshifts');
   const queryClient = useQueryClient();
+  const autoShiftLoaded = useRef(false);
 
   const handleRefresh = async () => {
     await Promise.all([
@@ -50,6 +53,24 @@ export default function Rota() {
   });
 
   const isAdmin = user?.role === 'admin' || user?.job_title === 'admin' || ['manager', 'supervisor'].includes(user?.job_title);
+
+  // Auto-open shift from URL param (set by ActiveShiftAutoOpen on app start)
+  const { data: autoShiftData } = useQuery({
+    queryKey: ['autoShift', autoShiftId],
+    queryFn: () => ShiftApi.filter({ id: autoShiftId }),
+    enabled: !!autoShiftId && !autoShiftLoaded.current,
+  });
+
+  useEffect(() => {
+    if (autoShiftData?.length > 0 && !autoShiftLoaded.current) {
+      autoShiftLoaded.current = true;
+      setSelectedShift(autoShiftData[0]);
+      // Clean the URL param without triggering a re-render
+      const url = new URL(window.location);
+      url.searchParams.delete('autoShift');
+      window.history.replaceState({}, '', url);
+    }
+  }, [autoShiftData]);
 
   // Get user's permission for selected area
   const { data: myPermissions = [] } = useQuery({

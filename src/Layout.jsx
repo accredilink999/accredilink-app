@@ -33,6 +33,7 @@ import NotificationBanner from '@/components/notifications/NotificationBanner';
 import AppUpdateBanner from '@/components/AppUpdateBanner';
 import GpsWarningBanner from '@/components/GpsWarningBanner';
 import OfflineManager from '@/components/OfflineManager';
+import ActiveShiftAutoOpen from '@/components/ActiveShiftAutoOpen';
 import HeaderIcons from '@/components/HeaderIcons';
 import LockScreen from '@/components/LockScreen';
 import { isBiometricEnabled, storeBiometricRefreshToken } from '@/utils/biometric';
@@ -797,24 +798,24 @@ export default function Layout({ children, currentPageName }) {
                   </div>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuContent align="start" className="w-56 z-[999999]" style={{ WebkitTransform: 'translateZ(0)' }}>
                 <div className="px-3 py-2">
                   <p className="text-sm font-medium text-slate-900">{user?.staff_full_name || user?.full_name}</p>
                   <p className="text-xs text-slate-500">{user?.email}</p>
                 </div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigate(createPageUrl('Profile'))} className="cursor-pointer">
+                <DropdownMenuItem onClick={() => navigate(createPageUrl('Profile'))} className="cursor-pointer touch-manipulation min-h-[44px]">
                   <User className="w-4 h-4 mr-2" />
                   My Profile
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate(createPageUrl('Settings'))} className="cursor-pointer">
+                <DropdownMenuItem onClick={() => navigate(createPageUrl('Settings'))} className="cursor-pointer touch-manipulation min-h-[44px]">
                   <Settings className="w-4 h-4 mr-2" />
                   Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={async () => { await base44.auth.logout(); }}
-                  className="cursor-pointer text-red-600 focus:text-red-600"
+                  className="cursor-pointer touch-manipulation min-h-[44px] text-red-600 focus:text-red-600"
                 >
                   <LogOut className="w-4 h-4 mr-2" />
                   Log Out
@@ -948,6 +949,7 @@ export default function Layout({ children, currentPageName }) {
                         unreadAssetsCount={openIncidents.length}
                       />
 
+                      {user?.id && <ActiveShiftAutoOpen userId={user.id} />}
                       <OfflineManager />
                       </div>
                       );
