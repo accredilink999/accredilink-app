@@ -491,21 +491,32 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
       const meta = parseSitinMeta(call);
       // Use the logged-in user's ID, not the viewed shift's staff_id
       const acceptorId = userId || shift?.staff_id;
+
+      // Get the acceptor's actual name
+      let acceptorName = shift?.staff_name || 'Staff';
+      try {
+        const currentUser = await base44.auth.me();
+        acceptorName = currentUser?.full_name || currentUser?.name || shift?.staff_name || 'Staff';
+      } catch (e) {
+        console.warn('Could not fetch current user name:', e);
+      }
+
       const updatedNotes = JSON.stringify({
         ...meta,
         accepted: true,
         accepted_by: acceptorId,
+        accepted_by_name: acceptorName,
         accepted_at: new Date().toISOString(),
       });
       const updatedCall = await ShiftCallApi.update(call.id, {
         notes: updatedNotes,
       });
 
-      // Notify admins
+      // Notify admins with acceptor's name
       notifyAdminsOfActivity({
-        title: 'Sit-in cover accepted',
-        message: `${shift?.staff_name || 'Staff'} accepted the sit-in cover call on their shift.`,
-        excludeUserId: shift?.staff_id,
+        title: `Sit-in cover accepted`,
+        message: `${acceptorName} has accepted the sit-in cover call on ${shift?.staff_name || 'the'} shift.`,
+        excludeUserId: acceptorId,
       });
 
       // Notify paired shift partner if exists
@@ -513,12 +524,12 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
         try {
           const allShifts = await ShiftApi.list('-created_date', 500);
           const pairedShift = allShifts.find(s => s.id === shift.paired_shift_id);
-          if (pairedShift?.staff_id && pairedShift.staff_id !== shift.staff_id) {
+          if (pairedShift?.staff_id && pairedShift.staff_id !== acceptorId) {
             await base44.functions.invoke('createNotification', {
               recipient_ids: [pairedShift.staff_id],
               type: 'shift_activity',
               title: 'Partner Accepted Sit-In Cover',
-              message: `${shift?.staff_name || 'Your shift partner'} has accepted the sit-in cover call.`,
+              message: `${acceptorName} has accepted the sit-in cover call.`,
               priority: 'normal',
               action_url: '/Rota',
               send_push: true,
@@ -526,6 +537,23 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
           }
         } catch (e) {
           console.warn('Failed to notify partner:', e);
+        }
+      }
+
+      // Also notify the shift's assigned staff if they're not the acceptor
+      if (shift?.staff_id && shift.staff_id !== acceptorId) {
+        try {
+          await base44.functions.invoke('createNotification', {
+            recipient_ids: [shift.staff_id],
+            type: 'shift_activity',
+            title: 'Sit-In Cover Accepted On Your Shift',
+            message: `${acceptorName} has accepted the sit-in cover call on your shift.`,
+            priority: 'normal',
+            action_url: '/Rota',
+            send_push: true,
+          });
+        } catch (e) {
+          console.warn('Failed to notify shift staff:', e);
         }
       }
 
@@ -543,7 +571,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
               notes: JSON.stringify({
                 ...otherMeta,
                 partner_accepted: true,
-                partner_name: shift?.staff_name || 'Partner',
+                partner_name: acceptorName,
               }),
             });
           }
