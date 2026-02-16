@@ -22,26 +22,26 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-slate-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20 sm:h-24">
+        <div className="flex items-center justify-between h-24 sm:h-28">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3 flex-shrink-0">
             <Image
               src="/images/logo.png"
               alt="Accredilink Logo"
-              width={56}
-              height={56}
-              className="w-14 h-14 rounded-lg object-contain"
+              width={80}
+              height={80}
+              className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg object-contain"
             />
             <Image
               src="/images/welsh-dragon.jpg"
               alt="Welsh Dragon"
-              width={48}
-              height={48}
-              className="w-12 h-12 rounded-lg object-contain"
+              width={64}
+              height={64}
+              className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg object-contain"
             />
             <div className="hidden sm:block">
-              <p className="font-bold text-slate-900 text-base leading-tight">Accredilink</p>
-              <p className="text-xs text-slate-500 leading-tight">Community Response Taskforce</p>
+              <p className="font-bold text-slate-900 text-2xl leading-tight">Accredilink</p>
+              <p className="text-sm text-slate-500 leading-tight">Community Response Taskforce</p>
             </div>
           </Link>
 
