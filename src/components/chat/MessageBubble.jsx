@@ -9,6 +9,23 @@ import { base44 } from '@/api/base44Client';
 
 const quickReactions = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
+const URL_REGEX = /(https?:\/\/[^\s<]+)/g;
+
+function Linkify({ children }) {
+  if (typeof children !== 'string') return children;
+  const parts = children.split(URL_REGEX);
+  if (parts.length === 1) return children;
+  return parts.map((part, i) =>
+    URL_REGEX.test(part) ? (
+      <a key={i} href={part} target="_blank" rel="noopener noreferrer"
+         className="text-blue-600 underline break-all"
+         onClick={(e) => e.stopPropagation()}>
+        {part}
+      </a>
+    ) : part
+  );
+}
+
 const MessageBubble = React.memo(({
   message,
   isOwn,
@@ -217,7 +234,7 @@ const MessageBubble = React.memo(({
           {(!message.attachment_url || message.attachment_type === 'audio' || (message.content && message.content !== '🎤 Voice Note')) && (
             <div className="flex items-end gap-2">
               <p className="text-[14.2px] leading-[19px] whitespace-pre-wrap break-words text-slate-900 flex-1" style={{ overflowWrap: 'anywhere' }}>
-                {message.attachment_type === 'audio' ? null : message.content}
+                {message.attachment_type === 'audio' ? null : <Linkify>{message.content}</Linkify>}
               </p>
               {/* Time + read receipt inline */}
               <span className={cn(
