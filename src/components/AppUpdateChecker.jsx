@@ -11,11 +11,12 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { isUpdateAvailable } from '@/lib/appVersion';
 import { openExternalUrl } from '@/lib/openExternalUrl';
-import { Download, X, Copy, Check } from 'lucide-react';
+import { Download, X, Copy, Check, Loader2 } from 'lucide-react';
 
 export default function AppUpdateChecker() {
   const [dismissed, setDismissed] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [installedVersion, setInstalledVersion] = useState(null);
 
   const native = !!window.Capacitor?.isNativePlatform?.();
@@ -89,8 +90,16 @@ export default function AppUpdateChecker() {
     setDismissed(true);
   };
 
-  const handleDownload = () => {
-    openExternalUrl(downloadUrl);
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      await openExternalUrl(downloadUrl);
+    } catch (e) {
+      console.warn('[UpdateChecker] Download failed:', e);
+    } finally {
+      // Keep spinner for a bit so user sees it worked
+      setTimeout(() => setDownloading(false), 3000);
+    }
   };
 
   const handleCopyLink = async () => {
@@ -150,10 +159,11 @@ export default function AppUpdateChecker() {
               <>
                 <button
                   onClick={handleDownload}
-                  className="w-full px-4 py-2.5 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-colors flex items-center justify-center gap-2"
+                  disabled={downloading}
+                  className="w-full px-4 py-2.5 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:bg-teal-400 transition-colors flex items-center justify-center gap-2"
                 >
-                  <Download className="w-4 h-4" />
-                  Download Update
+                  {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                  {downloading ? 'Downloading APK...' : 'Download Update'}
                 </button>
                 <div className="relative flex items-center py-1">
                   <div className="flex-grow border-t border-slate-200" />
