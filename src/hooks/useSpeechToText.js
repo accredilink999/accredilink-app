@@ -2,47 +2,34 @@
  * useSpeechToText — Universal speech-to-text hook.
  *
  * Strategy:
- * 1. Try the Web Speech API (SpeechRecognition) first — works on Chrome/Android WebView.
- * 2. Fall back to recording audio via MediaRecorder + transcribing via
- *    Groq Whisper API (works everywhere: mobile, WebViews, all browsers).
- *
- * Usage:
- *   const { isListening, startListening, stopListening, supported } = useSpeechToText({
- *     onResult: (text) => setInput(text),
- *     onError: (err) => toast.error(err),
- *     lang: 'en-GB',
- *   });
+ * 1. On desktop Chrome: Use Web Speech API (SpeechRecognition)
+ * 2. On Capacitor / mobile: Use native file capture (opens device recorder)
+ *    then transcribe via Groq Whisper
+ * 3. Fallback: MediaRecorder + Whisper (if getUserMedia works)
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { invokeFunction } from '@/api/functions'
 import { toast } from 'sonner'
 
-/** Detect iOS (iPhone, iPad, iPod) */
-function isIOS() {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-}
+const isCapacitor = () => !!window.Capacitor?.isNativePlatform?.()
 
 /** Check if native SpeechRecognition API is available AND functional */
 function hasSpeechRecognition() {
-  // Exclude iOS WebView (Capacitor) — SpeechRecognition exists but doesn't work reliably
-  if (isIOS() && window.Capacitor?.isNativePlatform?.()) return false
+  // Exclude Capacitor WebViews — SpeechRecognition exists but doesn't work
+  if (isCapacitor()) return false
   return 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window
-}
-
-/** Check if MediaRecorder is available for audio capture */
-function hasMediaRecorder() {
-  return 'MediaRecorder' in window && 'mediaDevices' in navigator
 }
 
 export default function useSpeechToText({ onResult, onError, lang = 'en-GB', continuous = false } = {}) {
   const [isListening, setIsListening] = useState(false)
+  const [isTranscribing, setIsTranscribing] = useState(false)
   const recognitionRef = useRef(null)
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
   const streamRef = useRef(null)
   const isListeningRef = useRef(false)
+  const fileInputRef = useRef(null)
 
   // Keep refs in sync with latest callbacks to avoid stale closures
   const onResultRef = useRef(onResult)
@@ -50,7 +37,24 @@ export default function useSpeechToText({ onResult, onError, lang = 'en-GB', con
   useEffect(() => { onResultRef.current = onResult }, [onResult])
   useEffect(() => { onErrorRef.current = onError }, [onError])
 
-  const supported = hasSpeechRecognition() || hasMediaRecorder()
+  // Create hidden file input for native audio capture (mobile/Capacitor)
+  useEffect(() => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'audio/*'
+    input.capture = 'microphone'
+    input.style.display = 'none'
+    input.setAttribute('id', 'speech-to-text-file-input')
+    document.body.appendChild(input)
+    fileInputRef.current = input
+
+    input.addEventListener('change', handleFileSelected)
+
+    return () => {
+      input.removeEventListener('change', handleFileSelected)
+      if (input.parentNode) input.parentNode.removeChild(input)
+    }
+  }, [])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -71,6 +75,7 @@ export default function useSpeechToText({ onResult, onError, lang = 'en-GB', con
     console.warn('[SpeechToText] Error:', msg)
     isListeningRef.current = false
     setIsListening(false)
+    setIsTranscribing(false)
     if (onErrorRef.current) {
       onErrorRef.current(msg)
     } else {
@@ -78,11 +83,69 @@ export default function useSpeechToText({ onResult, onError, lang = 'en-GB', con
     }
   }, [])
 
+  /** Process a captured audio file (from file input or MediaRecorder) */
+  const transcribeAudioBlob = useCallback(async (blob) => {
+    setIsTranscribing(true)
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          const result = reader.result?.split(',')[1]
+          if (result) resolve(result)
+          else reject(new Error('Failed to encode audio'))
+        }
+        reader.onerror = () => reject(new Error('Failed to read audio file'))
+        reader.readAsDataURL(blob)
+      })
+
+      toast.info('Transcribing your speech...', { duration: 5000, id: 'transcribing' })
+
+      const result = await invokeFunction('transcribeAudio', {
+        audioBase64: base64,
+        mimeType: blob.type || 'audio/webm',
+      })
+
+      toast.dismiss('transcribing')
+
+      if (result?.transcript) {
+        if (onResultRef.current) onResultRef.current(result.transcript)
+        toast.success('Speech added', { duration: 1500 })
+      } else {
+        handleError('No speech detected. Please try again.')
+      }
+    } catch (err) {
+      toast.dismiss('transcribing')
+      console.error('[SpeechToText] Transcription error:', err)
+      handleError('Transcription failed: ' + (err.message || 'Please try again.'))
+    } finally {
+      setIsTranscribing(false)
+    }
+  }, [handleError])
+
+  /** Handle file selected from native audio capture */
+  const handleFileSelected = useCallback((event) => {
+    const file = event.target?.files?.[0]
+    if (file) {
+      transcribeAudioBlob(file)
+    }
+    // Reset the input so the same file can be selected again
+    if (event.target) event.target.value = ''
+  }, [transcribeAudioBlob])
+
+  // Re-attach event listener when handler changes
+  useEffect(() => {
+    const input = fileInputRef.current
+    if (!input) return
+    input.removeEventListener('change', handleFileSelected)
+    input.addEventListener('change', handleFileSelected)
+    return () => input.removeEventListener('change', handleFileSelected)
+  }, [handleFileSelected])
+
   /** Start listening — picks the best available method */
   const startListening = useCallback(async () => {
     if (isListeningRef.current) return
 
-    // ── Method 1: Native SpeechRecognition ──
+    // ── Method 1: Native SpeechRecognition (desktop Chrome only) ──
     if (hasSpeechRecognition()) {
       try {
         const SR = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -117,20 +180,26 @@ export default function useSpeechToText({ onResult, onError, lang = 'en-GB', con
         recognitionRef.current = recognition
         isListeningRef.current = true
         setIsListening(true)
-        toast.info('Listening... Tap mic to stop', { duration: 2000 })
         return
       } catch (err) {
-        console.warn('[SpeechToText] SpeechRecognition failed, falling back to audio recording:', err)
+        console.warn('[SpeechToText] SpeechRecognition failed:', err)
       }
     }
 
-    // ── Method 2: Record audio + Whisper transcription ──
-    if (hasMediaRecorder()) {
+    // ── Method 2: On Capacitor/mobile — use native file capture ──
+    if (isCapacitor() || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) {
+      if (fileInputRef.current) {
+        fileInputRef.current.click()
+        return
+      }
+    }
+
+    // ── Method 3: MediaRecorder + Whisper (desktop fallback) ──
+    if ('MediaRecorder' in window && 'mediaDevices' in navigator) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
         streamRef.current = stream
 
-        // Prefer webm, fall back to whatever is supported
         const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
           ? 'audio/webm;codecs=opus'
           : MediaRecorder.isTypeSupported('audio/webm')
@@ -149,7 +218,6 @@ export default function useSpeechToText({ onResult, onError, lang = 'en-GB', con
         }
 
         recorder.onstop = async () => {
-          // Stop mic stream
           stream.getTracks().forEach(t => t.stop())
           streamRef.current = null
 
@@ -162,34 +230,7 @@ export default function useSpeechToText({ onResult, onError, lang = 'en-GB', con
             type: recorder.mimeType || 'audio/webm',
           })
 
-          // Convert to base64
-          const reader = new FileReader()
-          reader.onloadend = async () => {
-            const base64 = reader.result.split(',')[1]
-            if (!base64) {
-              handleError('Failed to encode audio')
-              return
-            }
-
-            try {
-              toast.info('Transcribing...', { duration: 3000 })
-              const result = await invokeFunction('transcribeAudio', {
-                audioBase64: base64,
-                mimeType: recorder.mimeType || 'audio/webm',
-              })
-
-              if (result?.transcript) {
-                if (onResultRef.current) onResultRef.current(result.transcript)
-                toast.success('Speech captured', { duration: 1500 })
-              } else {
-                handleError('No speech detected. Please try again.')
-              }
-            } catch (err) {
-              console.error('[SpeechToText] Whisper transcription error:', err)
-              handleError('Transcription failed. Please try again.')
-            }
-          }
-          reader.readAsDataURL(audioBlob)
+          await transcribeAudioBlob(audioBlob)
         }
 
         recorder.start()
@@ -200,19 +241,18 @@ export default function useSpeechToText({ onResult, onError, lang = 'en-GB', con
         return
       } catch (err) {
         console.error('[SpeechToText] MediaRecorder error:', err)
-        if (err.name === 'NotAllowedError') {
-          handleError('Microphone access denied. Please allow microphone permissions in your browser/device settings.')
-        } else if (err.name === 'NotFoundError') {
-          handleError('No microphone found. Please check your device.')
-        } else {
-          handleError('Could not access microphone: ' + (err.message || 'Unknown error'))
-        }
-        return
+        // Fall through to file input as last resort
       }
     }
 
+    // ── Last resort: file input on any platform ──
+    if (fileInputRef.current) {
+      fileInputRef.current.click()
+      return
+    }
+
     handleError('Speech input is not supported on this device/browser.')
-  }, [handleError, lang, continuous])
+  }, [handleError, lang, continuous, transcribeAudioBlob])
 
   /** Stop listening */
   const stopListening = useCallback(() => {
@@ -237,5 +277,5 @@ export default function useSpeechToText({ onResult, onError, lang = 'en-GB', con
     }
   }, [startListening, stopListening])
 
-  return { isListening, startListening, stopListening, toggleListening, supported }
+  return { isListening, isTranscribing, startListening, stopListening, toggleListening, supported: true }
 }
