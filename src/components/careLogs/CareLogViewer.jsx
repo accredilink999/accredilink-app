@@ -251,10 +251,46 @@ export default function CareLogViewer({ careLog, open, onOpenChange, isAdmin = f
                   <p className="text-sm font-medium text-slate-900 capitalize">{careLog.food_offered}</p>
                 </div>
               )}
+              {careLog.food_accepted && (
+                <div className="space-y-1">
+                  <p className="text-xs text-slate-600">Food Accepted?</p>
+                  <p className="text-sm font-medium text-slate-900 capitalize">{careLog.food_accepted}</p>
+                </div>
+              )}
+              {careLog.food_given && (
+                <div className="space-y-1">
+                  <p className="text-xs text-slate-600">What Was Given</p>
+                  <p className="text-sm font-medium text-slate-900">{careLog.food_given}</p>
+                </div>
+              )}
+              {careLog.food_outcome && (
+                <div className="space-y-1">
+                  <p className="text-xs text-slate-600">Food Outcome</p>
+                  <p className="text-sm font-medium text-slate-900 capitalize">{careLog.food_outcome.replace(/_/g, ' ')}</p>
+                </div>
+              )}
               {careLog.drinks_offered && (
                 <div className="space-y-1">
                   <p className="text-xs text-slate-600">Drinks Offered?</p>
                   <p className="text-sm font-medium text-slate-900 capitalize">{careLog.drinks_offered}</p>
+                </div>
+              )}
+              {careLog.drinks_accepted && (
+                <div className="space-y-1">
+                  <p className="text-xs text-slate-600">Drinks Accepted?</p>
+                  <p className="text-sm font-medium text-slate-900 capitalize">{careLog.drinks_accepted}</p>
+                </div>
+              )}
+              {careLog.drinks_given && (
+                <div className="space-y-1">
+                  <p className="text-xs text-slate-600">What Was Given</p>
+                  <p className="text-sm font-medium text-slate-900">{careLog.drinks_given}</p>
+                </div>
+              )}
+              {careLog.drinks_outcome && (
+                <div className="space-y-1">
+                  <p className="text-xs text-slate-600">Drinks Outcome</p>
+                  <p className="text-sm font-medium text-slate-900 capitalize">{careLog.drinks_outcome.replace(/_/g, ' ')}</p>
                 </div>
               )}
               {careLog.add_medication_round && (

@@ -90,6 +90,42 @@ Deno.serve(async (req) => {
           doc.text(`Food Intake: ${log.food_intake}`, margin, yPosition);
           yPosition += 5;
         }
+        if (log.fluid_intake) {
+          doc.text(`Fluid Intake: ${log.fluid_intake}`, margin, yPosition);
+          yPosition += 5;
+        }
+        if (log.food_offered) {
+          doc.text(`Food Offered: ${log.food_offered}`, margin, yPosition);
+          yPosition += 5;
+          if (log.food_accepted) {
+            doc.text(`  Accepted: ${log.food_accepted}`, margin, yPosition);
+            yPosition += 5;
+          }
+          if (log.food_given) {
+            doc.text(`  What Was Given: ${log.food_given}`, margin, yPosition);
+            yPosition += 5;
+          }
+          if (log.food_outcome) {
+            doc.text(`  Outcome: ${log.food_outcome.replace(/_/g, ' ')}`, margin, yPosition);
+            yPosition += 5;
+          }
+        }
+        if (log.drinks_offered) {
+          doc.text(`Drinks Offered: ${log.drinks_offered}`, margin, yPosition);
+          yPosition += 5;
+          if (log.drinks_accepted) {
+            doc.text(`  Accepted: ${log.drinks_accepted}`, margin, yPosition);
+            yPosition += 5;
+          }
+          if (log.drinks_given) {
+            doc.text(`  What Was Given: ${log.drinks_given}`, margin, yPosition);
+            yPosition += 5;
+          }
+          if (log.drinks_outcome) {
+            doc.text(`  Outcome: ${log.drinks_outcome.replace(/_/g, ' ')}`, margin, yPosition);
+            yPosition += 5;
+          }
+        }
         if (log.observations) {
           doc.text('Observations:', margin, yPosition);
           yPosition += 5;

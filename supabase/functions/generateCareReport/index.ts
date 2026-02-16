@@ -105,6 +105,22 @@ Deno.serve(async (req) => {
                 y += 5;
             }
 
+            if (shift.food_offered) {
+                doc.text(`Food Offered: ${shift.food_offered}`, 25, y);
+                y += 5;
+                if (shift.food_accepted) { doc.text(`  Accepted: ${shift.food_accepted}`, 25, y); y += 5; }
+                if (shift.food_given) { doc.text(`  What Was Given: ${shift.food_given}`, 25, y); y += 5; }
+                if (shift.food_outcome) { doc.text(`  Outcome: ${shift.food_outcome.replace(/_/g, ' ')}`, 25, y); y += 5; }
+            }
+
+            if (shift.drinks_offered) {
+                doc.text(`Drinks Offered: ${shift.drinks_offered}`, 25, y);
+                y += 5;
+                if (shift.drinks_accepted) { doc.text(`  Accepted: ${shift.drinks_accepted}`, 25, y); y += 5; }
+                if (shift.drinks_given) { doc.text(`  What Was Given: ${shift.drinks_given}`, 25, y); y += 5; }
+                if (shift.drinks_outcome) { doc.text(`  Outcome: ${shift.drinks_outcome.replace(/_/g, ' ')}`, 25, y); y += 5; }
+            }
+
             if (shift.care_notes) {
                 const notes = doc.splitTextToSize(`Notes: ${shift.care_notes}`, 170);
                 doc.text(notes, 25, y);
