@@ -54,6 +54,7 @@ function timeToMinutes(t) {
 export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId, isEditMode = false }) {
   const queryClient = useQueryClient();
   const isSitIn = SIT_IN_NAMES.has(shift?.shift_name);
+  const hasSitinCoverCall = calls?.some(c => c.call_type === 'sitin_cover');
   const [activeTab, setActiveTab] = useState(isSitIn ? 'sitting-logs' : 'calls');
   const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
   const [clockOffShiftConfirm, setClockOffShiftConfirm] = useState(false);
@@ -828,6 +829,14 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
                 <TabsTrigger value="sitting-logs">Sitting Logs</TabsTrigger>
                 <TabsTrigger value="details">Details</TabsTrigger>
               </TabsList>
+            ) : hasSitinCoverCall ? (
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="calls">
+                  Calls ({calls.length})
+                </TabsTrigger>
+                <TabsTrigger value="sitting-logs">Sitting Logs</TabsTrigger>
+                <TabsTrigger value="details">Details</TabsTrigger>
+              </TabsList>
             ) : (
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="calls">
@@ -837,8 +846,8 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
               </TabsList>
             )}
 
-            {/* Sitting Logs tab for sit-in shifts */}
-            {isSitIn && (
+            {/* Sitting Logs tab for sit-in shifts or shifts with sitin_cover calls */}
+            {(isSitIn || hasSitinCoverCall) && (
               <TabsContent value="sitting-logs" className="space-y-4 mt-4">
                 <ShiftSittingLogs
                   shift={currentShift}
@@ -846,7 +855,7 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
                   isAdmin={isAdmin}
                 />
                 {/* Clock Off button at bottom of sitting logs */}
-                {canClockOff && (
+                {canClockOff && isSitIn && (
                   <div className="mt-4 p-3 rounded-lg bg-slate-50">
                     <Button
                       onClick={() => setShiftSummaryOpen(true)}
