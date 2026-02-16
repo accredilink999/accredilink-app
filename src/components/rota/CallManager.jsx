@@ -76,6 +76,9 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
   }, [shift?.id, queryClient]);
 
   const callsToDisplay = (freshCalls || calls).sort((a, b) => {
+    // Sit-in cover calls always appear first
+    if (a.call_type === 'sitin_cover' && b.call_type !== 'sitin_cover') return -1;
+    if (b.call_type === 'sitin_cover' && a.call_type !== 'sitin_cover') return 1;
     const timeA = a.scheduled_time ? a.scheduled_time.split(':') : ['23', '59'];
     const timeB = b.scheduled_time ? b.scheduled_time.split(':') : ['23', '59'];
     const minutesA = parseInt(timeA[0]) * 60 + parseInt(timeA[1]);
