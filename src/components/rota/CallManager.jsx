@@ -475,7 +475,36 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
 
   const notMyCallMutation = useMutation({
     mutationFn: async (call) => {
+      // Delete the call from this shift
       await ShiftCallApi.delete(call.id);
+
+      // Notify paired partner that they now own this call
+      if (shift?.paired_shift_id && call.service_user_id && call.call_date && call.scheduled_time) {
+        try {
+          const pairedShift = await base44.entities.Shift.read(shift.paired_shift_id);
+          if (pairedShift?.staff_id && pairedShift.staff_id !== shift.staff_id) {
+            await base44.functions.invoke('createNotification', {
+              recipient_ids: [pairedShift.staff_id],
+              type: 'shift_activity',
+              title: `Call assigned to you: ${call.service_user_name}`,
+              message: `${shift?.staff_name || 'Your partner'} has marked ${call.service_user_name}'s ${call.scheduled_time} call as not theirs. You are now responsible for this call.`,
+              priority: 'high',
+              action_url: '/Rota',
+              send_push: true,
+            }).catch(e => console.warn('Partner notification failed:', e));
+          }
+        } catch (e) {
+          console.warn('Could not notify partner:', e);
+        }
+      }
+
+      // Notify admins
+      notifyAdminsOfActivity({
+        title: `Call removed: ${call.service_user_name}`,
+        message: `${shift?.staff_name || 'Staff'} removed ${call.service_user_name}'s ${call.scheduled_time} call from their shift.`,
+        excludeUserId: shift?.staff_id,
+      });
+
       return call.service_user_name;
     },
     onMutate: (call) => {
