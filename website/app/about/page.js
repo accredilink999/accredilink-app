@@ -62,9 +62,10 @@ export default function AboutPage() {
               <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-6">Who We Are</h2>
               <div className="space-y-4 text-slate-600 leading-relaxed">
                 <p>
-                  Accredilink Community Response Taskforce is a care provider based in Denbighshire, North Wales.
+                  Accredilink Community Response Taskforce is a <strong>not-for-profit</strong> care provider based in Denbighshire, North Wales.
                   We deliver a wide range of care and support services across Denbighshire, Conwy, and Wrexham —
                   from daily domiciliary care to emergency response and professional training.
+                  As a not-for-profit organisation, every penny we receive goes directly back into the care we provide and the communities we serve.
                 </p>
                 <p>
                   What makes us different is our integrated approach. We don't just provide routine care — we have

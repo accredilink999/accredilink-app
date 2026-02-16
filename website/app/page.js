@@ -133,7 +133,7 @@ export default function Home() {
 
               <p className="mt-6 text-lg sm:text-xl text-slate-300 leading-relaxed max-w-2xl">
                 Professional domiciliary care, emergency response, and specialist support services
-                across Denbighshire, Conwy, and Wrexham. Our trained team is here for you and your family.
+                across Denbighshire, Conwy, and Wrexham. As a not-for-profit organisation, every penny goes back into the care we deliver.
               </p>
 
               <div className="mt-8 flex flex-col sm:flex-row gap-4">
@@ -156,6 +156,42 @@ export default function Home() {
             </div>
             <div className="hidden lg:block relative h-96 rounded-2xl overflow-hidden">
               <Image src="/images/hero-home.jpg" alt="Compassionate care services in North Wales" fill className="object-cover" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Registered Providers & Not For Profit */}
+      <section className="py-10 sm:py-14 bg-white border-b border-slate-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-8">
+            <p className="text-sm font-semibold text-welsh-red uppercase tracking-wider mb-2">Not-For-Profit Organisation</p>
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">Trusted & Registered Provider</h2>
+            <p className="mt-3 text-slate-600 max-w-2xl mx-auto">
+              As a not-for-profit organisation, every penny goes back into delivering quality care for our community. We are proud to be a registered provider for:
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <div className="flex flex-col items-center p-6 bg-slate-50 rounded-2xl border border-slate-200">
+              <div className="relative w-48 h-16 mb-4">
+                <Image src="/images/denbighshire-logo.png" alt="Denbighshire County Council" fill className="object-contain" />
+              </div>
+              <h3 className="font-semibold text-slate-900 text-center">Denbighshire County Council</h3>
+              <p className="text-sm text-slate-500 text-center mt-1">Registered Care Provider</p>
+            </div>
+            <div className="flex flex-col items-center p-6 bg-slate-50 rounded-2xl border border-slate-200">
+              <div className="relative w-48 h-16 mb-4">
+                <Image src="/images/nhs-logo.png" alt="NHS Wales" fill className="object-contain" />
+              </div>
+              <h3 className="font-semibold text-slate-900 text-center">NHS Wales</h3>
+              <p className="text-sm text-slate-500 text-center mt-1">Registered Care Provider</p>
+            </div>
+            <div className="flex flex-col items-center p-6 bg-slate-50 rounded-2xl border border-slate-200">
+              <div className="relative w-48 h-16 mb-4">
+                <Image src="/images/bcuhb-logo.png" alt="Betsi Cadwaladr University Health Board" fill className="object-contain" />
+              </div>
+              <h3 className="font-semibold text-slate-900 text-center">Betsi Cadwaladr University Health Board</h3>
+              <p className="text-sm text-slate-500 text-center mt-1">Registered Care Provider</p>
             </div>
           </div>
         </div>
