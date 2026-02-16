@@ -20,8 +20,10 @@ import AddClientCallsModal from '@/components/rota/AddClientCallsModal';
 import CareLogForm from '@/components/careLogs/CareLogForm';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Clock, MapPin, CheckCircle, AlertCircle, Play, Square, Plus, Edit, Trash2, FileText, Car, ListChecks, ArrowRightLeft } from 'lucide-react';
+import SpeechButton from '@/components/ui/SpeechButton';
+import { Clock, MapPin, CheckCircle, AlertCircle, Play, Square, Plus, Edit, Trash2, FileText, Car, ListChecks, ArrowRightLeft, ClipboardList, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { notifyAdminsOfActivity } from '@/utils/adminNotifications';
 import { toast } from 'sonner';
@@ -60,6 +62,8 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
   const [driveToCallConfirm, setDriveToCallConfirm] = useState(null);
   const [taskWarningCall, setTaskWarningCall] = useState(null);
   const [newTaskText, setNewTaskText] = useState({});
+  const [sitinLogCallId, setSitinLogCallId] = useState(null);
+  const [sitinLogForm, setSitinLogForm] = useState({ visit_type: 'food_drink', notes: '', service_user_id: '' });
 
   const [freshCalls, setFreshCalls] = useState(calls);
 
@@ -118,6 +122,80 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
     },
     enabled: !!callsToDisplay?.length,
   });
+
+  // Fetch current user for sitting log attribution
+  const { data: currentUser } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: () => base44.auth.me(),
+  });
+
+  // Check if any sitin_cover calls exist to decide whether to load sitting logs
+  const hasSitinCalls = callsToDisplay.some(c => c.call_type === 'sitin_cover');
+
+  // Fetch sitting logs for this shift (only if sitin calls exist)
+  const { data: shiftSittingLogs = [] } = useQuery({
+    queryKey: ['shiftSittingLogs', shift?.id],
+    queryFn: () => base44.entities.SittingLog.filter({ shift_id: shift.id }, '-created_at', 200),
+    enabled: !!shift?.id && hasSitinCalls,
+  });
+
+  // Fetch all active service users for the sitting log client dropdown
+  const { data: allServiceUsers = [] } = useQuery({
+    queryKey: ['allActiveServiceUsers'],
+    queryFn: () => base44.entities.ServiceUser.filter({ status: 'active' }, 'full_name', 500),
+    enabled: hasSitinCalls,
+  });
+
+  const VISIT_TYPE_LABELS = {
+    food_drink: 'Food & Drink',
+    mood: 'Mood',
+    concerns: 'Concerns',
+    compliments: 'Compliments & Complaints',
+    healthcare_visit: 'Healthcare Visit',
+    social_care_call: 'Social Care Call',
+    appointment: 'Appointment',
+    social_care_outing: 'Social Care Outing',
+  };
+
+  const createSitinLogMutation = useMutation({
+    mutationFn: (data) => base44.entities.SittingLog.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shiftSittingLogs', shift.id] });
+      queryClient.invalidateQueries({ queryKey: ['sittingLogs'] });
+      setSitinLogForm({ visit_type: 'food_drink', notes: '', service_user_id: sitinLogForm.service_user_id });
+      setSitinLogCallId(null);
+      toast.success('Sitting log saved');
+    },
+    onError: (err) => toast.error('Failed to save: ' + (err.message || 'Unknown error')),
+  });
+
+  const deleteSitinLogMutation = useMutation({
+    mutationFn: (logId) => base44.entities.SittingLog.delete(logId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shiftSittingLogs', shift.id] });
+      queryClient.invalidateQueries({ queryKey: ['sittingLogs'] });
+      toast.success('Log deleted');
+    },
+  });
+
+  const handleSubmitSitinLog = () => {
+    if (!sitinLogForm.service_user_id || !sitinLogForm.notes.trim()) {
+      toast.error('Please select a client and enter details');
+      return;
+    }
+    const selectedClient = allServiceUsers.find(u => u.id === sitinLogForm.service_user_id);
+    createSitinLogMutation.mutate({
+      service_user_id: sitinLogForm.service_user_id,
+      service_user_name: selectedClient?.full_name || '',
+      visit_type: sitinLogForm.visit_type,
+      visitor_name: currentUser?.full_name || '',
+      visit_date: new Date().toISOString(),
+      notes: sitinLogForm.notes,
+      recorded_by: currentUser?.id || userId,
+      recorded_by_name: currentUser?.full_name || shift?.staff_name || '',
+      shift_id: shift.id,
+    });
+  };
 
   const clockInMutation = useMutation({
     mutationFn: async (call) => {
@@ -738,6 +816,20 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                          Check Out (Sit-In)
                        </Button>
                      )}
+                     {/* Sitting Log button — visible after acceptance + check-in */}
+                     {(isAccepted || isPartnerAccepted) && call.clock_in_time && (isMyShift || isAdmin) && call.status !== 'completed' && sitinLogCallId !== call.id && (
+                       <Button
+                         size="sm"
+                         onClick={() => {
+                           setSitinLogCallId(call.id);
+                           setSitinLogForm({ visit_type: 'food_drink', notes: '', service_user_id: '' });
+                         }}
+                         className="bg-teal-600 hover:bg-teal-700 w-full min-h-[44px] px-4 touch-manipulation"
+                       >
+                         <ClipboardList className="w-3 h-3 mr-1" />
+                         Sitting Log
+                       </Button>
+                     )}
                      {isAdmin && call.status !== 'completed' && (
                        <Button
                          size="sm"
@@ -758,6 +850,117 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                        </Button>
                      )}
                    </div>
+
+                   {/* Inline Sitting Log Form */}
+                   {sitinLogCallId === call.id && (
+                     <div className="mt-3 p-3 bg-teal-50 border border-teal-200 rounded-lg space-y-3">
+                       <h4 className="font-semibold text-slate-900 text-sm">New Sitting Log Entry</h4>
+                       <div>
+                         <label className="text-sm font-medium text-slate-700 mb-1 block">Client</label>
+                         <Select value={sitinLogForm.service_user_id} onValueChange={(v) => setSitinLogForm(prev => ({ ...prev, service_user_id: v }))}>
+                           <SelectTrigger>
+                             <SelectValue placeholder="Select client" />
+                           </SelectTrigger>
+                           <SelectContent>
+                             {allServiceUsers.map(u => (
+                               <SelectItem key={u.id} value={u.id}>{u.full_name}</SelectItem>
+                             ))}
+                           </SelectContent>
+                         </Select>
+                       </div>
+                       <div>
+                         <label className="text-sm font-medium text-slate-700 mb-1 block">Entry Type</label>
+                         <Select value={sitinLogForm.visit_type} onValueChange={(v) => setSitinLogForm(prev => ({ ...prev, visit_type: v }))}>
+                           <SelectTrigger>
+                             <SelectValue />
+                           </SelectTrigger>
+                           <SelectContent>
+                             <SelectItem value="food_drink">Food & Drink Log</SelectItem>
+                             <SelectItem value="mood">Mood Log</SelectItem>
+                             <SelectItem value="concerns">Concerns Log</SelectItem>
+                             <SelectItem value="compliments">Compliments & Complaints Log</SelectItem>
+                             <SelectItem value="healthcare_visit">Healthcare Visit</SelectItem>
+                             <SelectItem value="social_care_call">Social Care Call</SelectItem>
+                             <SelectItem value="appointment">Appointment</SelectItem>
+                             <SelectItem value="social_care_outing">Social Care Outing</SelectItem>
+                           </SelectContent>
+                         </Select>
+                       </div>
+                       <div>
+                         <label className="text-sm font-medium text-slate-700 mb-1 block">Details</label>
+                         <div className="flex gap-2">
+                           <Textarea
+                             placeholder="Enter details..."
+                             value={sitinLogForm.notes}
+                             onChange={(e) => setSitinLogForm(prev => ({ ...prev, notes: e.target.value }))}
+                             className="h-24 flex-1"
+                           />
+                           <SpeechButton
+                             onResult={(text) => setSitinLogForm(prev => ({ ...prev, notes: (prev.notes || '') + ' ' + text }))}
+                             className="h-12 px-3"
+                           />
+                         </div>
+                       </div>
+                       <div className="flex gap-2">
+                         <Button
+                           onClick={handleSubmitSitinLog}
+                           disabled={createSitinLogMutation.isPending}
+                           className="flex-1 min-h-[44px] touch-manipulation"
+                         >
+                           {createSitinLogMutation.isPending ? 'Saving...' : 'Save Sitting Log'}
+                         </Button>
+                         <Button variant="outline" onClick={() => setSitinLogCallId(null)} className="flex-1 min-h-[44px] touch-manipulation">
+                           Cancel
+                         </Button>
+                       </div>
+                     </div>
+                   )}
+
+                   {/* Existing sitting logs for this shift */}
+                   {shiftSittingLogs.length > 0 && (
+                     <div className="mt-3 space-y-2">
+                       <p className="text-xs font-semibold text-slate-500 flex items-center gap-1">
+                         <ClipboardList className="w-3 h-3" />
+                         Sitting Logs ({shiftSittingLogs.filter(l => !l.is_daily_report).length})
+                       </p>
+                       {shiftSittingLogs.filter(l => !l.is_daily_report).map(log => (
+                         <div key={log.id} className="p-2 bg-white border border-slate-200 rounded text-sm">
+                           <div className="flex items-start justify-between">
+                             <div className="flex-1 min-w-0">
+                               <div className="flex items-center gap-2 flex-wrap mb-1">
+                                 <span className="font-medium text-slate-900 text-xs truncate">{log.service_user_name}</span>
+                                 <Badge variant="outline" className="text-[10px] py-0 px-1">
+                                   {VISIT_TYPE_LABELS[log.visit_type] || log.visit_type}
+                                 </Badge>
+                               </div>
+                               <p className="text-xs text-slate-700 whitespace-pre-wrap line-clamp-2">{log.notes}</p>
+                               <div className="flex items-center gap-3 mt-1 text-[10px] text-slate-400">
+                                 <span className="flex items-center gap-1">
+                                   <Clock className="w-2.5 h-2.5" />
+                                   {format(new Date(log.visit_date), 'HH:mm')}
+                                 </span>
+                                 <span className="flex items-center gap-1">
+                                   <User className="w-2.5 h-2.5" />
+                                   {log.recorded_by_name}
+                                 </span>
+                               </div>
+                             </div>
+                             {(isAdmin || isMyShift) && (
+                               <Button
+                                 variant="ghost"
+                                 size="sm"
+                                 onClick={() => deleteSitinLogMutation.mutate(log.id)}
+                                 disabled={deleteSitinLogMutation.isPending}
+                                 className="text-red-400 hover:text-red-600 flex-shrink-0 h-6 w-6 p-0"
+                               >
+                                 <Trash2 className="w-3 h-3" />
+                               </Button>
+                             )}
+                           </div>
+                         </div>
+                       ))}
+                     </div>
+                   )}
                  </Card>
                );
              }
