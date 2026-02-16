@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { ShiftApi, ShiftCallApi } from '@/api/rotaApi';
+import { supabase } from '@/api/supabaseClient';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -37,6 +38,14 @@ export default function ShiftStatusOverview() {
     return unsubscribe;
   }, [queryClient, selectedDate]);
 
+  // Real-time shift_calls updates
+  useEffect(() => {
+    const unsubscribe = ShiftCallApi.subscribe(() => {
+      queryClient.invalidateQueries({ queryKey: ['shiftCalls'] });
+    });
+    return unsubscribe;
+  }, [queryClient]);
+
   // Force re-render every 30 seconds to update time-based status
   const [, setForceUpdate] = useState(0);
   useEffect(() => {
@@ -47,17 +56,31 @@ export default function ShiftStatusOverview() {
   const { data: careLogs = [] } = useQuery({
     queryKey: ['careLogs', selectedDate],
     queryFn: async () => {
-      const allLogs = await base44.entities.CareLog.list('-created_date', 500);
-      return allLogs.filter(l => l.visit_date === selectedDate);
+      const { data, error } = await supabase
+        .from('care_logs')
+        .select('*')
+        .eq('visit_date', selectedDate);
+      if (error) throw error;
+      return data || [];
     },
+    refetchInterval: 15000,
   });
 
+  // Fetch shift_calls for today's shifts only (direct supabase query for accuracy)
+  const shiftIds = shiftsToday.map(s => s.id);
   const { data: shiftCalls = [] } = useQuery({
-    queryKey: ['shiftCalls', selectedDate],
+    queryKey: ['shiftCalls', shiftIds.join(',')],
     queryFn: async () => {
-      const allCalls = await ShiftCallApi.list('-created_date', 500);
-      return allCalls;
+      if (shiftIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('shift_calls')
+        .select('*')
+        .in('shift_id', shiftIds);
+      if (error) throw error;
+      return data || [];
     },
+    enabled: shiftIds.length > 0,
+    refetchInterval: 10000,
   });
 
   const { data: staff = [] } = useQuery({
@@ -257,14 +280,16 @@ export default function ShiftStatusOverview() {
                        {(() => {
                          const shiftLogs = careLogs.filter(l => l.shift_id === shift.id);
                          const completedLogs = shiftLogs.filter(l => l.status === 'submitted').length;
-                         const totalLogs = shiftCalls.filter(c => c.shift_id === shift.id).length || 1;
+                         const callsForShift = shiftCalls.filter(c => c.shift_id === shift.id && c.call_type !== 'sitin_cover');
+                         const totalCalls = callsForShift.length;
+                         if (totalCalls === 0) return null;
                          return (
                            <Badge className={`text-xs ${
-                             completedLogs === totalLogs && totalLogs > 0
+                             completedLogs >= totalCalls
                                ? 'bg-green-100 text-green-800'
                                : 'bg-yellow-100 text-yellow-800'
                            }`}>
-                             {completedLogs} / {totalLogs} logs
+                             {completedLogs} / {totalCalls} logs
                            </Badge>
                          );
                        })()}
