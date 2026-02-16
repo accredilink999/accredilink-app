@@ -621,8 +621,10 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                const isAccepted = meta?.accepted === true;
                const isPartnerAccepted = meta?.partner_accepted === true;
                const acceptedByMe = meta?.accepted_by === shift?.staff_id;
-               const canSitinClockIn = isAccepted && (isMyShift || isAdmin) && !call.clock_in_time && call.status !== 'completed';
-               const canSitinClockOut = isAccepted && (isMyShift || isAdmin) && call.clock_in_time && !call.clock_out_time && call.status !== 'completed';
+               const iAccepted = isAccepted && acceptedByMe;
+               const partnerDidIt = isPartnerAccepted && !acceptedByMe;
+               const canSitinClockIn = iAccepted && (isMyShift || isAdmin) && !call.clock_in_time && call.status !== 'completed';
+               const canSitinClockOut = iAccepted && (isMyShift || isAdmin) && call.clock_in_time && !call.clock_out_time && call.status !== 'completed';
 
                return (
                  <Card key={call.id} className={`p-4 hover:shadow-md transition-shadow border-2 ${isAccepted ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
@@ -658,7 +660,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                    )}
 
                    <div className="grid grid-cols-1 gap-2 w-full">
-                     {!isAccepted && (isMyShift || isAdmin) && (
+                     {!isAccepted && !partnerDidIt && (isMyShift || isAdmin) && (
                        <Button
                          size="sm"
                          onClick={() => acceptSitinMutation.mutate(call)}
@@ -668,24 +670,19 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                          Accept Sit-in Call?
                        </Button>
                      )}
-                     {isAccepted && isPartnerAccepted && !acceptedByMe && (
-                       <div className="text-center p-2 bg-green-100 rounded-lg">
-                         <p className="text-sm font-medium text-green-700">
-                           Partner Accepted Call
+                     {partnerDidIt && (
+                       <div className="text-center p-3 bg-green-100 rounded-lg">
+                         <p className="text-sm font-semibold text-green-700">
+                           Partner Accepted This Call
                          </p>
                          <p className="text-xs text-green-600 mt-1">
-                           {meta?.partner_name || 'Partner'} accepted this sit-in
+                           {meta?.partner_name || 'Partner'} has accepted the sit-in cover
                          </p>
                        </div>
                      )}
-                     {isAccepted && acceptedByMe && (
+                     {iAccepted && (
                        <div className="text-center p-2 bg-green-100 rounded-lg">
                          <p className="text-sm font-medium text-green-700">You accepted this sit-in cover</p>
-                       </div>
-                     )}
-                     {isAccepted && !acceptedByMe && !isPartnerAccepted && (
-                       <div className="text-center p-2 bg-green-100 rounded-lg">
-                         <p className="text-sm font-medium text-green-700">Sit-in cover accepted</p>
                        </div>
                      )}
                      {canSitinClockIn && (
