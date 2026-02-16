@@ -54,7 +54,6 @@ function timeToMinutes(t) {
 export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId, isEditMode = false }) {
   const queryClient = useQueryClient();
   const isSitIn = SIT_IN_NAMES.has(shift?.shift_name);
-  const hasSitinCoverCall = calls?.some(c => c.call_type === 'sitin_cover');
   const [activeTab, setActiveTab] = useState(isSitIn ? 'sitting-logs' : 'calls');
   const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
   const [clockOffShiftConfirm, setClockOffShiftConfirm] = useState(false);
@@ -130,6 +129,8 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
     },
     enabled: !!shift.id,
   });
+
+  const hasSitinCoverCall = calls?.some(c => c.call_type === 'sitin_cover');
 
   // Initialize sit-in cover state from existing calls
   useEffect(() => {
