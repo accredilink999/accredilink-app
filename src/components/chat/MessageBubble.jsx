@@ -22,7 +22,12 @@ function Linkify({ children }) {
          onClick={(e) => {
            e.preventDefault();
            e.stopPropagation();
-           openExternalUrl(part);
+           // Use share sheet on mobile (opens Chrome), window.open on web
+           if (navigator.share) {
+             navigator.share({ title: 'Link', url: part }).catch(() => {});
+           } else {
+             window.open(part, '_blank');
+           }
          }}>
         {part}
       </a>
