@@ -18,7 +18,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
-import { supabase } from '@/api/supabaseClient';
 import { initFirebaseMessaging, requestFCMToken } from '@/lib/firebaseMessaging';
 import { Bell, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -35,11 +34,9 @@ function getPlatform() {
   return window.Capacitor?.getPlatform?.() === 'ios' ? 'ios' : 'android';
 }
 
-/** Save APNS token directly to the profiles table for iOS */
+/** Save APNS token via edge function (uses service key to bypass RLS) */
 async function saveApnsToken(token) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-  await supabase.from('profiles').update({ apns_device_token: token }).eq('id', user.id);
+  await base44.functions.invoke('manageFirebaseSubscription', { apnsToken: token, platform: 'ios' });
 }
 
 /**

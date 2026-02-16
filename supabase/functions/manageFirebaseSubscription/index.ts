@@ -33,10 +33,31 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'Unauthorized' }, 401);
     }
 
-    const { firebaseToken, platform } = await req.json();
+    const { firebaseToken, apnsToken, platform } = await req.json();
+
+    // --- iOS APNS token path ---
+    if (apnsToken) {
+      const { error: apnsErr } = await supabaseAdmin
+        .from('profiles')
+        .update({ apns_device_token: apnsToken, updated_at: new Date().toISOString() })
+        .eq('id', user.id);
+      if (apnsErr) {
+        console.error('[APNS] Failed to save APNS token to profiles:', apnsErr);
+        return jsonResponse({ error: 'Failed to save APNS token' }, 500);
+      }
+      // Also save to users table as fallback
+      await supabaseAdmin
+        .from('users')
+        .update({ apns_device_token: apnsToken })
+        .eq('id', user.id)
+        .then(() => {})
+        .catch(() => {});
+      console.log(`[APNS] Saved APNS token for user ${user.id} (platform: ios)`);
+      return jsonResponse({ success: true, message: 'APNS token saved successfully' });
+    }
 
     if (!firebaseToken) {
-      return jsonResponse({ error: 'firebaseToken is required' }, 400);
+      return jsonResponse({ error: 'firebaseToken or apnsToken is required' }, 400);
     }
 
     // Load existing fcm_tokens array

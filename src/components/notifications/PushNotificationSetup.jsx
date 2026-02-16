@@ -14,7 +14,6 @@
 import { useState, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { supabase } from '@/api/supabaseClient';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Bell, CheckCircle2, AlertTriangle, Smartphone, RefreshCw } from 'lucide-react';
@@ -128,12 +127,12 @@ export default function PushNotificationSetup() {
         }
       }
 
-      // Save token to backend
+      // Save token to backend via edge function (uses service key, bypasses RLS)
       if (platform === 'ios') {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          await supabase.from('profiles').update({ apns_device_token: token }).eq('id', user.id);
-        }
+        await base44.functions.invoke('manageFirebaseSubscription', {
+          apnsToken: token,
+          platform: 'ios',
+        });
       } else {
         await base44.functions.invoke('manageFirebaseSubscription', {
           firebaseToken: token,
