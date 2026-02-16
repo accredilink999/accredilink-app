@@ -313,7 +313,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] });
-      toast.success('Call deleted', { duration: 3000 });
+      toast.success('Call Removed', { duration: 3000 });
     },
     onError: (err, callId) => {
       // Revert optimistic delete
@@ -711,16 +711,8 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                        <Button
                          size="sm"
                          variant="ghost"
-                         onClick={() => {
-                           toast('Delete sit-in cover call?', {
-                             action: {
-                               label: 'Delete',
-                               onClick: () => deleteCallMutation.mutate(call.id),
-                             },
-                             cancel: { label: 'Cancel' },
-                             duration: 5000,
-                           });
-                         }}
+                         onClick={() => deleteCallMutation.mutate(call.id)}
+                         disabled={deleteCallMutation.isPending}
                          className="w-full min-h-[44px] px-4 touch-manipulation"
                        >
                          <Trash2 className="w-3 h-3" />
@@ -942,20 +934,12 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                       Not Home
                     </Button>
                   )}
-                  {isAdmin && call.status !== 'completed' && (
+                  {isAdmin && (
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => {
-                        toast(`Delete "${call.service_user_name || 'this call'}"?`, {
-                          action: {
-                            label: 'Delete',
-                            onClick: () => deleteCallMutation.mutate(call.id),
-                          },
-                          cancel: { label: 'Cancel' },
-                          duration: 5000,
-                        });
-                      }}
+                      onClick={() => deleteCallMutation.mutate(call.id)}
+                      disabled={deleteCallMutation.isPending}
                       className="w-full min-h-[44px] px-4 touch-manipulation"
                     >
                       <Trash2 className="w-3 h-3" />

@@ -463,6 +463,10 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
       setEditMode(false);
       onClose();
     },
+    onError: (err) => {
+      console.error('Update shift error:', err);
+      toast.error(err.message || 'Failed to update shift');
+    },
   });
 
   const pairShiftMutation = useMutation({
