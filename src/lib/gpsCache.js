@@ -1,8 +1,20 @@
 import { supabase } from '@/api/supabaseClient';
 
 /**
- * Fetch average historical GPS coordinates for a list of service users.
- * Uses all past shift_calls where checkin_latitude is not null.
+ * Compute the median of a sorted array of numbers.
+ */
+function median(arr) {
+  const sorted = [...arr].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[mid - 1] + sorted[mid]) / 2
+    : sorted[mid];
+}
+
+/**
+ * Fetch historical GPS coordinates for a list of service users.
+ * Uses the MEDIAN of all past shift_calls check-in coordinates,
+ * which is robust to outliers (e.g. staff checking in from home).
  * Returns a Map of serviceUserId → { latitude, longitude }.
  *
  * If addressFallbacks is provided (Map of id → address string),
@@ -23,7 +35,7 @@ export async function getServiceUserLocations(serviceUserIds, addressFallbacks) 
 
   if (error) console.warn('GPS cache query error:', error);
 
-  // Group by service_user_id and compute average lat/lng
+  // Group by service_user_id
   const grouped = {};
   for (const row of (data || [])) {
     const id = row.service_user_id;
@@ -32,11 +44,10 @@ export async function getServiceUserLocations(serviceUserIds, addressFallbacks) 
     grouped[id].lngs.push(parseFloat(row.checkin_longitude));
   }
 
+  // Use median coordinates (robust to outliers like staff checking in from home)
   const result = new Map();
   for (const [id, coords] of Object.entries(grouped)) {
-    const avgLat = coords.lats.reduce((a, b) => a + b, 0) / coords.lats.length;
-    const avgLng = coords.lngs.reduce((a, b) => a + b, 0) / coords.lngs.length;
-    result.set(id, { latitude: avgLat, longitude: avgLng });
+    result.set(id, { latitude: median(coords.lats), longitude: median(coords.lngs) });
   }
 
   // Geocode any missing IDs via Nominatim if address fallbacks provided
