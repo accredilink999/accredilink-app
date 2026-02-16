@@ -401,22 +401,34 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
 
       const targetStaffName = targetShift.staff_name;
 
-      // Copy this single call to the target shift
-      await ShiftCallApi.create({
-        shift_id: targetShift.id,
-        service_user_id: handoverCall.service_user_id,
-        service_user_name: handoverCall.service_user_name,
-        service_user_address: handoverCall.service_user_address,
-        scheduled_time: handoverCall.scheduled_time,
-        call_time: handoverCall.scheduled_time,
-        duration_minutes: handoverCall.duration_minutes,
-        call_type: handoverCall.call_type,
-        call_types: handoverCall.call_types,
-        tasks: handoverCall.tasks,
-        call_date: handoverCall.call_date,
-        status: 'pending',
-        notes: handoverCall.notes || '',
-      });
+      // Check if the target shift already has a call for the same service user at the same time
+      const existingCalls = await ShiftCallApi.filter({ shift_id: targetShift.id });
+      const isDuplicate = existingCalls.some(c =>
+        c.service_user_id === handoverCall.service_user_id &&
+        c.scheduled_time === handoverCall.scheduled_time
+      );
+
+      if (!isDuplicate) {
+        // Create the call on the target shift
+        await ShiftCallApi.create({
+          shift_id: targetShift.id,
+          service_user_id: handoverCall.service_user_id,
+          service_user_name: handoverCall.service_user_name,
+          service_user_address: handoverCall.service_user_address,
+          scheduled_time: handoverCall.scheduled_time,
+          call_time: handoverCall.scheduled_time,
+          duration_minutes: handoverCall.duration_minutes,
+          call_type: handoverCall.call_type,
+          call_types: handoverCall.call_types,
+          tasks: handoverCall.tasks,
+          call_date: handoverCall.call_date,
+          status: 'pending',
+          notes: handoverCall.notes || '',
+        });
+      }
+
+      // Remove the call from the current shift
+      await ShiftCallApi.delete(handoverCall.id);
 
       // Send push notification to the receiving staff member
       await base44.functions.invoke('createNotification', {
@@ -438,6 +450,12 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
 
       return { clientName: handoverCall.service_user_name, targetName: targetStaffName };
     },
+    onMutate: () => {
+      // Optimistic: remove the call from the local list immediately
+      if (handoverCall) {
+        setFreshCalls(prev => prev.filter(c => c.id !== handoverCall.id));
+      }
+    },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['shift-calls'] });
       toast.success(`${result.clientName}'s call handed over to ${result.targetName}`);
@@ -445,6 +463,9 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
       setHandoverStaffId('');
     },
     onError: (err) => {
+      // Revert optimistic removal
+      setFreshCalls(calls);
+      queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] });
       toast.error('Handover failed: ' + (err.message || 'Unknown error'));
     },
   });
