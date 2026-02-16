@@ -253,7 +253,7 @@ export default function ControlRoom() {
           hasRecentActivity,
         };
       })
-      .filter(s => s.hasRecentActivity || s.status === 'in_progress' || s.clock_in_time)
+      .filter(s => s.status !== 'completed' && (s.hasRecentActivity || s.status === 'in_progress' || s.clock_in_time))
       .sort((a, b) => (a.staff_name || '').localeCompare(b.staff_name || ''));
   }, [todayShifts, todayCalls]);
 
