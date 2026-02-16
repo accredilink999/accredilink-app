@@ -187,9 +187,11 @@ export default function ControlRoom() {
     // Determine overall status for each client marker
     return Object.values(byClient).map(client => {
       const calls = client.calls.sort((a, b) => (a.scheduled_time || '').localeCompare(b.scheduled_time || ''));
-      const hasInProgress = calls.some(c => c.status === 'in_progress');
-      const allCompleted = calls.every(c => c.status === 'completed' || c.status === 'missed');
-      const latestCall = calls[calls.length - 1];
+      const realCalls = calls.filter(c => c.call_type !== 'sitin_cover');
+      // Only count as in_progress if staff has actually clocked in
+      const hasInProgress = realCalls.some(c => c.status === 'in_progress' && c.clock_in_time);
+      const allCompleted = realCalls.length > 0 && realCalls.every(c => c.status === 'completed' || c.status === 'missed');
+      const latestCall = realCalls[realCalls.length - 1] || calls[calls.length - 1];
 
       let markerStatus = 'pending';
       let statusColor = '#10B981'; // green
@@ -207,7 +209,7 @@ export default function ControlRoom() {
         markerStatus,
         statusColor,
         latestCall,
-        inProgressCall: calls.find(c => c.status === 'in_progress'),
+        inProgressCall: realCalls.find(c => c.status === 'in_progress' && c.clock_in_time),
       };
     });
   }, [todayCalls, clientLocations, todayShifts]);
@@ -220,9 +222,11 @@ export default function ControlRoom() {
       .filter(s => s.staff_id && s.status !== 'cancelled')
       .map(shift => {
         const shiftCalls = todayCalls.filter(c => c.shift_id === shift.id);
-        const totalCalls = shiftCalls.length;
-        const completedCalls = shiftCalls.filter(c => c.status === 'completed').length;
-        const hasInProgress = shiftCalls.some(c => c.status === 'in_progress');
+        const realCalls = shiftCalls.filter(c => c.call_type !== 'sitin_cover');
+        const totalCalls = realCalls.length;
+        const completedCalls = realCalls.filter(c => c.status === 'completed').length;
+        // Only count as in_progress if staff has actually clocked in
+        const hasInProgress = realCalls.some(c => c.status === 'in_progress' && c.clock_in_time);
 
         // Check for recent activity
         const hasRecentActivity = shift.clock_in_time ||

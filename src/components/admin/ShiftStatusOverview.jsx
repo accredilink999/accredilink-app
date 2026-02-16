@@ -140,7 +140,13 @@ export default function ShiftStatusOverview() {
   const getCallStatus = (shift) => {
     const shiftStatus = getShiftStatus(shift);
     const shiftCallsList = shiftCalls.filter(c => c.shift_id === shift.id);
-    const inProgressCalls = shiftCallsList.filter(c => c.status === 'in_progress' || c.status === 'started');
+    // Only count as "in progress" if the call has actually been clocked into (has clock_in_time)
+    // and is a real visit (not sitin_cover)
+    const inProgressCalls = shiftCallsList.filter(c =>
+      (c.status === 'in_progress' || c.status === 'started') &&
+      c.clock_in_time &&
+      c.call_type !== 'sitin_cover'
+    );
     if (inProgressCalls.length > 0) return 'in_progress';
     if (shiftStatus === 'booked_on') return 'between_calls';
     return null;
