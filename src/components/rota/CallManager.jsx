@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
-import { ShiftCallApi } from '@/api/rotaApi';
+import { ShiftCallApi, ShiftApi } from '@/api/rotaApi';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +36,16 @@ function haversineMiles(lat1, lon1, lat2, lon2) {
     Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
+}
+
+// Parse sit-in cover metadata from call notes (JSON)
+function parseSitinMeta(call) {
+  if (call.call_type !== 'sitin_cover') return null;
+  try {
+    return JSON.parse(call.notes || '{}');
+  } catch {
+    return { sitin_cover: true, accepted: false };
+  }
 }
 
 export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayShifts = [] }) {
@@ -137,21 +147,23 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
         }
       }
 
-      // ALWAYS show "Did you drive?" prompt — for every call including the first
-      setDriveToCallConfirm({ ...data, currentLocation: null });
+      // Show "Did you drive?" prompt — skip for sit-in cover calls
+      if (data.call_type !== 'sitin_cover') {
+        setDriveToCallConfirm({ ...data, currentLocation: null });
 
-      // Capture geolocation in parallel while dialog is showing
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            setDriveToCallConfirm(prev => prev ? {
-              ...prev,
-              currentLocation: position.coords
-            } : null);
-          },
-          (error) => console.log('Geolocation error:', error),
-          { enableHighAccuracy: true, timeout: 10000 }
-        );
+        // Capture geolocation in parallel while dialog is showing
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              setDriveToCallConfirm(prev => prev ? {
+                ...prev,
+                currentLocation: position.coords
+              } : null);
+            },
+            (error) => console.log('Geolocation error:', error),
+            { enableHighAccuracy: true, timeout: 10000 }
+          );
+        }
       }
 
       // Notify admins of call check-in
@@ -222,11 +234,12 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
         }
       }
 
-      // Check if this is the last call to be completed
-      const completedCount = freshCalls.filter(c => c.status === 'completed').length;
-      const isLastCall = completedCount >= freshCalls.length - 1;
+      // Check if this is the last regular call to be completed (exclude sitin_cover)
+      const regularCalls = freshCalls.filter(c => c.call_type !== 'sitin_cover');
+      const completedCount = regularCalls.filter(c => c.status === 'completed').length;
+      const isLastCall = completedCount >= regularCalls.length - 1;
 
-      if (isLastCall) {
+      if (isLastCall && data.call_type !== 'sitin_cover') {
         // Calculate mileage from all shift_calls where drove_to_call=true
         try {
           const allShiftCalls = await ShiftCallApi.filter(
@@ -470,6 +483,87 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
     },
   });
 
+  const acceptSitinMutation = useMutation({
+    mutationFn: async (call) => {
+      const meta = parseSitinMeta(call);
+      const updatedNotes = JSON.stringify({
+        ...meta,
+        accepted: true,
+        accepted_by: shift?.staff_id,
+        accepted_at: new Date().toISOString(),
+      });
+      const updatedCall = await ShiftCallApi.update(call.id, {
+        notes: updatedNotes,
+      });
+
+      // Notify admins
+      notifyAdminsOfActivity({
+        title: 'Sit-in cover accepted',
+        message: `${shift?.staff_name || 'Staff'} accepted the sit-in cover call on their shift.`,
+        excludeUserId: shift?.staff_id,
+      });
+
+      // Notify paired shift partner if exists
+      if (shift?.paired_shift_id) {
+        try {
+          const allShifts = await ShiftApi.list('-created_date', 500);
+          const pairedShift = allShifts.find(s => s.id === shift.paired_shift_id);
+          if (pairedShift?.staff_id && pairedShift.staff_id !== shift.staff_id) {
+            await base44.functions.invoke('createNotification', {
+              recipient_ids: [pairedShift.staff_id],
+              type: 'shift_activity',
+              title: 'Partner Accepted Sit-In Cover',
+              message: `${shift?.staff_name || 'Your shift partner'} has accepted the sit-in cover call.`,
+              priority: 'normal',
+              action_url: '/Rota',
+              send_push: true,
+            });
+          }
+        } catch (e) {
+          console.warn('Failed to notify partner:', e);
+        }
+      }
+
+      // Sync acceptance to paired shift's matching sitin_cover call
+      if (call.call_date && call.scheduled_time) {
+        try {
+          const matchingCalls = await ShiftCallApi.filter({
+            call_date: call.call_date,
+            scheduled_time: call.scheduled_time,
+          });
+          const otherSitinCalls = matchingCalls.filter(c => c.id !== call.id && c.call_type === 'sitin_cover');
+          for (const otherCall of otherSitinCalls) {
+            const otherMeta = parseSitinMeta(otherCall);
+            await ShiftCallApi.update(otherCall.id, {
+              notes: JSON.stringify({
+                ...otherMeta,
+                partner_accepted: true,
+                partner_name: shift?.staff_name || 'Partner',
+              }),
+            });
+          }
+        } catch (err) {
+          console.log('Error syncing sitin acceptance:', err);
+        }
+      }
+
+      return updatedCall;
+    },
+    onMutate: (call) => {
+      const meta = parseSitinMeta(call);
+      const updatedNotes = JSON.stringify({ ...meta, accepted: true, accepted_by: shift?.staff_id, accepted_at: new Date().toISOString() });
+      setFreshCalls(prev => prev.map(c => c.id === call.id ? { ...c, notes: updatedNotes } : c));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] });
+      toast.success('Sit-in cover accepted');
+    },
+    onError: () => {
+      setFreshCalls(calls);
+      toast.error('Failed to accept sit-in cover');
+    },
+  });
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'completed': return 'bg-green-100 text-green-800';
@@ -518,6 +612,125 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
       ) : (
         <div className="space-y-3">
            {callsToDisplay.map((call, index) => {
+             // Special rendering for sit-in cover calls
+             if (call.call_type === 'sitin_cover') {
+               const meta = parseSitinMeta(call);
+               const isAccepted = meta?.accepted === true;
+               const isPartnerAccepted = meta?.partner_accepted === true;
+               const acceptedByMe = meta?.accepted_by === shift?.staff_id;
+               const canSitinClockIn = isAccepted && (isMyShift || isAdmin) && !call.clock_in_time && call.status !== 'completed';
+               const canSitinClockOut = isAccepted && (isMyShift || isAdmin) && call.clock_in_time && !call.clock_out_time && call.status !== 'completed';
+
+               return (
+                 <Card key={call.id} className={`p-4 hover:shadow-md transition-shadow border-2 ${isAccepted ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
+                   <div className="flex items-start justify-between mb-3">
+                     <div className="flex items-start gap-3">
+                       <div className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm ${isAccepted ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                         {index + 1}
+                       </div>
+                       <div>
+                         <h4 className="font-semibold text-slate-900">Sit-in Required On Shift</h4>
+                         <p className="text-sm text-slate-600 flex items-center gap-1 mt-1">
+                           <Clock className="w-3 h-3" />
+                           {meta?.time_on || call.scheduled_time} - {meta?.time_off || ''}
+                           {call.duration_minutes ? ` (${call.duration_minutes}min)` : ''}
+                         </p>
+                         <Badge variant="outline" className="mt-1 text-xs py-0 px-1.5 border-amber-300 text-amber-700">
+                           Sit-in Cover
+                         </Badge>
+                       </div>
+                     </div>
+                     <Badge className={isAccepted ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}>
+                       {isAccepted ? 'Accepted' : 'Pending'}
+                     </Badge>
+                   </div>
+
+                   {call.clock_in_time && (
+                     <div className="text-xs text-slate-600 space-y-1 mb-3">
+                       <p>Checked in: {format(new Date(call.clock_in_time), 'HH:mm')}</p>
+                       {call.clock_out_time && (
+                         <p>Checked out: {format(new Date(call.clock_out_time), 'HH:mm')}</p>
+                       )}
+                     </div>
+                   )}
+
+                   <div className="grid grid-cols-1 gap-2 w-full">
+                     {!isAccepted && (isMyShift || isAdmin) && (
+                       <Button
+                         size="sm"
+                         onClick={() => acceptSitinMutation.mutate(call)}
+                         disabled={acceptSitinMutation.isPending}
+                         className="bg-amber-500 hover:bg-amber-600 text-white w-full min-h-[44px] px-4 touch-manipulation"
+                       >
+                         Accept Sit-in Call?
+                       </Button>
+                     )}
+                     {isAccepted && isPartnerAccepted && !acceptedByMe && (
+                       <div className="text-center p-2 bg-green-100 rounded-lg">
+                         <p className="text-sm font-medium text-green-700">
+                           Partner Accepted Call
+                         </p>
+                         <p className="text-xs text-green-600 mt-1">
+                           {meta?.partner_name || 'Partner'} accepted this sit-in
+                         </p>
+                       </div>
+                     )}
+                     {isAccepted && acceptedByMe && (
+                       <div className="text-center p-2 bg-green-100 rounded-lg">
+                         <p className="text-sm font-medium text-green-700">You accepted this sit-in cover</p>
+                       </div>
+                     )}
+                     {isAccepted && !acceptedByMe && !isPartnerAccepted && (
+                       <div className="text-center p-2 bg-green-100 rounded-lg">
+                         <p className="text-sm font-medium text-green-700">Sit-in cover accepted</p>
+                       </div>
+                     )}
+                     {canSitinClockIn && (
+                       <Button
+                         size="sm"
+                         onClick={() => clockInMutation.mutate(call)}
+                         disabled={clockInMutation.isPending}
+                         className="bg-green-600 hover:bg-green-700 w-full min-h-[44px] px-4 touch-manipulation"
+                       >
+                         <Play className="w-3 h-3 mr-1" />
+                         Check In (Sit-In)
+                       </Button>
+                     )}
+                     {canSitinClockOut && (
+                       <Button
+                         size="sm"
+                         onClick={() => clockOutMutation.mutate(call)}
+                         disabled={clockOutMutation.isPending}
+                         className="bg-red-600 hover:bg-red-700 w-full min-h-[44px] px-4 touch-manipulation"
+                       >
+                         <Square className="w-3 h-3 mr-1" />
+                         Check Out (Sit-In)
+                       </Button>
+                     )}
+                     {isAdmin && call.status !== 'completed' && (
+                       <Button
+                         size="sm"
+                         variant="ghost"
+                         onClick={() => {
+                           toast('Delete sit-in cover call?', {
+                             action: {
+                               label: 'Delete',
+                               onClick: () => deleteCallMutation.mutate(call.id),
+                             },
+                             cancel: { label: 'Cancel' },
+                             duration: 5000,
+                           });
+                         }}
+                         className="w-full min-h-[44px] px-4 touch-manipulation"
+                       >
+                         <Trash2 className="w-3 h-3" />
+                       </Button>
+                     )}
+                   </div>
+                 </Card>
+               );
+             }
+
              const serviceUser = serviceUsers.find(su => su.id === call.service_user_id);
              const isOnHold = serviceUser?.status === 'on_hold';
              const canClockIn = (isMyShift || isAdmin) && !call.clock_in_time && (call.status === 'pending' || call.status === 'in_progress') && !isOnHold;
@@ -600,7 +813,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                   </div>
                 )}
 
-                {call.notes && (
+                {call.notes && call.call_type !== 'sitin_cover' && (
                   <p className="text-sm text-slate-600 mb-3">{call.notes}</p>
                 )}
 

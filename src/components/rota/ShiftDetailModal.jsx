@@ -45,6 +45,12 @@ function haversineMiles(lat1, lon1, lat2, lon2) {
 // Sit-in shift types don't have client calls — only clock on/off
 const SIT_IN_NAMES = new Set(['Sit In L', 'Sit In E', 'Sit In FD']);
 
+function timeToMinutes(t) {
+  if (!t) return 0;
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + (m || 0);
+}
+
 export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId, isEditMode = false }) {
   const queryClient = useQueryClient();
   const isSitIn = SIT_IN_NAMES.has(shift?.shift_name);
@@ -67,6 +73,10 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
 
   const [currentShift, setCurrentShift] = useState(shift);
   const [summaryLogCall, setSummaryLogCall] = useState(null);
+  const [sitInCoverRequired, setSitInCoverRequired] = useState('no');
+  const [showSitInTimePopup, setShowSitInTimePopup] = useState(false);
+  const [sitInTimeOn, setSitInTimeOn] = useState('');
+  const [sitInTimeOff, setSitInTimeOff] = useState('');
 
   useEffect(() => {
     setCurrentShift(shift);
@@ -120,6 +130,26 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
     },
     enabled: !!shift.id,
   });
+
+  // Initialize sit-in cover state from existing calls
+  useEffect(() => {
+    const sitinCall = calls.find(c => c.call_type === 'sitin_cover');
+    if (sitinCall) {
+      setSitInCoverRequired('yes');
+      try {
+        const meta = JSON.parse(sitinCall.notes || '{}');
+        setSitInTimeOn(meta.time_on || sitinCall.scheduled_time || '');
+        setSitInTimeOff(meta.time_off || '');
+      } catch {
+        setSitInTimeOn(sitinCall.scheduled_time || '');
+        setSitInTimeOff('');
+      }
+    } else {
+      setSitInCoverRequired('no');
+      setSitInTimeOn('');
+      setSitInTimeOff('');
+    }
+  }, [calls]);
 
   const { data: serviceUser = null } = useQuery({
     queryKey: ['serviceUser', shift.service_user_id],
@@ -201,16 +231,17 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
 
   // Compute shift summary data for the checkout popup
   const getShiftSummary = () => {
-    const totalCalls = calls.length;
-    const completedCalls = calls.filter(c => c.status === 'completed').length;
-    const inProgressCalls = calls.filter(c => c.status === 'in_progress').length;
-    const pendingCalls = calls.filter(c => c.status === 'pending').length;
-    const missedCalls = calls.filter(c => c.status === 'missed').length;
-    const droveCalls = calls.filter(c => c.drove_to_call);
-    const didNotDriveCalls = calls.filter(c => c.drove_to_call === false);
+    const regularCalls = calls.filter(c => c.call_type !== 'sitin_cover');
+    const totalCalls = regularCalls.length;
+    const completedCalls = regularCalls.filter(c => c.status === 'completed').length;
+    const inProgressCalls = regularCalls.filter(c => c.status === 'in_progress').length;
+    const pendingCalls = regularCalls.filter(c => c.status === 'pending').length;
+    const missedCalls = regularCalls.filter(c => c.status === 'missed').length;
+    const droveCalls = regularCalls.filter(c => c.drove_to_call);
+    const didNotDriveCalls = regularCalls.filter(c => c.drove_to_call === false);
 
     // Calculate total mileage from GPS
-    const withGPS = calls
+    const withGPS = regularCalls
       .filter(c => c.drove_to_call && c.checkin_latitude && c.checkin_longitude)
       .sort((a, b) => {
         const tA = a.scheduled_time || '23:59';
@@ -225,8 +256,8 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
       );
     }
 
-    // Outstanding logs = calls without a care log
-    const outstandingLogs = calls.filter(c => {
+    // Outstanding logs = calls without a care log (exclude sitin_cover)
+    const outstandingLogs = regularCalls.filter(c => {
       if (c.status === 'missed') return false; // missed calls don't need logs
       const hasLog = shiftCareLogs.some(log => log.id === c.care_log_id || log.shift_call_id === c.id);
       return !hasLog;
@@ -238,7 +269,7 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
       didNotDriveCalls: didNotDriveCalls.length,
       totalMiles: Math.round(totalMiles * 100) / 100,
       outstandingLogs,
-      callDetails: calls.sort((a, b) => (a.scheduled_time || '').localeCompare(b.scheduled_time || '')),
+      callDetails: regularCalls.sort((a, b) => (a.scheduled_time || '').localeCompare(b.scheduled_time || '')),
     };
   };
 
@@ -360,10 +391,74 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
   });
 
   const updateShiftMutation = useMutation({
-    mutationFn: () => ShiftApi.update(shift.id, editData),
+    mutationFn: async () => {
+      await ShiftApi.update(shift.id, editData);
+
+      // Handle sit-in cover call changes
+      const existingSitinCall = calls.find(c => c.call_type === 'sitin_cover');
+
+      if (sitInCoverRequired === 'yes' && sitInTimeOn && sitInTimeOff) {
+        const durationMinutes = timeToMinutes(sitInTimeOff) - timeToMinutes(sitInTimeOn);
+        const existingMeta = existingSitinCall ? (() => { try { return JSON.parse(existingSitinCall.notes || '{}'); } catch { return {}; } })() : {};
+        const sitinNotes = JSON.stringify({
+          sitin_cover: true,
+          time_on: sitInTimeOn,
+          time_off: sitInTimeOff,
+          accepted: existingMeta.accepted || false,
+          accepted_by: existingMeta.accepted_by || null,
+          accepted_at: existingMeta.accepted_at || null,
+        });
+
+        if (existingSitinCall) {
+          await ShiftCallApi.update(existingSitinCall.id, {
+            scheduled_time: sitInTimeOn,
+            call_time: sitInTimeOn,
+            duration_minutes: durationMinutes > 0 ? durationMinutes : 60,
+            notes: sitinNotes,
+          });
+        } else {
+          await ShiftCallApi.create({
+            shift_id: shift.id,
+            service_user_name: 'Sit-in Required On Shift',
+            service_user_address: '',
+            scheduled_time: sitInTimeOn,
+            call_time: sitInTimeOn,
+            duration_minutes: durationMinutes > 0 ? durationMinutes : 60,
+            call_type: 'sitin_cover',
+            call_types: ['sitin_cover'],
+            tasks: [],
+            call_date: shift.date,
+            status: 'pending',
+            notes: sitinNotes,
+          });
+
+          // Notify staff
+          if (shift.staff_id) {
+            base44.functions.invoke('createNotification', {
+              recipient_ids: [shift.staff_id],
+              type: 'shift_activity',
+              title: 'Sit-In Cover Added',
+              message: `A sit-in cover call has been added to your shift (${sitInTimeOn} - ${sitInTimeOff}).`,
+              priority: 'high',
+              action_url: '/Rota',
+              send_push: true,
+            }).catch(e => console.warn('Notification failed:', e));
+          }
+
+          notifyAdminsOfActivity({
+            title: 'Sit-in cover added',
+            message: `Sit-in cover added to ${shift.staff_name || 'staff'}'s shift (${sitInTimeOn} - ${sitInTimeOff}).`,
+            excludeUserId: shift.staff_id,
+          });
+        }
+      } else if (sitInCoverRequired === 'no' && existingSitinCall) {
+        await ShiftCallApi.delete(existingSitinCall.id);
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       queryClient.invalidateQueries({ queryKey: ['shift', shift.id] });
+      queryClient.invalidateQueries({ queryKey: ['shift-calls', shift.id] });
       toast.success('Shift updated successfully');
       setEditMode(false);
       onClose();
@@ -382,6 +477,29 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
         paired_shift_id: shift.id,
         paired_staff_name: currentShift.staff_name
       });
+
+      // Copy sitin_cover calls to the paired shift
+      const currentCalls = await ShiftCallApi.filter({ shift_id: shift.id });
+      const sitinCalls = currentCalls.filter(c => c.call_type === 'sitin_cover');
+      for (const sc of sitinCalls) {
+        const existing = await ShiftCallApi.filter({ shift_id: targetShiftId, call_type: 'sitin_cover', scheduled_time: sc.scheduled_time });
+        if (existing.length === 0) {
+          await ShiftCallApi.create({
+            shift_id: targetShiftId,
+            service_user_name: 'Sit-in Required On Shift',
+            service_user_address: '',
+            scheduled_time: sc.scheduled_time,
+            call_time: sc.call_time,
+            duration_minutes: sc.duration_minutes,
+            call_type: 'sitin_cover',
+            call_types: ['sitin_cover'],
+            tasks: [],
+            call_date: sc.call_date,
+            status: sc.status,
+            notes: sc.notes,
+          });
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
@@ -418,7 +536,8 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
   // before the user can actually clock off. The !clock_out_time check is sufficient.
   const hasWorkedCalls = calls.length > 0 && calls.some(c => c.status === 'completed' || c.status === 'in_progress');
   const canClockOff = (isMyShift || isAdmin) && !currentShift.clock_out_time && (currentShift.clock_in_time || hasWorkedCalls) && !serviceUserOnHold;
-  const allCallsDone = calls.length > 0 && calls.every(c => c.status === 'completed' || c.status === 'missed');
+  const regularCallsForDone = calls.filter(c => c.call_type !== 'sitin_cover');
+  const allCallsDone = regularCallsForDone.length > 0 && regularCallsForDone.every(c => c.status === 'completed' || c.status === 'missed');
 
   return (
     <>
@@ -550,6 +669,45 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
                     placeholder="Add any notes about this shift"
                     className="text-sm"
                   />
+                </div>
+                <div>
+                  <Label className="text-xs">Any Sit In Cover Required For This Shift?</Label>
+                  <Select
+                    value={sitInCoverRequired}
+                    onValueChange={(value) => {
+                      setSitInCoverRequired(value);
+                      if (value === 'yes' && !sitInTimeOn) {
+                        setShowSitInTimePopup(true);
+                      } else if (value === 'no') {
+                        setSitInTimeOn('');
+                        setSitInTimeOff('');
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="no">No</SelectItem>
+                      <SelectItem value="yes">Yes</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {sitInCoverRequired === 'yes' && sitInTimeOn && sitInTimeOff && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 mt-2">
+                      <p className="text-xs text-amber-800 font-medium">
+                        Sit-in cover: {sitInTimeOn} - {sitInTimeOff}
+                      </p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-amber-700 h-6 px-2 text-xs"
+                        onClick={() => setShowSitInTimePopup(true)}
+                      >
+                        Edit Times
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
@@ -1009,6 +1167,49 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
               callId={summaryLogCall.id}
             />
           )}
+
+          {/* Sit-in Cover Time Popup (edit mode) */}
+          <AlertDialog open={showSitInTimePopup} onOpenChange={setShowSitInTimePopup}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Sit-In Cover Times</AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div className="space-y-4 pt-2">
+                    <div className="space-y-2">
+                      <Label>Time On</Label>
+                      <Input
+                        type="time"
+                        value={sitInTimeOn}
+                        onChange={(e) => setSitInTimeOn(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Time Off</Label>
+                      <Input
+                        type="time"
+                        value={sitInTimeOff}
+                        onChange={(e) => setSitInTimeOff(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="flex gap-3">
+                <AlertDialogCancel onClick={() => {
+                  if (!sitInTimeOn || !sitInTimeOff) {
+                    setSitInCoverRequired('no');
+                  }
+                }}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => setShowSitInTimePopup(false)}
+                  disabled={!sitInTimeOn || !sitInTimeOff}
+                  className="bg-teal-600 hover:bg-teal-700"
+                >
+                  Confirm
+                </AlertDialogAction>
+              </div>
+            </AlertDialogContent>
+          </AlertDialog>
           </>
           );
           }

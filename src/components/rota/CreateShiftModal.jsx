@@ -13,8 +13,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { format, addDays, eachDayOfInterval } from 'date-fns';
 import { Calendar, Clock, Copy, Users } from 'lucide-react';
+import { notifyAdminsOfActivity } from '@/utils/adminNotifications';
 
 // Sit-in shift types — no client calls, only clock on/off
 const SIT_IN_NAMES = new Set(['Sit In L', 'Sit In E', 'Sit In FD']);
@@ -33,6 +43,10 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
   const [useMultipleDays, setUseMultipleDays] = useState(false);
   const [endDate, setEndDate] = useState('');
   const [shiftsToCreate, setShiftsToCreate] = useState([]);
+  const [sitInCoverRequired, setSitInCoverRequired] = useState('no');
+  const [showSitInTimePopup, setShowSitInTimePopup] = useState(false);
+  const [sitInTimeOn, setSitInTimeOn] = useState('');
+  const [sitInTimeOff, setSitInTimeOff] = useState('');
   const [formData, setFormData] = useState({
       shift_name: '',
       staff_id: '',
@@ -164,7 +178,8 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
        console.log('[CreateShift] Service users available:', serviceUsers.length);
        const shifts = [];
        let totalCalls = 0;
-       for (const shiftData of shiftsData) {
+       for (const rawShiftData of shiftsData) {
+         const { _sitInCover, ...shiftData } = rawShiftData;
          const shift = await ShiftApi.create(shiftData);
          shifts.push(shift);
 
@@ -203,6 +218,58 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
            } catch (callError) {
              console.error('[CreateShift] Failed to create call:', call.service_user_name, call.scheduled_time, callError);
            }
+         }
+
+         // Create sit-in cover call if requested
+         if (_sitInCover) {
+           const { time_on, time_off } = _sitInCover;
+           const durationMinutes = timeToMinutes(time_off) - timeToMinutes(time_on);
+           const sitinNotes = JSON.stringify({
+             sitin_cover: true,
+             time_on,
+             time_off,
+             accepted: false,
+             accepted_by: null,
+             accepted_at: null,
+           });
+           try {
+             await ShiftCallApi.create({
+               shift_id: shift.id,
+               service_user_name: 'Sit-in Required On Shift',
+               service_user_address: '',
+               scheduled_time: time_on,
+               call_time: time_on,
+               duration_minutes: durationMinutes > 0 ? durationMinutes : 60,
+               call_type: 'sitin_cover',
+               call_types: ['sitin_cover'],
+               tasks: [],
+               call_date: shiftData.date,
+               status: 'pending',
+               notes: sitinNotes,
+             });
+             totalCalls++;
+           } catch (err) {
+             console.error('[CreateShift] Failed to create sit-in cover call:', err);
+           }
+
+           // Send push notification to assigned staff
+           if (shiftData.staff_id) {
+             base44.functions.invoke('createNotification', {
+               recipient_ids: [shiftData.staff_id],
+               type: 'shift_activity',
+               title: 'Sit-In Cover Required',
+               message: `A sit-in cover call has been added to your shift on ${shiftData.date} (${time_on} - ${time_off}). Please accept when ready.`,
+               priority: 'high',
+               action_url: '/Rota',
+               send_push: true,
+             }).catch(e => console.warn('Sitin cover notification failed:', e));
+           }
+
+           notifyAdminsOfActivity({
+             title: 'Sit-in cover created',
+             message: `Sit-in cover added to ${shiftData.staff_name || 'staff'}'s shift on ${shiftData.date} (${time_on} - ${time_off}).`,
+             excludeUserId: shiftData.staff_id,
+           });
          }
        }
        console.log('[CreateShift] Done. Total calls auto-assigned:', totalCalls);
@@ -256,6 +323,9 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
       status: 'scheduled',
       rota_area_id: areaId,
       _matchingCalls: matchCount, // preview only, stripped before create
+      _sitInCover: (tab === 'staff' && sitInCoverRequired === 'yes' && sitInTimeOn && sitInTimeOff)
+        ? { time_on: sitInTimeOn, time_off: sitInTimeOff }
+        : null,
     }));
 
     setShiftsToCreate([...shiftsToCreate, ...newShifts]);
@@ -267,6 +337,9 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
       end_time: '17:00',
       visit_details: '',
     });
+    setSitInCoverRequired('no');
+    setSitInTimeOn('');
+    setSitInTimeOff('');
     setShiftDate(selectedDate);
     setEndDate('');
     setUseMultipleDays(false);
@@ -289,6 +362,7 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
@@ -392,6 +466,47 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
                   onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
                 />
               </div>
+            </div>
+
+            {/* Sit-in Cover Required dropdown */}
+            <div className="space-y-2">
+              <Label>Any Sit In Cover Required For This Shift?</Label>
+              <Select
+                value={sitInCoverRequired}
+                onValueChange={(value) => {
+                  setSitInCoverRequired(value);
+                  if (value === 'yes') {
+                    setShowSitInTimePopup(true);
+                  } else {
+                    setSitInTimeOn('');
+                    setSitInTimeOff('');
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="no">No</SelectItem>
+                  <SelectItem value="yes">Yes</SelectItem>
+                </SelectContent>
+              </Select>
+              {sitInCoverRequired === 'yes' && sitInTimeOn && sitInTimeOff && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <p className="text-sm text-amber-800 font-medium">
+                    Sit-in cover: {sitInTimeOn} - {sitInTimeOff}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-amber-700 mt-1 h-7 px-2"
+                    onClick={() => setShowSitInTimePopup(true)}
+                  >
+                    Edit Times
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Live preview of auto-matched calls */}
@@ -508,6 +623,11 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
                         {shift._matchingCalls} client call{shift._matchingCalls !== 1 ? 's' : ''} will be auto-assigned
                       </p>
                     )}
+                    {shift._sitInCover && (
+                      <p className="text-xs text-amber-600 mt-1">
+                        Sit-in cover: {shift._sitInCover.time_on} - {shift._sitInCover.time_off}
+                      </p>
+                    )}
                   </div>
                   <Button
                     variant="ghost"
@@ -544,5 +664,49 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Sit-in Cover Time Popup */}
+    <AlertDialog open={showSitInTimePopup} onOpenChange={setShowSitInTimePopup}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Sit-In Cover Times</AlertDialogTitle>
+          <AlertDialogDescription asChild>
+            <div className="space-y-4 pt-2">
+              <div className="space-y-2">
+                <Label>Time On</Label>
+                <Input
+                  type="time"
+                  value={sitInTimeOn}
+                  onChange={(e) => setSitInTimeOn(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Time Off</Label>
+                <Input
+                  type="time"
+                  value={sitInTimeOff}
+                  onChange={(e) => setSitInTimeOff(e.target.value)}
+                />
+              </div>
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div className="flex gap-3">
+          <AlertDialogCancel onClick={() => {
+            if (!sitInTimeOn || !sitInTimeOff) {
+              setSitInCoverRequired('no');
+            }
+          }}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => setShowSitInTimePopup(false)}
+            disabled={!sitInTimeOn || !sitInTimeOff}
+            className="bg-teal-600 hover:bg-teal-700"
+          >
+            Confirm
+          </AlertDialogAction>
+        </div>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
