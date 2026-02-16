@@ -6,20 +6,24 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Avatar from '@/components/ui/Avatar';
 import VoiceNotePlayer from './VoiceNotePlayer';
 import { base44 } from '@/api/base44Client';
+import { openExternalUrl } from '@/lib/openExternalUrl';
 
 const quickReactions = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
-const URL_REGEX = /(https?:\/\/[^\s<]+)/g;
-
 function Linkify({ children }) {
   if (typeof children !== 'string') return children;
-  const parts = children.split(URL_REGEX);
+  const regex = /(https?:\/\/[^\s<]+)/gi;
+  const parts = children.split(regex);
   if (parts.length === 1) return children;
   return parts.map((part, i) =>
-    URL_REGEX.test(part) ? (
+    /^https?:\/\//i.test(part) ? (
       <a key={i} href={part} target="_blank" rel="noopener noreferrer"
          className="text-blue-600 underline break-all"
-         onClick={(e) => e.stopPropagation()}>
+         onClick={(e) => {
+           e.preventDefault();
+           e.stopPropagation();
+           openExternalUrl(part);
+         }}>
         {part}
       </a>
     ) : part
