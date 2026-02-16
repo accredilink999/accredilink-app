@@ -2,7 +2,7 @@
  * useSpeechToText — Universal speech-to-text hook.
  *
  * Strategy:
- * 1. Try the Web Speech API (SpeechRecognition) first — works on Chrome desktop.
+ * 1. Try the Web Speech API (SpeechRecognition) first — works on Chrome/Android WebView.
  * 2. Fall back to recording audio via MediaRecorder + transcribing via
  *    Groq Whisper API (works everywhere: mobile, WebViews, all browsers).
  *
@@ -18,10 +18,16 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { invokeFunction } from '@/api/functions'
 import { toast } from 'sonner'
 
+/** Detect iOS (iPhone, iPad, iPod) */
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+}
+
 /** Check if native SpeechRecognition API is available AND functional */
 function hasSpeechRecognition() {
-  // Exclude iOS WebView (Capacitor) — SpeechRecognition exists but doesn't work
-  if (window.Capacitor?.isNativePlatform?.()) return false
+  // Exclude iOS WebView (Capacitor) — SpeechRecognition exists but doesn't work reliably
+  if (isIOS() && window.Capacitor?.isNativePlatform?.()) return false
   return 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window
 }
 
@@ -36,6 +42,13 @@ export default function useSpeechToText({ onResult, onError, lang = 'en-GB', con
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
   const streamRef = useRef(null)
+  const isListeningRef = useRef(false)
+
+  // Keep refs in sync with latest callbacks to avoid stale closures
+  const onResultRef = useRef(onResult)
+  const onErrorRef = useRef(onError)
+  useEffect(() => { onResultRef.current = onResult }, [onResult])
+  useEffect(() => { onErrorRef.current = onError }, [onError])
 
   const supported = hasSpeechRecognition() || hasMediaRecorder()
 
@@ -55,17 +68,19 @@ export default function useSpeechToText({ onResult, onError, lang = 'en-GB', con
   }, [])
 
   const handleError = useCallback((msg) => {
+    console.warn('[SpeechToText] Error:', msg)
+    isListeningRef.current = false
     setIsListening(false)
-    if (onError) {
-      onError(msg)
+    if (onErrorRef.current) {
+      onErrorRef.current(msg)
     } else {
       toast.error(msg)
     }
-  }, [onError])
+  }, [])
 
   /** Start listening — picks the best available method */
   const startListening = useCallback(async () => {
-    if (isListening) return
+    if (isListeningRef.current) return
 
     // ── Method 1: Native SpeechRecognition ──
     if (hasSpeechRecognition()) {
@@ -78,10 +93,11 @@ export default function useSpeechToText({ onResult, onError, lang = 'en-GB', con
 
         recognition.onresult = (event) => {
           const transcript = event.results[event.results.length - 1][0].transcript
-          if (onResult) onResult(transcript)
+          if (onResultRef.current) onResultRef.current(transcript)
         }
 
         recognition.onerror = (event) => {
+          console.warn('[SpeechToText] SpeechRecognition error:', event.error)
           const errorMap = {
             'not-allowed': 'Microphone access denied. Please allow microphone permissions.',
             'no-speech': 'No speech detected. Please try again.',
@@ -92,16 +108,19 @@ export default function useSpeechToText({ onResult, onError, lang = 'en-GB', con
         }
 
         recognition.onend = () => {
+          isListeningRef.current = false
           setIsListening(false)
           recognitionRef.current = null
         }
 
         recognition.start()
         recognitionRef.current = recognition
+        isListeningRef.current = true
         setIsListening(true)
+        toast.info('Listening... Tap mic to stop', { duration: 2000 })
         return
       } catch (err) {
-        console.warn('SpeechRecognition failed, falling back to audio recording:', err)
+        console.warn('[SpeechToText] SpeechRecognition failed, falling back to audio recording:', err)
       }
     }
 
@@ -153,19 +172,20 @@ export default function useSpeechToText({ onResult, onError, lang = 'en-GB', con
             }
 
             try {
-              toast.info('Transcribing...', { duration: 2000 })
+              toast.info('Transcribing...', { duration: 3000 })
               const result = await invokeFunction('transcribeAudio', {
                 audioBase64: base64,
                 mimeType: recorder.mimeType || 'audio/webm',
               })
 
               if (result?.transcript) {
-                if (onResult) onResult(result.transcript)
+                if (onResultRef.current) onResultRef.current(result.transcript)
+                toast.success('Speech captured', { duration: 1500 })
               } else {
                 handleError('No speech detected. Please try again.')
               }
             } catch (err) {
-              console.error('Whisper transcription error:', err)
+              console.error('[SpeechToText] Whisper transcription error:', err)
               handleError('Transcription failed. Please try again.')
             }
           }
@@ -174,11 +194,16 @@ export default function useSpeechToText({ onResult, onError, lang = 'en-GB', con
 
         recorder.start()
         mediaRecorderRef.current = recorder
+        isListeningRef.current = true
         setIsListening(true)
+        toast.info('Recording... Tap mic to stop', { duration: 2000 })
         return
       } catch (err) {
+        console.error('[SpeechToText] MediaRecorder error:', err)
         if (err.name === 'NotAllowedError') {
           handleError('Microphone access denied. Please allow microphone permissions in your browser/device settings.')
+        } else if (err.name === 'NotFoundError') {
+          handleError('No microphone found. Please check your device.')
         } else {
           handleError('Could not access microphone: ' + (err.message || 'Unknown error'))
         }
@@ -187,7 +212,7 @@ export default function useSpeechToText({ onResult, onError, lang = 'en-GB', con
     }
 
     handleError('Speech input is not supported on this device/browser.')
-  }, [isListening, onResult, handleError, lang, continuous])
+  }, [handleError, lang, continuous])
 
   /** Stop listening */
   const stopListening = useCallback(() => {
@@ -199,17 +224,18 @@ export default function useSpeechToText({ onResult, onError, lang = 'en-GB', con
       mediaRecorderRef.current.stop()
       mediaRecorderRef.current = null
     }
+    isListeningRef.current = false
     setIsListening(false)
   }, [])
 
   /** Toggle listening on/off */
   const toggleListening = useCallback(() => {
-    if (isListening) {
+    if (isListeningRef.current) {
       stopListening()
     } else {
       startListening()
     }
-  }, [isListening, startListening, stopListening])
+  }, [startListening, stopListening])
 
   return { isListening, startListening, stopListening, toggleListening, supported }
 }
