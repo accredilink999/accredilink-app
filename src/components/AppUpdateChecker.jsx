@@ -2,10 +2,8 @@
  * AppUpdateChecker
  *
  * Shows an update popup when a newer APK exists.
- * - On native (Capacitor): reads the INSTALLED app version from the native
- *   binary via @capacitor/app, NOT from the JS bundle (which is always latest
- *   since it loads from Vercel).
- * - On web/PWA: no-op — web users always get the latest code from Vercel.
+ * On native (Capacitor): reads the INSTALLED app version from the native
+ * binary via @capacitor/app. On web: no-op since Vercel always serves latest.
  */
 
 import { useState, useEffect } from 'react';
@@ -15,50 +13,29 @@ import { isUpdateAvailable } from '@/lib/appVersion';
 import { openExternalUrl } from '@/lib/openExternalUrl';
 import { Download, X, Copy, Check } from 'lucide-react';
 
-function isNativePlatform() {
-  return window.Capacitor?.isNativePlatform?.() === true;
-}
-
-function isAndroid() {
-  return window.Capacitor?.getPlatform?.() === 'android';
-}
-
-function isIOS() {
-  return window.Capacitor?.getPlatform?.() === 'ios';
-}
-
-/** Get the INSTALLED native app version from the APK/IPA binary */
-async function getNativeVersion() {
-  try {
-    const { App } = await import('@capacitor/app');
-    const info = await App.getInfo();
-    return info.version; // versionName from build.gradle / CFBundleShortVersionString
-  } catch {
-    return null;
-  }
-}
-
 export default function AppUpdateChecker() {
   const [dismissed, setDismissed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [installedVersion, setInstalledVersion] = useState(null);
 
-  const native = isNativePlatform();
-  const android = isAndroid();
-  const ios = isIOS();
+  const native = !!window.Capacitor?.isNativePlatform?.();
+  const android = window.Capacitor?.getPlatform?.() === 'android';
+  const ios = window.Capacitor?.getPlatform?.() === 'ios';
 
-  // Web users always get the latest from Vercel — no update check needed
-  if (!native) return null;
-
-  // Get the native installed version on mount
+  // Get the INSTALLED native app version from the APK/IPA binary
   useEffect(() => {
-    if (native) {
-      getNativeVersion().then(v => {
-        if (v) setInstalledVersion(v);
-      });
-    }
+    if (!native) return;
+    import('@capacitor/app').then(({ App }) =>
+      App.getInfo().then(info => {
+        console.log('[UpdateChecker] Native version:', info.version);
+        setInstalledVersion(info.version);
+      })
+    ).catch(err => {
+      console.warn('[UpdateChecker] Failed to get native version:', err);
+    });
   }, [native]);
 
+  // Fetch the latest version info from the database
   const { data: latestInfo } = useQuery({
     queryKey: ['app_download_android_check'],
     queryFn: async () => {
@@ -82,7 +59,7 @@ export default function AppUpdateChecker() {
   const releaseNotes = latestInfo?.notes;
 
   // Compare INSTALLED native version against latest in database
-  const updateAvailable = installedVersion && latestVersion
+  const updateAvailable = native && installedVersion && latestVersion
     ? isUpdateAvailable(installedVersion, latestVersion)
     : false;
 
@@ -96,7 +73,15 @@ export default function AppUpdateChecker() {
     }
   }, [latestVersion]);
 
-  if (!updateAvailable || dismissed) return null;
+  // Log for debugging
+  useEffect(() => {
+    if (native) {
+      console.log('[UpdateChecker] installed:', installedVersion, 'latest:', latestVersion, 'update:', updateAvailable, 'dismissed:', dismissed);
+    }
+  }, [native, installedVersion, latestVersion, updateAvailable, dismissed]);
+
+  // Don't render: not native, no update, or dismissed
+  if (!native || !updateAvailable || dismissed) return null;
   if (android && !downloadUrl) return null;
 
   const handleDismiss = () => {
@@ -128,7 +113,6 @@ export default function AppUpdateChecker() {
   return (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 fade-in duration-200">
-        {/* Header */}
         <div className="bg-gradient-to-r from-teal-500 to-teal-600 p-5 text-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -142,17 +126,12 @@ export default function AppUpdateChecker() {
                 </p>
               </div>
             </div>
-            <button
-              onClick={handleDismiss}
-              className="text-white/70 hover:text-white p-1"
-              aria-label="Dismiss"
-            >
+            <button onClick={handleDismiss} className="text-white/70 hover:text-white p-1" aria-label="Dismiss">
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* Body */}
         <div className="p-5 space-y-4">
           {releaseNotes && (
             <div className="bg-slate-50 rounded-lg p-3">
@@ -160,7 +139,6 @@ export default function AppUpdateChecker() {
               <p className="text-sm text-slate-700">{releaseNotes}</p>
             </div>
           )}
-
           {!releaseNotes && (
             <p className="text-sm text-slate-600">
               A new version of the app is available with the latest features and improvements.
@@ -168,7 +146,6 @@ export default function AppUpdateChecker() {
           )}
 
           <div className="space-y-2">
-            {/* Android — download APK */}
             {android && (
               <>
                 <button
@@ -178,7 +155,6 @@ export default function AppUpdateChecker() {
                   <Download className="w-4 h-4" />
                   Download Update
                 </button>
-
                 <button
                   onClick={handleCopyLink}
                   className="w-full px-4 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors flex items-center justify-center gap-2"
@@ -191,20 +167,14 @@ export default function AppUpdateChecker() {
                 </p>
               </>
             )}
-
-            {/* iOS — TestFlight */}
             {ios && (
               <div className="bg-blue-50 rounded-lg p-3 text-center">
                 <p className="text-sm text-blue-700">
-                  Updates are delivered through TestFlight. Check for an update notification from Apple, or open the TestFlight app to install the latest version.
+                  Updates are delivered through TestFlight. Open TestFlight to install the latest version.
                 </p>
               </div>
             )}
-
-            <button
-              onClick={handleDismiss}
-              className="w-full px-4 py-2.5 text-xs text-slate-400 hover:text-slate-600 transition-colors"
-            >
+            <button onClick={handleDismiss} className="w-full px-4 py-2.5 text-xs text-slate-400 hover:text-slate-600 transition-colors">
               Remind me later
             </button>
           </div>
