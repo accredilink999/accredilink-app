@@ -13,6 +13,7 @@ const posts = [
     excerpt: 'Everything you need to know about setting up home care in Wales — from assessments and funding to choosing the right provider.',
     category: 'Guides',
     date: '2026-02-10',
+    thumbnail: '/images/domiciliary-care.jpg',
   },
   {
     slug: 'understanding-care-funding-in-wales',
@@ -20,6 +21,7 @@ const posts = [
     excerpt: 'A clear guide to local authority funding, direct payments, Attendance Allowance, and NHS Continuing Healthcare in Wales.',
     category: 'Funding',
     date: '2026-02-03',
+    thumbnail: '/images/funding.jpg',
   },
   {
     slug: 'signs-elderly-parent-needs-care',
@@ -27,6 +29,7 @@ const posts = [
     excerpt: 'How to recognise when a loved one might benefit from professional domiciliary care — and what to do next.',
     category: 'Family Advice',
     date: '2026-01-27',
+    thumbnail: '/images/hero-care.jpg',
   },
   {
     slug: 'what-is-respite-care',
@@ -34,6 +37,7 @@ const posts = [
     excerpt: 'Understanding respite care, who it\'s for, and how it can give family carers the break they need.',
     category: 'Guides',
     date: '2026-01-20',
+    thumbnail: '/images/respite-care.jpg',
   },
   {
     slug: 'hospital-discharge-care-wales',
@@ -41,6 +45,7 @@ const posts = [
     excerpt: 'What to expect when a loved one is discharged from hospital and how domiciliary care can support a safe recovery at home.',
     category: 'Guides',
     date: '2026-01-13',
+    thumbnail: '/images/hero-home.jpg',
   },
   {
     slug: 'dementia-care-at-home-tips',
@@ -48,6 +53,7 @@ const posts = [
     excerpt: 'Practical advice for families supporting a loved one with dementia, including daily routines, communication tips, and when to seek professional help.',
     category: 'Dementia',
     date: '2026-01-06',
+    thumbnail: '/images/palliative-care.jpg',
   },
 ];
 
@@ -77,22 +83,32 @@ export default function BlogPage() {
               <Link
                 key={post.slug}
                 href={`/blog/${post.slug}`}
-                className="block p-6 rounded-2xl border border-slate-200 hover:border-welsh-red/30 hover:shadow-lg transition-all group bg-white border-l-4 border-l-welsh-red/60 hover:border-l-welsh-red"
+                className="flex flex-col sm:flex-row gap-0 sm:gap-0 rounded-2xl border border-slate-200 hover:border-welsh-red/30 hover:shadow-lg transition-all group bg-white overflow-hidden"
               >
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="px-2.5 py-1 bg-red-50 text-welsh-red text-xs font-medium rounded-full">{post.category}</span>
-                  <span className="text-xs text-slate-400">{new Date(post.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                <div className="relative w-full sm:w-48 md:w-56 h-48 sm:h-auto flex-shrink-0">
+                  <Image
+                    src={post.thumbnail}
+                    alt={post.title}
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
                 </div>
-                <h2 className="text-xl font-semibold text-slate-900 group-hover:text-welsh-red transition-colors mb-2">
-                  {post.title}
-                </h2>
-                <p className="text-slate-600 text-sm leading-relaxed">{post.excerpt}</p>
-                <span className="inline-flex items-center gap-1 mt-3 text-sm font-medium text-welsh-red">
-                  Read more
-                  <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </span>
+                <div className="p-6 flex-1">
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="px-2.5 py-1 bg-red-50 text-welsh-red text-xs font-medium rounded-full">{post.category}</span>
+                    <span className="text-xs text-slate-400">{new Date(post.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                  </div>
+                  <h2 className="text-xl font-semibold text-slate-900 group-hover:text-welsh-red transition-colors mb-2">
+                    {post.title}
+                  </h2>
+                  <p className="text-slate-600 text-sm leading-relaxed">{post.excerpt}</p>
+                  <span className="inline-flex items-center gap-1 mt-3 text-sm font-medium text-welsh-red">
+                    Read more
+                    <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </span>
+                </div>
               </Link>
             ))}
           </div>
