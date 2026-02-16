@@ -17,6 +17,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from 'sonner';
+import { notifyAdminsOfActivity } from '@/utils/adminNotifications';
+import { ShiftCallApi } from '@/api/rotaApi';
 import CallTypeManager from '../rota/CallTypeManager';
 import {
   Phone,
@@ -138,9 +140,49 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
   const updateCallTimesMutation = useMutation({
     mutationFn: (newCallTimes) =>
       base44.entities.ServiceUser.update(serviceUser.id, { call_times: newCallTimes }),
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['serviceUsers'] });
       toast.success('Call times updated');
+
+      // Notify admins
+      const clientName = serviceUser.full_name || 'Client';
+      notifyAdminsOfActivity({
+        title: `Call times updated: ${clientName}`,
+        message: `${clientName}'s scheduled call times have been updated.`,
+        excludeUserId: currentUser?.id,
+        actionUrl: '/Clients',
+      });
+
+      // Notify staff who have upcoming shifts/calls with this client
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const upcomingCalls = await ShiftCallApi.filter({ service_user_id: serviceUser.id });
+        const futureCalls = upcomingCalls.filter(c => c.call_date >= today);
+        const shiftIds = [...new Set(futureCalls.map(c => c.shift_id).filter(Boolean))];
+
+        if (shiftIds.length > 0) {
+          const allShifts = await ShiftApi.list('-created_date', 500);
+          const staffIds = [...new Set(
+            allShifts
+              .filter(s => shiftIds.includes(s.id) && s.staff_id && s.staff_id !== currentUser?.id)
+              .map(s => s.staff_id)
+          )];
+
+          if (staffIds.length > 0) {
+            await base44.functions.invoke('createNotification', {
+              recipient_ids: staffIds,
+              type: 'shift_activity',
+              title: `Call times updated: ${clientName}`,
+              message: `${clientName}'s scheduled call times have been updated. Please check the latest schedule.`,
+              priority: 'normal',
+              action_url: '/Rota',
+              send_push: true,
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to notify staff of call time changes:', e);
+      }
     },
     onError: () => toast.error('Failed to update call times'),
   });
