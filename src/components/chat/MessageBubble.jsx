@@ -19,16 +19,7 @@ function Linkify({ children }) {
     /^https?:\/\//i.test(part) ? (
       <a key={i} href={part} target="_blank" rel="noopener noreferrer"
          className="text-blue-600 underline break-all"
-         onClick={(e) => {
-           e.preventDefault();
-           e.stopPropagation();
-           // Use share sheet on mobile (opens Chrome), window.open on web
-           if (navigator.share) {
-             navigator.share({ title: 'Link', url: part }).catch(() => {});
-           } else {
-             window.open(part, '_blank');
-           }
-         }}>
+         onClick={(e) => e.stopPropagation()}>
         {part}
       </a>
     ) : part
