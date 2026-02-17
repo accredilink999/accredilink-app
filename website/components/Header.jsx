@@ -28,16 +28,16 @@ export default function Header() {
             <Image
               src="/images/logo.png"
               alt="Accredilink Logo"
-              width={280}
-              height={280}
-              className="w-[120px] h-[120px] sm:w-[200px] sm:h-[200px] lg:w-[280px] lg:h-[280px] rounded-xl object-contain"
+              width={140}
+              height={140}
+              className="w-[60px] h-[60px] sm:w-[100px] sm:h-[100px] lg:w-[140px] lg:h-[140px] rounded-xl object-contain"
             />
             <Image
               src="/images/welsh-dragon.jpg"
               alt="Welsh Dragon"
-              width={200}
-              height={200}
-              className="w-[80px] h-[80px] sm:w-[140px] sm:h-[140px] lg:w-[200px] lg:h-[200px] rounded-xl object-contain"
+              width={100}
+              height={100}
+              className="w-[40px] h-[40px] sm:w-[70px] sm:h-[70px] lg:w-[100px] lg:h-[100px] rounded-xl object-contain"
             />
             <div className="hidden sm:block">
               <p className="font-bold text-slate-900 text-2xl sm:text-3xl lg:text-4xl leading-tight">Accredilink</p>
