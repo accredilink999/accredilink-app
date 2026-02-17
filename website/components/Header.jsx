@@ -28,7 +28,7 @@ export default function Header() {
 
       {/* Info strip */}
       <div className="bg-slate-900 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between py-1.5 text-xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between py-0.5 text-xs">
           <div className="flex items-center gap-4">
             <span className="hidden sm:flex items-center gap-1.5">
               <svg className="w-3.5 h-3.5 text-welsh-green" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -69,8 +69,8 @@ export default function Header() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Main header row */}
-        <div className="flex items-center justify-between py-3 sm:py-4">
-          <Link href="/" className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
+        <div className="flex items-center justify-between py-1 sm:py-1.5">
+          <Link href="/" className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             <Image
               src="/images/welsh-dragon.png"
               alt="Welsh Dragon"
@@ -86,15 +86,15 @@ export default function Header() {
               className="w-[60px] h-[60px] sm:w-[100px] sm:h-[100px] lg:w-[140px] lg:h-[140px] rounded-xl object-contain"
             />
             <div className="hidden sm:block">
-              <p className="font-bold text-slate-900 text-2xl sm:text-3xl lg:text-4xl leading-tight">Accredilink</p>
-              <p className="text-sm sm:text-base lg:text-lg text-slate-500 leading-tight">Community Response Taskforce</p>
+              <p className="font-bold text-slate-900 text-xl sm:text-2xl lg:text-3xl leading-none">Accredilink</p>
+              <p className="text-xs sm:text-sm lg:text-base text-slate-500 leading-none">Community Response Taskforce</p>
             </div>
           </Link>
 
           <div className="flex items-center gap-3">
             <Link
               href="/contact"
-              className="hidden md:inline-flex items-center gap-2 px-5 py-2.5 bg-welsh-red text-white text-sm font-medium rounded-lg hover:bg-welsh-red-light transition-colors"
+              className="hidden md:inline-flex items-center gap-2 px-4 py-1.5 bg-welsh-red text-white text-sm font-medium rounded-lg hover:bg-welsh-red-light transition-colors"
             >
               Get Care Support
             </Link>
@@ -119,14 +119,14 @@ export default function Header() {
         </div>
 
         {/* Desktop nav row */}
-        <nav className="hidden lg:flex items-center gap-1 pb-3 border-t border-slate-100 pt-3">
+        <nav className="hidden lg:flex items-center gap-0.5 pb-1.5 border-t border-slate-100 pt-1.5">
           {navLinks.map(link => {
             const isActive = pathname === link.href || (link.href !== '/' && pathname.startsWith(link.href));
             return (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
                   isActive
                     ? 'text-welsh-red bg-red-50'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -138,7 +138,7 @@ export default function Header() {
           })}
           <Link
             href="/compliance"
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
               pathname === '/compliance'
                 ? 'text-welsh-red bg-red-50'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
