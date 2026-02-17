@@ -26,18 +26,18 @@ export default function Header() {
         <div className="flex items-center justify-between py-3 sm:py-4">
           <Link href="/" className="flex items-center gap-4 flex-shrink-0">
             <Image
+              src="/images/welsh-dragon.jpg"
+              alt="Welsh Dragon"
+              width={120}
+              height={120}
+              className="w-[50px] h-[50px] sm:w-[85px] sm:h-[85px] lg:w-[120px] lg:h-[120px] rounded-xl object-contain"
+            />
+            <Image
               src="/images/logo.png"
               alt="Accredilink Logo"
               width={140}
               height={140}
               className="w-[60px] h-[60px] sm:w-[100px] sm:h-[100px] lg:w-[140px] lg:h-[140px] rounded-xl object-contain"
-            />
-            <Image
-              src="/images/welsh-dragon.jpg"
-              alt="Welsh Dragon"
-              width={100}
-              height={100}
-              className="w-[40px] h-[40px] sm:w-[70px] sm:h-[70px] lg:w-[100px] lg:h-[100px] rounded-xl object-contain"
             />
             <div className="hidden sm:block">
               <p className="font-bold text-slate-900 text-2xl sm:text-3xl lg:text-4xl leading-tight">Accredilink</p>
