@@ -70,11 +70,11 @@ export default function Header() {
         <div className="flex items-center justify-between py-3 sm:py-4">
           <Link href="/" className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
             <Image
-              src="/images/welsh-dragon.jpg"
+              src="/images/welsh-dragon.png"
               alt="Welsh Dragon"
-              width={60}
-              height={60}
-              className="w-[25px] h-[25px] sm:w-[42px] sm:h-[42px] lg:w-[60px] lg:h-[60px] rounded-lg object-contain"
+              width={36}
+              height={36}
+              className="w-[18px] h-[18px] sm:w-[28px] sm:h-[28px] lg:w-[36px] lg:h-[36px] object-contain"
             />
             <Image
               src="/images/logo.png"
