@@ -130,39 +130,6 @@ const features = [
   },
 ];
 
-const screenshots = [
-  {
-    title: 'Staff Dashboard',
-    description: 'At-a-glance view of today\u2019s shifts, client calls, open incidents, and pending tasks. Staff see exactly what they need to do and when.',
-    image: '/images/app/dashboard.png',
-  },
-  {
-    title: 'GPS Control Room',
-    description: 'Live map showing all active staff and service user locations. Coordinators can see shift status, send messages, and manage operations in real-time.',
-    image: '/images/app/control-room.png',
-  },
-  {
-    title: 'Rota Management',
-    description: 'Month, week, and day views for building and managing staff schedules. Create recurring patterns, assign areas, and allocate shifts with drag-and-drop simplicity.',
-    image: '/images/app/rota.png',
-  },
-  {
-    title: 'Care Logs',
-    description: 'Detailed care visit records capturing mood, nutrition, personal care, and carer notes. Searchable and filterable for easy access during audits.',
-    image: '/images/app/care-logs.png',
-  },
-  {
-    title: 'Analytics & Reports',
-    description: 'Multi-metric dashboards with interactive charts covering every aspect of your care operations — from shift coverage to incident trends.',
-    image: '/images/app/reports.png',
-  },
-  {
-    title: 'Mobile Experience',
-    description: 'Clean, intuitive mobile interface for carers in the field. Clock in with GPS, log care notes, report incidents, and check schedules — all from their phone.',
-    image: '/images/app/mobile.png',
-  },
-];
-
 const ciwFeatures = [
   {
     title: 'Incident Reporting & Notifications',
@@ -373,7 +340,7 @@ export default function CareCallAIPage() {
         </div>
       </section>
 
-      {/* Screenshots / App Preview */}
+      {/* App Preview Mockups */}
       <section className="py-20 sm:py-28 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <AnimateOnScroll animation="fade-up">
@@ -385,26 +352,343 @@ export default function CareCallAIPage() {
             </div>
           </AnimateOnScroll>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {screenshots.map((screen, i) => (
-              <AnimateOnScroll key={screen.title} animation="fade-up" delay={i * 100}>
-                <div className="group">
-                  <div className="bg-gradient-to-br from-slate-100 to-slate-200 rounded-2xl overflow-hidden mb-4 aspect-video flex items-center justify-center border border-slate-200 group-hover:shadow-lg transition-shadow">
-                    <div className="text-center p-6">
-                      <div className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center mx-auto mb-3">
-                        <svg className="w-6 h-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
+          <div className="space-y-16">
+            {/* Dashboard Mockup */}
+            <AnimateOnScroll animation="fade-up">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <div className="bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-700">
+                  <div className="flex items-center gap-2 mb-3 px-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                    <span className="text-[10px] text-slate-500 ml-2">Dashboard — CareCall AI</span>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-bold text-slate-900">Good morning, Sarah</p>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700">Online</span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2">
+                      <div className="bg-white rounded-lg p-2.5 border border-slate-200 text-center">
+                        <p className="text-lg font-bold text-welsh-green">12</p>
+                        <p className="text-[9px] text-slate-500">On Shift</p>
                       </div>
-                      <p className="text-sm text-slate-500 font-medium">{screen.title}</p>
-                      <p className="text-xs text-slate-400 mt-1">Screenshot coming soon</p>
+                      <div className="bg-white rounded-lg p-2.5 border border-slate-200 text-center">
+                        <p className="text-lg font-bold text-blue-600">47</p>
+                        <p className="text-[9px] text-slate-500">Calls Today</p>
+                      </div>
+                      <div className="bg-white rounded-lg p-2.5 border border-slate-200 text-center">
+                        <p className="text-lg font-bold text-amber-500">2</p>
+                        <p className="text-[9px] text-slate-500">Incidents</p>
+                      </div>
+                      <div className="bg-white rounded-lg p-2.5 border border-slate-200 text-center">
+                        <p className="text-lg font-bold text-rose-500">3</p>
+                        <p className="text-[9px] text-slate-500">Training Due</p>
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-lg p-3 border border-slate-200">
+                      <p className="text-[10px] font-semibold text-slate-700 mb-2">Today&apos;s Calls</p>
+                      {[
+                        { name: 'Mrs. Williams', time: '08:00', status: 'Completed', color: 'bg-green-100 text-green-700' },
+                        { name: 'Mr. Hughes', time: '09:30', status: 'In Progress', color: 'bg-blue-100 text-blue-700' },
+                        { name: 'Mrs. Evans', time: '11:00', status: 'Upcoming', color: 'bg-slate-100 text-slate-600' },
+                        { name: 'Mr. Jones', time: '13:00', status: 'Upcoming', color: 'bg-slate-100 text-slate-600' },
+                      ].map((call) => (
+                        <div key={call.name} className="flex items-center justify-between py-1.5 border-b border-slate-50 last:border-0">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[8px] font-bold text-slate-600">{call.name.split(' ').pop()[0]}</div>
+                            <div>
+                              <p className="text-[10px] font-medium text-slate-800">{call.name}</p>
+                              <p className="text-[8px] text-slate-400">{call.time}</p>
+                            </div>
+                          </div>
+                          <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-medium ${call.color}`}>{call.status}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                  <h3 className="font-semibold text-slate-900 mb-1">{screen.title}</h3>
-                  <p className="text-sm text-slate-600 leading-relaxed">{screen.description}</p>
                 </div>
-              </AnimateOnScroll>
-            ))}
+                <div>
+                  <h3 className="text-2xl font-bold text-slate-900 mb-3">Staff Dashboard</h3>
+                  <p className="text-slate-600 leading-relaxed">At-a-glance view of today&apos;s shifts, client calls, open incidents, and pending tasks. Staff see exactly what they need to do and when. Quick-access stats keep everyone informed and ready.</p>
+                </div>
+              </div>
+            </AnimateOnScroll>
+
+            {/* Control Room Mockup */}
+            <AnimateOnScroll animation="fade-up">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <div className="order-2 lg:order-1">
+                  <h3 className="text-2xl font-bold text-slate-900 mb-3">GPS Control Room</h3>
+                  <p className="text-slate-600 leading-relaxed">Live map showing all active staff and service user locations. Coordinators can see shift status, send messages, and manage operations in real-time with location updates every 15 seconds.</p>
+                </div>
+                <div className="order-1 lg:order-2 bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-700">
+                  <div className="flex items-center gap-2 mb-3 px-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                    <span className="text-[10px] text-slate-500 ml-2">Control Room — CareCall AI</span>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg overflow-hidden">
+                    {/* Map mockup */}
+                    <div className="relative bg-gradient-to-br from-green-100 via-green-50 to-blue-50 h-52">
+                      <div className="absolute inset-0 opacity-30">
+                        <div className="absolute top-8 left-12 w-24 h-[1px] bg-slate-400" />
+                        <div className="absolute top-16 left-4 w-32 h-[1px] bg-slate-400" />
+                        <div className="absolute top-24 left-16 w-20 h-[1px] bg-slate-300" />
+                        <div className="absolute top-8 left-24 w-[1px] h-20 bg-slate-400" />
+                        <div className="absolute top-4 left-36 w-[1px] h-28 bg-slate-300" />
+                      </div>
+                      {/* Staff markers */}
+                      <div className="absolute top-10 left-16 w-6 h-6 rounded-full bg-welsh-green border-2 border-white shadow-md flex items-center justify-center">
+                        <span className="text-[7px] font-bold text-white">SJ</span>
+                      </div>
+                      <div className="absolute top-20 left-40 w-6 h-6 rounded-full bg-welsh-green border-2 border-white shadow-md flex items-center justify-center">
+                        <span className="text-[7px] font-bold text-white">KL</span>
+                      </div>
+                      <div className="absolute top-32 left-24 w-6 h-6 rounded-full bg-blue-500 border-2 border-white shadow-md flex items-center justify-center">
+                        <span className="text-[7px] font-bold text-white">RW</span>
+                      </div>
+                      <div className="absolute top-14 right-16 w-6 h-6 rounded-full bg-welsh-green border-2 border-white shadow-md flex items-center justify-center">
+                        <span className="text-[7px] font-bold text-white">AM</span>
+                      </div>
+                      <div className="absolute top-36 right-24 w-6 h-6 rounded-full bg-amber-500 border-2 border-white shadow-md flex items-center justify-center">
+                        <span className="text-[7px] font-bold text-white">DT</span>
+                      </div>
+                      {/* Service user markers */}
+                      <div className="absolute top-12 left-32 w-4 h-4 rounded-full bg-rose-400 border-2 border-white shadow-sm" />
+                      <div className="absolute top-28 left-44 w-4 h-4 rounded-full bg-rose-400 border-2 border-white shadow-sm" />
+                      <div className="absolute top-40 right-32 w-4 h-4 rounded-full bg-rose-400 border-2 border-white shadow-sm" />
+                      {/* Legend */}
+                      <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur rounded px-2 py-1 flex items-center gap-3">
+                        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-welsh-green" /><span className="text-[7px] text-slate-600">Active</span></div>
+                        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-blue-500" /><span className="text-[7px] text-slate-600">En Route</span></div>
+                        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-rose-400" /><span className="text-[7px] text-slate-600">Service User</span></div>
+                      </div>
+                    </div>
+                    {/* Staff list */}
+                    <div className="p-3">
+                      <p className="text-[10px] font-semibold text-slate-700 mb-2">Active Staff (5)</p>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {['Sarah J. — On Call', 'Katie L. — Visit', 'Rob W. — Travelling', 'Amy M. — Visit', 'Dan T. — Break'].map((s) => (
+                          <div key={s} className="flex items-center gap-1.5 bg-white rounded px-2 py-1 border border-slate-100">
+                            <div className="w-1.5 h-1.5 rounded-full bg-welsh-green flex-shrink-0" />
+                            <span className="text-[8px] text-slate-700 truncate">{s}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </AnimateOnScroll>
+
+            {/* Rota Mockup */}
+            <AnimateOnScroll animation="fade-up">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <div className="bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-700">
+                  <div className="flex items-center gap-2 mb-3 px-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                    <span className="text-[10px] text-slate-500 ml-2">Rota — CareCall AI</span>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs font-bold text-slate-900">February 2026</p>
+                      <div className="flex gap-1">
+                        {['Month', 'Week', 'Day'].map((v) => (
+                          <span key={v} className={`text-[8px] px-2 py-0.5 rounded ${v === 'Week' ? 'bg-welsh-red text-white' : 'bg-white text-slate-500 border border-slate-200'}`}>{v}</span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-7 gap-[2px] mb-2">
+                      {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
+                        <div key={d} className="text-center text-[8px] font-medium text-slate-500 py-1">{d}</div>
+                      ))}
+                    </div>
+                    <div className="space-y-1">
+                      {['Sarah Jones', 'Katie Lewis', 'Rob Williams', 'Amy Morgan'].map((name) => (
+                        <div key={name} className="grid grid-cols-8 gap-[2px] items-center">
+                          <span className="text-[8px] font-medium text-slate-700 truncate col-span-1">{name.split(' ')[0]}</span>
+                          {[...Array(7)].map((_, j) => {
+                            const shifts = ['bg-green-200 text-green-800', 'bg-blue-200 text-blue-800', 'bg-amber-200 text-amber-800', '', 'bg-green-200 text-green-800', 'bg-purple-200 text-purple-800', ''];
+                            const labels = ['Early', 'Late', 'Long', '', 'Early', 'Night', ''];
+                            return (
+                              <div key={j} className={`rounded text-center py-1 text-[7px] font-medium ${shifts[j] || 'bg-slate-100 text-slate-400'}`}>
+                                {labels[j] || '-'}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-slate-900 mb-3">Rota Management</h3>
+                  <p className="text-slate-600 leading-relaxed">Month, week, and day views for building and managing staff schedules. Create recurring patterns, assign areas, and allocate shifts. Staff see their schedules instantly on mobile with real-time updates.</p>
+                </div>
+              </div>
+            </AnimateOnScroll>
+
+            {/* Care Logs Mockup */}
+            <AnimateOnScroll animation="fade-up">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <div className="order-2 lg:order-1">
+                  <h3 className="text-2xl font-bold text-slate-900 mb-3">Care Logs</h3>
+                  <p className="text-slate-600 leading-relaxed">Detailed care visit records capturing mood, nutrition, personal care, and carer notes. Searchable and filterable for easy access during audits. Every visit creates a comprehensive care record.</p>
+                </div>
+                <div className="order-1 lg:order-2 bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-700">
+                  <div className="flex items-center gap-2 mb-3 px-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                    <span className="text-[10px] text-slate-500 ml-2">Care Logs — CareCall AI</span>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-xs font-bold text-slate-900">Recent Care Logs</p>
+                      <span className="text-[8px] px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-500">Filter</span>
+                    </div>
+                    {[
+                      { user: 'Mrs. Williams', carer: 'Sarah J.', mood: '😊', food: 'Good', fluid: 'Good', time: '08:45' },
+                      { user: 'Mr. Hughes', carer: 'Katie L.', mood: '😐', food: 'Fair', fluid: 'Good', time: '10:15' },
+                      { user: 'Mrs. Evans', carer: 'Rob W.', mood: '😊', food: 'Good', fluid: 'Fair', time: '11:30' },
+                    ].map((log) => (
+                      <div key={log.user} className="bg-white rounded-lg p-2.5 border border-slate-200">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <p className="text-[10px] font-semibold text-slate-900">{log.user}</p>
+                          <span className="text-[8px] text-slate-400">{log.time}</span>
+                        </div>
+                        <p className="text-[8px] text-slate-500 mb-1.5">Carer: {log.carer}</p>
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1"><span className="text-sm">{log.mood}</span><span className="text-[8px] text-slate-500">Mood</span></div>
+                          <div className="flex items-center gap-1"><span className={`text-[8px] px-1.5 py-0.5 rounded-full font-medium ${log.food === 'Good' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>{log.food}</span><span className="text-[8px] text-slate-500">Food</span></div>
+                          <div className="flex items-center gap-1"><span className={`text-[8px] px-1.5 py-0.5 rounded-full font-medium ${log.fluid === 'Good' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>{log.fluid}</span><span className="text-[8px] text-slate-500">Fluid</span></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </AnimateOnScroll>
+
+            {/* Reports Mockup */}
+            <AnimateOnScroll animation="fade-up">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <div className="bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-700">
+                  <div className="flex items-center gap-2 mb-3 px-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                    <span className="text-[10px] text-slate-500 ml-2">Reports — CareCall AI</span>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs font-bold text-slate-900">Analytics Overview</p>
+                      <div className="flex gap-1">
+                        {['7 Days', '30 Days', '90 Days'].map((v) => (
+                          <span key={v} className={`text-[8px] px-2 py-0.5 rounded ${v === '30 Days' ? 'bg-welsh-red text-white' : 'bg-white text-slate-500 border border-slate-200'}`}>{v}</span>
+                        ))}
+                      </div>
+                    </div>
+                    {/* Chart mockup */}
+                    <div className="bg-white rounded-lg p-3 border border-slate-200 mb-2">
+                      <p className="text-[9px] font-medium text-slate-600 mb-2">Shifts Completed</p>
+                      <div className="flex items-end gap-1.5 h-20">
+                        {[65, 72, 58, 80, 75, 90, 85, 70, 78, 92, 88, 76].map((h, i) => (
+                          <div key={i} className="flex-1 rounded-t" style={{ height: `${h}%`, background: `linear-gradient(to top, #166534, #16A34A)` }} />
+                        ))}
+                      </div>
+                      <div className="flex justify-between mt-1">
+                        <span className="text-[7px] text-slate-400">Week 1</span>
+                        <span className="text-[7px] text-slate-400">Week 4</span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
+                        <p className="text-sm font-bold text-welsh-green">847</p>
+                        <p className="text-[8px] text-slate-500">Total Shifts</p>
+                      </div>
+                      <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
+                        <p className="text-sm font-bold text-blue-600">98.2%</p>
+                        <p className="text-[8px] text-slate-500">Attendance</p>
+                      </div>
+                      <div className="bg-white rounded-lg p-2 border border-slate-200 text-center">
+                        <p className="text-sm font-bold text-amber-500">12</p>
+                        <p className="text-[8px] text-slate-500">Incidents</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-slate-900 mb-3">Analytics & Reports</h3>
+                  <p className="text-slate-600 leading-relaxed">Multi-metric dashboards with interactive charts covering every aspect of your care operations — from shift coverage and incident trends to training completion and payroll summaries. Export data for stakeholders and CIW.</p>
+                </div>
+              </div>
+            </AnimateOnScroll>
+
+            {/* Mobile Mockup */}
+            <AnimateOnScroll animation="fade-up">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <div className="order-2 lg:order-1">
+                  <h3 className="text-2xl font-bold text-slate-900 mb-3">Mobile Experience</h3>
+                  <p className="text-slate-600 leading-relaxed">Clean, intuitive mobile interface for carers in the field. Clock in with GPS, log care notes, report incidents, and check schedules — all from their phone. Works offline and syncs when back online.</p>
+                </div>
+                <div className="order-1 lg:order-2 flex justify-center">
+                  <div className="w-56 bg-slate-900 rounded-[2rem] p-3 shadow-2xl border border-slate-700">
+                    {/* Phone notch */}
+                    <div className="w-20 h-4 bg-slate-800 rounded-full mx-auto mb-2" />
+                    <div className="bg-white rounded-2xl overflow-hidden">
+                      {/* Status bar */}
+                      <div className="bg-welsh-green px-3 py-2 flex items-center justify-between">
+                        <span className="text-[9px] font-semibold text-white">CareCall AI</span>
+                        <span className="text-[8px] text-white/80">09:42</span>
+                      </div>
+                      {/* Content */}
+                      <div className="p-3 space-y-2">
+                        <p className="text-[10px] font-bold text-slate-900">Hi Sarah</p>
+                        <div className="bg-green-50 rounded-lg p-2 border border-green-200">
+                          <p className="text-[9px] font-semibold text-green-800">Current Visit</p>
+                          <p className="text-[10px] font-bold text-slate-900 mt-0.5">Mrs. Williams</p>
+                          <p className="text-[8px] text-slate-500">12 High Street, Denbigh</p>
+                          <div className="flex gap-2 mt-1.5">
+                            <span className="text-[7px] px-1.5 py-0.5 rounded bg-green-200 text-green-800 font-medium">Clocked In 08:02</span>
+                          </div>
+                        </div>
+                        <div className="bg-slate-50 rounded-lg p-2 border border-slate-200">
+                          <p className="text-[9px] font-semibold text-slate-700">Quick Actions</p>
+                          <div className="grid grid-cols-2 gap-1.5 mt-1.5">
+                            {['Log Care', 'Clock Out', 'Incident', 'Messages'].map((a) => (
+                              <div key={a} className="bg-white rounded-lg py-2 text-center border border-slate-100">
+                                <p className="text-[8px] font-medium text-slate-700">{a}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="bg-slate-50 rounded-lg p-2 border border-slate-200">
+                          <p className="text-[9px] font-semibold text-slate-700">Next Visit</p>
+                          <div className="flex items-center justify-between mt-1">
+                            <div>
+                              <p className="text-[9px] font-medium text-slate-900">Mr. Hughes</p>
+                              <p className="text-[7px] text-slate-500">09:30 — Oak Lane</p>
+                            </div>
+                            <span className="text-[7px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">30 min</span>
+                          </div>
+                        </div>
+                      </div>
+                      {/* Bottom nav */}
+                      <div className="flex items-center justify-around py-2 border-t border-slate-100">
+                        {['Home', 'Rota', 'Chat', 'Profile'].map((t) => (
+                          <span key={t} className={`text-[8px] font-medium ${t === 'Home' ? 'text-welsh-green' : 'text-slate-400'}`}>{t}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </AnimateOnScroll>
           </div>
         </div>
       </section>
