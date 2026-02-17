@@ -689,6 +689,681 @@ export default function CareCallAIPage() {
                 </div>
               </div>
             </AnimateOnScroll>
+
+            {/* Training Academy Mockup */}
+            <AnimateOnScroll animation="fade-up">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <div className="bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-700">
+                  <div className="flex items-center gap-2 mb-3 px-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                    <span className="text-[10px] text-slate-500 ml-2">Training Academy — CareCall AI</span>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-xs font-bold text-slate-900">Training Academy</p>
+                      <div className="flex gap-1">
+                        <span className="text-[8px] px-2 py-0.5 rounded bg-welsh-green text-white">+ AI Course Builder</span>
+                        <span className="text-[8px] px-2 py-0.5 rounded bg-white text-slate-500 border border-slate-200">Assign</span>
+                      </div>
+                    </div>
+                    {/* Course cards */}
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { title: 'Manual Handling', modules: 6, duration: '2h 30m', color: 'bg-blue-500', progress: 85 },
+                        { title: 'Safeguarding Adults', modules: 8, duration: '3h 15m', color: 'bg-rose-500', progress: 62 },
+                        { title: 'Medication Admin', modules: 5, duration: '1h 45m', color: 'bg-amber-500', progress: 100 },
+                        { title: 'Infection Control', modules: 4, duration: '1h 20m', color: 'bg-green-500', progress: 40 },
+                      ].map((course) => (
+                        <div key={course.title} className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+                          <div className={`${course.color} h-1.5`} />
+                          <div className="p-2.5">
+                            <p className="text-[10px] font-semibold text-slate-900 mb-1">{course.title}</p>
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-[8px] text-slate-500">{course.modules} modules</span>
+                              <span className="text-[8px] text-slate-400">•</span>
+                              <span className="text-[8px] text-slate-500">{course.duration}</span>
+                            </div>
+                            <div className="w-full bg-slate-100 rounded-full h-1.5">
+                              <div className={`${course.color} h-1.5 rounded-full`} style={{ width: `${course.progress}%` }} />
+                            </div>
+                            <p className="text-[8px] text-slate-500 mt-1">{course.progress}% complete</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Staff training overview */}
+                    <div className="bg-white rounded-lg border border-slate-200 p-2.5">
+                      <p className="text-[10px] font-semibold text-slate-700 mb-2">Team Compliance</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="text-center">
+                          <p className="text-sm font-bold text-welsh-green">18</p>
+                          <p className="text-[8px] text-slate-500">Up to Date</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm font-bold text-amber-500">4</p>
+                          <p className="text-[8px] text-slate-500">Due Soon</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm font-bold text-rose-500">2</p>
+                          <p className="text-[8px] text-slate-500">Overdue</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-slate-900 mb-3">Training Academy & AI Course Builder</h3>
+                  <p className="text-slate-600 leading-relaxed mb-4">A complete learning management system built into CareCall AI. Create, assign, and track mandatory and optional training across your entire team. Monitor completion rates, flag overdue certificates, and ensure your workforce is always compliant.</p>
+                  <ul className="space-y-2">
+                    {['AI-powered course creation in minutes', 'Module-based learning with quizzes', 'Certificate tracking and expiry alerts', 'Assign courses to individuals or teams', 'Completion analytics and compliance reports'].map((item) => (
+                      <li key={item} className="flex items-center gap-2 text-sm text-slate-600">
+                        <svg className="w-4 h-4 text-welsh-green flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </AnimateOnScroll>
+
+            {/* Clock In/Out & Care Visit Mockup */}
+            <AnimateOnScroll animation="fade-up">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <div className="order-2 lg:order-1">
+                  <h3 className="text-2xl font-bold text-slate-900 mb-3">Clock In/Out & Visit Logging</h3>
+                  <p className="text-slate-600 leading-relaxed mb-4">Carers clock in when they arrive at a service user&apos;s home and clock out when they leave. GPS location is captured automatically to verify attendance. During the visit, they log mood, food &amp; fluid intake, personal care tasks, and detailed notes — building a comprehensive care record with every call.</p>
+                  <ul className="space-y-2">
+                    {['GPS-verified clock in and clock out', 'Automatic visit duration tracking', 'Mood assessment with emoji scale', 'Food, fluid & personal care logging', 'Free-text notes for detailed observations', 'Photo attachments for wound care etc.'].map((item) => (
+                      <li key={item} className="flex items-center gap-2 text-sm text-slate-600">
+                        <svg className="w-4 h-4 text-welsh-green flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="order-1 lg:order-2 flex justify-center">
+                  {/* Phone mockup for clock in/out flow */}
+                  <div className="w-56 bg-slate-900 rounded-[2rem] p-3 shadow-2xl border border-slate-700">
+                    <div className="w-20 h-4 bg-slate-800 rounded-full mx-auto mb-2" />
+                    <div className="bg-white rounded-2xl overflow-hidden">
+                      <div className="bg-welsh-green px-3 py-2 flex items-center justify-between">
+                        <span className="text-[9px] font-semibold text-white">Care Visit</span>
+                        <span className="text-[8px] text-white/80">10:22</span>
+                      </div>
+                      <div className="p-3 space-y-2">
+                        <div className="bg-green-50 rounded-lg p-2.5 border border-green-200">
+                          <div className="flex items-center justify-between mb-1">
+                            <p className="text-[10px] font-bold text-green-800">Clocked In</p>
+                            <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-green-200 text-green-800 font-medium">10:02 AM</span>
+                          </div>
+                          <p className="text-[10px] font-semibold text-slate-900">Mrs. Williams</p>
+                          <p className="text-[8px] text-slate-500">12 High Street, Denbigh</p>
+                          <div className="flex items-center gap-1 mt-1">
+                            <div className="w-2 h-2 rounded-full bg-green-500" />
+                            <span className="text-[7px] text-green-700">GPS Verified</span>
+                          </div>
+                        </div>
+                        {/* Care logging form */}
+                        <div className="bg-slate-50 rounded-lg p-2.5 border border-slate-200">
+                          <p className="text-[9px] font-semibold text-slate-700 mb-2">Log Care</p>
+                          <div className="space-y-2">
+                            <div>
+                              <p className="text-[8px] text-slate-500 mb-1">Mood</p>
+                              <div className="flex gap-1.5">
+                                {['😊', '🙂', '😐', '😔', '😢'].map((e, i) => (
+                                  <span key={e} className={`text-base cursor-pointer ${i === 0 ? 'scale-125' : 'opacity-40'}`}>{e}</span>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              <div>
+                                <p className="text-[8px] text-slate-500 mb-0.5">Food Intake</p>
+                                <div className="bg-white rounded px-2 py-1 border border-slate-200 text-[8px] text-green-700 font-medium">Good</div>
+                              </div>
+                              <div>
+                                <p className="text-[8px] text-slate-500 mb-0.5">Fluid Intake</p>
+                                <div className="bg-white rounded px-2 py-1 border border-slate-200 text-[8px] text-green-700 font-medium">Good</div>
+                              </div>
+                            </div>
+                            <div>
+                              <p className="text-[8px] text-slate-500 mb-0.5">Personal Care</p>
+                              <div className="flex flex-wrap gap-1">
+                                {['Wash', 'Dress', 'Meds', 'Meals'].map((t) => (
+                                  <span key={t} className="text-[7px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">{t}</span>
+                                ))}
+                              </div>
+                            </div>
+                            <div>
+                              <p className="text-[8px] text-slate-500 mb-0.5">Notes</p>
+                              <div className="bg-white rounded px-2 py-1.5 border border-slate-200 text-[8px] text-slate-600 italic">Good spirits today, ate well...</div>
+                            </div>
+                          </div>
+                        </div>
+                        <button className="w-full bg-rose-500 text-white text-[9px] font-semibold rounded-lg py-2">
+                          Clock Out & Submit
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </AnimateOnScroll>
+
+            {/* Client Management Mockup */}
+            <AnimateOnScroll animation="fade-up">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <div className="bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-700">
+                  <div className="flex items-center gap-2 mb-3 px-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                    <span className="text-[10px] text-slate-500 ml-2">Service Users — CareCall AI</span>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-xs font-bold text-slate-900">Service Users</p>
+                      <span className="text-[8px] px-2.5 py-1 rounded-lg bg-welsh-green text-white font-medium">+ Add Client</span>
+                    </div>
+                    {/* Client cards */}
+                    {[
+                      { name: 'Mrs. Gwen Williams', age: 82, address: '12 High Street, Denbigh', visits: 'Daily — AM & PM', conditions: ['Dementia', 'Diabetes'], status: 'Active' },
+                      { name: 'Mr. Idris Hughes', age: 74, address: '5 Oak Lane, Ruthin', visits: 'Daily — AM', conditions: ['Mobility', 'Heart'], status: 'Active' },
+                      { name: 'Mrs. Megan Evans', age: 88, address: '23 Castle Road, Conwy', visits: 'Mon/Wed/Fri', conditions: ['Arthritis'], status: 'Active' },
+                    ].map((client) => (
+                      <div key={client.name} className="bg-white rounded-lg border border-slate-200 p-3">
+                        <div className="flex items-start justify-between mb-1.5">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600">
+                              {client.name.split(' ').pop()[0]}{client.name.split(' ')[1][0]}
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-semibold text-slate-900">{client.name}</p>
+                              <p className="text-[8px] text-slate-400">Age {client.age}</p>
+                            </div>
+                          </div>
+                          <span className="text-[7px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">{client.status}</span>
+                        </div>
+                        <p className="text-[8px] text-slate-500 mb-1.5">{client.address}</p>
+                        <div className="flex items-center justify-between">
+                          <div className="flex gap-1">
+                            {client.conditions.map((c) => (
+                              <span key={c} className="text-[7px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 font-medium">{c}</span>
+                            ))}
+                          </div>
+                          <span className="text-[8px] text-slate-400">{client.visits}</span>
+                        </div>
+                      </div>
+                    ))}
+                    {/* Summary bar */}
+                    <div className="flex items-center justify-between bg-white rounded-lg border border-slate-200 p-2">
+                      <span className="text-[9px] text-slate-500">Showing 3 of 28 service users</span>
+                      <div className="flex gap-1">
+                        <span className="text-[8px] px-2 py-0.5 rounded bg-slate-100 text-slate-500">← Prev</span>
+                        <span className="text-[8px] px-2 py-0.5 rounded bg-slate-100 text-slate-500">Next →</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-slate-900 mb-3">Client / Service User Management</h3>
+                  <p className="text-slate-600 leading-relaxed mb-4">Add, edit, and manage all your service users in one place. Store personal details, medical conditions, care plans, emergency contacts, GP information, and visit schedules. Every client has a complete profile that carers can access on their phone before each visit.</p>
+                  <ul className="space-y-2">
+                    {['Full client profiles with medical history', 'Care plan documentation and review dates', 'Emergency contact details and GP info', 'Visit schedule and preferred carer assignment', 'Condition and allergy alerts for carers', 'Link to all care logs, incidents, and notes'].map((item) => (
+                      <li key={item} className="flex items-center gap-2 text-sm text-slate-600">
+                        <svg className="w-4 h-4 text-welsh-green flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </AnimateOnScroll>
+
+            {/* Sick & Leave Management Mockup */}
+            <AnimateOnScroll animation="fade-up">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <div className="order-2 lg:order-1">
+                  <h3 className="text-2xl font-bold text-slate-900 mb-3">Sick & Leave Management</h3>
+                  <p className="text-slate-600 leading-relaxed mb-4">Staff submit leave requests directly through the app — annual leave, sick leave, compassionate leave, or training days. Managers receive instant notifications and can approve or reject requests with a single tap. The system automatically tracks Bradford Factor scores and absence patterns to help identify concerns early.</p>
+                  <ul className="space-y-2">
+                    {['Annual, sick, compassionate & training leave types', 'One-tap approval or rejection for managers', 'Bradford Factor scoring for absence monitoring', 'Automatic rota conflict detection', 'Leave balance tracking per staff member', 'Absence pattern reports for HR oversight'].map((item) => (
+                      <li key={item} className="flex items-center gap-2 text-sm text-slate-600">
+                        <svg className="w-4 h-4 text-welsh-green flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="order-1 lg:order-2 bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-700">
+                  <div className="flex items-center gap-2 mb-3 px-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                    <span className="text-[10px] text-slate-500 ml-2">Leave Management — CareCall AI</span>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-xs font-bold text-slate-900">Leave Requests</p>
+                      <div className="flex gap-1">
+                        <span className="text-[8px] px-2 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">3 Pending</span>
+                      </div>
+                    </div>
+                    {/* Leave request cards */}
+                    {[
+                      { name: 'Katie Lewis', type: 'Annual Leave', dates: '24–28 Feb', days: 5, status: 'Pending', statusColor: 'bg-amber-100 text-amber-700' },
+                      { name: 'Rob Williams', type: 'Sick Leave', dates: '17 Feb', days: 1, status: 'Pending', statusColor: 'bg-amber-100 text-amber-700' },
+                      { name: 'Amy Morgan', type: 'Training Day', dates: '20 Feb', days: 1, status: 'Pending', statusColor: 'bg-amber-100 text-amber-700' },
+                    ].map((req) => (
+                      <div key={req.name} className="bg-white rounded-lg border border-slate-200 p-2.5">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[8px] font-bold text-slate-600">
+                              {req.name.split(' ').map(n => n[0]).join('')}
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-semibold text-slate-900">{req.name}</p>
+                              <p className="text-[8px] text-slate-400">{req.type}</p>
+                            </div>
+                          </div>
+                          <span className={`text-[7px] px-1.5 py-0.5 rounded-full font-medium ${req.statusColor}`}>{req.status}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[8px] text-slate-500">{req.dates} ({req.days} day{req.days > 1 ? 's' : ''})</span>
+                          <div className="flex gap-1">
+                            <span className="text-[7px] px-2 py-0.5 rounded bg-green-100 text-green-700 font-medium cursor-pointer">Approve</span>
+                            <span className="text-[7px] px-2 py-0.5 rounded bg-red-100 text-red-700 font-medium cursor-pointer">Reject</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {/* Recent decisions */}
+                    <div className="bg-white rounded-lg border border-slate-200 p-2.5">
+                      <p className="text-[10px] font-semibold text-slate-700 mb-1.5">Recent Decisions</p>
+                      {[
+                        { name: 'Sarah Jones', type: 'Annual Leave', status: 'Approved', color: 'text-green-600' },
+                        { name: 'Dan Thomas', type: 'Sick Leave', status: 'Recorded', color: 'text-blue-600' },
+                      ].map((d) => (
+                        <div key={d.name} className="flex items-center justify-between py-1 border-b border-slate-50 last:border-0">
+                          <span className="text-[8px] text-slate-600">{d.name} — {d.type}</span>
+                          <span className={`text-[8px] font-medium ${d.color}`}>{d.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Bradford Factor */}
+                    <div className="bg-white rounded-lg border border-slate-200 p-2.5">
+                      <p className="text-[10px] font-semibold text-slate-700 mb-1.5">Bradford Factor Scores</p>
+                      <div className="space-y-1">
+                        {[
+                          { name: 'Sarah J.', score: 12, level: 'Low', color: 'bg-green-200 text-green-800', bar: 'bg-green-400', width: '12%' },
+                          { name: 'Rob W.', score: 48, level: 'Medium', color: 'bg-amber-200 text-amber-800', bar: 'bg-amber-400', width: '48%' },
+                          { name: 'Dan T.', score: 96, level: 'High', color: 'bg-red-200 text-red-800', bar: 'bg-red-400', width: '96%' },
+                        ].map((s) => (
+                          <div key={s.name} className="flex items-center gap-2">
+                            <span className="text-[8px] text-slate-600 w-12">{s.name}</span>
+                            <div className="flex-1 bg-slate-100 rounded-full h-1.5">
+                              <div className={`${s.bar} h-1.5 rounded-full`} style={{ width: s.width }} />
+                            </div>
+                            <span className={`text-[7px] px-1.5 py-0.5 rounded-full font-medium ${s.color}`}>{s.score}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </AnimateOnScroll>
+
+            {/* Admin Approval Workflows Mockup */}
+            <AnimateOnScroll animation="fade-up">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <div className="bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-700">
+                  <div className="flex items-center gap-2 mb-3 px-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                    <span className="text-[10px] text-slate-500 ml-2">Admin Approvals — CareCall AI</span>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-xs font-bold text-slate-900">Approval Queue</p>
+                      <span className="text-[8px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">7 Awaiting Action</span>
+                    </div>
+                    {/* Approval categories */}
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {[
+                        { label: 'Leave', count: 3, color: 'bg-amber-50 text-amber-700 border-amber-200' },
+                        { label: 'Expenses', count: 2, color: 'bg-blue-50 text-blue-700 border-blue-200' },
+                        { label: 'Incidents', count: 1, color: 'bg-red-50 text-red-700 border-red-200' },
+                        { label: 'Training', count: 1, color: 'bg-purple-50 text-purple-700 border-purple-200' },
+                      ].map((cat) => (
+                        <div key={cat.label} className={`rounded-lg p-2 text-center border ${cat.color}`}>
+                          <p className="text-sm font-bold">{cat.count}</p>
+                          <p className="text-[8px]">{cat.label}</p>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Approval items */}
+                    {[
+                      { type: 'Leave Request', who: 'Katie Lewis', detail: 'Annual Leave — 24-28 Feb (5 days)', icon: '📅', urgency: 'Normal', urgencyColor: 'bg-blue-100 text-blue-700' },
+                      { type: 'Expense Claim', who: 'Rob Williams', detail: 'Mileage — £47.50 (94 miles)', icon: '💷', urgency: 'Normal', urgencyColor: 'bg-blue-100 text-blue-700' },
+                      { type: 'Incident Review', who: 'Sarah Jones', detail: 'Fall — Mrs. Williams (Low severity)', icon: '⚠️', urgency: 'Urgent', urgencyColor: 'bg-red-100 text-red-700' },
+                      { type: 'Training Request', who: 'Amy Morgan', detail: 'Advanced Safeguarding — External course', icon: '📚', urgency: 'Normal', urgencyColor: 'bg-blue-100 text-blue-700' },
+                      { type: 'Expense Claim', who: 'Dan Thomas', detail: 'PPE Supplies — £23.80', icon: '💷', urgency: 'Normal', urgencyColor: 'bg-blue-100 text-blue-700' },
+                    ].map((item) => (
+                      <div key={`${item.type}-${item.who}`} className="bg-white rounded-lg border border-slate-200 p-2.5">
+                        <div className="flex items-start justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm">{item.icon}</span>
+                            <div>
+                              <p className="text-[10px] font-semibold text-slate-900">{item.type}</p>
+                              <p className="text-[8px] text-slate-400">Submitted by {item.who}</p>
+                            </div>
+                          </div>
+                          <span className={`text-[7px] px-1.5 py-0.5 rounded-full font-medium ${item.urgencyColor}`}>{item.urgency}</span>
+                        </div>
+                        <p className="text-[8px] text-slate-600 mb-1.5">{item.detail}</p>
+                        <div className="flex gap-1">
+                          <span className="text-[7px] px-2.5 py-0.5 rounded bg-green-500 text-white font-medium">Approve</span>
+                          <span className="text-[7px] px-2.5 py-0.5 rounded bg-slate-200 text-slate-600 font-medium">Reject</span>
+                          <span className="text-[7px] px-2.5 py-0.5 rounded bg-white text-slate-500 border border-slate-200 font-medium">View Details</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-slate-900 mb-3">Admin Approval Workflows</h3>
+                  <p className="text-slate-600 leading-relaxed mb-4">A centralised approval queue where managers handle all pending requests in one place. Leave requests, expense claims, incident reviews, and training requests all flow through a structured approval workflow with full audit trails. Nothing slips through the cracks.</p>
+                  <ul className="space-y-2">
+                    {['Unified approval queue for all request types', 'One-tap approve or reject with notes', 'Urgency flagging for time-sensitive items', 'Full audit trail — who approved, when, and why', 'Push notifications for new pending approvals', 'Expense claims with receipt attachments and mileage tracking'].map((item) => (
+                      <li key={item} className="flex items-center gap-2 text-sm text-slate-600">
+                        <svg className="w-4 h-4 text-welsh-green flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </AnimateOnScroll>
+
+            {/* Direct Chat & Messaging Mockup */}
+            <AnimateOnScroll animation="fade-up">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <div className="order-2 lg:order-1">
+                  <h3 className="text-2xl font-bold text-slate-900 mb-3">Direct Chat & Team Messaging</h3>
+                  <p className="text-slate-600 leading-relaxed mb-4">Built-in messaging so your team never needs WhatsApp or personal phones for work communication. One-to-one direct messages, team group chats, and priority announcements — all within CareCall AI. Messages are secure, auditable, and tied to your organisation.</p>
+                  <ul className="space-y-2">
+                    {['One-to-one direct messaging between staff', 'Team and group chat channels', 'Priority-based announcements (Critical, High, Normal, Low)', 'Read receipts and acknowledgement tracking', 'Push notifications for new messages', 'Secure — no personal phone numbers shared'].map((item) => (
+                      <li key={item} className="flex items-center gap-2 text-sm text-slate-600">
+                        <svg className="w-4 h-4 text-welsh-green flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="order-1 lg:order-2 flex justify-center">
+                  {/* Phone mockup for chat */}
+                  <div className="w-56 bg-slate-900 rounded-[2rem] p-3 shadow-2xl border border-slate-700">
+                    <div className="w-20 h-4 bg-slate-800 rounded-full mx-auto mb-2" />
+                    <div className="bg-white rounded-2xl overflow-hidden">
+                      <div className="bg-indigo-600 px-3 py-2 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <svg className="w-3.5 h-3.5 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                          </svg>
+                          <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-[7px] font-bold text-white">KL</div>
+                          <div>
+                            <span className="text-[9px] font-semibold text-white">Katie Lewis</span>
+                            <p className="text-[7px] text-white/60">Online</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="p-2.5 space-y-2 bg-slate-50 h-56 overflow-hidden">
+                        {/* Incoming message */}
+                        <div className="flex gap-1.5">
+                          <div className="w-4 h-4 rounded-full bg-slate-300 flex items-center justify-center text-[6px] font-bold text-slate-600 flex-shrink-0 mt-0.5">KL</div>
+                          <div>
+                            <div className="bg-white rounded-lg rounded-tl-none px-2.5 py-1.5 border border-slate-200 max-w-[160px]">
+                              <p className="text-[8px] text-slate-800">Hi Sarah, just wanted to check — is Mrs. Williams&apos; medication still the same?</p>
+                            </div>
+                            <p className="text-[6px] text-slate-400 mt-0.5 ml-1">09:14</p>
+                          </div>
+                        </div>
+                        {/* Outgoing message */}
+                        <div className="flex justify-end">
+                          <div>
+                            <div className="bg-indigo-600 rounded-lg rounded-tr-none px-2.5 py-1.5 max-w-[160px]">
+                              <p className="text-[8px] text-white">Yes, no changes. Same dosage as last week. Check the care plan for details.</p>
+                            </div>
+                            <p className="text-[6px] text-slate-400 mt-0.5 text-right mr-1">09:15 ✓✓</p>
+                          </div>
+                        </div>
+                        {/* Incoming */}
+                        <div className="flex gap-1.5">
+                          <div className="w-4 h-4 rounded-full bg-slate-300 flex items-center justify-center text-[6px] font-bold text-slate-600 flex-shrink-0 mt-0.5">KL</div>
+                          <div>
+                            <div className="bg-white rounded-lg rounded-tl-none px-2.5 py-1.5 border border-slate-200 max-w-[160px]">
+                              <p className="text-[8px] text-slate-800">Perfect, thanks! Also she seemed a bit low yesterday — I&apos;ll keep an eye today.</p>
+                            </div>
+                            <p className="text-[6px] text-slate-400 mt-0.5 ml-1">09:16</p>
+                          </div>
+                        </div>
+                        {/* Outgoing */}
+                        <div className="flex justify-end">
+                          <div>
+                            <div className="bg-indigo-600 rounded-lg rounded-tr-none px-2.5 py-1.5 max-w-[160px]">
+                              <p className="text-[8px] text-white">Good thinking. Log it in the mood assessment so we can track it. Thanks Katie 👍</p>
+                            </div>
+                            <p className="text-[6px] text-slate-400 mt-0.5 text-right mr-1">09:17 ✓✓</p>
+                          </div>
+                        </div>
+                      </div>
+                      {/* Chat input */}
+                      <div className="px-2.5 py-2 border-t border-slate-200 flex items-center gap-2">
+                        <div className="flex-1 bg-slate-100 rounded-full px-2.5 py-1.5">
+                          <p className="text-[8px] text-slate-400">Type a message...</p>
+                        </div>
+                        <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center">
+                          <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </AnimateOnScroll>
+
+            {/* Push Notifications & Alerts Mockup */}
+            <AnimateOnScroll animation="fade-up">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <div className="bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-700">
+                  <div className="flex items-center gap-2 mb-3 px-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                    <span className="text-[10px] text-slate-500 ml-2">Notifications — CareCall AI</span>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-xs font-bold text-slate-900">Notifications Centre</p>
+                      <span className="text-[8px] px-2 py-0.5 rounded bg-white text-slate-500 border border-slate-200">Mark All Read</span>
+                    </div>
+                    {/* Priority announcement */}
+                    <div className="bg-red-50 rounded-lg border border-red-200 p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                        <span className="text-[9px] font-bold text-red-700">CRITICAL ANNOUNCEMENT</span>
+                      </div>
+                      <p className="text-[10px] font-semibold text-slate-900 mb-0.5">Icy Roads Warning — Extra Care Required</p>
+                      <p className="text-[8px] text-slate-600">All staff: Roads are icy across Denbighshire this morning. Allow extra travel time and take extreme care when walking to clients&apos; doors. Report any concerns immediately.</p>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-[7px] text-slate-400">Posted by Management — 06:45 AM</span>
+                        <span className="text-[7px] px-1.5 py-0.5 rounded bg-red-200 text-red-700 font-medium">18/24 read</span>
+                      </div>
+                    </div>
+                    {/* Notification list */}
+                    {[
+                      { icon: '📋', title: 'New shift assigned', desc: 'You have been assigned to Mr. Hughes — tomorrow 09:30', time: '2m ago', unread: true },
+                      { icon: '✅', title: 'Leave approved', desc: 'Your annual leave request (24-28 Feb) has been approved', time: '15m ago', unread: true },
+                      { icon: '💬', title: 'New message from Katie L.', desc: 'Re: Mrs. Williams medication query', time: '23m ago', unread: true },
+                      { icon: '⚠️', title: 'Incident logged', desc: 'Rob W. reported a near miss at 23 Castle Road', time: '1h ago', unread: false },
+                      { icon: '📚', title: 'Training due reminder', desc: 'Manual Handling refresher expires in 7 days', time: '3h ago', unread: false },
+                      { icon: '🌤️', title: 'Weather alert', desc: 'Heavy rain forecast 2-6PM — drive safely', time: '5h ago', unread: false },
+                    ].map((notif) => (
+                      <div key={notif.title} className={`flex items-start gap-2.5 p-2 rounded-lg ${notif.unread ? 'bg-blue-50/50 border border-blue-100' : 'bg-white border border-slate-100'}`}>
+                        <span className="text-sm flex-shrink-0 mt-0.5">{notif.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <p className={`text-[9px] font-semibold ${notif.unread ? 'text-slate-900' : 'text-slate-600'}`}>{notif.title}</p>
+                            {notif.unread && <div className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />}
+                          </div>
+                          <p className="text-[8px] text-slate-500 truncate">{notif.desc}</p>
+                          <p className="text-[7px] text-slate-400">{notif.time}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-slate-900 mb-3">Push Notifications & Alerts</h3>
+                  <p className="text-slate-600 leading-relaxed mb-4">Never miss anything important. CareCall AI sends real-time push notifications for new messages, shift assignments, approval decisions, incident reports, training reminders, and priority announcements. Managers can broadcast critical alerts to the whole team with read-receipt tracking.</p>
+                  <ul className="space-y-2">
+                    {['Real-time push notifications on mobile and desktop', 'Priority-based announcements (Critical, High, Normal, Low)', 'Read receipts and acknowledgement tracking for announcements', 'Shift assignment and rota change alerts', 'Approval decision notifications (leave, expenses, etc.)', 'Training due and overdue reminders', 'Incident alert escalation to managers'].map((item) => (
+                      <li key={item} className="flex items-center gap-2 text-sm text-slate-600">
+                        <svg className="w-4 h-4 text-welsh-green flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </AnimateOnScroll>
+
+            {/* Weather Alerts Mockup */}
+            <AnimateOnScroll animation="fade-up">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <div className="order-2 lg:order-1">
+                  <h3 className="text-2xl font-bold text-slate-900 mb-3">Live Weather Alerts</h3>
+                  <p className="text-slate-600 leading-relaxed mb-4">Because your carers work outdoors and travel between clients, weather matters. CareCall AI integrates live weather data and Met Office warnings so coordinators and staff are always aware of conditions that could affect service delivery — from icy roads and flooding to heat warnings and storms.</p>
+                  <ul className="space-y-2">
+                    {['Live weather conditions for your service area', 'Met Office yellow, amber & red warning integration', 'Automatic alerts to staff when warnings are issued', 'Travel safety considerations for coordinators', 'Historical weather data logged against incidents', 'Helps evidence extreme weather in CIW reports'].map((item) => (
+                      <li key={item} className="flex items-center gap-2 text-sm text-slate-600">
+                        <svg className="w-4 h-4 text-welsh-green flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="order-1 lg:order-2 bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-700">
+                  <div className="flex items-center gap-2 mb-3 px-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                    <span className="text-[10px] text-slate-500 ml-2">Weather — CareCall AI</span>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-4 space-y-3">
+                    {/* Current weather */}
+                    <div className="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg p-4 text-white">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-[10px] text-white/80">Denbighshire • Now</p>
+                          <p className="text-3xl font-bold">4°C</p>
+                          <p className="text-[10px] text-white/80">Feels like 1°C</p>
+                        </div>
+                        <div className="text-center">
+                          <span className="text-4xl">🌧️</span>
+                          <p className="text-[10px] text-white/80 mt-1">Light Rain</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-white/20">
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px]">💨</span>
+                          <span className="text-[9px] text-white/80">18 mph</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px]">💧</span>
+                          <span className="text-[9px] text-white/80">85%</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px]">👁️</span>
+                          <span className="text-[9px] text-white/80">4 km</span>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Active warnings */}
+                    <div className="bg-amber-50 rounded-lg border border-amber-200 p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-5 h-5 rounded bg-amber-500 flex items-center justify-center">
+                          <span className="text-[10px] font-bold text-white">!</span>
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-bold text-amber-800">YELLOW WARNING — Ice</p>
+                          <p className="text-[8px] text-amber-600">Met Office • Valid until 10:00 AM</p>
+                        </div>
+                      </div>
+                      <p className="text-[8px] text-slate-600">Icy patches likely on untreated roads and pavements. Extra care needed when walking to and from clients&apos; homes.</p>
+                    </div>
+                    {/* Hourly forecast */}
+                    <div className="bg-white rounded-lg border border-slate-200 p-3">
+                      <p className="text-[10px] font-semibold text-slate-700 mb-2">Hourly Forecast</p>
+                      <div className="flex justify-between">
+                        {[
+                          { time: '10AM', icon: '🌧️', temp: '4°' },
+                          { time: '12PM', icon: '🌥️', temp: '6°' },
+                          { time: '2PM', icon: '🌧️', temp: '5°' },
+                          { time: '4PM', icon: '🌧️', temp: '4°' },
+                          { time: '6PM', icon: '🌙', temp: '2°' },
+                        ].map((h) => (
+                          <div key={h.time} className="text-center">
+                            <p className="text-[8px] text-slate-500">{h.time}</p>
+                            <span className="text-lg">{h.icon}</span>
+                            <p className="text-[9px] font-semibold text-slate-900">{h.temp}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {/* Staff impact */}
+                    <div className="bg-white rounded-lg border border-slate-200 p-2.5">
+                      <p className="text-[10px] font-semibold text-slate-700 mb-1.5">Staff Impact Assessment</p>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[8px] text-slate-600">Driving conditions</span>
+                          <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">Caution</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[8px] text-slate-600">Walking conditions</span>
+                          <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">Poor</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[8px] text-slate-600">Estimated delays</span>
+                          <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">10-15 min</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </AnimateOnScroll>
           </div>
         </div>
       </section>
