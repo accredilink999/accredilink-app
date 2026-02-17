@@ -70,26 +70,26 @@ export default function Header() {
 
       {/* Single main row: logo + nav + CTA */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between py-1">
+        <div className="flex items-center justify-between py-2">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 flex-shrink-0">
+          <Link href="/" className="flex items-center gap-3 flex-shrink-0">
             <Image
               src="/images/welsh-dragon.png"
               alt="Welsh Dragon"
-              width={24}
-              height={24}
-              className="w-[16px] h-[16px] sm:w-[20px] sm:h-[20px] lg:w-[24px] lg:h-[24px] object-contain"
+              width={48}
+              height={48}
+              className="w-[32px] h-[32px] sm:w-[40px] sm:h-[40px] lg:w-[48px] lg:h-[48px] object-contain"
             />
             <Image
               src="/images/logo.png"
               alt="Accredilink Logo"
-              width={44}
-              height={44}
-              className="w-[36px] h-[36px] sm:w-[40px] sm:h-[40px] lg:w-[44px] lg:h-[44px] rounded-lg object-contain"
+              width={88}
+              height={88}
+              className="w-[72px] h-[72px] sm:w-[80px] sm:h-[80px] lg:w-[88px] lg:h-[88px] rounded-xl object-contain"
             />
             <div className="hidden sm:block">
-              <p className="font-bold text-slate-900 text-base sm:text-lg lg:text-xl leading-none">Accredilink</p>
-              <p className="text-[10px] sm:text-xs text-slate-500 leading-none mt-0.5">Community Response Taskforce</p>
+              <p className="font-bold text-slate-900 text-xl sm:text-2xl lg:text-3xl leading-none">Accredilink</p>
+              <p className="text-xs sm:text-sm text-slate-500 leading-none mt-0.5">Community Response Taskforce</p>
             </div>
           </Link>
 
