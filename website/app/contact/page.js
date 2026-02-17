@@ -20,7 +20,7 @@ export default function ContactPage() {
 
     // For now, mailto fallback — replace with form service later
     const mailtoBody = `Name: ${formData.name}%0AEmail: ${formData.email}%0APhone: ${formData.phone}%0ASubject: ${formData.subject}%0A%0A${formData.message}`;
-    window.location.href = `mailto:info@accredilinkcare.co.uk?subject=${encodeURIComponent(`Website Enquiry: ${formData.subject}`)}&body=${mailtoBody}`;
+    window.location.href = `mailto:enquiries@accredilinkcare.co.uk?subject=${encodeURIComponent(`Website Enquiry: ${formData.subject}`)}&body=${mailtoBody}`;
 
     setTimeout(() => {
       setSubmitted(true);
@@ -75,7 +75,28 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <p className="font-medium text-slate-900">Email</p>
-                    <p className="text-slate-600">info@accredilinkcare.co.uk</p>
+                    <div className="space-y-1.5">
+                      <p className="text-slate-600">
+                        <a href="mailto:enquiries@accredilinkcare.co.uk" className="text-welsh-red hover:underline">enquiries@accredilinkcare.co.uk</a>
+                        <span className="text-xs text-slate-400 ml-1.5">— Care enquiries</span>
+                      </p>
+                      <p className="text-slate-600">
+                        <a href="mailto:info@accredilinkcare.co.uk" className="text-welsh-red hover:underline">info@accredilinkcare.co.uk</a>
+                        <span className="text-xs text-slate-400 ml-1.5">— General information</span>
+                      </p>
+                      <p className="text-slate-600">
+                        <a href="mailto:careers@accredilinkcare.co.uk" className="text-welsh-red hover:underline">careers@accredilinkcare.co.uk</a>
+                        <span className="text-xs text-slate-400 ml-1.5">— Jobs &amp; recruitment</span>
+                      </p>
+                      <p className="text-slate-600">
+                        <a href="mailto:safeguarding@accredilinkcare.co.uk" className="text-welsh-red hover:underline">safeguarding@accredilinkcare.co.uk</a>
+                        <span className="text-xs text-slate-400 ml-1.5">— Safeguarding concerns</span>
+                      </p>
+                      <p className="text-slate-600">
+                        <a href="mailto:complaints@accredilinkcare.co.uk" className="text-welsh-red hover:underline">complaints@accredilinkcare.co.uk</a>
+                        <span className="text-xs text-slate-400 ml-1.5">— Complaints</span>
+                      </p>
+                    </div>
                   </div>
                 </div>
 
@@ -121,7 +142,7 @@ export default function ContactPage() {
                     </svg>
                   </div>
                   <h3 className="text-xl font-semibold text-slate-900 mb-2">Thank You</h3>
-                  <p className="text-slate-600">Your email client should have opened with your message. If not, please email us directly at info@accredilinkcare.co.uk.</p>
+                  <p className="text-slate-600">Your email client should have opened with your message. If not, please email us directly at enquiries@accredilinkcare.co.uk.</p>
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="p-6 sm:p-8 rounded-2xl bg-slate-50 border border-slate-200">

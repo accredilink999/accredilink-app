@@ -118,7 +118,10 @@ export default function Footer() {
                 <svg className="w-4 h-4 mt-0.5 text-slate-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
-                <span className="text-sm text-slate-400">info@accredilinkcare.co.uk</span>
+                <div className="text-sm text-slate-400">
+                  <a href="mailto:enquiries@accredilinkcare.co.uk" className="hover:text-white transition-colors block">enquiries@accredilinkcare.co.uk</a>
+                  <a href="mailto:info@accredilinkcare.co.uk" className="hover:text-white transition-colors block">info@accredilinkcare.co.uk</a>
+                </div>
               </li>
               <li className="flex items-start gap-2.5">
                 <svg className="w-4 h-4 mt-0.5 text-slate-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">

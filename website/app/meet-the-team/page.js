@@ -130,6 +130,11 @@ export default function MeetTheTeamPage() {
           >
             View Careers
           </Link>
+          <p className="text-sm text-green-100 mt-6">
+            Email{' '}
+            <a href="mailto:careers@accredilinkcare.co.uk" className="text-white font-medium hover:underline">careers@accredilinkcare.co.uk</a>
+            {' '}to express your interest or ask about vacancies.
+          </p>
         </div>
       </section>
     </>
