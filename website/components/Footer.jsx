@@ -95,14 +95,9 @@ export default function Footer() {
                 </li>
               ))}
               <li>
-                <a
-                  href="https://care-call-ai-clone.vercel.app"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-slate-400 hover:text-white transition-colors"
-                >
-                  Staff Portal
-                </a>
+                <Link href="/admin" className="text-sm text-slate-400 hover:text-white transition-colors">
+                  Admin Portal
+                </Link>
               </li>
             </ul>
           </div>
