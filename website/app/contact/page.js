@@ -88,7 +88,7 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <p className="font-medium text-slate-900">Location</p>
-                    <p className="text-slate-600">The Hummingbird, 27-29 High St, Denbigh LL16 3HY</p>
+                    <p className="text-slate-600">Accredilink Community Response Taskforce, The Hummingbird, 27-29 High St, Denbigh LL16 3HY</p>
                   </div>
                 </div>
 
