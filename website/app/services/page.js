@@ -120,10 +120,27 @@ const services = [
     ),
     stats: 'Accredited courses',
   },
+  {
+    title: 'Event Medical Services',
+    description: 'Professional medical cover for community events, festivals, sporting fixtures, and public gatherings with qualified pre-hospital emergency care responders.',
+    href: '/services/event-medical-services',
+    gradient: 'from-rose-500 to-red-700',
+    bgLight: 'bg-rose-50',
+    textColor: 'text-rose-600',
+    borderHover: 'hover:border-rose-300',
+    image: '/images/event-medical.jpg',
+    icon: (
+      <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4m0 0v4m0-4h4m-4 0H8" />
+      </svg>
+    ),
+    stats: 'Community events',
+  },
 ];
 
 const stats = [
-  { value: '7', label: 'Care Services', suffix: '+' },
+  { value: '8', label: 'Care Services', suffix: '+' },
   { value: '3', label: 'Counties Covered', suffix: '' },
   { value: '24/7', label: 'Emergency Response', suffix: '' },
   { value: '100', label: 'CIW Compliant', suffix: '%' },

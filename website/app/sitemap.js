@@ -18,6 +18,7 @@ export default function sitemap() {
   const services = [
     'domiciliary-care', 'respite-care', 'sit-in-services',
     'emergency-response', 'social-care', 'palliative-care', 'training',
+    'event-medical-services',
   ];
   const servicePages = services.map(s => ({
     url: `${baseUrl}/services/${s}`,
