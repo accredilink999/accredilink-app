@@ -9,7 +9,7 @@ export default function CallbackForm({ className = '' }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     const mailtoBody = `Callback Request%0A%0AName: ${formData.name}%0APhone: ${formData.phone}%0ABest Time: ${formData.bestTime}`;
-    window.location.href = `mailto:info@accredilink.co.uk?subject=${encodeURIComponent('Callback Request')}&body=${mailtoBody}`;
+    window.location.href = `mailto:info@accredilinkcare.co.uk?subject=${encodeURIComponent('Callback Request')}&body=${mailtoBody}`;
     setSubmitted(true);
   };
 

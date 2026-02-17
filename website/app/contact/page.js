@@ -20,7 +20,7 @@ export default function ContactPage() {
 
     // For now, mailto fallback — replace with form service later
     const mailtoBody = `Name: ${formData.name}%0AEmail: ${formData.email}%0APhone: ${formData.phone}%0ASubject: ${formData.subject}%0A%0A${formData.message}`;
-    window.location.href = `mailto:info@accredilink.co.uk?subject=${encodeURIComponent(`Website Enquiry: ${formData.subject}`)}&body=${mailtoBody}`;
+    window.location.href = `mailto:info@accredilinkcare.co.uk?subject=${encodeURIComponent(`Website Enquiry: ${formData.subject}`)}&body=${mailtoBody}`;
 
     setTimeout(() => {
       setSubmitted(true);
@@ -75,7 +75,7 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <p className="font-medium text-slate-900">Email</p>
-                    <p className="text-slate-600">info@accredilink.co.uk</p>
+                    <p className="text-slate-600">info@accredilinkcare.co.uk</p>
                   </div>
                 </div>
 
@@ -121,7 +121,7 @@ export default function ContactPage() {
                     </svg>
                   </div>
                   <h3 className="text-xl font-semibold text-slate-900 mb-2">Thank You</h3>
-                  <p className="text-slate-600">Your email client should have opened with your message. If not, please email us directly at info@accredilink.co.uk.</p>
+                  <p className="text-slate-600">Your email client should have opened with your message. If not, please email us directly at info@accredilinkcare.co.uk.</p>
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="p-6 sm:p-8 rounded-2xl bg-slate-50 border border-slate-200">

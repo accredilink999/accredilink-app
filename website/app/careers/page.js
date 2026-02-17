@@ -156,10 +156,10 @@ export default function CareersPage() {
               Contact Us to Apply
             </Link>
             <a
-              href="mailto:careers@accredilink.co.uk"
+              href="mailto:careers@accredilinkcare.co.uk"
               className="inline-flex items-center justify-center px-6 py-3.5 border-2 border-white/30 text-white font-semibold rounded-xl hover:bg-white/10 transition-colors"
             >
-              Email: careers@accredilink.co.uk
+              Email: careers@accredilinkcare.co.uk
             </a>
           </div>
         </div>

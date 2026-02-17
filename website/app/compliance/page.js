@@ -240,7 +240,7 @@ export default function CompliancePage() {
                   If you have a concern about someone we support or the conduct of any of our staff, contact us immediately:
                 </p>
                 <p className="text-sm"><strong>Phone:</strong> 01745 000 000</p>
-                <p className="text-sm"><strong>Email:</strong> safeguarding@accredilink.co.uk</p>
+                <p className="text-sm"><strong>Email:</strong> safeguarding@accredilinkcare.co.uk</p>
                 <p className="mt-3 text-xs text-slate-500">
                   You can also contact your local authority safeguarding team directly, or call the police if someone is in immediate danger.
                 </p>
@@ -502,7 +502,7 @@ export default function CompliancePage() {
             <div className="p-5 bg-white rounded-xl border border-slate-200">
               <p className="font-medium text-slate-900 mb-2">Contact us about a complaint:</p>
               <p className="text-sm text-slate-600"><strong>Phone:</strong> 01745 000 000</p>
-              <p className="text-sm text-slate-600"><strong>Email:</strong> complaints@accredilink.co.uk</p>
+              <p className="text-sm text-slate-600"><strong>Email:</strong> complaints@accredilinkcare.co.uk</p>
               <p className="text-sm text-slate-600"><strong>Write to:</strong> Accredilink CRT, [Office Address], Denbighshire</p>
             </div>
           </div>

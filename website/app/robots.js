@@ -4,6 +4,6 @@ export default function robots() {
       userAgent: '*',
       allow: '/',
     },
-    sitemap: 'https://accredilink.co.uk/sitemap.xml',
+    sitemap: 'https://accredilinkcare.co.uk/sitemap.xml',
   };
 }
