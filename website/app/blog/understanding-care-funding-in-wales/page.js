@@ -23,52 +23,55 @@ export default function UnderstandingCareFundingInWales() {
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-10 mb-8">
         <div className="relative h-64 sm:h-80 rounded-2xl overflow-hidden shadow-lg">
-          <Image src="/images/hero-care.jpg" alt="Care services in Wales" fill className="object-cover" />
+          <Image src="/images/funding.jpg" alt="Understanding care funding in Wales" fill className="object-cover" />
         </div>
       </div>
 
       <article className="py-16 sm:py-20 bg-white">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 prose prose-slate prose-lg">
           <p>
-            One of the most common questions families ask when they begin thinking about care is: <em>&ldquo;How do we pay for it?&rdquo;</em> It is a fair question, and the answer in Wales is more favourable than many people realise. Wales has its own distinct funding framework for social care, with a cap on weekly charges that makes domiciliary care more affordable than in many other parts of the UK.
+            When families start thinking about care, there&rsquo;s one question that comes up almost every time: <em>&ldquo;How do we pay for it?&rdquo;</em> It&rsquo;s a completely fair thing to ask &mdash; and the good news is that the answer in Wales is better than most people expect.
           </p>
           <p>
-            This guide explains the main routes for funding care at home in Wales, including local authority funding, direct payments, NHS Continuing Healthcare, Attendance Allowance, and what happens if you choose to self-fund. Whether you live in Denbighshire, Conwy, Wrexham, or elsewhere in Wales, the principles are the same &mdash; though your local authority will handle the process.
+            Wales has its own funding system for social care, including a cap on weekly charges that makes home care here much more affordable than in lots of other parts of the UK. So let&rsquo;s break it all down.
+          </p>
+          <p>
+            In this guide, we&rsquo;ll cover local authority funding, direct payments, NHS Continuing Healthcare, Attendance Allowance, and what happens if you decide to self-fund. Whether you&rsquo;re in Denbighshire, Conwy, Wrexham, or anywhere else in Wales, the basics are the same &mdash; your local authority just handles the process for your area.
           </p>
 
           <h2>Local Authority Funded Care</h2>
           <p>
-            The most common route to funded domiciliary care is through your local authority. Under the <strong>Social Services and Well-being (Wales) Act 2014</strong>, councils have a duty to assess anyone who appears to have care and support needs and to arrange services for those who are eligible.
+            The most common way to get funded domiciliary care is through your local council. Under the <strong>Social Services and Well-being (Wales) Act 2014</strong>, councils have a duty to assess anyone who might need care and support, and to arrange services for those who qualify.
           </p>
           <p>
-            The process begins with a <strong>care needs assessment</strong>, which is free and does not commit you to anything. If the assessment determines that your loved one has eligible needs, the council will then carry out a <strong>financial assessment</strong> (also called a means test) to determine how much, if anything, the person should contribute towards the cost of their care.
+            It starts with a <strong>care needs assessment</strong>, which is free and doesn&rsquo;t commit you to anything. If the assessment shows your loved one has eligible needs, the council will then do a <strong>financial assessment</strong> (also called a means test) to work out how much, if anything, they&rsquo;d need to pay towards their care.
           </p>
 
           <h3>The Financial Assessment</h3>
           <p>
-            During the financial assessment, the local authority will look at the person&rsquo;s income and savings. Some key points to understand:
+            During this assessment, the council looks at the person&rsquo;s income and savings. Here are the key things to know:
           </p>
           <ul>
-            <li>If savings and capital are below a certain threshold, the person will usually qualify for fully funded or heavily subsidised care.</li>
-            <li>Certain income, such as Disability Living Allowance (DLA) mobility component, is disregarded in the calculation.</li>
-            <li>The value of the person&rsquo;s home is <strong>not</strong> included in the financial assessment for non-residential care (that is, domiciliary care).</li>
-            <li>If the person has a partner, only the individual&rsquo;s finances are assessed, not the household&rsquo;s.</li>
+            <li>If savings and capital are below a certain threshold, they&rsquo;ll usually qualify for fully funded or heavily subsidised care.</li>
+            <li>Some income is ignored in the calculation &mdash; for example, the mobility component of Disability Living Allowance (DLA).</li>
+            <li>The value of the person&rsquo;s home is <strong>not</strong> counted for non-residential care (that&rsquo;s domiciliary care). This is a big one that catches people by surprise.</li>
+            <li>If the person has a partner, only the individual&rsquo;s finances are assessed &mdash; not the whole household&rsquo;s.</li>
           </ul>
 
           <h2>The Welsh Cap on Care Charges</h2>
           <p>
-            One of the most significant differences between care funding in Wales and England is the <strong>weekly cap on non-residential care charges</strong>. The Welsh Government sets a maximum amount that any local authority can charge for domiciliary care per week. This cap is reviewed annually and has been in place since 2011.
+            This is one of the biggest differences between Wales and England, and it&rsquo;s really good news. The Welsh Government sets a <strong>weekly cap on non-residential care charges</strong> &mdash; a maximum that any council can charge you for domiciliary care per week. It&rsquo;s been in place since 2011 and gets reviewed every year.
           </p>
           <p>
-            What this means in practice is that even if the actual cost of your care is several hundred pounds per week, the most you will ever be asked to pay is the capped amount. The local authority covers the difference. This makes Wales one of the most affordable places in the UK to receive care at home.
+            What does that actually mean for you? Even if your care costs several hundred pounds a week, the most you&rsquo;ll ever be asked to pay is the capped amount. The council covers the rest. That&rsquo;s a really significant safety net, and it makes Wales one of the most affordable places in the UK for care at home.
           </p>
           <p>
-            The cap applies to all non-residential social care services, including <Link href="/services/domiciliary-care">domiciliary care</Link>, <Link href="/services/sit-in-services">sit-in services</Link>, and day care. It does not apply to residential or nursing home fees, which are assessed differently.
+            The cap covers all non-residential social care services, including <Link href="/services/domiciliary-care">domiciliary care</Link>, <Link href="/services/sit-in-services">sit-in services</Link>, and day care. It doesn&rsquo;t cover residential or nursing home fees &mdash; those are worked out differently.
           </p>
 
           <h2>Direct Payments</h2>
           <p>
-            If your loved one is assessed as having eligible care needs, they may be offered <strong>direct payments</strong> instead of (or alongside) services arranged by the local authority. Direct payments put the money directly into the person&rsquo;s hands, giving them the freedom to choose their own care provider and arrange their support in the way that suits them best.
+            If your loved one is assessed as having eligible needs, they might be offered <strong>direct payments</strong> instead of (or alongside) services the council arranges. This means the money goes straight to them, so they can choose their own care provider and set things up in the way that works best for them.
           </p>
           <p>
             Direct payments can be used to:
@@ -79,81 +82,81 @@ export default function UnderstandingCareFundingInWales() {
             <li>Purchase other services that meet the person&rsquo;s assessed needs</li>
           </ul>
           <p>
-            There is some administration involved in managing direct payments &mdash; you will need to keep records of how the money is spent &mdash; but many local authorities offer support with this, and there are payroll services specifically designed for direct payment recipients.
+            There&rsquo;s a bit of paperwork involved &mdash; you&rsquo;ll need to keep records of how the money is spent &mdash; but many councils offer help with that, and there are payroll services set up specifically for direct payment recipients.
           </p>
           <p>
-            Direct payments give families real choice and control. If you value being able to choose exactly who provides the care and when, this is an option worth exploring with your local authority.
+            The real benefit here is choice and control. If it matters to you to pick exactly who provides the care and when they come, this is definitely worth discussing with your local authority.
           </p>
 
           <h2>NHS Continuing Healthcare (CHC)</h2>
           <p>
-            <strong>NHS Continuing Healthcare</strong> is a package of care that is fully funded by the NHS for people who have a &ldquo;primary health need&rdquo;. This is not the same as having a health condition &mdash; it specifically means that the person&rsquo;s main care need is health-related rather than social in nature.
+            <strong>NHS Continuing Healthcare</strong> is a package of care that&rsquo;s fully funded by the NHS for people who have a &ldquo;primary health need&rdquo;. Now, that&rsquo;s not quite the same as having a health condition &mdash; it specifically means the person&rsquo;s main care need is health-related rather than social.
           </p>
           <p>
-            CHC is assessed through a multi-disciplinary team process and involves completing a Decision Support Tool (DST) that evaluates needs across a range of domains, including cognition, behaviour, mobility, breathing, and skin integrity. If a person is found to be eligible, all of their care &mdash; including domiciliary care &mdash; is funded entirely by the NHS at no cost to the individual.
+            The assessment is done by a multi-disciplinary team using something called a Decision Support Tool (DST). It looks at needs across several areas &mdash; things like cognition, behaviour, mobility, breathing, and skin integrity. If your loved one qualifies, all their care &mdash; including domiciliary care &mdash; is funded entirely by the NHS. They won&rsquo;t pay a penny.
           </p>
           <p>
-            CHC eligibility is not means-tested. It does not matter how much money or savings a person has. If their needs are primarily health-related, they may qualify. Common conditions that can lead to CHC eligibility include advanced dementia, severe neurological conditions, and complex nursing needs.
+            And here&rsquo;s a really important detail: CHC isn&rsquo;t means-tested. It doesn&rsquo;t matter what savings or income someone has. If their needs are primarily health-related, they could be eligible. Common conditions that can lead to CHC include advanced dementia, severe neurological conditions, and complex nursing needs.
           </p>
           <p>
-            The process can be lengthy and, frankly, it can be difficult to navigate. If you believe your loved one may be eligible, it is worth requesting an assessment through their GP, hospital consultant, or community nurse. You can also ask Accredilink for informal advice &mdash; we have experience supporting families through the CHC process.
+            We won&rsquo;t sugar-coat it &mdash; the CHC process can be long and tricky to navigate. But if you think your loved one might qualify, it&rsquo;s well worth asking for an assessment through their GP, hospital consultant, or community nurse. You can also ask us at Accredilink for a chat &mdash; we&rsquo;ve helped plenty of families through the CHC process and we&rsquo;re happy to share what we know.
           </p>
 
           <h2>Attendance Allowance</h2>
           <p>
-            <strong>Attendance Allowance</strong> is a non-means-tested benefit from the Department for Work and Pensions (DWP) for people aged 65 or over who have a physical or mental disability that means they need help with personal care or supervision. It is paid at two rates:
+            <strong>Attendance Allowance</strong> is a benefit from the Department for Work and Pensions (DWP) for people aged 65 or over who have a physical or mental disability that means they need help with personal care or supervision. It&rsquo;s not means-tested, and it&rsquo;s paid at two rates:
           </p>
           <ul>
             <li><strong>Lower rate:</strong> for people who need help during the day or night</li>
             <li><strong>Higher rate:</strong> for people who need help both during the day and at night, or who are terminally ill</li>
           </ul>
           <p>
-            Attendance Allowance is not affected by savings or income, and it is tax-free. It can be spent on whatever the person chooses &mdash; it does not have to be spent on care, though many people use it to contribute towards the cost of their <Link href="/services/domiciliary-care">domiciliary care</Link>.
+            It&rsquo;s not affected by savings or income, and it&rsquo;s completely tax-free. Your loved one can spend it on whatever they like &mdash; it doesn&rsquo;t have to go on care, though lots of people do use it to help cover their <Link href="/services/domiciliary-care">domiciliary care</Link> costs.
           </p>
           <p>
-            Importantly, receiving Attendance Allowance can also increase entitlement to other benefits, such as Pension Credit and Council Tax Reduction. It is always worth claiming, even if the person already receives local authority funded care.
+            Here&rsquo;s a bonus: getting Attendance Allowance can actually unlock extra entitlement to other benefits too, like Pension Credit and Council Tax Reduction. It&rsquo;s always worth claiming, even if your loved one is already getting council-funded care.
           </p>
           <p>
-            The application form (AA1) can be lengthy, but organisations such as Age Cymru and Citizens Advice can help with completing it. If your loved one is terminally ill, there is a fast-track &ldquo;special rules&rdquo; process that can speed up the claim significantly.
+            The application form (AA1) is a bit long, but organisations like Age Cymru and Citizens Advice can help you fill it in. And if your loved one is terminally ill, there&rsquo;s a fast-track &ldquo;special rules&rdquo; process that can speed things up a lot.
           </p>
 
           <h2>Self-Funding Care</h2>
           <p>
-            Some families choose to arrange and pay for domiciliary care privately, without going through the local authority. This is sometimes called self-funding. Reasons for self-funding include:
+            Some families prefer to arrange and pay for domiciliary care privately, without involving the council. There are a few common reasons people go this route:
           </p>
           <ul>
-            <li>Wanting to arrange care quickly without waiting for an assessment</li>
-            <li>Preferring to have full control over the choice of provider and the care schedule</li>
-            <li>Not qualifying for local authority funding because savings are above the threshold</li>
-            <li>Wanting additional hours or services beyond what the local authority would fund</li>
+            <li>Wanting to get care set up quickly without waiting for an assessment</li>
+            <li>Preferring full control over who provides the care and when</li>
+            <li>Not qualifying for council funding because savings are above the threshold</li>
+            <li>Wanting extra hours or services beyond what the council would fund</li>
           </ul>
           <p>
-            If you are self-funding, it is still important to choose a provider that is registered with <strong>Care Inspectorate Wales (CIW)</strong>. Registration means the provider is regularly inspected and must meet national standards for quality and safety.
+            If you&rsquo;re self-funding, it&rsquo;s still really important to choose a provider that&rsquo;s registered with <strong>Care Inspectorate Wales (CIW)</strong>. Registration means they&rsquo;re regularly inspected and have to meet national standards for quality and safety.
           </p>
           <p>
-            Even if you are self-funding now, circumstances can change. If savings fall below the local authority threshold, you can request an assessment at any time. It is also worth claiming Attendance Allowance regardless, as it is not means-tested and can help offset costs.
+            And remember &mdash; things can change. If savings drop below the council&rsquo;s threshold, you can request an assessment at any point. It&rsquo;s also worth claiming Attendance Allowance regardless, since it&rsquo;s not means-tested and can help take the edge off costs.
           </p>
 
           <h2>Carer&rsquo;s Allowance and Support for Family Carers</h2>
           <p>
-            If you are a family member providing regular, substantial care, you may be entitled to <strong>Carer&rsquo;s Allowance</strong>. To qualify, you generally need to be caring for someone for at least 35 hours per week, and the person you care for must be receiving certain disability benefits.
+            If you&rsquo;re a family member providing regular care, you might be entitled to <strong>Carer&rsquo;s Allowance</strong>. To qualify, you generally need to be caring for someone at least 35 hours a week, and the person you look after must be receiving certain disability benefits.
           </p>
           <p>
-            Beyond financial support, family carers in Wales are entitled to a <strong>carer&rsquo;s assessment</strong> in their own right. This can lead to support services such as <Link href="/services/respite-care">respite care</Link>, which gives you a break while ensuring your loved one continues to receive quality support. Read our article on <Link href="/blog/what-is-respite-care">what respite care is and how it can help</Link> for more detail.
+            But it&rsquo;s not just about money. Family carers in Wales are also entitled to a <strong>carer&rsquo;s assessment</strong> in their own right. This can open the door to support services like <Link href="/services/respite-care">respite care</Link>, which gives you a proper break while making sure your loved one is still well looked after. Have a read of our article on <Link href="/blog/what-is-respite-care">what respite care is and how it can help</Link> if that sounds useful.
           </p>
 
           <h2>Getting the Right Advice</h2>
           <p>
-            Navigating care funding can feel complex, but you do not have to do it alone. Here are some sources of free, impartial advice:
+            We know this can all feel like a lot to take in. But you really don&rsquo;t have to figure it out on your own. Here are some great sources of free, impartial advice:
           </p>
           <ul>
             <li><strong>Age Cymru</strong> &mdash; offers a free advice line and can help with benefit claims and care funding queries</li>
             <li><strong>Citizens Advice</strong> &mdash; available locally in Denbighshire, Conwy, and Wrexham</li>
             <li><strong>Dewis Cymru</strong> &mdash; the Welsh directory of well-being services and information</li>
-            <li><strong>Your local authority</strong> &mdash; the Single Point of Access or Adult Social Care team can explain the process and your options</li>
+            <li><strong>Your local authority</strong> &mdash; the Single Point of Access or Adult Social Care team can walk you through the process and your options</li>
           </ul>
           <p>
-            At Accredilink, we are always happy to have an informal conversation about funding. While we cannot provide formal financial advice, we have helped many families understand their options and we can point you towards the right resources. Visit our <Link href="/compliance#funding">funding guidance page</Link> for an overview, or <Link href="/contact">get in touch</Link> to speak to one of our team.
+            And of course, we&rsquo;re always happy to have an informal chat about funding here at Accredilink. We can&rsquo;t give formal financial advice, but we&rsquo;ve helped lots of families get their heads around the options, and we can point you to the right people. Have a look at our <Link href="/compliance#funding">funding guidance page</Link> for an overview, or <Link href="/contact">get in touch</Link> to speak to one of our team.
           </p>
         </div>
       </article>

@@ -23,30 +23,33 @@ export default function HowToArrangeDomiciliaryCareInWales() {
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-10 mb-8">
         <div className="relative h-64 sm:h-80 rounded-2xl overflow-hidden shadow-lg">
-          <Image src="/images/hero-care.jpg" alt="Care services in Wales" fill className="object-cover" />
+          <Image src="/images/domiciliary-care.jpg" alt="Domiciliary care at home in Wales" fill className="object-cover" />
         </div>
       </div>
 
       <article className="py-16 sm:py-20 bg-white">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 prose prose-slate prose-lg">
           <p>
-            When a loved one begins to struggle with everyday tasks, arranging the right support can feel overwhelming. Domiciliary care &mdash; sometimes called home care or care at home &mdash; allows people to receive professional support in the comfort of their own home, rather than moving into a residential care setting. In Wales, there is a well-established system for assessing need, securing funding, and finding a registered provider.
+            If someone you love is starting to struggle with everyday things, figuring out how to get them the right help can feel really overwhelming. You&rsquo;re not alone in that &mdash; we hear it from families every single day.
           </p>
           <p>
-            This guide walks you through every step of arranging domiciliary care in Wales, whether you live in Denbighshire, Conwy, Wrexham, or elsewhere in the country. At <strong>Accredilink Community Response Taskforce</strong>, we help families navigate this process every day, and we want to make sure you have the clearest possible picture of what to expect.
+            The good news is that domiciliary care &mdash; that&rsquo;s just a formal way of saying &ldquo;care at home&rdquo; &mdash; lets your loved one get professional support without having to leave the place they know and love. And here in Wales, there&rsquo;s a solid system in place to help you assess needs, sort out funding, and find a registered provider.
+          </p>
+          <p>
+            We&rsquo;re going to walk you through the whole process, step by step. Whether you&rsquo;re in Denbighshire, Conwy, Wrexham, or anywhere else in Wales, this guide has you covered. At <strong>Accredilink Community Response Taskforce</strong>, we help families through this every day, and we want to make it as clear and stress-free as possible for you.
           </p>
 
           <h2>What Is Domiciliary Care?</h2>
           <p>
-            Domiciliary care is professional care and support delivered in a person&rsquo;s own home. It can include help with personal care such as washing and dressing, medication prompts, meal preparation, companionship, and support with mobility. For many people across Wales, domiciliary care is the key to maintaining independence while staying safe and well in familiar surroundings.
+            Put simply, it&rsquo;s professional care that comes to you &mdash; right in your own home. That might mean help with washing and dressing, reminders to take medication, someone to prepare meals, a bit of companionship, or support getting around the house safely. For lots of people across Wales, it&rsquo;s what makes the difference between staying independent at home and having to move somewhere unfamiliar.
           </p>
           <p>
-            Unlike residential care, <Link href="/services/domiciliary-care">domiciliary care</Link> is tailored entirely to the individual. Visits can range from a short 30-minute call in the morning to a full live-in care arrangement, depending on what is needed. The care is regulated by <strong>Care Inspectorate Wales (CIW)</strong>, which means every registered provider must meet strict standards of quality and safety.
+            Unlike residential care, <Link href="/services/domiciliary-care">domiciliary care</Link> is built entirely around the individual. Visits can be as short as 30 minutes in the morning or as comprehensive as full live-in care &mdash; it all depends on what&rsquo;s needed. And every registered provider is regulated by <strong>Care Inspectorate Wales (CIW)</strong>, so there are strict quality and safety standards in place.
           </p>
 
           <h2>Step 1: Recognise the Need</h2>
           <p>
-            The first step is often the hardest. It can be difficult to accept that a parent, partner, or family member needs extra help. Some of the common signs that domiciliary care could be beneficial include:
+            This is often the hardest part. It&rsquo;s tough to admit that a parent, partner, or someone close to you needs extra help. But spotting the signs early really does make a difference. Here are some things to look out for:
           </p>
           <ul>
             <li>Difficulty with personal hygiene, washing, or dressing</li>
@@ -57,15 +60,15 @@ export default function HowToArrangeDomiciliaryCareInWales() {
             <li>The home becoming untidy or unsafe</li>
           </ul>
           <p>
-            If you have noticed any of these changes, it may be time to explore care options. You can read our detailed guide on <Link href="/blog/signs-elderly-parent-needs-care">the signs that your elderly parent may need care</Link> for more help with this step.
+            If any of that sounds familiar, it&rsquo;s probably worth exploring your options. We&rsquo;ve got a more detailed guide on <Link href="/blog/signs-elderly-parent-needs-care">the signs that your elderly parent may need care</Link> that might help too.
           </p>
 
           <h2>Step 2: Contact Your Local Authority</h2>
           <p>
-            In Wales, your local council is the starting point for accessing publicly funded care. Under the <strong>Social Services and Well-being (Wales) Act 2014</strong>, every local authority has a duty to assess anyone who appears to have care and support needs. You do not need a referral from a GP &mdash; you can contact your council directly.
+            Your local council is the best place to start when it comes to publicly funded care. Under the <strong>Social Services and Well-being (Wales) Act 2014</strong>, every council has to assess anyone who looks like they might need care and support. You don&rsquo;t need a GP referral &mdash; just pick up the phone and call them directly.
           </p>
           <p>
-            If you are in the areas we serve, the relevant contacts are:
+            If you&rsquo;re in the areas we serve, here&rsquo;s who to contact:
           </p>
           <ul>
             <li><strong>Denbighshire County Council</strong> &mdash; Single Point of Access (SPoA)</li>
@@ -73,15 +76,15 @@ export default function HowToArrangeDomiciliaryCareInWales() {
             <li><strong>Wrexham County Borough Council</strong> &mdash; Adult Social Care team</li>
           </ul>
           <p>
-            You can also ask a hospital social worker to start the process if your loved one is currently in hospital and approaching discharge. See our article on <Link href="/blog/hospital-discharge-care-wales">hospital discharge and home care in Wales</Link> for more on this.
+            If your loved one is currently in hospital and about to be discharged, you can also ask a hospital social worker to get things started. Have a look at our article on <Link href="/blog/hospital-discharge-care-wales">hospital discharge and home care in Wales</Link> for more on that.
           </p>
 
           <h2>Step 3: The Care Needs Assessment</h2>
           <p>
-            Once you have made contact, the local authority will arrange a care needs assessment. This is a conversation &mdash; usually carried out by a social worker or care assessor &mdash; to understand what the person can and cannot do, and what support would help them live well at home.
+            Once you&rsquo;ve got in touch, the council will arrange a care needs assessment. Don&rsquo;t worry &mdash; it&rsquo;s really just a conversation. A social worker or assessor will chat with you and your loved one to understand what they can and can&rsquo;t manage, and what kind of support would help them stay well at home.
           </p>
           <p>
-            The assessment will consider:
+            They&rsquo;ll look at things like:
           </p>
           <ul>
             <li>Physical health and mobility</li>
@@ -92,21 +95,21 @@ export default function HowToArrangeDomiciliaryCareInWales() {
             <li>What outcomes the person wants to achieve</li>
           </ul>
           <p>
-            In Wales, the assessment is grounded in the principle of &ldquo;what matters&rdquo; to the individual. The person being assessed should be at the centre of the conversation, and their voice should be heard. If your loved one has difficulty communicating, an advocate can be provided.
+            In Wales, the whole assessment is built around the idea of &ldquo;what matters&rdquo; to the person. Their voice should be front and centre. And if your loved one finds it hard to communicate, they can have an advocate to speak up for them.
           </p>
           <p>
-            The assessment is free of charge and does not commit you to anything. It simply establishes whether eligible needs exist and what type of support might help.
+            Here&rsquo;s the really important bit: the assessment is completely free, and it doesn&rsquo;t commit you to anything. It&rsquo;s simply about working out whether there are eligible needs and what kind of help might work best.
           </p>
 
           <h2>Step 4: Financial Assessment and Funding</h2>
           <p>
-            If the care needs assessment determines that your loved one has eligible needs, the local authority will then carry out a <strong>financial assessment</strong> (sometimes called a means test) to work out how much, if anything, the person should contribute towards the cost of their care.
+            If the assessment shows your loved one has eligible needs, the next step is a <strong>financial assessment</strong> (sometimes called a means test). This figures out how much, if anything, they&rsquo;d need to contribute towards their care costs.
           </p>
           <p>
-            In Wales, there is a weekly cap on charges for non-residential care, which makes domiciliary care more affordable than in England. As of the latest guidance, the maximum weekly charge is significantly lower than the actual cost of care, which means the local authority subsidises the remainder.
+            Here&rsquo;s where Wales really shines. There&rsquo;s a weekly cap on what you can be charged for non-residential care, which makes domiciliary care here much more affordable than in England. The maximum weekly charge is well below the actual cost of care &mdash; the council picks up the rest.
           </p>
           <p>
-            Depending on the outcome of the financial assessment, your loved one may:
+            After the financial assessment, your loved one might:
           </p>
           <ul>
             <li>Receive fully funded care at no personal cost</li>
@@ -114,70 +117,70 @@ export default function HowToArrangeDomiciliaryCareInWales() {
             <li>Choose to top up their care privately for additional hours or services</li>
           </ul>
           <p>
-            There are also other funding routes, including <strong>NHS Continuing Healthcare (CHC)</strong> for those with a primary health need, <strong>direct payments</strong> which give you control over how your care budget is spent, and benefits such as <strong>Attendance Allowance</strong>. We cover all of these in detail in our <Link href="/blog/understanding-care-funding-in-wales">guide to care funding in Wales</Link>, and our <Link href="/compliance#funding">funding guidance page</Link> has further information.
+            There are other funding options too, like <strong>NHS Continuing Healthcare (CHC)</strong> for people with a primary health need, <strong>direct payments</strong> that let you control how your care budget is spent, and benefits like <strong>Attendance Allowance</strong>. We go into all of these in our <Link href="/blog/understanding-care-funding-in-wales">guide to care funding in Wales</Link>, and our <Link href="/compliance#funding">funding guidance page</Link> has even more detail.
           </p>
 
           <h2>Step 5: Choosing a Domiciliary Care Provider</h2>
           <p>
-            Whether your care is funded by the local authority or you are arranging it privately, choosing the right provider is one of the most important decisions you will make. Here are some things to consider:
+            Whether the council is funding your care or you&rsquo;re arranging it privately, picking the right provider really matters. Here&rsquo;s what to look for:
           </p>
 
           <h3>Registration and Regulation</h3>
           <p>
-            Every domiciliary care provider in Wales must be registered with <strong>Care Inspectorate Wales (CIW)</strong>. You can check a provider&rsquo;s registration and read their latest inspection report on the CIW website. This is a vital step &mdash; never use an unregistered provider.
+            Every domiciliary care provider in Wales must be registered with <strong>Care Inspectorate Wales (CIW)</strong>. You can check any provider&rsquo;s registration and read their latest inspection report on the CIW website. Please don&rsquo;t skip this step &mdash; never use an unregistered provider.
           </p>
 
           <h3>Local Knowledge</h3>
           <p>
-            A provider that knows your area will be better placed to deliver reliable, consistent care. At Accredilink, we are based in and around Denbighshire, Conwy, and Wrexham, which means our care workers know the communities they serve. This matters for timekeeping, continuity, and building trust.
+            A provider that knows your area well will give you more reliable, consistent care. We&rsquo;re based in and around Denbighshire, Conwy, and Wrexham, so our care workers genuinely know the communities they work in. That makes a real difference when it comes to timekeeping, continuity, and building trust.
           </p>
 
           <h3>Flexibility and Range of Services</h3>
           <p>
-            Care needs change over time. Look for a provider that offers a range of services, from short daily visits to <Link href="/services/sit-in-services">sit-in services</Link>, <Link href="/services/respite-care">respite care</Link>, and even <Link href="/services/emergency-response">emergency care response</Link>. This means you will not need to change provider as needs evolve.
+            Care needs don&rsquo;t stay the same forever. Look for a provider that offers a good range of services &mdash; from short daily visits to <Link href="/services/sit-in-services">sit-in services</Link>, <Link href="/services/respite-care">respite care</Link>, and even <Link href="/services/emergency-response">emergency care response</Link>. That way, you won&rsquo;t need to switch providers as things change down the road.
           </p>
 
           <h3>Staff Continuity</h3>
           <p>
-            Consistency matters enormously. Ask prospective providers how they manage staff rotas and whether you can expect to see the same care workers regularly. Familiar faces make a real difference, especially for people living with dementia or anxiety.
+            Seeing the same familiar faces makes a huge difference, especially for someone living with dementia or anxiety. When you&rsquo;re speaking to providers, ask how they manage their rotas and whether you can expect regular, consistent care workers.
           </p>
 
           <h3>Communication</h3>
           <p>
-            A good provider will keep you informed. Ask how they communicate with families &mdash; whether through regular reviews, digital updates, or phone calls. You should always feel able to pick up the phone and speak to someone if you have a concern.
+            A good provider keeps you in the loop. Ask how they stay in touch with families &mdash; whether that&rsquo;s through regular reviews, digital updates, or phone calls. You should always feel like you can pick up the phone and speak to someone if something&rsquo;s on your mind.
           </p>
 
           <h2>Step 6: What to Expect When Care Begins</h2>
           <p>
-            Once you have chosen a provider and a care plan has been agreed, care will typically begin within a few days to a couple of weeks, depending on availability and the complexity of the care needed. Here is what the first few weeks usually look like:
+            Once you&rsquo;ve chosen a provider and agreed on a care plan, things usually get started within a few days to a couple of weeks, depending on availability and how complex the care is. Here&rsquo;s what those first few weeks typically look like:
           </p>
           <ul>
-            <li><strong>Introduction visit:</strong> A senior member of the care team will visit to introduce themselves, go through the care plan in detail, and answer any questions.</li>
-            <li><strong>First care calls:</strong> The initial visits may be slightly longer to allow the care worker and the person receiving care to get to know each other.</li>
-            <li><strong>Review:</strong> Most providers will carry out a review within the first few weeks to check that the care plan is working well and make any adjustments.</li>
-            <li><strong>Ongoing communication:</strong> You should receive regular updates and be invited to periodic reviews, usually every few months or whenever needs change.</li>
+            <li><strong>Introduction visit:</strong> A senior member of the care team will pop in to introduce themselves, go through the care plan properly, and answer any questions you&rsquo;ve got.</li>
+            <li><strong>First care calls:</strong> The early visits might run a bit longer so the care worker and your loved one can get to know each other.</li>
+            <li><strong>Review:</strong> Most providers will check in within the first few weeks to make sure the care plan is working well and tweak anything that needs adjusting.</li>
+            <li><strong>Ongoing communication:</strong> You&rsquo;ll get regular updates and be invited to reviews, usually every few months or whenever needs change.</li>
           </ul>
           <p>
-            It is completely normal for it to take a little time to adjust. A small amount of anxiety at the start is natural, both for the person receiving care and for their family. A compassionate, well-trained care team will take this in their stride and work gently to build trust and confidence.
+            It&rsquo;s completely normal for it to take a little while to settle in. A bit of anxiety at the start is natural &mdash; for your loved one and for you. A good care team will understand that and take it gently, building trust and confidence over time.
           </p>
 
           <h2>Can I Arrange Domiciliary Care Privately?</h2>
           <p>
-            Yes. You do not have to go through the local authority. Many families choose to arrange and fund domiciliary care privately, which can sometimes mean shorter waiting times and greater flexibility in the hours and type of care provided.
+            Absolutely. You don&rsquo;t have to go through the council at all. Lots of families choose to arrange and pay for care privately, which can sometimes mean shorter waiting times and more flexibility with hours and the type of care you get.
           </p>
           <p>
-            If you choose to self-fund, you should still ensure the provider is registered with CIW and that a thorough care plan is developed. At Accredilink, we work with both local authority-funded and privately funded clients, and the standard of care is the same regardless of how it is funded.
+            If you do go down this route, just make sure the provider is registered with CIW and that they put together a proper care plan. At Accredilink, we work with families who are council-funded and families who self-fund &mdash; and the standard of care is exactly the same either way.
           </p>
 
           <h2>How Accredilink Can Help</h2>
           <p>
-            We are a CIW-registered domiciliary care provider serving Denbighshire, Conwy, and Wrexham. Our team includes experienced care workers and <Link href="/services/emergency-response">emergency care responders</Link> available on shift around the clock. Whether you need a few visits a week or more intensive support, we are here to help.
+            We&rsquo;re a CIW-registered domiciliary care provider covering Denbighshire, Conwy, and Wrexham. Our team includes experienced care workers and <Link href="/services/emergency-response">emergency care responders</Link> available on shift around the clock. Whether you need a few visits a week or something more intensive, we&rsquo;re here for you.
           </p>
           <p>
-            Our services include <Link href="/services/domiciliary-care">personal care and daily living support</Link>, <Link href="/services/respite-care">respite care for family carers</Link>, <Link href="/services/palliative-care">palliative and end-of-life care</Link>, <Link href="/services/social-care">social care and companionship</Link>, and <Link href="/services/sit-in-services">sit-in services</Link>. We also provide <Link href="/services/training">care training</Link> for organisations and individuals.
+            Our services include <Link href="/services/domiciliary-care">personal care and daily living support</Link>, <Link href="/services/respite-care">respite care for family carers</Link>, <Link href="/services/palliative-care">palliative and end-of-life care</Link>, <Link href="/services/social-care">social care and companionship</Link>, and <Link href="/services/sit-in-services">sit-in services</Link>. We also offer <Link href="/services/training">care training</Link> for organisations and individuals.
           </p>
           <p>
-            If you are thinking about arranging care for a loved one and are not sure where to start, we are always happy to have an informal conversation. There is no obligation, and we will do our best to point you in the right direction &mdash; even if that means recommending another service.
+            If you&rsquo;re thinking about care for a loved one and aren&rsquo;t sure where to begin, we&rsquo;d love to chat. There&rsquo;s no obligation at all, and we&rsquo;ll always do our best to point you in the right direction &mdash; even if that means suggesting someone else.
           </p>
         </div>
       </article>
