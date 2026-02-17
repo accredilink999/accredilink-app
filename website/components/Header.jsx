@@ -8,6 +8,7 @@ import { usePathname } from 'next/navigation';
 const navLinks = [
   { href: '/', label: 'Home' },
   { href: '/services', label: 'Services' },
+  { href: '/services/event-medical-services', label: 'Event Medical' },
   { href: '/about', label: 'About' },
   { href: '/areas', label: 'Areas' },
   { href: '/blog', label: 'Blog' },
@@ -90,15 +91,6 @@ export default function Header() {
           </Link>
 
           <div className="flex items-center gap-3">
-            <a
-              href="https://care-call-ai-clone.vercel.app"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden sm:inline-flex items-center gap-2 px-5 py-2.5 bg-welsh-green text-white text-sm font-medium rounded-lg hover:bg-welsh-green-light transition-colors"
-            >
-              Staff Login
-            </a>
-
             <Link
               href="/contact"
               className="hidden md:inline-flex items-center gap-2 px-5 py-2.5 bg-welsh-red text-white text-sm font-medium rounded-lg hover:bg-welsh-red-light transition-colors"
@@ -189,14 +181,6 @@ export default function Header() {
               Compliance
             </Link>
             <div className="pt-2 border-t border-slate-100 mt-2 space-y-1">
-              <a
-                href="https://care-call-ai-clone.vercel.app"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block px-3 py-2.5 text-sm font-medium text-welsh-green hover:bg-green-50 rounded-lg"
-              >
-                Staff Login
-              </a>
               <Link
                 href="/contact"
                 onClick={() => setMobileOpen(false)}

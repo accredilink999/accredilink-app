@@ -6,6 +6,7 @@ const serviceLinks = [
   { href: '/services/respite-care', label: 'Respite Care' },
   { href: '/services/emergency-response', label: 'Emergency Response' },
   { href: '/services/palliative-care', label: 'Palliative Care' },
+  { href: '/services/event-medical-services', label: 'Event Medical Services' },
   { href: '/services/training', label: 'Training' },
 ];
 
