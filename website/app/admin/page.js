@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 
 const emailAccounts = [
@@ -13,37 +13,86 @@ const emailAccounts = [
 
 export default function AdminPortal() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [loginMode, setLoginMode] = useState('owner');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
 
+  // Invite state
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteUrl, setInviteUrl] = useState('');
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteError, setInviteError] = useState('');
+  const [inviteSuccess, setInviteSuccess] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  // Users state
+  const [adminUsers, setAdminUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [removeConfirm, setRemoveConfirm] = useState(null);
+
   useEffect(() => {
     const token = sessionStorage.getItem('admin_token');
-    if (token) setIsLoggedIn(true);
+    const userStr = sessionStorage.getItem('admin_user');
+    if (token) {
+      setIsLoggedIn(true);
+      if (userStr) {
+        try { setCurrentUser(JSON.parse(userStr)); } catch { /* ignore */ }
+      }
+    }
     setCheckingSession(false);
   }, []);
+
+  const fetchUsers = useCallback(async () => {
+    const token = sessionStorage.getItem('admin_token');
+    if (!token) return;
+    setUsersLoading(true);
+    try {
+      const res = await fetch('/api/admin/users', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) setAdminUsers(data.users);
+    } catch { /* ignore */ }
+    setUsersLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (isLoggedIn && currentUser?.role === 'owner') {
+      fetchUsers();
+    }
+  }, [isLoggedIn, currentUser, fetchUsers]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
+    const body = loginMode === 'owner'
+      ? { password }
+      : { email, password };
+
     try {
       const res = await fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();
 
       if (data.success) {
         sessionStorage.setItem('admin_token', data.token);
+        sessionStorage.setItem('admin_user', JSON.stringify(data.user));
+        setCurrentUser(data.user);
         setIsLoggedIn(true);
         setPassword('');
+        setEmail('');
       } else {
-        setError('Invalid password. Please try again.');
+        setError(data.error || 'Invalid credentials. Please try again.');
       }
     } catch {
       setError('Something went wrong. Please try again.');
@@ -54,7 +103,82 @@ export default function AdminPortal() {
 
   const handleLogout = () => {
     sessionStorage.removeItem('admin_token');
+    sessionStorage.removeItem('admin_user');
     setIsLoggedIn(false);
+    setCurrentUser(null);
+    setAdminUsers([]);
+  };
+
+  const handleInvite = async () => {
+    setInviteError('');
+    setInviteUrl('');
+    setInviteSuccess('');
+    setCopied(false);
+
+    if (!inviteEmail || !inviteEmail.includes('@')) {
+      setInviteError('Please enter a valid email address.');
+      return;
+    }
+
+    setInviteLoading(true);
+    try {
+      const res = await fetch('/api/admin/invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${sessionStorage.getItem('admin_token')}`,
+        },
+        body: JSON.stringify({ email: inviteEmail, role: 'manager' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setInviteUrl(data.inviteUrl);
+        setInviteSuccess(`Invite created for ${data.email}`);
+        setInviteEmail('');
+      } else {
+        setInviteError(data.error || 'Failed to create invite.');
+      }
+    } catch {
+      setInviteError('Failed to create invite.');
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 3000);
+    } catch {
+      // Fallback for older browsers
+      const input = document.createElement('input');
+      input.value = inviteUrl;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      document.body.removeChild(input);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 3000);
+    }
+  };
+
+  const handleRemoveUser = async (userEmail) => {
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${sessionStorage.getItem('admin_token')}`,
+        },
+        body: JSON.stringify({ email: userEmail }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAdminUsers((prev) => prev.filter((u) => u.email !== userEmail));
+      }
+    } catch { /* ignore */ }
+    setRemoveConfirm(null);
   };
 
   if (checkingSession) {
@@ -81,38 +205,85 @@ export default function AdminPortal() {
             <p className="text-slate-400 text-sm mt-1">Accredilink Community Response Taskforce</p>
           </div>
 
-          <form onSubmit={handleLogin} className="bg-white rounded-2xl shadow-xl p-8">
-            <div className="mb-6">
-              <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-2">
-                Admin Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter admin password"
-                className="w-full px-4 py-3 rounded-lg border border-slate-300 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#B91C1C]/50 focus:border-[#B91C1C]"
-              />
+          <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+            {/* Login mode tabs */}
+            <div className="flex border-b border-slate-200">
+              <button
+                type="button"
+                onClick={() => { setLoginMode('owner'); setError(''); }}
+                className={`flex-1 py-3 text-sm font-medium transition-colors ${
+                  loginMode === 'owner'
+                    ? 'text-[#B91C1C] border-b-2 border-[#B91C1C] bg-red-50/50'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Owner
+              </button>
+              <button
+                type="button"
+                onClick={() => { setLoginMode('admin'); setError(''); }}
+                className={`flex-1 py-3 text-sm font-medium transition-colors ${
+                  loginMode === 'admin'
+                    ? 'text-[#B91C1C] border-b-2 border-[#B91C1C] bg-red-50/50'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Admin
+              </button>
             </div>
 
-            {error && (
-              <p className="text-red-600 text-sm mb-4 bg-red-50 p-3 rounded-lg">{error}</p>
-            )}
+            <form onSubmit={handleLogin} className="p-8">
+              {loginMode === 'admin' && (
+                <div className="mb-4">
+                  <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">
+                    Email Address
+                  </label>
+                  <input
+                    id="email"
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email"
+                    className="w-full px-4 py-3 rounded-lg border border-slate-300 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#B91C1C]/50 focus:border-[#B91C1C]"
+                  />
+                </div>
+              )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full px-4 py-3 bg-[#B91C1C] text-white font-semibold rounded-lg hover:bg-[#DC2626] transition-colors text-sm disabled:opacity-50"
-            >
-              {loading ? 'Signing in...' : 'Sign In'}
-            </button>
-          </form>
+              <div className="mb-6">
+                <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-2">
+                  {loginMode === 'owner' ? 'Owner Password' : 'Password'}
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={loginMode === 'owner' ? 'Enter owner password' : 'Enter your password'}
+                  className="w-full px-4 py-3 rounded-lg border border-slate-300 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#B91C1C]/50 focus:border-[#B91C1C]"
+                />
+              </div>
+
+              {error && (
+                <p className="text-red-600 text-sm mb-4 bg-red-50 p-3 rounded-lg">{error}</p>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full px-4 py-3 bg-[#B91C1C] text-white font-semibold rounded-lg hover:bg-[#DC2626] transition-colors text-sm disabled:opacity-50"
+              >
+                {loading ? 'Signing in...' : 'Sign In'}
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     );
   }
+
+  const isOwner = currentUser?.role === 'owner';
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -132,12 +303,20 @@ export default function AdminPortal() {
               <p className="text-xs text-slate-400">Accredilink Community Response Taskforce</p>
             </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="px-4 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
-          >
-            Sign Out
-          </button>
+          <div className="flex items-center gap-4">
+            {currentUser && (
+              <div className="hidden sm:block text-right">
+                <p className="text-sm text-white">{currentUser.name}</p>
+                <p className="text-xs text-slate-400 capitalize">{currentUser.role}</p>
+              </div>
+            )}
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+            >
+              Sign Out
+            </button>
+          </div>
         </div>
       </div>
 
@@ -195,19 +374,19 @@ export default function AdminPortal() {
         <div className="mb-8">
           <h2 className="text-lg font-semibold text-slate-900 mb-4">Email Accounts</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {emailAccounts.map((email) => (
+            {emailAccounts.map((acct) => (
               <a
-                key={email.address}
+                key={acct.address}
                 href="https://mail.ionos.co.uk"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group bg-white rounded-xl border border-slate-200 p-5 hover:shadow-md hover:border-red-300 transition-all"
               >
                 <div className="flex items-start gap-3">
-                  <span className="text-2xl">{email.icon}</span>
+                  <span className="text-2xl">{acct.icon}</span>
                   <div className="min-w-0">
-                    <p className="font-medium text-slate-900 text-sm">{email.label}</p>
-                    <p className="text-xs text-slate-500 truncate">{email.address}</p>
+                    <p className="font-medium text-slate-900 text-sm">{acct.label}</p>
+                    <p className="text-xs text-slate-500 truncate">{acct.address}</p>
                   </div>
                   <svg className="w-4 h-4 text-slate-300 ml-auto mt-1 group-hover:text-red-500 transition-colors flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -220,7 +399,7 @@ export default function AdminPortal() {
         </div>
 
         {/* Admin Tools */}
-        <div>
+        <div className="mb-8">
           <h2 className="text-lg font-semibold text-slate-900 mb-4">Admin Tools</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <a
@@ -281,6 +460,130 @@ export default function AdminPortal() {
             </a>
           </div>
         </div>
+
+        {/* Owner-only: Invite Manager */}
+        {isOwner && (
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold text-slate-900 mb-4">Invite Manager</h2>
+            <div className="bg-white rounded-2xl border border-slate-200 p-6">
+              <p className="text-sm text-slate-500 mb-4">
+                Generate an invite link and share it with a manager. They&apos;ll set up their own password to access this portal.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="manager@example.com"
+                  className="flex-1 px-4 py-3 rounded-lg border border-slate-300 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#B91C1C]/50 focus:border-[#B91C1C]"
+                />
+                <button
+                  onClick={handleInvite}
+                  disabled={inviteLoading}
+                  className="px-6 py-3 bg-[#B91C1C] text-white font-semibold rounded-lg hover:bg-[#DC2626] transition-colors text-sm disabled:opacity-50 whitespace-nowrap"
+                >
+                  {inviteLoading ? 'Creating...' : 'Generate Invite Link'}
+                </button>
+              </div>
+
+              {inviteError && (
+                <p className="text-red-600 text-sm mt-3 bg-red-50 p-3 rounded-lg">{inviteError}</p>
+              )}
+
+              {inviteUrl && (
+                <div className="mt-4">
+                  {inviteSuccess && (
+                    <p className="text-green-700 text-sm mb-2 font-medium">{inviteSuccess}</p>
+                  )}
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={inviteUrl}
+                      className="flex-1 px-4 py-3 rounded-lg border border-slate-300 text-slate-700 text-sm bg-slate-50 font-mono"
+                    />
+                    <button
+                      onClick={handleCopy}
+                      className={`px-6 py-3 font-semibold rounded-lg text-sm transition-colors whitespace-nowrap ${
+                        copied
+                          ? 'bg-green-100 text-green-700 border border-green-300'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300'
+                      }`}
+                    >
+                      {copied ? 'Copied!' : 'Copy Link'}
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-2">This link expires in 7 days. Share it via WhatsApp, email, or message.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Owner-only: Admin Users */}
+        {isOwner && (
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900 mb-4">Admin Users</h2>
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+              {usersLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin w-6 h-6 border-3 border-slate-300 border-t-[#B91C1C] rounded-full" />
+                </div>
+              ) : adminUsers.length === 0 ? (
+                <div className="text-center py-12 px-6">
+                  <svg className="w-12 h-12 text-slate-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <p className="text-sm text-slate-500">No managers invited yet.</p>
+                  <p className="text-xs text-slate-400 mt-1">Use the invite section above to add managers.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {adminUsers.map((user) => (
+                    <div key={user.email} className="flex items-center justify-between px-6 py-4">
+                      <div>
+                        <p className="font-medium text-slate-900 text-sm">{user.name}</p>
+                        <p className="text-xs text-slate-500">{user.email}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Added {new Date(user.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          {user.invitedBy && ` by ${user.invitedBy}`}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-medium capitalize">
+                          {user.role}
+                        </span>
+                        {removeConfirm === user.email ? (
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleRemoveUser(user.email)}
+                              className="px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              onClick={() => setRemoveConfirm(null)}
+                              className="px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setRemoveConfirm(user.email)}
+                            className="px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
