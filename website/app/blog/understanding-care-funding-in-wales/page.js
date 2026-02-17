@@ -153,7 +153,7 @@ export default function UnderstandingCareFundingInWales() {
             <li><strong>Your local authority</strong> &mdash; the Single Point of Access or Adult Social Care team can explain the process and your options</li>
           </ul>
           <p>
-            At Accredilink, we are always happy to have an informal conversation about funding. While we cannot provide formal financial advice, we have helped many families understand their options and we can point you towards the right resources. Visit our <Link href="/funding-guidance">funding guidance page</Link> for an overview, or <Link href="/contact">get in touch</Link> to speak to one of our team.
+            At Accredilink, we are always happy to have an informal conversation about funding. While we cannot provide formal financial advice, we have helped many families understand their options and we can point you towards the right resources. Visit our <Link href="/compliance#funding">funding guidance page</Link> for an overview, or <Link href="/contact">get in touch</Link> to speak to one of our team.
           </p>
         </div>
       </article>

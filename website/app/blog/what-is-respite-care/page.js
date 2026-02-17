@@ -145,7 +145,7 @@ export default function WhatIsRespiteCare() {
             <li><strong>Self-funding:</strong> You can arrange and pay for respite care privately at any time.</li>
           </ul>
           <p>
-            Our <Link href="/funding-guidance">funding guidance page</Link> provides further detail on the options available, and our team is always happy to discuss what might work for your situation.
+            Our <Link href="/compliance#funding">funding guidance page</Link> provides further detail on the options available, and our team is always happy to discuss what might work for your situation.
           </p>
 
           <h2>Overcoming Guilt</h2>

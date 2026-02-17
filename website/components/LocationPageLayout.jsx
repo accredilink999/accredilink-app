@@ -168,7 +168,7 @@ export default function LocationPageLayout({
               </summary>
               <p className="mt-3 text-sm text-slate-600 leading-relaxed">
                 Care funding may be available through your local authority. We can help guide you through the
-                assessment process. Visit our <Link href="/funding-guidance" className="text-welsh-red hover:underline">funding guidance</Link> page for more details.
+                assessment process. Visit our <Link href="/compliance#funding" className="text-welsh-red hover:underline">funding guidance</Link> page for more details.
               </p>
             </details>
             <details className="group p-4 bg-slate-50 rounded-xl border border-slate-200">

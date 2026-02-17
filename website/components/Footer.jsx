@@ -13,9 +13,7 @@ const quickLinks = [
   { href: '/about', label: 'About Us' },
   { href: '/areas', label: 'Areas We Cover' },
   { href: '/faq', label: 'FAQ' },
-  { href: '/funding-guidance', label: 'Funding Guidance' },
-  { href: '/safeguarding', label: 'Safeguarding' },
-  { href: '/ciw-compliance', label: 'CIW Compliance' },
+  { href: '/compliance', label: 'Compliance & Funding' },
   { href: '/careers', label: 'Careers' },
   { href: '/contact', label: 'Contact Us' },
 ];

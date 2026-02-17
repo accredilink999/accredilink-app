@@ -114,7 +114,7 @@ export default function HowToArrangeDomiciliaryCareInWales() {
             <li>Choose to top up their care privately for additional hours or services</li>
           </ul>
           <p>
-            There are also other funding routes, including <strong>NHS Continuing Healthcare (CHC)</strong> for those with a primary health need, <strong>direct payments</strong> which give you control over how your care budget is spent, and benefits such as <strong>Attendance Allowance</strong>. We cover all of these in detail in our <Link href="/blog/understanding-care-funding-in-wales">guide to care funding in Wales</Link>, and our <Link href="/funding-guidance">funding guidance page</Link> has further information.
+            There are also other funding routes, including <strong>NHS Continuing Healthcare (CHC)</strong> for those with a primary health need, <strong>direct payments</strong> which give you control over how your care budget is spent, and benefits such as <strong>Attendance Allowance</strong>. We cover all of these in detail in our <Link href="/blog/understanding-care-funding-in-wales">guide to care funding in Wales</Link>, and our <Link href="/compliance#funding">funding guidance page</Link> has further information.
           </p>
 
           <h2>Step 5: Choosing a Domiciliary Care Provider</h2>
