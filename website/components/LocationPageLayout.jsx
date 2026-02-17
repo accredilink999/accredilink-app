@@ -196,8 +196,8 @@ export default function LocationPageLayout({
             <Link href="/contact" className="inline-flex items-center justify-center px-6 py-3.5 bg-white text-welsh-red font-semibold rounded-xl hover:bg-red-50 transition-colors">
               Get in Touch
             </Link>
-            <a href="tel:01745000000" className="inline-flex items-center justify-center px-6 py-3.5 border-2 border-white/30 text-white font-semibold rounded-xl hover:bg-white/10 transition-colors">
-              Call 01745 000 000
+            <a href="tel:01824538688" className="inline-flex items-center justify-center px-6 py-3.5 border-2 border-white/30 text-white font-semibold rounded-xl hover:bg-white/10 transition-colors">
+              Call 01824 538688
             </a>
           </div>
         </div>

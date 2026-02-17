@@ -63,7 +63,7 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <p className="font-medium text-slate-900">Phone</p>
-                    <p className="text-slate-600">01745 000 000</p>
+                    <p className="text-slate-600">01824 538688</p>
                   </div>
                 </div>
 
@@ -88,7 +88,7 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <p className="font-medium text-slate-900">Location</p>
-                    <p className="text-slate-600">Denbighshire, North Wales</p>
+                    <p className="text-slate-600">The Hummingbird, 27-29 High St, Denbigh LL16 3HY</p>
                   </div>
                 </div>
 
@@ -160,7 +160,7 @@ export default function ContactPage() {
                         value={formData.phone}
                         onChange={e => setFormData(prev => ({ ...prev, phone: e.target.value }))}
                         className="w-full px-4 py-2.5 rounded-lg border border-slate-300 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-welsh-red/50 focus:border-welsh-red"
-                        placeholder="01745 000 000"
+                        placeholder="01824 538688"
                       />
                     </div>
                     <div>

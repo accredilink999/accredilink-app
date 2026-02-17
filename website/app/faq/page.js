@@ -37,7 +37,7 @@ const faqs = [
     questions: [
       {
         q: 'How do I arrange care for myself or a family member?',
-        a: 'Simply contact us by phone (01745 000 000) or through our contact form. We will arrange a free, no-obligation assessment to understand your needs and create a personalised care plan.',
+        a: 'Simply contact us by phone (01824 538688) or through our contact form. We will arrange a free, no-obligation assessment to understand your needs and create a personalised care plan.',
       },
       {
         q: 'How quickly can care start?',
