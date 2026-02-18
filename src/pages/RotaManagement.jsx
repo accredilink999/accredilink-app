@@ -12,6 +12,7 @@ import ShiftDetailModal from '@/components/rota/ShiftDetailModal';
 import CreateShiftModal from '@/components/rota/CreateShiftModal';
 import PatternManager from '@/components/rota/PatternManager';
 import BaseShiftTemplateManager from '@/components/rota/BaseShiftTemplateManager';
+import ClaimShiftModal from '@/components/rota/ClaimShiftModal';
 import RotaAreaSelector from '@/components/rota/RotaAreaSelector';
 import ClientCallManager from '@/components/rota/ClientCallManager';
 import ShiftTypeManager from '@/components/rota/ShiftTypeManager';
@@ -31,6 +32,7 @@ export default function RotaManagement() {
   const [isCreateAreaOpen, setIsCreateAreaOpen] = useState(false);
   const [isManageAreasOpen, setIsManageAreasOpen] = useState(false);
   const [shiftFilter, setShiftFilter] = useState('my-shifts');
+  const [claimShift, setClaimShift] = useState(null);
   const queryClient = useQueryClient();
 
   const { data: user } = useQuery({
@@ -92,6 +94,14 @@ export default function RotaManagement() {
 
   const handleToday = () => {
     setCurrentDate(new Date());
+  };
+
+  const handleShiftClick = (shift) => {
+    if (!shift.staff_id) {
+      setClaimShift(shift);
+    } else {
+      setSelectedShift(shift);
+    }
   };
 
   const handleCreateShift = (date) => {
@@ -246,7 +256,7 @@ export default function RotaManagement() {
         <TabsContent value="month" className="mt-6">
           <MonthView 
             currentDate={currentDate}
-            onShiftClick={setSelectedShift}
+            onShiftClick={handleShiftClick}
             onCreateShift={handleCreateShift}
             isAdmin={isAdmin}
             selectedAreaId={selectedAreaId}
@@ -258,7 +268,7 @@ export default function RotaManagement() {
         <TabsContent value="week" className="mt-6">
           <WeekView 
             currentDate={currentDate}
-            onShiftClick={setSelectedShift}
+            onShiftClick={handleShiftClick}
             onCreateShift={handleCreateShift}
             isAdmin={isAdmin}
             selectedAreaId={selectedAreaId}
@@ -270,7 +280,7 @@ export default function RotaManagement() {
         <TabsContent value="day" className="mt-6">
           <DayView 
             currentDate={currentDate}
-            onShiftClick={setSelectedShift}
+            onShiftClick={handleShiftClick}
             onCreateShift={handleCreateShift}
             isAdmin={isAdmin}
             userId={user?.id}
@@ -327,6 +337,14 @@ export default function RotaManagement() {
         <BaseShiftTemplateManager
           open={isTemplateManagerOpen}
           onClose={() => setIsTemplateManagerOpen(false)}
+        />
+      )}
+
+      {claimShift && (
+        <ClaimShiftModal
+          shift={claimShift}
+          open={!!claimShift}
+          onClose={() => setClaimShift(null)}
         />
       )}
 

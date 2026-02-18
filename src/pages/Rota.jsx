@@ -110,7 +110,7 @@ export default function Rota() {
   };
 
   const handleShiftClick = (shift) => {
-    if (!shift.staff_id && !canEdit) {
+    if (!shift.staff_id) {
       setClaimShift(shift);
     } else {
       setSelectedShift(shift);
