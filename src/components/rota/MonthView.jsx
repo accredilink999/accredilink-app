@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ShiftApi } from '@/api/rotaApi';
 import { ShiftTypeApi } from '@/api/shiftTypeApi';
+import { supabase } from '@/api/supabaseClient';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, parseISO } from 'date-fns';
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,15 +19,19 @@ export default function MonthView({ currentDate, onShiftClick, onCreateShift, is
    const { data: shifts = [], isLoading } = useQuery({
      queryKey: ['shifts', 'month', format(monthStart, 'yyyy-MM'), selectedAreaId, filterByUserId, showAllShifts],
      queryFn: async () => {
-       const allShifts = await ShiftApi.list('-created_date', 1000);
-       let filtered = allShifts.filter(shift => {
-         if (!shift.date) return false;
-         const shiftDate = parseISO(shift.date);
-         const dateMatches = shiftDate >= startDate && shiftDate <= endDate;
-         const shiftArea = shift.rota_area_id || shift.area_id;
-         const areaMatches = !selectedAreaId || shiftArea === selectedAreaId;
-         return dateMatches && areaMatches;
-       });
+       const startStr = format(startDate, 'yyyy-MM-dd');
+       const endStr = format(endDate, 'yyyy-MM-dd');
+       let query = supabase
+         .from('shifts')
+         .select('*')
+         .gte('date', startStr)
+         .lte('date', endStr);
+       if (selectedAreaId) {
+         query = query.or(`rota_area_id.eq.${selectedAreaId},area_id.eq.${selectedAreaId}`);
+       }
+       const { data: allShifts = [], error } = await query;
+       if (error) throw error;
+       let filtered = allShifts;
        if (filterByUserId) {
          filtered = filtered.filter(s => s.staff_id === filterByUserId || !s.staff_id);
        } else if (!showAllShifts && !isAdmin && userId) {

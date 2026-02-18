@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ShiftApi, ShiftCallApi } from '@/api/rotaApi';
 import { ShiftTypeApi } from '@/api/shiftTypeApi';
+import { supabase } from '@/api/supabaseClient';
 import { format, startOfWeek, addDays, isSameDay, parseISO } from 'date-fns';
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,17 +20,21 @@ export default function WeekView({ currentDate, onShiftClick, onCreateShift, isA
      queryKey: ['shifts', 'week', format(weekStart, 'yyyy-MM-dd'), selectedAreaId, filterByUserId, showAllShifts],
      queryFn: async () => {
        console.log('[WeekView] Fetching shifts...');
-       const allShifts = await ShiftApi.list('-created_date', 500);
-       console.log('[WeekView] Raw shifts from DB:', allShifts?.length);
-       const weekEnd = addDays(weekStart, 6);
-       let filtered = allShifts.filter(shift => {
-         if (!shift.date) return false;
-         const shiftDate = parseISO(shift.date);
-         const dateMatches = shiftDate.getTime() >= weekStart.getTime() && shiftDate.getTime() <= weekEnd.getTime();
-         const shiftArea = shift.rota_area_id || shift.area_id;
-         const areaMatches = !selectedAreaId || shiftArea === selectedAreaId;
-         return dateMatches && areaMatches;
-       });
+       const weekStartStr = format(weekStart, 'yyyy-MM-dd');
+       const weekEndStr = format(addDays(weekStart, 6), 'yyyy-MM-dd');
+       // Query shifts directly for this week's date range from Supabase
+       let query = supabase
+         .from('shifts')
+         .select('*')
+         .gte('date', weekStartStr)
+         .lte('date', weekEndStr);
+       if (selectedAreaId) {
+         query = query.or(`rota_area_id.eq.${selectedAreaId},area_id.eq.${selectedAreaId}`);
+       }
+       const { data: allShifts = [], error } = await query;
+       if (error) throw error;
+       console.log('[WeekView] Shifts for week:', allShifts?.length);
+       let filtered = allShifts;
        if (filterByUserId) {
          filtered = filtered.filter(s => s.staff_id === filterByUserId || !s.staff_id);
        } else if (!showAllShifts && !isAdmin && userId) {

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ShiftApi, ShiftCallApi } from '@/api/rotaApi';
 import { ShiftTypeApi } from '@/api/shiftTypeApi';
+import { supabase } from '@/api/supabaseClient';
 import { format, isSameDay, parseISO } from 'date-fns';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,14 +14,17 @@ export default function DayView({ currentDate, onShiftClick, onCreateShift, isAd
    const { data: shifts = [], isLoading } = useQuery({
      queryKey: ['shifts', 'day', format(currentDate, 'yyyy-MM-dd'), selectedAreaId, filterByUserId, userId],
      queryFn: async () => {
-       const allShifts = await ShiftApi.list('-created_date', 500);
-       let filtered = allShifts.filter(shift => {
-         if (!shift.date) return false;
-         const dateMatches = isSameDay(parseISO(shift.date), currentDate);
-         const shiftArea = shift.rota_area_id || shift.area_id;
-         const areaMatches = !selectedAreaId || shiftArea === selectedAreaId;
-         return dateMatches && areaMatches;
-       });
+       const dateStr = format(currentDate, 'yyyy-MM-dd');
+       let query = supabase
+         .from('shifts')
+         .select('*')
+         .eq('date', dateStr);
+       if (selectedAreaId) {
+         query = query.or(`rota_area_id.eq.${selectedAreaId},area_id.eq.${selectedAreaId}`);
+       }
+       const { data: allShifts = [], error } = await query;
+       if (error) throw error;
+       let filtered = allShifts;
        if (filterByUserId) {
          filtered = filtered.filter(s => s.staff_id === filterByUserId || !s.staff_id);
        }
