@@ -607,12 +607,12 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
   return (
     <>
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="w-full h-screen md:max-w-3xl md:max-h-[90vh] p-0 md:p-6 md:rounded-lg rounded-none flex flex-col">
+      <DialogContent className="w-full h-[calc(100dvh-4rem)] md:max-w-3xl md:max-h-[90vh] p-0 md:p-6 md:rounded-lg rounded-none md:rounded-lg flex flex-col fixed bottom-16 md:bottom-auto md:top-[50%] md:translate-y-[-50%] top-auto translate-y-0">
         <DialogHeader className="px-4 pt-4 md:px-0 md:pt-0">
           <DialogTitle>Shift Details</DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto px-4 md:px-0 space-y-6 pb-4 md:pb-0">
+        <div className="flex-1 overflow-y-auto px-4 md:px-0 space-y-6 pb-6 md:pb-0">
           {/* Shift Header */}
           <Card className={`p-4 border-0 ${serviceUserOnHold ? 'bg-gray-100 opacity-50' : 'bg-slate-50'}`}>
            <div className="flex items-start justify-between mb-4 gap-2">
