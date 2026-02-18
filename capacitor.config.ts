@@ -23,7 +23,7 @@ const config: CapacitorConfig = {
 
     // Keyboard — push content up when keyboard opens
     Keyboard: {
-      resize: 'body',
+      resize: 'native',
       style: 'DARK',
     },
 

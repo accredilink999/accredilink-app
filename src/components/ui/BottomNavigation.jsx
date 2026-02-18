@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { cn } from "@/lib/utils";
@@ -19,13 +20,13 @@ const navigation = [
 
 export default function BottomNavigation({ currentPageName, unreadChatCount = 0, unreadAssetsCount = 0 }) {
   const navigate = useNavigate();
-  return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-[60]" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+  return createPortal(
+    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-[9999] shadow-[0_-2px_10px_rgba(0,0,0,0.05)]" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="flex items-center justify-around">
         {navigation.map((item) => {
           const isActive = currentPageName === item.page;
           const badgeCount = item.page === 'Chat' ? unreadChatCount : (item.page === 'Assets' ? unreadAssetsCount : 0);
-          
+
           return (
             <Link
               key={item.name}
@@ -38,8 +39,8 @@ export default function BottomNavigation({ currentPageName, unreadChatCount = 0,
               }}
               className={cn(
                 "flex flex-col items-center justify-center gap-1 py-3 px-0 flex-1 transition-colors relative min-h-[48px]",
-                isActive 
-                  ? "text-teal-600 border-t-2 border-teal-600" 
+                isActive
+                  ? "text-teal-600 border-t-2 border-teal-600"
                   : "text-slate-600 hover:text-slate-900"
               )}
             >
@@ -60,6 +61,7 @@ export default function BottomNavigation({ currentPageName, unreadChatCount = 0,
           );
         })}
       </div>
-    </nav>
+    </nav>,
+    document.body
   );
 }

@@ -49,7 +49,6 @@ export default function ChatWindow({ conversation, currentUserId, currentUserNam
     const handleResize = () => {
       const container = chatContainerRef.current;
       if (!container) return;
-      // Calculate how much height is available from the container's top to the bottom of the visual viewport
       const containerTop = container.getBoundingClientRect().top;
       const availableHeight = vv.height - containerTop + vv.offsetTop;
       if (availableHeight > 0 && availableHeight < window.innerHeight) {
@@ -66,6 +65,31 @@ export default function ChatWindow({ conversation, currentUserId, currentUserNam
       vv.removeEventListener('scroll', handleResize);
       if (chatContainerRef.current) chatContainerRef.current.style.height = '';
     };
+  }, []);
+
+  // Capacitor native iOS keyboard fix — use plugin when available
+  useEffect(() => {
+    let cleanup;
+    import('@capacitor/keyboard').then(({ Keyboard }) => {
+      const showListener = Keyboard.addListener('keyboardWillShow', (info) => {
+        const container = chatContainerRef.current;
+        if (!container) return;
+        const keyboardHeight = info.keyboardHeight || 0;
+        container.style.height = `calc(100% - ${keyboardHeight}px)`;
+        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+      });
+      const hideListener = Keyboard.addListener('keyboardWillHide', () => {
+        const container = chatContainerRef.current;
+        if (container) container.style.height = '';
+      });
+      cleanup = () => {
+        showListener.then(h => h.remove());
+        hideListener.then(h => h.remove());
+      };
+    }).catch(() => {
+      // Not running in Capacitor — web fallback handles it
+    });
+    return () => { if (cleanup) cleanup(); };
   }, []);
 
   const { data: allUsers = [] } = useQuery({
