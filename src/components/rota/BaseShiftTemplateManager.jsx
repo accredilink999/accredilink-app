@@ -104,19 +104,27 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
 
     setDeployingAll(true);
     try {
+      // Log all templates for debugging
+      console.log(`[DeployAll] ${templates.length} templates to process:`);
+      templates.forEach((t, i) => {
+        console.log(`  ${i + 1}. "${t.name}" | area_id: ${t.area_id} | type: ${t.shift_type_name} | ${t.start_time}-${t.end_time} | days: ${JSON.stringify(t.days_of_week)} | active: ${t.is_active}`);
+      });
+
       const days = eachDayOfInterval({
         start: parseISO(deployAllStartDate),
         end: parseISO(deployAllEndDate),
       });
+      console.log(`[DeployAll] Date range: ${deployAllStartDate} to ${deployAllEndDate} (${days.length} days)`);
 
-      // Count existing shifts per key (supports multiple staff slots)
-      // Query only the date range we're deploying to — avoids Supabase row limits
+      // Query existing shifts in this date range directly from Supabase
       const { data: existingShifts = [], error: fetchErr } = await supabase
         .from('shifts')
         .select('id, date, shift_name, start_time, end_time, rota_area_id, area_id, staff_id')
         .gte('date', deployAllStartDate)
-        .lte('date', deployAllEndDate);
+        .lte('date', deployAllEndDate)
+        .limit(5000);
       if (fetchErr) throw fetchErr;
+      console.log(`[DeployAll] Found ${existingShifts.length} existing shifts in range`);
 
       const existingCount = {};
       for (const s of existingShifts) {
@@ -128,25 +136,41 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
 
       let totalCreated = 0;
       let totalSkipped = 0;
-      const results = []; // per-template results for feedback
+      const results = [];
 
       // Track how many templates have been processed per key
       const templatesSeen = {};
 
       for (const template of templates) {
-        if (template.is_active === false) continue;
-        const templateDays = new Set(template.days_of_week || []);
+        // Parse days_of_week defensively (handle string, null, array)
+        let daysArray = template.days_of_week;
+        if (typeof daysArray === 'string') {
+          try { daysArray = JSON.parse(daysArray); } catch { daysArray = []; }
+        }
+        if (!Array.isArray(daysArray)) daysArray = [];
+
+        const templateDays = new Set(daysArray);
         const shiftsForTemplate = [];
         let skippedForTemplate = 0;
 
+        // Skip inactive (check both boolean false and string "false")
+        if (template.is_active === false || template.is_active === 'false') {
+          console.log(`[DeployAll] SKIP "${template.name}" — inactive`);
+          results.push({ name: template.name, created: 0, skipped: 0, error: 'inactive' });
+          continue;
+        }
         if (!template.area_id) {
+          console.log(`[DeployAll] SKIP "${template.name}" — no area_id`);
           results.push({ name: template.name, created: 0, skipped: 0, error: 'no area set' });
           continue;
         }
         if (!templateDays.size) {
+          console.log(`[DeployAll] SKIP "${template.name}" — no days (raw: ${JSON.stringify(template.days_of_week)})`);
           results.push({ name: template.name, created: 0, skipped: 0, error: 'no days selected' });
           continue;
         }
+
+        console.log(`[DeployAll] Processing "${template.name}" — days: [${[...templateDays].join(',')}], type: ${template.shift_type_name}, times: ${template.start_time}-${template.end_time}`);
 
         for (const day of days) {
           const dayName = DAY_NAME_MAP[day.getDay()];
@@ -184,36 +208,39 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
             await ShiftApi.bulkCreate(shiftsForTemplate);
             totalCreated += shiftsForTemplate.length;
             results.push({ name: template.name, created: shiftsForTemplate.length, skipped: skippedForTemplate });
+            console.log(`[DeployAll] ✓ "${template.name}" — ${shiftsForTemplate.length} created, ${skippedForTemplate} skipped`);
           } catch (err) {
-            console.error(`[DeployAll] Failed for template "${template.name}":`, err);
+            console.error(`[DeployAll] ✗ "${template.name}" — FAILED:`, err);
             results.push({ name: template.name, created: 0, skipped: skippedForTemplate, error: err.message });
           }
         } else {
+          console.log(`[DeployAll] ○ "${template.name}" — nothing to create (${skippedForTemplate} skipped)`);
           results.push({ name: template.name, created: 0, skipped: skippedForTemplate });
         }
       }
 
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
 
-      // Show per-template breakdown for ALL templates
-      const breakdown = results
-        .map(r => {
-          if (r.error) return `${r.name}: FAILED (${r.error})`;
-          if (r.created > 0 && r.skipped > 0) return `${r.name}: ${r.created} created, ${r.skipped} skipped`;
-          if (r.created > 0) return `${r.name}: ${r.created} created`;
-          if (r.skipped > 0) return `${r.name}: ${r.skipped} skipped`;
-          return `${r.name}: 0`;
-        })
-        .join('\n');
-      console.log('[DeployAll] Results:\n' + breakdown);
+      // Build readable results
+      console.table(results);
+      const errors = results.filter(r => r.error);
+      const created = results.filter(r => r.created > 0);
 
       if (totalCreated === 0) {
-        toast.error(`No shifts created.\n${breakdown}`);
+        const detail = results.map(r => r.error ? `${r.name}: ${r.error}` : `${r.name}: ${r.skipped} exist`).join(', ');
+        toast.error('No shifts created — check browser console (F12) for details', { description: detail, duration: 8000 });
       } else {
-        toast.success(`${totalCreated} shifts created (${totalSkipped} skipped)\n${breakdown}`);
+        const summary = `${totalCreated} shifts created across ${created.length} template(s)`;
+        const detail = results.map(r => r.error ? `✗ ${r.name}: ${r.error}` : r.created > 0 ? `✓ ${r.name}: ${r.created}` : `- ${r.name}: skipped`).join(', ');
+        if (errors.length > 0) {
+          toast.warning(summary, { description: `${errors.length} template(s) failed — ${detail}`, duration: 8000 });
+        } else {
+          toast.success(summary, { description: detail, duration: 6000 });
+        }
       }
       setShowDeployAll(false);
     } catch (e) {
+      console.error('[DeployAll] Fatal error:', e);
       toast.error('Failed to deploy all: ' + e.message);
     }
     setDeployingAll(false);
