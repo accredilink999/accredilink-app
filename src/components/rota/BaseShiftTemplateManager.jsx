@@ -104,18 +104,23 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
         end: parseISO(deployAllEndDate),
       });
 
-      // Fetch all existing shifts once to check for duplicates
+      // Count existing shifts per key (not just boolean — supports multiple staff slots)
       const existingShifts = await ShiftApi.list('-created_date', 5000);
-      const existingSet = new Set();
+      const existingCount = {};
       for (const s of existingShifts) {
         if (!s.date) continue;
         const sArea = s.rota_area_id || s.area_id;
-        existingSet.add(`${sArea}|${s.date}|${s.shift_name}|${s.start_time}|${s.end_time}`);
+        const key = `${sArea}|${s.date}|${s.shift_name}|${s.start_time}|${s.end_time}`;
+        existingCount[key] = (existingCount[key] || 0) + 1;
       }
 
       const allShiftsToCreate = [];
       let totalSkipped = 0;
       let templatesUsed = 0;
+
+      // Track how many templates have been processed per key
+      // so multiple templates for the same shift type each get a slot
+      const templatesSeen = {};
 
       for (const template of templates) {
         if (template.is_active === false) continue;
@@ -129,13 +134,16 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
           const dateStr = format(day, 'yyyy-MM-dd');
           const key = `${template.area_id}|${dateStr}|${template.shift_type_name}|${template.start_time}|${template.end_time}`;
 
-          if (existingSet.has(key)) {
+          // How many templates (including this one) need this shift slot?
+          templatesSeen[key] = (templatesSeen[key] || 0) + 1;
+          const needed = templatesSeen[key];
+          const existing = existingCount[key] || 0;
+
+          // Skip only if enough shifts already exist in the DB
+          if (existing >= needed) {
             totalSkipped++;
             continue;
           }
-
-          // Add to existing set so templates with same params don't duplicate each other
-          existingSet.add(key);
 
           allShiftsToCreate.push({
             staff_id: null,
@@ -186,15 +194,24 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
         end: parseISO(endDate),
       });
 
-      // Fetch existing shifts in this area for the date range to avoid duplicates
+      // Count existing shifts per key in this area (supports multiple staff slots)
       const existingShifts = await ShiftApi.list('-created_date', 5000);
-      const existingSet = new Set();
+      const existingCount = {};
+      // Also count how many templates share the same params to know total slots needed
+      const sameTemplateCount = templates.filter(t =>
+        t.area_id === template.area_id &&
+        t.shift_type_name === template.shift_type_name &&
+        t.start_time === template.start_time &&
+        t.end_time === template.end_time &&
+        t.is_active !== false
+      ).length;
+
       for (const s of existingShifts) {
         if (!s.date) continue;
         const sArea = s.rota_area_id || s.area_id;
         if (sArea === template.area_id) {
-          // Key: date + shift_name + start_time + end_time
-          existingSet.add(`${s.date}|${s.shift_name}|${s.start_time}|${s.end_time}`);
+          const key = `${s.date}|${s.shift_name}|${s.start_time}|${s.end_time}`;
+          existingCount[key] = (existingCount[key] || 0) + 1;
         }
       }
 
@@ -209,8 +226,9 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
         const dateStr = format(day, 'yyyy-MM-dd');
         const key = `${dateStr}|${template.shift_type_name}|${template.start_time}|${template.end_time}`;
 
-        // Skip if a shift with the same type/time already exists on this day
-        if (existingSet.has(key)) {
+        // Skip only if enough shifts already exist to cover all templates with these params
+        const existing = existingCount[key] || 0;
+        if (existing >= sameTemplateCount) {
           skipped++;
           continue;
         }
