@@ -70,12 +70,31 @@ export default function PushCredentialsManager() {
     mutationFn: async (data) => {
       const existing = credentials.find(c => c.credential_type === data.credential_type);
       if (existing) {
-        return base44.entities.NotificationCredentials.update(existing.id, data);
+        await base44.entities.NotificationCredentials.update(existing.id, data);
+      } else {
+        await base44.entities.NotificationCredentials.create(data);
       }
-      return base44.entities.NotificationCredentials.create(data);
+
+      // For APNS credentials, also save to system_settings so the
+      // sendAPNSPushNotification edge function can find them
+      if (data.credential_type === 'apns') {
+        const apnsSettingValue = {
+          key_id: data.apns_key_id,
+          team_id: data.apns_team_id,
+          private_key: data.apns_auth_key,
+          bundle_id: data.apns_bundle_id || 'com.carecallai.app',
+          environment: data.apns_environment || 'production',
+        };
+        await saveSetting(
+          'apns_credentials',
+          apnsSettingValue,
+          'APNs auth key credentials for iOS push notifications'
+        );
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notificationCredentials'] });
+      queryClient.invalidateQueries({ queryKey: ['firebaseWebSettings'] });
       toast.success('Credentials saved');
       setEditingType(null);
       setFormData({});

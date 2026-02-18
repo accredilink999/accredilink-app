@@ -108,30 +108,57 @@ Deno.serve(async (req) => {
       action_url: `/Chat`,
     };
 
-    const pushResp = await fetch(`${supabaseUrl}/functions/v1/sendFirebasePushNotification`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${supabaseAnonKey}`,
-        'apikey': supabaseAnonKey,
-      },
-      body: JSON.stringify(pushBody),
-    });
+    const pushHeaders = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${supabaseAnonKey}`,
+      'apikey': supabaseAnonKey,
+    };
 
-    let pushData: unknown;
-    try { pushData = await pushResp.json(); } catch { pushData = await pushResp.text(); }
+    // Send to BOTH Firebase (Android/Web) and APNS (iOS) in parallel
+    const [fcmResp, apnsResp] = await Promise.allSettled([
+      fetch(`${supabaseUrl}/functions/v1/sendFirebasePushNotification`, {
+        method: 'POST',
+        headers: pushHeaders,
+        body: JSON.stringify(pushBody),
+      }),
+      fetch(`${supabaseUrl}/functions/v1/sendAPNSPushNotification`, {
+        method: 'POST',
+        headers: pushHeaders,
+        body: JSON.stringify(pushBody),
+      }),
+    ]);
 
-    if (!pushResp.ok) {
-      console.error(`[Chat Push] sendFirebasePushNotification returned ${pushResp.status}:`, JSON.stringify(pushData));
-      return jsonResponse({ success: false, status: pushResp.status, pushError: pushData, recipients: activeRecipients.length });
+    // Parse FCM result
+    let fcmData: unknown = null;
+    if (fcmResp.status === 'fulfilled') {
+      try { fcmData = await fcmResp.value.json(); } catch { fcmData = await fcmResp.value.text(); }
+      if (!fcmResp.value.ok) {
+        console.error(`[Chat Push] FCM returned ${fcmResp.value.status}:`, JSON.stringify(fcmData));
+      } else {
+        console.log('[Chat Push] FCM result:', JSON.stringify(fcmData));
+      }
+    } else {
+      console.error('[Chat Push] FCM call failed:', fcmResp.reason);
     }
 
-    console.log('[Chat Push] Push result:', JSON.stringify(pushData));
+    // Parse APNS result
+    let apnsData: unknown = null;
+    if (apnsResp.status === 'fulfilled') {
+      try { apnsData = await apnsResp.value.json(); } catch { apnsData = await apnsResp.value.text(); }
+      if (!apnsResp.value.ok) {
+        console.error(`[Chat Push] APNS returned ${apnsResp.value.status}:`, JSON.stringify(apnsData));
+      } else {
+        console.log('[Chat Push] APNS result:', JSON.stringify(apnsData));
+      }
+    } else {
+      console.error('[Chat Push] APNS call failed:', apnsResp.reason);
+    }
 
     return jsonResponse({
       success: true,
       recipients: activeRecipients.length,
-      push: pushData,
+      fcm: fcmData,
+      apns: apnsData,
     });
   } catch (error) {
     console.error('sendChatMessagePushNotification error:', error);

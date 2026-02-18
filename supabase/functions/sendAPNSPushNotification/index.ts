@@ -186,29 +186,58 @@ Deno.serve(async (req) => {
     const notifTitle = title || 'Notification';
 
     // ------------------------------------------------------------------
-    // 1. Load APNs credentials from SystemSettings
+    // 1. Load APNs credentials — try system_settings first, then
+    //    fall back to notification_credentials table
     // ------------------------------------------------------------------
+    let creds: { key_id: string; team_id: string; private_key: string; bundle_id: string; environment?: string } | null = null;
+
+    // Primary: system_settings (where the admin UI now saves them)
     const { data: apnsRow } = await supabaseAdmin
       .from('system_settings')
       .select('setting_value')
       .eq('setting_key', 'apns_credentials')
       .maybeSingle();
 
-    if (!apnsRow?.setting_value) {
-      console.warn('[APNS] No apns_credentials in SystemSettings');
-      return Response.json({
-        success: false,
-        error: 'APNs credentials not configured. Admin must add them in Settings.',
-      }, { status: 400 });
+    if (apnsRow?.setting_value) {
+      try {
+        const parsed = typeof apnsRow.setting_value === 'string'
+          ? JSON.parse(apnsRow.setting_value)
+          : apnsRow.setting_value;
+        if (parsed.key_id && parsed.team_id && parsed.private_key) {
+          creds = parsed;
+          console.log('[APNS] Loaded credentials from system_settings');
+        }
+      } catch {
+        console.warn('[APNS] Invalid JSON in system_settings.apns_credentials');
+      }
     }
 
-    let creds: { key_id: string; team_id: string; private_key: string; bundle_id: string; environment?: string };
-    try {
-      creds = typeof apnsRow.setting_value === 'string'
-        ? JSON.parse(apnsRow.setting_value)
-        : apnsRow.setting_value;
-    } catch {
-      return Response.json({ success: false, error: 'Invalid APNs credentials JSON' }, { status: 400 });
+    // Fallback: notification_credentials table (legacy storage location)
+    if (!creds) {
+      const { data: ncRow } = await supabaseAdmin
+        .from('notification_credentials')
+        .select('*')
+        .eq('credential_type', 'apns')
+        .maybeSingle();
+
+      if (ncRow?.apns_auth_key && ncRow?.apns_key_id && ncRow?.apns_team_id) {
+        creds = {
+          key_id: ncRow.apns_key_id,
+          team_id: ncRow.apns_team_id,
+          private_key: ncRow.apns_auth_key,
+          bundle_id: ncRow.apns_bundle_id || 'com.carecallai.app',
+          environment: ncRow.apns_environment || 'production',
+        };
+        console.log('[APNS] Loaded credentials from notification_credentials (fallback)');
+      }
+    }
+
+    if (!creds) {
+      console.warn('[APNS] No APNs credentials found in either system_settings or notification_credentials');
+      return Response.json({
+        success: false,
+        error: 'APNs credentials not configured. Admin must add them in Settings → Push Notification Credentials → APNS.',
+      }, { status: 400 });
     }
 
     if (!creds.key_id || !creds.team_id || !creds.private_key) {
