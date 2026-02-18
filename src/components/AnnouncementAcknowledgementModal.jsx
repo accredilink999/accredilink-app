@@ -155,12 +155,33 @@ export default function AnnouncementAcknowledgementModal({ announcement, announc
             </Button>
           </div>
 
-          {/* Remind me later */}
+          {/* Dismiss and auto-acknowledge */}
           <button
-            onClick={() => { setDismissed(true); onDismiss?.(); }}
+            onClick={async () => {
+              // Auto-acknowledge all so the modal doesn't keep reappearing
+              const now = new Date().toISOString();
+              for (const ann of announcementList) {
+                try {
+                  await base44.entities.AnnouncementAcknowledgement.create({
+                    announcement_id: ann.id,
+                    staff_id: user.id,
+                    staff_name: user.staff_full_name || user.full_name,
+                    acknowledged_at: now,
+                    read_at: now
+                  });
+                  await base44.entities.Message.update(ann.id, {
+                    read_by: [...(ann.read_by || []), user.id]
+                  });
+                } catch (e) { /* ignore duplicates */ }
+              }
+              queryClient.invalidateQueries({ queryKey: ['unacknowledgedAnnouncements'] });
+              queryClient.invalidateQueries({ queryKey: ['messages'] });
+              setDismissed(true);
+              onDismiss?.();
+            }}
             className="w-full text-center text-sm text-slate-500 hover:text-slate-700 py-2"
           >
-            Remind me later
+            Dismiss
           </button>
 
           {/* Note */}
