@@ -104,7 +104,7 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
         end: parseISO(deployAllEndDate),
       });
 
-      // Count existing shifts per key (not just boolean — supports multiple staff slots)
+      // Count existing shifts per key (supports multiple staff slots)
       const existingShifts = await ShiftApi.list('-created_date', 5000);
       const existingCount = {};
       for (const s of existingShifts) {
@@ -114,18 +114,27 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
         existingCount[key] = (existingCount[key] || 0) + 1;
       }
 
-      const allShiftsToCreate = [];
+      let totalCreated = 0;
       let totalSkipped = 0;
-      let templatesUsed = 0;
+      const results = []; // per-template results for feedback
 
       // Track how many templates have been processed per key
-      // so multiple templates for the same shift type each get a slot
       const templatesSeen = {};
 
       for (const template of templates) {
         if (template.is_active === false) continue;
         const templateDays = new Set(template.days_of_week || []);
-        let templateCreated = 0;
+        const shiftsForTemplate = [];
+        let skippedForTemplate = 0;
+
+        if (!template.area_id) {
+          results.push({ name: template.name, created: 0, skipped: 0, error: 'no area set' });
+          continue;
+        }
+        if (!templateDays.size) {
+          results.push({ name: template.name, created: 0, skipped: 0, error: 'no days selected' });
+          continue;
+        }
 
         for (const day of days) {
           const dayName = DAY_NAME_MAP[day.getDay()];
@@ -134,18 +143,17 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
           const dateStr = format(day, 'yyyy-MM-dd');
           const key = `${template.area_id}|${dateStr}|${template.shift_type_name}|${template.start_time}|${template.end_time}`;
 
-          // How many templates (including this one) need this shift slot?
           templatesSeen[key] = (templatesSeen[key] || 0) + 1;
           const needed = templatesSeen[key];
           const existing = existingCount[key] || 0;
 
-          // Skip only if enough shifts already exist in the DB
           if (existing >= needed) {
+            skippedForTemplate++;
             totalSkipped++;
             continue;
           }
 
-          allShiftsToCreate.push({
+          shiftsForTemplate.push({
             staff_id: null,
             staff_name: null,
             date: dateStr,
@@ -156,25 +164,40 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
             status: 'scheduled',
             is_base_shift: true,
           });
-          templateCreated++;
         }
 
-        if (templateCreated > 0) templatesUsed++;
+        // Create this template's shifts in a separate batch
+        if (shiftsForTemplate.length > 0) {
+          try {
+            await ShiftApi.bulkCreate(shiftsForTemplate);
+            totalCreated += shiftsForTemplate.length;
+            results.push({ name: template.name, created: shiftsForTemplate.length, skipped: skippedForTemplate });
+          } catch (err) {
+            console.error(`[DeployAll] Failed for template "${template.name}":`, err);
+            results.push({ name: template.name, created: 0, skipped: skippedForTemplate, error: err.message });
+          }
+        } else {
+          results.push({ name: template.name, created: 0, skipped: skippedForTemplate });
+        }
       }
 
-      if (allShiftsToCreate.length === 0) {
-        toast.error(totalSkipped > 0
-          ? `All shifts already exist for this date range (${totalSkipped} skipped)`
-          : 'No matching days across any templates');
-        setDeployingAll(false);
-        return;
-      }
-
-      await ShiftApi.bulkCreate(allShiftsToCreate);
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
-      const msg = `${allShiftsToCreate.length} available shift${allShiftsToCreate.length !== 1 ? 's' : ''} created from ${templatesUsed} template${templatesUsed !== 1 ? 's' : ''}` +
-        (totalSkipped > 0 ? ` (${totalSkipped} skipped — already exist)` : '');
-      toast.success(msg);
+
+      if (totalCreated === 0) {
+        const detail = results
+          .filter(r => r.error || r.skipped > 0)
+          .map(r => r.error ? `${r.name}: ${r.error}` : `${r.name}: ${r.skipped} already exist`)
+          .join(', ');
+        toast.error(`No shifts created. ${detail || 'All days already covered.'}`);
+      } else {
+        // Show per-template breakdown
+        const breakdown = results
+          .filter(r => r.created > 0 || r.error)
+          .map(r => r.error ? `${r.name} (failed)` : `${r.name}: ${r.created}`)
+          .join(', ');
+        const skipMsg = totalSkipped > 0 ? ` (${totalSkipped} skipped)` : '';
+        toast.success(`${totalCreated} shifts created${skipMsg} — ${breakdown}`);
+      }
       setShowDeployAll(false);
     } catch (e) {
       toast.error('Failed to deploy all: ' + e.message);
