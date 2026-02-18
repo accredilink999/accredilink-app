@@ -3,7 +3,7 @@ import AnimateOnScroll from '@/components/AnimateOnScroll';
 
 export const metadata = {
   title: 'CareCall AI | All-in-One Domiciliary Care Management Platform',
-  description: 'CareCall AI is a comprehensive staff management and care operations platform built specifically for domiciliary care agencies. GPS tracking, rota management, care documentation, incident reporting, training, and CIW compliance — all in one app.',
+  description: 'CareCall AI is a comprehensive staff management and care operations platform built specifically for domiciliary care agencies. GPS tracking, rota management, care documentation, incident reporting, training, automatic payroll & payslips, invoicing, fuel & expense tracking, and CIW compliance — all in one app.',
 };
 
 const features = [
@@ -128,6 +128,42 @@ const features = [
     bg: 'bg-red-50',
     textColor: 'text-welsh-red',
   },
+  {
+    title: 'Fuel & Mileage Tracking',
+    description: 'Staff log fuel purchases and mileage directly in the app with receipt photo uploads. Automatic mileage calculation between client visits using GPS data, HMRC-rate reimbursement calculations, and full expense reporting — giving managers complete visibility of travel costs across the team.',
+    icon: (
+      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+      </svg>
+    ),
+    color: 'from-orange-500 to-amber-500',
+    bg: 'bg-orange-50',
+    textColor: 'text-orange-600',
+  },
+  {
+    title: 'Automatic Payroll & Payslip Generation',
+    description: 'CareCall AI automatically calculates pay based on clocked hours, shift types, overtime, enhancements, and deductions. Generate professional payslips for every staff member at the click of a button. Pay periods, tax breakdowns, holiday pay, and pension contributions — all handled automatically.',
+    icon: (
+      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+      </svg>
+    ),
+    color: 'from-cyan-500 to-blue-500',
+    bg: 'bg-cyan-50',
+    textColor: 'text-cyan-600',
+  },
+  {
+    title: 'Automatic Invoicing System',
+    description: 'Generate invoices automatically based on completed visits, shift hours, and service agreements. CareCall AI creates professional, itemised invoices for local authorities, private clients, or funding bodies — with automatic scheduling, PDF export, payment tracking, and ageing reports.',
+    icon: (
+      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+      </svg>
+    ),
+    color: 'from-violet-500 to-purple-500',
+    bg: 'bg-violet-50',
+    textColor: 'text-violet-600',
+  },
 ];
 
 const ciwFeatures = [
@@ -185,6 +221,18 @@ const faqs = [
   {
     q: 'How is CareCall AI different from other care management systems?',
     a: 'CareCall AI is built by carers, for carers. Our development team includes experienced care professionals who understand the daily realities of domiciliary care. It\u2019s designed from the ground up for CIW compliance, not retrofitted. And it\u2019s a complete all-in-one platform — not a collection of separate tools bolted together.',
+  },
+  {
+    q: 'Does CareCall AI handle payroll and payslips?',
+    a: 'Yes. CareCall AI automatically calculates pay from clocked shift hours, applying the correct rates for different shift types including early, late, night, weekend, and bank holiday enhancements. You can generate professional PDF payslips for your entire team in seconds, with full breakdowns of tax, National Insurance, pension contributions, and deductions.',
+  },
+  {
+    q: 'Can it generate invoices for our clients?',
+    a: 'Absolutely. CareCall AI generates invoices automatically from completed visit data, matched against your service agreements and hourly rates. Whether you bill local authorities, NHS bodies, or private clients, every invoice is itemised, professional, and audit-ready. You can schedule automatic invoice generation and track payments with ageing reports.',
+  },
+  {
+    q: 'How does fuel and mileage tracking work?',
+    a: 'Mileage between client visits is calculated automatically using GPS clock-in and clock-out locations. Staff can also log fuel receipts with photo uploads directly in the app. The system calculates HMRC-rate reimbursements (45p/25p per mile) and feeds into the expense approval workflow, giving managers complete visibility of travel costs.',
   },
 ];
 
@@ -340,11 +388,11 @@ export default function CareCallAIPage() {
           <AnimateOnScroll animation="fade-up">
             <div className="text-center mb-16">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-welsh-green/10 text-welsh-green text-sm font-medium mb-4">
-                10 Powerful Modules
+                13 Powerful Modules
               </div>
               <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">Everything You Need, In One Place</h2>
               <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-                CareCall AI combines ten integrated modules that work together seamlessly — no integrations needed, no data silos, no switching between systems.
+                CareCall AI combines thirteen integrated modules that work together seamlessly — no integrations needed, no data silos, no switching between systems.
               </p>
             </div>
           </AnimateOnScroll>
@@ -1393,6 +1441,278 @@ export default function CareCallAIPage() {
                 </div>
               </div>
             </AnimateOnScroll>
+
+            {/* Fuel & Mileage Tracking Mockup */}
+            <AnimateOnScroll animation="fade-up">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <div className="bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-700">
+                  <div className="flex items-center gap-2 mb-3 px-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                    <span className="text-[10px] text-slate-500 ml-2">Fuel & Expenses — CareCall AI</span>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-xs font-bold text-slate-900">Fuel & Mileage Tracker</p>
+                      <span className="text-[8px] px-2.5 py-1 rounded-lg bg-orange-500 text-white font-medium">+ Log Expense</span>
+                    </div>
+                    {/* Monthly summary */}
+                    <div className="bg-white rounded-lg border border-slate-200 p-3">
+                      <p className="text-[10px] font-semibold text-slate-700 mb-2">February 2026 Summary</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="text-center">
+                          <p className="text-sm font-bold text-orange-600">£342.80</p>
+                          <p className="text-[8px] text-slate-500">Total Fuel</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm font-bold text-blue-600">1,847 mi</p>
+                          <p className="text-[8px] text-slate-500">Total Miles</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm font-bold text-green-600">£831.15</p>
+                          <p className="text-[8px] text-slate-500">HMRC Claim</p>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Expense entries */}
+                    {[
+                      { staff: 'Sarah Jones', type: 'Mileage', detail: '47 miles — 6 client visits', amount: '£21.15', date: '18 Feb', status: 'Auto-logged', statusColor: 'bg-green-100 text-green-700' },
+                      { staff: 'Katie Lewis', type: 'Fuel Receipt', detail: 'BP Denbigh — Unleaded', amount: '£52.40', date: '17 Feb', status: 'Pending', statusColor: 'bg-amber-100 text-amber-700' },
+                      { staff: 'Rob Williams', type: 'Mileage', detail: '62 miles — 8 client visits', amount: '£27.90', date: '17 Feb', status: 'Approved', statusColor: 'bg-blue-100 text-blue-700' },
+                    ].map((exp) => (
+                      <div key={`${exp.staff}-${exp.date}`} className="bg-white rounded-lg border border-slate-200 p-2.5">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center">
+                              <span className="text-[8px]">{exp.type === 'Mileage' ? '🚗' : '⛽'}</span>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-semibold text-slate-900">{exp.staff}</p>
+                              <p className="text-[8px] text-slate-400">{exp.type} — {exp.date}</p>
+                            </div>
+                          </div>
+                          <p className="text-[10px] font-bold text-slate-900">{exp.amount}</p>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <p className="text-[8px] text-slate-500">{exp.detail}</p>
+                          <span className={`text-[7px] px-1.5 py-0.5 rounded-full font-medium ${exp.statusColor}`}>{exp.status}</span>
+                        </div>
+                      </div>
+                    ))}
+                    {/* GPS auto-mileage bar */}
+                    <div className="bg-orange-50 rounded-lg border border-orange-200 p-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-orange-500" />
+                        <p className="text-[9px] font-semibold text-orange-800">GPS Auto-Mileage Active</p>
+                      </div>
+                      <p className="text-[8px] text-slate-600 mt-1">Mileage between client visits is calculated automatically from GPS clock-in/out locations. Staff can also log fuel receipts with photo attachments.</p>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-slate-900 mb-3">Fuel & Mileage Tracking</h3>
+                  <p className="text-slate-600 leading-relaxed mb-4">Take the pain out of expense claims. CareCall AI automatically tracks mileage between client visits using GPS data, and staff can log fuel purchases with receipt photos directly in the app. Managers get full visibility of travel costs across the team with HMRC-rate reimbursement calculations built in.</p>
+                  <ul className="space-y-2">
+                    {['Automatic mileage calculation from GPS clock-in/out data', 'Fuel receipt logging with photo uploads', 'HMRC mileage rate calculations (45p/25p per mile)', 'Per-staff and team-wide expense reporting', 'Manager approval workflow for expense claims', 'Monthly and quarterly expense summaries for accounts'].map((item) => (
+                      <li key={item} className="flex items-center gap-2 text-sm text-slate-600">
+                        <svg className="w-4 h-4 text-welsh-green flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </AnimateOnScroll>
+
+            {/* Automatic Payroll & Payslip Generation Mockup */}
+            <AnimateOnScroll animation="fade-up">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <div className="order-2 lg:order-1">
+                  <h3 className="text-2xl font-bold text-slate-900 mb-3">Automatic Payroll & Payslip Generation</h3>
+                  <p className="text-slate-600 leading-relaxed mb-4">Stop spending hours on spreadsheets. CareCall AI calculates pay automatically from clocked shift hours, applying the correct rates for early, late, night, weekend, and bank holiday shifts. Generate professional payslips for your entire team in seconds — complete with tax, NI, pension, and deduction breakdowns.</p>
+                  <ul className="space-y-2">
+                    {['Automatic pay calculation from clocked hours', 'Shift-type pay rates (early, late, night, weekend, bank holiday)', 'Overtime and enhancement calculations', 'Tax, National Insurance & pension deductions', 'Professional PDF payslip generation', 'Pay period management (weekly, fortnightly, monthly)', 'Holiday pay accrual and calculation', 'Year-to-date summaries and P60-ready data'].map((item) => (
+                      <li key={item} className="flex items-center gap-2 text-sm text-slate-600">
+                        <svg className="w-4 h-4 text-welsh-green flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="order-1 lg:order-2 bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-700">
+                  <div className="flex items-center gap-2 mb-3 px-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                    <span className="text-[10px] text-slate-500 ml-2">Payroll — CareCall AI</span>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-xs font-bold text-slate-900">Payroll — February 2026</p>
+                      <div className="flex gap-1">
+                        <span className="text-[8px] px-2 py-0.5 rounded bg-cyan-500 text-white font-medium">Generate Payslips</span>
+                      </div>
+                    </div>
+                    {/* Pay period summary */}
+                    <div className="bg-white rounded-lg border border-slate-200 p-3">
+                      <p className="text-[10px] font-semibold text-slate-700 mb-2">Pay Period: 1–28 Feb 2026</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="text-center">
+                          <p className="text-sm font-bold text-cyan-600">£18,420</p>
+                          <p className="text-[8px] text-slate-500">Gross Pay</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm font-bold text-red-500">£4,105</p>
+                          <p className="text-[8px] text-slate-500">Deductions</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm font-bold text-green-600">£14,315</p>
+                          <p className="text-[8px] text-slate-500">Net Pay</p>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Staff payslip rows */}
+                    {[
+                      { name: 'Sarah Jones', hours: '152h', gross: '£1,824.00', net: '£1,456.20', status: 'Ready' },
+                      { name: 'Katie Lewis', hours: '144h', gross: '£1,728.00', net: '£1,382.40', status: 'Ready' },
+                      { name: 'Rob Williams', hours: '160h', gross: '£1,920.00', net: '£1,536.00', status: 'Ready' },
+                      { name: 'Amy Morgan', hours: '136h', gross: '£1,632.00', net: '£1,305.60', status: 'Ready' },
+                    ].map((staff) => (
+                      <div key={staff.name} className="bg-white rounded-lg border border-slate-200 p-2.5">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-cyan-100 flex items-center justify-center text-[8px] font-bold text-cyan-700">
+                              {staff.name.split(' ').map(n => n[0]).join('')}
+                            </div>
+                            <p className="text-[10px] font-semibold text-slate-900">{staff.name}</p>
+                          </div>
+                          <span className="text-[7px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">{staff.status}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex gap-3">
+                            <span className="text-[8px] text-slate-500">{staff.hours} worked</span>
+                            <span className="text-[8px] text-slate-500">Gross: {staff.gross}</span>
+                          </div>
+                          <span className="text-[10px] font-bold text-green-600">{staff.net}</span>
+                        </div>
+                      </div>
+                    ))}
+                    {/* Payslip preview */}
+                    <div className="bg-cyan-50 rounded-lg border border-cyan-200 p-2.5">
+                      <div className="flex items-center gap-2 mb-1">
+                        <svg className="w-4 h-4 text-cyan-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <p className="text-[9px] font-semibold text-cyan-800">Payslip Preview — Sarah Jones</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[8px]">
+                        <span className="text-slate-500">Basic Pay (152h × £12/h)</span><span className="text-right text-slate-800 font-medium">£1,824.00</span>
+                        <span className="text-slate-500">Night Enhancement</span><span className="text-right text-slate-800 font-medium">£48.00</span>
+                        <span className="text-slate-500">Weekend Enhancement</span><span className="text-right text-slate-800 font-medium">£72.00</span>
+                        <span className="text-slate-500 font-semibold">Gross Pay</span><span className="text-right text-slate-900 font-bold">£1,944.00</span>
+                        <span className="text-slate-500">Income Tax</span><span className="text-right text-red-600">−£218.80</span>
+                        <span className="text-slate-500">National Insurance</span><span className="text-right text-red-600">−£156.40</span>
+                        <span className="text-slate-500">Pension (5%)</span><span className="text-right text-red-600">−£97.20</span>
+                        <span className="text-slate-500 font-semibold">Net Pay</span><span className="text-right text-green-600 font-bold">£1,471.60</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </AnimateOnScroll>
+
+            {/* Automatic Invoicing System Mockup */}
+            <AnimateOnScroll animation="fade-up">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <div className="bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-700">
+                  <div className="flex items-center gap-2 mb-3 px-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                    <span className="text-[10px] text-slate-500 ml-2">Invoicing — CareCall AI</span>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-xs font-bold text-slate-900">Invoices — February 2026</p>
+                      <div className="flex gap-1">
+                        <span className="text-[8px] px-2 py-0.5 rounded bg-violet-500 text-white font-medium">+ Generate Invoice</span>
+                        <span className="text-[8px] px-2 py-0.5 rounded bg-white text-slate-500 border border-slate-200">Export</span>
+                      </div>
+                    </div>
+                    {/* Invoice summary */}
+                    <div className="bg-white rounded-lg border border-slate-200 p-3">
+                      <p className="text-[10px] font-semibold text-slate-700 mb-2">Monthly Overview</p>
+                      <div className="grid grid-cols-4 gap-2">
+                        <div className="text-center">
+                          <p className="text-sm font-bold text-violet-600">12</p>
+                          <p className="text-[8px] text-slate-500">Invoices</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm font-bold text-green-600">£28,450</p>
+                          <p className="text-[8px] text-slate-500">Invoiced</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm font-bold text-blue-600">£19,200</p>
+                          <p className="text-[8px] text-slate-500">Paid</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm font-bold text-amber-600">£9,250</p>
+                          <p className="text-[8px] text-slate-500">Outstanding</p>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Invoice rows */}
+                    {[
+                      { ref: 'INV-2026-0047', client: 'Denbighshire County Council', amount: '£8,420.00', date: '01 Feb', due: '28 Feb', status: 'Paid', statusColor: 'bg-green-100 text-green-700' },
+                      { ref: 'INV-2026-0048', client: 'Conwy Borough Council', amount: '£6,180.00', date: '01 Feb', due: '28 Feb', status: 'Sent', statusColor: 'bg-blue-100 text-blue-700' },
+                      { ref: 'INV-2026-0049', client: 'Mrs. G. Williams (Private)', amount: '£1,240.00', date: '05 Feb', due: '05 Mar', status: 'Sent', statusColor: 'bg-blue-100 text-blue-700' },
+                      { ref: 'INV-2026-0050', client: 'Flintshire County Council', amount: '£4,860.00', date: '14 Feb', due: '14 Mar', status: 'Draft', statusColor: 'bg-slate-100 text-slate-600' },
+                    ].map((inv) => (
+                      <div key={inv.ref} className="bg-white rounded-lg border border-slate-200 p-2.5">
+                        <div className="flex items-center justify-between mb-1">
+                          <div>
+                            <p className="text-[10px] font-semibold text-slate-900">{inv.client}</p>
+                            <p className="text-[8px] text-slate-400">{inv.ref} — Issued {inv.date}</p>
+                          </div>
+                          <span className={`text-[7px] px-1.5 py-0.5 rounded-full font-medium ${inv.statusColor}`}>{inv.status}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[8px] text-slate-500">Due: {inv.due}</span>
+                          <span className="text-[10px] font-bold text-slate-900">{inv.amount}</span>
+                        </div>
+                      </div>
+                    ))}
+                    {/* Auto-generate info */}
+                    <div className="bg-violet-50 rounded-lg border border-violet-200 p-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-violet-500" />
+                        <p className="text-[9px] font-semibold text-violet-800">Auto-Generation Active</p>
+                      </div>
+                      <p className="text-[8px] text-slate-600 mt-1">Invoices are generated automatically from completed visit data and service agreements. Itemised by service user, visit dates, hours delivered, and agreed hourly rates.</p>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-slate-900 mb-3">Automatic Invoicing System</h3>
+                  <p className="text-slate-600 leading-relaxed mb-4">Let CareCall AI handle your billing. Invoices are generated automatically from completed visits, matched against service agreements and hourly rates. Whether you&apos;re billing local authorities, the NHS, or private clients — every invoice is accurate, professional, and audit-ready.</p>
+                  <ul className="space-y-2">
+                    {['Auto-generate invoices from completed visit data', 'Itemised by service user, dates, and hours delivered', 'Multiple billing clients (councils, NHS, private)', 'Professional PDF invoices with your branding', 'Payment tracking and ageing reports', 'Automatic invoice scheduling (weekly, monthly)', 'Credit notes and adjustments', 'Export to accounting software (CSV, PDF)'].map((item) => (
+                      <li key={item} className="flex items-center gap-2 text-sm text-slate-600">
+                        <svg className="w-4 h-4 text-welsh-green flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </AnimateOnScroll>
           </div>
         </div>
       </section>
@@ -1439,7 +1759,7 @@ export default function CareCallAIPage() {
                 {[
                   { number: '24/7', label: 'Operations Support' },
                   { number: '15s', label: 'GPS Update Interval' },
-                  { number: '42+', label: 'Integrated Features' },
+                  { number: '50+', label: 'Integrated Features' },
                   { number: '100%', label: 'Welsh CIW Focused' },
                 ].map((stat) => (
                   <div key={stat.label} className="bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-6 text-center">
