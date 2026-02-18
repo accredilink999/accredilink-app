@@ -37,6 +37,36 @@ function MaskedInput({ value, onChange, placeholder, className }) {
 }
 
 // ---------------------------------------------------------------------------
+// Normalize APNS credentials from either storage format
+// Old format: { service: 'apns', credentials: { key_id, team_id, private_key, ... } }
+// New format: { credential_type: 'apns', apns_key_id, apns_team_id, apns_auth_key, ... }
+// ---------------------------------------------------------------------------
+function normalizeApnsCredential(raw) {
+  if (!raw) return null;
+  // If it already has the new-format fields, return as-is
+  if (raw.apns_key_id || raw.apns_auth_key || raw.apns_team_id) {
+    return { ...raw, credential_type: 'apns' };
+  }
+  // Try extracting from the credentials JSONB column
+  const creds = typeof raw.credentials === 'string'
+    ? (() => { try { return JSON.parse(raw.credentials); } catch { return null; } })()
+    : raw.credentials;
+  if (creds && typeof creds === 'object') {
+    return {
+      ...raw,
+      credential_type: 'apns',
+      apns_key_id: creds.key_id || creds.apns_key_id || '',
+      apns_team_id: creds.team_id || creds.apns_team_id || '',
+      apns_auth_key: creds.private_key || creds.apns_auth_key || creds.auth_key || '',
+      apns_bundle_id: creds.bundle_id || creds.apns_bundle_id || 'com.carecallai.app',
+      apns_environment: creds.environment || creds.apns_environment || 'production',
+      is_active: raw.is_active,
+    };
+  }
+  return { ...raw, credential_type: 'apns' };
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -59,8 +89,12 @@ export default function PushCredentialsManager() {
     }),
   });
 
-  const firebaseCredential = credentials.find(c => c.credential_type === 'firebase');
-  const apnsCredential = credentials.find(c => c.credential_type === 'apns');
+  const firebaseCredential = credentials.find(c => c.credential_type === 'firebase' || c.service === 'firebase');
+
+  // APNS credentials may be stored with either credential_type='apns' (new format)
+  // or service='apns' with data in the credentials JSONB column (old format)
+  const apnsCredentialRaw = credentials.find(c => c.credential_type === 'apns' || c.service === 'apns');
+  const apnsCredential = apnsCredentialRaw ? normalizeApnsCredential(apnsCredentialRaw) : null;
   const webConfigSetting = systemSettings.find(s => s.setting_key === 'firebase_web_config');
   const vapidSetting = systemSettings.find(s => s.setting_key === 'firebase_vapid_key');
   const serviceAccountSetting = systemSettings.find(s => s.setting_key === 'firebase_service_account');
@@ -68,11 +102,31 @@ export default function PushCredentialsManager() {
   // Save push credentials (server key / APNS)
   const saveCredentialMutation = useMutation({
     mutationFn: async (data) => {
-      const existing = credentials.find(c => c.credential_type === data.credential_type);
+      // Find existing record by credential_type OR service field
+      const existing = credentials.find(
+        c => c.credential_type === data.credential_type || c.service === data.credential_type
+      );
+
+      // For APNS, also save into the credentials JSONB column for backwards compatibility
+      const saveData = { ...data };
+      if (data.credential_type === 'apns') {
+        saveData.service = 'apns';
+        saveData.credentials = {
+          key_id: data.apns_key_id,
+          team_id: data.apns_team_id,
+          private_key: data.apns_auth_key,
+          bundle_id: data.apns_bundle_id || 'com.carecallai.app',
+          environment: data.apns_environment || 'production',
+        };
+      }
+      if (data.credential_type === 'firebase') {
+        saveData.service = 'firebase';
+      }
+
       if (existing) {
-        await base44.entities.NotificationCredentials.update(existing.id, data);
+        await base44.entities.NotificationCredentials.update(existing.id, saveData);
       } else {
-        await base44.entities.NotificationCredentials.create(data);
+        await base44.entities.NotificationCredentials.create(saveData);
       }
 
       // For APNS credentials, also save to system_settings so the

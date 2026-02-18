@@ -213,22 +213,54 @@ Deno.serve(async (req) => {
     }
 
     // Fallback: notification_credentials table (legacy storage location)
+    // Try both credential_type='apns' and service='apns' since the table
+    // may use either column depending on when the data was saved.
     if (!creds) {
-      const { data: ncRow } = await supabaseAdmin
+      // Try credential_type column first
+      let { data: ncRow } = await supabaseAdmin
         .from('notification_credentials')
         .select('*')
         .eq('credential_type', 'apns')
         .maybeSingle();
 
-      if (ncRow?.apns_auth_key && ncRow?.apns_key_id && ncRow?.apns_team_id) {
-        creds = {
-          key_id: ncRow.apns_key_id,
-          team_id: ncRow.apns_team_id,
-          private_key: ncRow.apns_auth_key,
-          bundle_id: ncRow.apns_bundle_id || 'com.carecallai.app',
-          environment: ncRow.apns_environment || 'production',
-        };
-        console.log('[APNS] Loaded credentials from notification_credentials (fallback)');
+      // If not found, try service column
+      if (!ncRow) {
+        const { data: ncRow2 } = await supabaseAdmin
+          .from('notification_credentials')
+          .select('*')
+          .eq('service', 'apns')
+          .maybeSingle();
+        ncRow = ncRow2;
+      }
+
+      if (ncRow) {
+        // Check for direct columns first (new format)
+        if (ncRow.apns_auth_key && ncRow.apns_key_id && ncRow.apns_team_id) {
+          creds = {
+            key_id: ncRow.apns_key_id,
+            team_id: ncRow.apns_team_id,
+            private_key: ncRow.apns_auth_key,
+            bundle_id: ncRow.apns_bundle_id || 'com.carecallai.app',
+            environment: ncRow.apns_environment || 'production',
+          };
+          console.log('[APNS] Loaded credentials from notification_credentials (direct columns)');
+        }
+        // Fall back to credentials JSONB column (old format)
+        else if (ncRow.credentials) {
+          const jsonCreds = typeof ncRow.credentials === 'string'
+            ? JSON.parse(ncRow.credentials)
+            : ncRow.credentials;
+          if (jsonCreds.key_id || jsonCreds.private_key || jsonCreds.team_id) {
+            creds = {
+              key_id: jsonCreds.key_id || jsonCreds.apns_key_id || '',
+              team_id: jsonCreds.team_id || jsonCreds.apns_team_id || '',
+              private_key: jsonCreds.private_key || jsonCreds.apns_auth_key || jsonCreds.auth_key || '',
+              bundle_id: jsonCreds.bundle_id || jsonCreds.apns_bundle_id || 'com.carecallai.app',
+              environment: jsonCreds.environment || jsonCreds.apns_environment || 'production',
+            };
+            console.log('[APNS] Loaded credentials from notification_credentials JSONB (legacy format)');
+          }
+        }
       }
     }
 
