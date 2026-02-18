@@ -98,7 +98,7 @@ export default function CareersPage() {
                 Whether you're experienced or new to care, we'd love to hear from you.
               </p>
             </div>
-            <div className="relative h-64 sm:h-80 rounded-2xl overflow-hidden shadow-lg hidden lg:block">
+            <div className="relative h-48 sm:h-64 lg:h-80 rounded-2xl overflow-hidden shadow-lg mt-6 lg:mt-0">
               <Image src="/images/careers.jpg" alt="Join the Accredilink care team" fill className="object-cover" />
             </div>
           </div>

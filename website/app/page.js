@@ -189,8 +189,8 @@ export default function Home() {
               </AnimateOnScroll>
             </div>
 
-            <AnimateOnScroll animation="scale-in" delay={300} className="hidden lg:block">
-              <div className="relative h-96 rounded-2xl overflow-hidden shadow-2xl">
+            <AnimateOnScroll animation="scale-in" delay={300}>
+              <div className="relative h-56 sm:h-72 lg:h-96 rounded-2xl overflow-hidden shadow-2xl mt-8 lg:mt-0">
                 <Image src="/images/hero-home.jpg" alt="Compassionate care services in North Wales" fill className="object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900/30 to-transparent" />
               </div>
@@ -306,8 +306,8 @@ export default function Home() {
                 </AnimateOnScroll>
               ))}
             </div>
-            <AnimateOnScroll animation="scale-in" delay={300} className="lg:col-span-2 hidden lg:block">
-              <div className="relative h-80 rounded-2xl overflow-hidden shadow-xl">
+            <AnimateOnScroll animation="scale-in" delay={300} className="lg:col-span-2">
+              <div className="relative h-56 sm:h-64 lg:h-80 rounded-2xl overflow-hidden shadow-xl mt-6 lg:mt-0">
                 <Image src="/images/why-choose-us.jpg" alt="Professional care team" fill className="object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900/30 to-transparent" />
               </div>
@@ -358,8 +358,8 @@ export default function Home() {
       <section className="py-16 sm:py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <AnimateOnScroll animation="slide-in-left" className="hidden lg:block">
-              <div className="relative h-64 rounded-2xl overflow-hidden shadow-xl">
+            <AnimateOnScroll animation="slide-in-left">
+              <div className="relative h-48 sm:h-56 lg:h-64 rounded-2xl overflow-hidden shadow-xl mb-8 lg:mb-0">
                 <Image src="/images/testimonial.jpg" alt="Happy families we support" fill className="object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900/20 to-transparent" />
               </div>
@@ -369,11 +369,11 @@ export default function Home() {
                 <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">
                   Need Care Support?
                 </h2>
-                <p className="text-lg text-slate-600 mb-8 max-w-2xl mx-auto lg:mx-0">
+                <p className="text-lg text-slate-600 mb-6 max-w-2xl mx-auto lg:mx-0">
                   Get in touch to discuss your care needs. We offer free, no-obligation assessments
                   and can tailor our services to suit you and your family.
                 </p>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+                <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-6">
                   <Link
                     href="/contact"
                     className="inline-flex items-center justify-center px-6 py-3.5 bg-gradient-to-r from-welsh-red to-red-500 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-red-500/25 hover:-translate-y-0.5 transition-all duration-300"
@@ -387,6 +387,12 @@ export default function Home() {
                     View All Services
                   </Link>
                 </div>
+                <p className="text-sm text-slate-500 text-center lg:text-left">
+                  Or email us at{' '}
+                  <a href="mailto:enquiries@accredilinkcare.co.uk" className="text-welsh-red font-medium hover:underline">
+                    enquiries@accredilinkcare.co.uk
+                  </a>
+                </p>
               </div>
             </AnimateOnScroll>
           </div>

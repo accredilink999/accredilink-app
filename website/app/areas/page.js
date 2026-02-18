@@ -44,7 +44,7 @@ export default function AreasPage() {
                 We provide care services across three counties in North Wales — Denbighshire, Conwy, and Wrexham.
               </p>
             </div>
-            <div className="hidden lg:block relative h-72 rounded-2xl overflow-hidden">
+            <div className="relative h-48 sm:h-56 lg:h-72 rounded-2xl overflow-hidden mt-6 lg:mt-0">
               <Image src="/images/welsh-landscape.jpg" alt="Beautiful North Wales landscape" fill className="object-cover" />
             </div>
           </div>
@@ -122,6 +122,10 @@ export default function AreasPage() {
           <Link href="/contact" className="inline-flex items-center justify-center px-6 py-3.5 bg-welsh-red text-white font-semibold rounded-xl hover:bg-welsh-red-light transition-colors">
             Get in Touch
           </Link>
+          <p className="text-sm text-slate-500 mt-6">
+            Call <strong>01824 538688</strong> or email{' '}
+            <a href="mailto:enquiries@accredilinkcare.co.uk" className="text-welsh-red font-medium hover:underline">enquiries@accredilinkcare.co.uk</a>
+          </p>
         </div>
       </section>
     </>

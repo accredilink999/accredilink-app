@@ -84,7 +84,7 @@ export default function AboutPage() {
                 </p>
               </div>
             </div>
-            <div className="relative h-96 rounded-2xl overflow-hidden hidden lg:block">
+            <div className="relative h-56 sm:h-72 lg:h-96 rounded-2xl overflow-hidden">
               <Image src="/images/about-team.jpg" alt="Our dedicated care team" fill className="object-cover" />
             </div>
           </div>
@@ -148,9 +148,9 @@ export default function AboutPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-4">Want to Know More?</h2>
           <p className="text-lg text-slate-600 mb-8">
-            We'd love to talk to you about how we can help. Get in touch for an informal chat.
+            We&apos;d love to talk to you about how we can help. Get in touch for an informal chat.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-6">
             <Link href="/contact" className="inline-flex items-center justify-center px-6 py-3.5 bg-welsh-red text-white font-semibold rounded-xl hover:bg-welsh-red-light transition-colors">
               Contact Us
             </Link>
@@ -158,6 +158,13 @@ export default function AboutPage() {
               Join Our Team
             </Link>
           </div>
+          <p className="text-sm text-slate-500">
+            Email us at{' '}
+            <a href="mailto:info@accredilinkcare.co.uk" className="text-welsh-red font-medium hover:underline">info@accredilinkcare.co.uk</a>
+            {' '}for general information or{' '}
+            <a href="mailto:enquiries@accredilinkcare.co.uk" className="text-welsh-red font-medium hover:underline">enquiries@accredilinkcare.co.uk</a>
+            {' '}to discuss care needs.
+          </p>
         </div>
       </section>
     </>

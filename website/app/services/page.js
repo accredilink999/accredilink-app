@@ -208,8 +208,8 @@ export default function ServicesPage() {
               </AnimateOnScroll>
             </div>
 
-            <AnimateOnScroll animation="scale-in" delay={300} className="hidden lg:block">
-              <div className="relative h-96 rounded-2xl overflow-hidden shadow-2xl">
+            <AnimateOnScroll animation="scale-in" delay={300}>
+              <div className="relative h-56 sm:h-72 lg:h-96 rounded-2xl overflow-hidden shadow-2xl mt-8 lg:mt-0">
                 <Image src="/images/services-overview.jpg" alt="Our care services" fill className="object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900/40 to-transparent" />
               </div>
@@ -376,9 +376,14 @@ export default function ServicesPage() {
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-6">
               Ready to Discuss Your Care Needs?
             </h2>
-            <p className="text-lg sm:text-xl text-white/90 mb-10 max-w-2xl mx-auto">
+            <p className="text-lg sm:text-xl text-white/90 mb-4 max-w-2xl mx-auto">
               We offer free, no-obligation assessments. Our team is here to help you find
               the right care solution for you and your family.
+            </p>
+            <p className="text-base text-white/60 mb-10">
+              Email{' '}
+              <a href="mailto:enquiries@accredilinkcare.co.uk" className="text-white/90 font-medium hover:underline">enquiries@accredilinkcare.co.uk</a>
+              {' '}or call <strong className="text-white/90">01824 538688</strong>
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
