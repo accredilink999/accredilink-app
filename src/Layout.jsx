@@ -120,7 +120,7 @@ export default function Layout({ children, currentPageName }) {
 
   const { data: pendingSwaps = [] } = useQuery({
     queryKey: ['pendingSwaps'],
-    queryFn: () => base44.entities.ShiftSwapRequest.filter({ status: 'pending' }),
+    queryFn: () => base44.entities.ShiftSwapRequest.filter({ status: 'pending_admin' }),
     enabled: isAdmin,
   });
 
@@ -617,6 +617,9 @@ export default function Layout({ children, currentPageName }) {
 
       const unsubscribeSwaps = base44.entities.ShiftSwapRequest.subscribe(() => {
         queryClient.invalidateQueries({ queryKey: ['pendingSwaps'] });
+        queryClient.invalidateQueries({ queryKey: ['shiftSwapRequests'] });
+        queryClient.invalidateQueries({ queryKey: ['incomingSwapRequests'] });
+        queryClient.invalidateQueries({ queryKey: ['mySwapRequests'] });
       });
 
       return () => {

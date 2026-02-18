@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2 } from 'lucide-react';
+import { notifySwapCreated } from '@/utils/shiftSwapNotifications';
 
 export default function ShiftSwapRequest({ shift, open, onClose }) {
   const queryClient = useQueryClient();
@@ -18,17 +19,28 @@ export default function ShiftSwapRequest({ shift, open, onClose }) {
     queryFn: () => base44.entities.User.list(),
   });
 
+  const activeStaff = staff.filter(s => s.is_active !== false && s.id !== shift?.staff_id);
+
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.ShiftSwapRequest.create(data),
+    mutationFn: async (data) => {
+      const result = await base44.entities.ShiftSwapRequest.create(data);
+      // Send notifications (fire-and-forget)
+      notifySwapCreated({
+        swap: data,
+        areaId: shift.rota_area_id || shift.area_id,
+      });
+      return result;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shiftSwapRequests'] });
+      queryClient.invalidateQueries({ queryKey: ['mySwapRequests'] });
       onClose();
     },
   });
 
-  const handleSubmit = async () => {
-    const swapWithStaff = swapWithId ? staff.find(s => s.id === swapWithId) : null;
-    
+  const handleSubmit = () => {
+    const swapWithStaff = staff.find(s => s.id === swapWithId);
+
     createMutation.mutate({
       shift_id: shift.id,
       requester_id: shift.staff_id,
@@ -36,10 +48,11 @@ export default function ShiftSwapRequest({ shift, open, onClose }) {
       shift_date: shift.date,
       shift_time: `${shift.start_time} - ${shift.end_time}`,
       service_user_name: shift.service_user_name,
-      swap_with_id: swapWithId || null,
+      swap_with_id: swapWithId,
       swap_with_name: swapWithStaff?.staff_full_name || swapWithStaff?.full_name || null,
+      rota_area_id: shift.rota_area_id || shift.area_id || null,
       reason,
-      status: 'pending'
+      status: 'pending_target'
     });
   };
 
@@ -53,25 +66,22 @@ export default function ShiftSwapRequest({ shift, open, onClose }) {
         <div className="space-y-4 py-4">
           <div className="p-3 bg-slate-50 rounded-lg">
             <p className="text-sm text-slate-500">Shift Details</p>
-            <p className="font-medium">{shift?.service_user_name}</p>
-            <p className="text-sm text-slate-600">{shift?.date} • {shift?.start_time} - {shift?.end_time}</p>
+            <p className="font-medium">{shift?.service_user_name || 'General shift'}</p>
+            <p className="text-sm text-slate-600">{shift?.date} &bull; {shift?.start_time} - {shift?.end_time}</p>
           </div>
 
           <div>
-            <Label>Swap With (Optional)</Label>
+            <Label>Swap With *</Label>
             <Select value={swapWithId} onValueChange={setSwapWithId}>
               <SelectTrigger>
-                <SelectValue placeholder="Select staff member or leave empty" />
+                <SelectValue placeholder="Select staff member to swap with" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={null}>Anyone Available</SelectItem>
-                {staff
-                  .filter(s => s.id !== shift?.staff_id)
-                  .map(s => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.staff_full_name || s.full_name}
-                    </SelectItem>
-                  ))}
+                {activeStaff.map(s => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.staff_full_name || s.full_name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -91,9 +101,9 @@ export default function ShiftSwapRequest({ shift, open, onClose }) {
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button 
+          <Button
             onClick={handleSubmit}
-            disabled={!reason || createMutation.isPending}
+            disabled={!reason || !swapWithId || createMutation.isPending}
             className="bg-teal-600 hover:bg-teal-700"
           >
             {createMutation.isPending ? (

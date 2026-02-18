@@ -33,8 +33,10 @@ import {
   Shield,
   Settings,
   Menu,
-  MessageSquare } from
+  MessageSquare,
+  ArrowRightLeft } from
 'lucide-react';
+import ShiftSwapResponseModal from '@/components/rota/ShiftSwapResponseModal';
 
 export default function Dashboard() {
   const today = format(new Date(), 'yyyy-MM-dd');
@@ -107,6 +109,30 @@ export default function Dashboard() {
     queryKey: ['pendingLeave'],
     queryFn: () => base44.entities.LeaveRequest.filter({ status: 'pending' })
   });
+
+  // Shift swap requests where I'm the target and need to respond
+  const { data: incomingSwapRequests = [] } = useQuery({
+    queryKey: ['incomingSwapRequests', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const all = await base44.entities.ShiftSwapRequest.filter({ swap_with_id: user.id, status: 'pending_target' });
+      return all;
+    },
+    enabled: !!user?.id,
+  });
+
+  // Shift swap requests I've made (to show status)
+  const { data: mySwapRequests = [] } = useQuery({
+    queryKey: ['mySwapRequests', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const all = await base44.entities.ShiftSwapRequest.filter({ requester_id: user.id });
+      return all.filter(r => ['pending_target', 'pending_admin', 'accepted', 'declined', 'approved', 'rejected'].includes(r.status));
+    },
+    enabled: !!user?.id,
+  });
+
+  const [selectedSwapRequest, setSelectedSwapRequest] = useState(null);
 
   const totalAdminTasks = openIncidents.length + pendingLeave.length;
 
@@ -231,6 +257,77 @@ export default function Dashboard() {
           </div>
         </Card>
       }
+
+      {/* Incoming Shift Swap Requests — target staff needs to respond */}
+      {incomingSwapRequests.length > 0 && (
+        <Card className="p-4 sm:p-5 bg-gradient-to-br from-yellow-50 to-amber-50 border-0 shadow-sm">
+          <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2 text-sm sm:text-base">
+            <ArrowRightLeft className="w-4 h-4 text-yellow-600 flex-shrink-0" />
+            Shift Swap Request{incomingSwapRequests.length > 1 ? 's' : ''}
+          </h3>
+          <div className="space-y-2">
+            {incomingSwapRequests.map(swap => (
+              <div
+                key={swap.id}
+                onClick={() => setSelectedSwapRequest(swap)}
+                className="flex items-center gap-3 p-3 bg-white/80 rounded-lg hover:bg-white transition-colors cursor-pointer"
+              >
+                <ArrowRightLeft className="w-5 h-5 text-yellow-500" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-900 truncate">
+                    {swap.requester_name} wants to swap shifts with you
+                  </p>
+                  <p className="text-xs text-slate-500">{swap.shift_date} &bull; {swap.shift_time}</p>
+                </div>
+                <Badge className="bg-yellow-100 text-yellow-700 text-xs flex-shrink-0">Action Needed</Badge>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* My outgoing swap request status updates */}
+      {mySwapRequests.filter(r => !['approved', 'rejected', 'declined'].includes(r.status)).length > 0 && (
+        <Card className="p-4 sm:p-5 bg-gradient-to-br from-blue-50 to-indigo-50 border-0 shadow-sm">
+          <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2 text-sm sm:text-base">
+            <ArrowRightLeft className="w-4 h-4 text-blue-600 flex-shrink-0" />
+            Your Swap Requests
+          </h3>
+          <div className="space-y-2">
+            {mySwapRequests.filter(r => !['approved', 'rejected', 'declined'].includes(r.status)).map(swap => (
+              <div key={swap.id} className="flex items-center gap-3 p-3 bg-white/80 rounded-lg">
+                <ArrowRightLeft className="w-5 h-5 text-blue-500" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-900 truncate">
+                    Swap with {swap.swap_with_name} — {swap.shift_date}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {swap.status === 'pending_target' && `Awaiting ${swap.swap_with_name}'s response`}
+                    {swap.status === 'pending_admin' && 'Accepted — awaiting admin approval'}
+                    {swap.status === 'accepted' && 'Accepted — awaiting admin approval'}
+                  </p>
+                </div>
+                <Badge className={`text-xs flex-shrink-0 ${
+                  swap.status === 'pending_target' ? 'bg-orange-100 text-orange-700' :
+                  'bg-blue-100 text-blue-700'
+                }`}>
+                  {swap.status === 'pending_target' ? 'Pending' : 'With Admin'}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Shift Swap Response Modal */}
+      {selectedSwapRequest && (
+        <ShiftSwapResponseModal
+          swapRequest={selectedSwapRequest}
+          open={!!selectedSwapRequest}
+          onClose={() => setSelectedSwapRequest(null)}
+          currentUser={user}
+        />
+      )}
 
       {/* Chat Banner */}
       {unreadConversations.length > 0 &&
