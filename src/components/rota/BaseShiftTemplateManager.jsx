@@ -250,27 +250,29 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
     if (!clearStartDate || !clearEndDate) return;
     setClearing(true);
     try {
-      // Count how many will be deleted first
+      // Count how many will be deleted — ONLY template-generated unassigned shifts
       const { count, error: countErr } = await supabase
         .from('shifts')
         .select('id', { count: 'exact', head: true })
         .is('staff_id', null)
+        .eq('is_base_shift', true)
         .gte('date', clearStartDate)
         .lte('date', clearEndDate);
 
       if (countErr) throw countErr;
 
       if (!count || count === 0) {
-        toast.error('No available (unassigned) shifts found in that date range');
+        toast.error('No template-generated available shifts found in that date range');
         setClearing(false);
         return;
       }
 
-      // Delete directly using the same filters — no ID array needed
+      // Delete only template-generated unassigned shifts
       const { error: delError } = await supabase
         .from('shifts')
         .delete()
         .is('staff_id', null)
+        .eq('is_base_shift', true)
         .gte('date', clearStartDate)
         .lte('date', clearEndDate);
 
@@ -537,8 +539,8 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
               <p className="text-sm font-medium text-red-800">Clear Available Shifts</p>
             </div>
             <p className="text-xs text-red-600">
-              This will delete all unassigned/available shifts in the selected date range.
-              Shifts that already have staff assigned will NOT be affected.
+              This will only delete template-generated available shifts (created by Deploy All).
+              Manually created shifts and staff-assigned shifts will NOT be affected.
             </p>
             <div className="grid grid-cols-2 gap-2">
               <div>
