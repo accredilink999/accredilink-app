@@ -28,10 +28,9 @@ export default function MonthView({ currentDate, onShiftClick, onCreateShift, is
          return dateMatches && areaMatches;
        });
        if (filterByUserId) {
-         filtered = filtered.filter(s => s.staff_id === filterByUserId);
+         filtered = filtered.filter(s => s.staff_id === filterByUserId || !s.staff_id);
        } else if (!showAllShifts && !isAdmin && userId) {
-         // Show only current user's shifts unless "all shifts" is toggled
-         filtered = filtered.filter(s => s.staff_id === userId);
+         filtered = filtered.filter(s => s.staff_id === userId || !s.staff_id);
        }
        return filtered;
      },
@@ -96,25 +95,34 @@ export default function MonthView({ currentDate, onShiftClick, onCreateShift, is
                     dayShifts.map((shift) => {
                       const shiftType = shiftTypes.find(st => st.name === shift.shift_name);
                       const shiftColor = shiftType?.color || '#14b8a6';
+                      const isAvailable = !shift.staff_id;
                       return (
                         <button
                            key={shift.id}
                            onClick={() => onShiftClick(shift)}
-                           className="w-full text-left p-3 rounded-lg hover:shadow-lg select-none transition-all"
-                           style={{
-                             backgroundColor: shiftColor
+                           className={`w-full text-left p-3 rounded-lg hover:shadow-lg select-none transition-all ${isAvailable ? 'border-2 border-dashed' : ''}`}
+                           style={isAvailable ? {
+                             borderColor: shiftColor,
+                             backgroundColor: `${shiftColor}15`,
+                           } : {
+                             backgroundColor: shiftColor,
                            }}
                          >
-                          <p className="text-sm font-medium text-white">
-                            {shift.shift_name ? (
-                              <>
-                                {shift.shift_name}
-                                <span className="opacity-90"> ({shift.staff_name}{shift.paired_staff_name ? ` + ${shift.paired_staff_name}` : ''})</span>
-                              </>
-                            ) : shift.staff_name ? `${shift.staff_name}${shift.paired_staff_name ? ` + ${shift.paired_staff_name}` : ''}` : 'Unassigned'}
+                          <p className={`text-sm font-medium ${isAvailable ? '' : 'text-white'}`} style={isAvailable ? { color: shiftColor } : {}}>
+                            {isAvailable ? (shift.shift_name || 'Shift') : (
+                              shift.shift_name ? (
+                                <>
+                                  {shift.shift_name}
+                                  <span className="opacity-90"> ({shift.staff_name}{shift.paired_staff_name ? ` + ${shift.paired_staff_name}` : ''})</span>
+                                </>
+                              ) : shift.staff_name ? `${shift.staff_name}${shift.paired_staff_name ? ` + ${shift.paired_staff_name}` : ''}` : 'Unassigned'
+                            )}
                           </p>
-                          <p className="text-sm text-white opacity-90">{shift.start_time} - {shift.end_time}</p>
-                          {shift.service_user_name && (
+                          <p className={`text-sm ${isAvailable ? 'text-slate-500' : 'text-white opacity-90'}`}>{shift.start_time} - {shift.end_time}</p>
+                          {isAvailable && (
+                            <p className="text-xs font-medium text-teal-600 mt-1">Available - Tap to Claim</p>
+                          )}
+                          {!isAvailable && shift.service_user_name && (
                             <p className="text-xs text-white opacity-80">{shift.service_user_name}</p>
                           )}
                         </button>

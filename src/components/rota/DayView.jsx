@@ -22,7 +22,7 @@ export default function DayView({ currentDate, onShiftClick, onCreateShift, isAd
          return dateMatches && areaMatches;
        });
        if (filterByUserId) {
-         filtered = filtered.filter(s => s.staff_id === filterByUserId);
+         filtered = filtered.filter(s => s.staff_id === filterByUserId || !s.staff_id);
        }
        return filtered;
      },
@@ -59,28 +59,37 @@ export default function DayView({ currentDate, onShiftClick, onCreateShift, isAd
     const shiftType = shiftTypes.find(st => st.name === shift.shift_name);
     const shiftColor = shiftType?.color || '#14b8a6';
     const shiftCalls = getCallsForShift(shift.id);
+    const isAvailable = !shift.staff_id;
 
     return (
       <button
          onClick={onClick}
-         className="w-full text-left p-3 rounded-lg hover:shadow-lg transition-all select-none"
-         style={{
-           backgroundColor: shiftColor
+         className={`w-full text-left p-3 rounded-lg hover:shadow-lg transition-all select-none ${isAvailable ? 'border-2 border-dashed' : ''}`}
+         style={isAvailable ? {
+           borderColor: shiftColor,
+           backgroundColor: `${shiftColor}15`,
+         } : {
+           backgroundColor: shiftColor,
          }}
        >
-         <p className="text-sm font-medium text-white">
-           {shift.shift_name ? (
-             <>
-               {shift.shift_name}
-               <span className="opacity-90"> ({shift.staff_name}{shift.paired_staff_name ? ` + ${shift.paired_staff_name}` : ''})</span>
-             </>
-           ) : shift.staff_name ? `${shift.staff_name}${shift.paired_staff_name ? ` + ${shift.paired_staff_name}` : ''}` : 'Unassigned'}
+         <p className={`text-sm font-medium ${isAvailable ? '' : 'text-white'}`} style={isAvailable ? { color: shiftColor } : {}}>
+           {isAvailable ? (shift.shift_name || 'Shift') : (
+             shift.shift_name ? (
+               <>
+                 {shift.shift_name}
+                 <span className="opacity-90"> ({shift.staff_name}{shift.paired_staff_name ? ` + ${shift.paired_staff_name}` : ''})</span>
+               </>
+             ) : shift.staff_name ? `${shift.staff_name}${shift.paired_staff_name ? ` + ${shift.paired_staff_name}` : ''}` : 'Unassigned'
+           )}
          </p>
-         <p className="text-sm text-white opacity-90">{shift.start_time} - {shift.end_time}</p>
-         {shift.service_user_name && (
+         <p className={`text-sm ${isAvailable ? 'text-slate-500' : 'text-white opacity-90'}`}>{shift.start_time} - {shift.end_time}</p>
+         {isAvailable && (
+           <p className="text-xs font-medium text-teal-600 mt-1">Available - Tap to Claim</p>
+         )}
+         {!isAvailable && shift.service_user_name && (
            <p className="text-xs text-white opacity-80">{shift.service_user_name}</p>
          )}
-         {shiftCalls.length > 0 && (
+         {!isAvailable && shiftCalls.length > 0 && (
            <div className="mt-2">
              <p className="text-xs text-white opacity-80 mb-1">{shiftCalls.length} call{shiftCalls.length !== 1 ? 's' : ''}</p>
              <div className="flex gap-0.5">

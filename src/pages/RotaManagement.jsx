@@ -11,10 +11,11 @@ import DayView from '@/components/rota/DayView';
 import ShiftDetailModal from '@/components/rota/ShiftDetailModal';
 import CreateShiftModal from '@/components/rota/CreateShiftModal';
 import PatternManager from '@/components/rota/PatternManager';
+import BaseShiftTemplateManager from '@/components/rota/BaseShiftTemplateManager';
 import RotaAreaSelector from '@/components/rota/RotaAreaSelector';
 import ClientCallManager from '@/components/rota/ClientCallManager';
 import ShiftTypeManager from '@/components/rota/ShiftTypeManager';
-import { ChevronLeft, ChevronRight, Plus, Settings, Phone, Tag, CalendarDays, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Settings, Phone, Tag, CalendarDays, MapPin, LayoutTemplate } from 'lucide-react';
 
 export default function RotaManagement() {
   const [view, setView] = useState('week');
@@ -24,6 +25,7 @@ export default function RotaManagement() {
   const [isPatternManagerOpen, setIsPatternManagerOpen] = useState(false);
   const [isCallManagerOpen, setIsCallManagerOpen] = useState(false);
   const [isShiftTypeManagerOpen, setIsShiftTypeManagerOpen] = useState(false);
+  const [isTemplateManagerOpen, setIsTemplateManagerOpen] = useState(false);
   const [createShiftDate, setCreateShiftDate] = useState(null);
   const [selectedAreaId, setSelectedAreaId] = useState(null);
   const [isCreateAreaOpen, setIsCreateAreaOpen] = useState(false);
@@ -166,8 +168,8 @@ export default function RotaManagement() {
           </div>
         )}
 
-        {/* Row 3: Create Area + Patterns side by side */}
-        <div className="flex gap-2">
+        {/* Row 3: Create Area + Patterns + Base Templates */}
+        <div className="flex gap-2 flex-wrap">
           {isAdmin && (
             <Button
               variant="outline"
@@ -186,6 +188,16 @@ export default function RotaManagement() {
             <Settings className="w-4 h-4" />
             Patterns
           </Button>
+          {isAdmin && (
+            <Button
+              variant="outline"
+              onClick={() => setIsTemplateManagerOpen(true)}
+              className="gap-1.5 text-xs sm:text-sm h-9 flex-1 md:flex-none"
+            >
+              <LayoutTemplate className="w-4 h-4" />
+              Base Templates
+            </Button>
+          )}
         </div>
 
         {/* Row 4: Client Calls + Shift Types side by side */}
@@ -308,6 +320,13 @@ export default function RotaManagement() {
         <ShiftTypeManager
           open={isShiftTypeManagerOpen}
           onClose={() => setIsShiftTypeManagerOpen(false)}
+        />
+      )}
+
+      {isTemplateManagerOpen && (
+        <BaseShiftTemplateManager
+          open={isTemplateManagerOpen}
+          onClose={() => setIsTemplateManagerOpen(false)}
         />
       )}
 

@@ -35,7 +35,8 @@ import {
   Settings,
   Menu,
   MessageSquare,
-  ArrowRightLeft } from
+  ArrowRightLeft,
+  Hand } from
 'lucide-react';
 import ShiftSwapResponseModal from '@/components/rota/ShiftSwapResponseModal';
 
@@ -135,6 +136,23 @@ export default function Dashboard() {
 
   const [selectedSwapRequest, setSelectedSwapRequest] = useState(null);
 
+  // Shift claim requests I've made
+  const { data: myClaimRequests = [] } = useQuery({
+    queryKey: ['myClaimRequests', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      return base44.entities.ShiftClaimRequest.filter({ staff_id: user.id });
+    },
+    enabled: !!user?.id,
+  });
+
+  // Pending claims for admin
+  const { data: pendingClaimsAdmin = [] } = useQuery({
+    queryKey: ['pendingClaims'],
+    queryFn: () => base44.entities.ShiftClaimRequest.filter({ status: 'pending' }),
+    enabled: isAdmin,
+  });
+
   const totalAdminTasks = openIncidents.length + pendingLeave.length;
 
   const { data: conversations = [] } = useQuery({
@@ -232,7 +250,7 @@ export default function Dashboard() {
        </div>
 
       {/* Alerts Banner */}
-      {(openIncidents.length > 0 || pendingLeave.length > 0 && isAdmin) &&
+      {(openIncidents.length > 0 || (pendingLeave.length > 0 && isAdmin) || (pendingClaimsAdmin.length > 0 && isAdmin)) &&
       <Card className="bg-gradient-to-br text-card-foreground p-4 rounded-md sm:p-5 from-amber-50 to-orange-50 border-0 shadow-sm">
           <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2 text-sm sm:text-base">
             <Bell className="w-4 h-4 text-amber-600 flex-shrink-0" />
@@ -252,6 +270,14 @@ export default function Dashboard() {
                 <div className="flex items-center gap-3 p-3 bg-white/80 rounded-lg hover:bg-white transition-colors">
                   <FileText className="w-5 h-5 text-amber-500" />
                   <span className="text-sm font-medium">{pendingLeave.length} pending leave request{pendingLeave.length > 1 ? 's' : ''}</span>
+                </div>
+              </Link>
+          }
+            {pendingClaimsAdmin.length > 0 && isAdmin &&
+          <Link to={createPageUrl('RequestsManagement')}>
+                <div className="flex items-center gap-3 p-3 bg-white/80 rounded-lg hover:bg-white transition-colors">
+                  <Hand className="w-5 h-5 text-purple-500" />
+                  <span className="text-sm font-medium">{pendingClaimsAdmin.length} pending shift claim{pendingClaimsAdmin.length > 1 ? 's' : ''}</span>
                 </div>
               </Link>
           }
@@ -314,6 +340,32 @@ export default function Dashboard() {
                 }`}>
                   {swap.status === 'pending_target' ? 'Pending' : 'With Admin'}
                 </Badge>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* My shift claim request status updates */}
+      {myClaimRequests.filter(r => r.status === 'pending').length > 0 && (
+        <Card className="p-4 sm:p-5 bg-gradient-to-br from-purple-50 to-indigo-50 border-0 shadow-sm">
+          <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2 text-sm sm:text-base">
+            <Hand className="w-4 h-4 text-purple-600 flex-shrink-0" />
+            Your Shift Claims
+          </h3>
+          <div className="space-y-2">
+            {myClaimRequests.filter(r => r.status === 'pending').map(claim => (
+              <div key={claim.id} className="flex items-center gap-3 p-3 bg-white/80 rounded-lg">
+                <Hand className="w-5 h-5 text-purple-500" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-900 truncate">
+                    {claim.shift_name || 'Shift'} — {claim.shift_date}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {claim.shift_time} &bull; Awaiting admin approval
+                  </p>
+                </div>
+                <Badge className="bg-purple-100 text-purple-700 text-xs flex-shrink-0">Pending</Badge>
               </div>
             ))}
           </div>

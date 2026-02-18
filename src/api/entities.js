@@ -318,6 +318,8 @@ export const entities = {
   PayPeriod:                   buildEntity('pay_periods'),
   PayrollRecord:               buildEntity('payroll_records'),
   ShiftSwapRequest:            buildEntity('shift_swap_requests'),
+  ShiftClaimRequest:           buildEntity('shift_claim_requests'),
+  BaseShiftTemplate:           buildEntity('base_shift_templates'),
 
   // Training & Compliance
   Training:                    buildEntity('trainings'),

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { ShiftApi } from '@/api/rotaApi';
+import { ShiftApi, ShiftCallApi } from '@/api/rotaApi';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,8 @@ import PageHeader from '@/components/ui/PageHeader';
 import EmptyState from '@/components/ui/EmptyState';
 import { toast } from 'sonner';
 import { notifySwapApproved, notifySwapRejected } from '@/utils/shiftSwapNotifications';
+import { notifyClaimApproved, notifyClaimRejected } from '@/utils/shiftClaimNotifications';
+import { getMatchingCallsForShift } from '@/utils/shiftCallAutoAssign';
 import {
   Calendar,
   RefreshCw,
@@ -19,7 +21,8 @@ import {
   X,
   Loader2,
   MessageSquare,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Hand
 } from 'lucide-react';
 
 export default function RequestsManagement() {
@@ -40,6 +43,11 @@ export default function RequestsManagement() {
   const { data: leaveRequests = [] } = useQuery({
     queryKey: ['leaveRequests'],
     queryFn: () => base44.entities.LeaveRequest.list('-created_date'),
+  });
+
+  const { data: claimRequests = [] } = useQuery({
+    queryKey: ['shiftClaimRequests'],
+    queryFn: () => base44.entities.ShiftClaimRequest.list('-created_date'),
   });
 
   const updateSwapMutation = useMutation({
@@ -170,11 +178,115 @@ export default function RequestsManagement() {
     });
   };
 
+  const SIT_IN_NAMES = new Set(['Sit In L', 'Sit In E', 'Sit In FD']);
+
+  const handleClaimDecision = async (claim, status) => {
+    setProcessingId(claim.id);
+    const adminName = user.gps_map_name || user.staff_full_name || user.full_name;
+
+    if (status === 'approved') {
+      try {
+        // 1. Assign staff to the shift
+        await ShiftApi.update(claim.shift_id, {
+          staff_id: claim.staff_id,
+          staff_name: claim.staff_name,
+          status: 'scheduled',
+        });
+
+        // 2. Auto-create client calls (skip for sit-in shifts)
+        const shiftData = (await ShiftApi.filter({ id: claim.shift_id }))[0];
+        if (shiftData && !SIT_IN_NAMES.has(shiftData.shift_name)) {
+          const serviceUsers = await base44.entities.ServiceUser.filter({ status: 'active' });
+          const matchingCalls = getMatchingCallsForShift(
+            serviceUsers, claim.area_id, shiftData.start_time, shiftData.end_time
+          );
+          const callTypesData = await base44.entities.CallType.filter({ is_active: true });
+          for (const call of matchingCalls) {
+            const ct = callTypesData.find(c => c.name === call.call_type);
+            const tasks = ct?.default_tasks?.length ? ct.default_tasks.map(t => ({ text: t, completed: false })) : [];
+            try {
+              await ShiftCallApi.create({
+                shift_id: claim.shift_id,
+                service_user_id: call.service_user_id,
+                service_user_name: call.service_user_name,
+                service_user_address: call.service_user_address,
+                scheduled_time: call.scheduled_time,
+                call_time: call.scheduled_time,
+                duration_minutes: call.duration_minutes,
+                call_type: call.call_type,
+                call_types: call.call_types || [call.call_type],
+                tasks,
+                call_date: shiftData.date,
+                status: 'pending',
+                notes: call.notes || '',
+              });
+            } catch (callErr) {
+              console.error('[ClaimApprove] Failed to create call:', callErr);
+            }
+          }
+        }
+
+        // 3. Update claim status
+        await base44.entities.ShiftClaimRequest.update(claim.id, {
+          status: 'approved',
+          reviewed_by: user.id,
+          reviewed_by_name: adminName,
+          reviewed_at: new Date().toISOString(),
+          review_notes: reviewNotes[claim.id] || '',
+        });
+
+        // 4. Auto-reject other pending claims for same shift
+        const otherClaims = claimRequests.filter(
+          c => c.shift_id === claim.shift_id && c.id !== claim.id && c.status === 'pending'
+        );
+        for (const other of otherClaims) {
+          await base44.entities.ShiftClaimRequest.update(other.id, {
+            status: 'rejected',
+            reviewed_by: user.id,
+            reviewed_by_name: adminName,
+            reviewed_at: new Date().toISOString(),
+            review_notes: 'Shift claimed by another staff member',
+          });
+          notifyClaimRejected({ claim: other, adminName, areaId: other.area_id });
+        }
+
+        queryClient.invalidateQueries({ queryKey: ['shiftClaimRequests'] });
+        queryClient.invalidateQueries({ queryKey: ['pendingClaims'] });
+        queryClient.invalidateQueries({ queryKey: ['myClaimRequests'] });
+        queryClient.invalidateQueries({ queryKey: ['shifts'] });
+        queryClient.invalidateQueries({ queryKey: ['shift-calls'] });
+
+        toast.success('Shift claim approved — staff assigned with client calls');
+        notifyClaimApproved({ claim, adminName, areaId: claim.area_id });
+      } catch (err) {
+        console.error('Claim approval error:', err);
+        toast.error('Failed to approve claim: ' + (err.message || 'Unknown error'));
+      }
+    } else {
+      // Rejected
+      await base44.entities.ShiftClaimRequest.update(claim.id, {
+        status: 'rejected',
+        reviewed_by: user.id,
+        reviewed_by_name: adminName,
+        reviewed_at: new Date().toISOString(),
+        review_notes: reviewNotes[claim.id] || '',
+      });
+      queryClient.invalidateQueries({ queryKey: ['shiftClaimRequests'] });
+      queryClient.invalidateQueries({ queryKey: ['pendingClaims'] });
+      queryClient.invalidateQueries({ queryKey: ['myClaimRequests'] });
+      toast.success('Shift claim rejected');
+      notifyClaimRejected({ claim, adminName, areaId: claim.area_id });
+    }
+    setProcessingId(null);
+    setReviewNotes({});
+  };
+
   // Only show swaps that the target staff has accepted (pending_admin)
   const pendingSwaps = swapRequests.filter(r => r.status === 'pending_admin');
   // Also show pending_target for visibility but without approve buttons
   const awaitingTargetSwaps = swapRequests.filter(r => r.status === 'pending_target');
   const pendingLeave = leaveRequests.filter(r => r.status === 'pending');
+  const pendingClaims = claimRequests.filter(r => r.status === 'pending');
 
   return (
     <div className="space-y-6">
@@ -182,9 +294,12 @@ export default function RequestsManagement() {
         title="Requests Management"
         subtitle="Review and approve shift swaps and leave requests"
       >
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Badge className="bg-orange-100 text-orange-700">
             {pendingSwaps.length} Swap{pendingSwaps.length !== 1 ? 's' : ''}
+          </Badge>
+          <Badge className="bg-teal-100 text-teal-700">
+            {pendingClaims.length} Claim{pendingClaims.length !== 1 ? 's' : ''}
           </Badge>
           <Badge className="bg-purple-100 text-purple-700">
             {pendingLeave.length} Leave
@@ -193,12 +308,15 @@ export default function RequestsManagement() {
       </PageHeader>
 
       <Tabs defaultValue="swaps" className="w-full">
-        <TabsList className="grid w-full max-w-md mx-auto grid-cols-2">
-          <TabsTrigger value="swaps">
-            Shift Swaps ({pendingSwaps.length})
+        <TabsList className="grid w-full max-w-lg mx-auto grid-cols-3">
+          <TabsTrigger value="swaps" className="text-xs sm:text-sm">
+            Swaps ({pendingSwaps.length})
           </TabsTrigger>
-          <TabsTrigger value="leave">
-            Leave Requests ({pendingLeave.length})
+          <TabsTrigger value="claims" className="text-xs sm:text-sm">
+            Claims ({pendingClaims.length})
+          </TabsTrigger>
+          <TabsTrigger value="leave" className="text-xs sm:text-sm">
+            Leave ({pendingLeave.length})
           </TabsTrigger>
         </TabsList>
 
@@ -295,6 +413,82 @@ export default function RequestsManagement() {
                       className="flex-1"
                     >
                       {processingId === request.id ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <X className="w-4 h-4 mr-2" />
+                      )}
+                      Reject
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="claims" className="mt-6">
+          {pendingClaims.length === 0 ? (
+            <EmptyState
+              icon={Hand}
+              title="No pending shift claims"
+              description="When staff claim available shifts, they'll appear here for your approval."
+            />
+          ) : (
+            <div className="space-y-4">
+              {pendingClaims.map((claim) => (
+                <Card key={claim.id} className="p-5">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="font-semibold text-slate-900">
+                        {claim.staff_name}
+                      </h3>
+                      <p className="text-sm text-slate-500">
+                        {claim.shift_date} &bull; {claim.shift_time}
+                      </p>
+                      {claim.shift_name && (
+                        <p className="text-sm text-teal-600">{claim.shift_name}</p>
+                      )}
+                    </div>
+                    <Badge className="bg-teal-100 text-teal-700">Claim</Badge>
+                  </div>
+
+                  {claim.reason && (
+                    <div className="mb-4">
+                      <p className="text-sm font-medium text-slate-700 mb-2">Reason:</p>
+                      <p className="text-sm text-slate-600">{claim.reason}</p>
+                    </div>
+                  )}
+
+                  <div className="mb-4">
+                    <Label>Review Notes (Optional)</Label>
+                    <Textarea
+                      value={reviewNotes[claim.id] || ''}
+                      onChange={(e) => setReviewNotes(prev => ({...prev, [claim.id]: e.target.value}))}
+                      placeholder="Add notes about your decision..."
+                      className="mt-1"
+                    />
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => handleClaimDecision(claim, 'approved')}
+                      disabled={processingId === claim.id}
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                    >
+                      {processingId === claim.id ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Check className="w-4 h-4 mr-2" />
+                      )}
+                      Approve & Assign
+                    </Button>
+                    <Button
+                      onClick={() => handleClaimDecision(claim, 'rejected')}
+                      disabled={processingId === claim.id}
+                      variant="destructive"
+                      className="flex-1"
+                    >
+                      {processingId === claim.id ? (
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       ) : (
                         <X className="w-4 h-4 mr-2" />

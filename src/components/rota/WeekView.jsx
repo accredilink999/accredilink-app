@@ -31,9 +31,9 @@ export default function WeekView({ currentDate, onShiftClick, onCreateShift, isA
          return dateMatches && areaMatches;
        });
        if (filterByUserId) {
-         filtered = filtered.filter(s => s.staff_id === filterByUserId);
+         filtered = filtered.filter(s => s.staff_id === filterByUserId || !s.staff_id);
        } else if (!showAllShifts && !isAdmin && userId) {
-         filtered = filtered.filter(s => s.staff_id === userId);
+         filtered = filtered.filter(s => s.staff_id === userId || !s.staff_id);
        }
        console.log('[WeekView] Filtered shifts:', filtered?.length, 'selectedAreaId:', selectedAreaId);
        return filtered;
@@ -110,28 +110,37 @@ export default function WeekView({ currentDate, onShiftClick, onCreateShift, isA
                       const shiftType = shiftTypes.find(st => st.name === shift.shift_name);
                       const shiftColor = shiftType?.color || '#14b8a6';
                       const shiftCalls = getCallsForShift(shift.id);
+                      const isAvailable = !shift.staff_id;
                       return (
                         <button
                           key={shift.id}
                           onClick={() => onShiftClick(shift)}
-                          className="w-full text-left p-3 rounded-lg hover:shadow-lg transition-all select-none"
-                          style={{
-                            backgroundColor: shiftColor
+                          className={`w-full text-left p-3 rounded-lg hover:shadow-lg transition-all select-none ${isAvailable ? 'border-2 border-dashed' : ''}`}
+                          style={isAvailable ? {
+                            borderColor: shiftColor,
+                            backgroundColor: `${shiftColor}15`,
+                          } : {
+                            backgroundColor: shiftColor,
                           }}
                         >
-                          <p className="text-sm font-medium text-white">
-                            {shift.shift_name ? (
-                              <>
-                                {shift.shift_name}
-                                <span className="opacity-90"> ({shift.staff_name}{shift.paired_staff_name ? ` + ${shift.paired_staff_name}` : ''})</span>
-                              </>
-                            ) : shift.staff_name ? `${shift.staff_name}${shift.paired_staff_name ? ` + ${shift.paired_staff_name}` : ''}` : 'Unassigned'}
+                          <p className={`text-sm font-medium ${isAvailable ? '' : 'text-white'}`} style={isAvailable ? { color: shiftColor } : {}}>
+                            {isAvailable ? (shift.shift_name || 'Shift') : (
+                              shift.shift_name ? (
+                                <>
+                                  {shift.shift_name}
+                                  <span className="opacity-90"> ({shift.staff_name}{shift.paired_staff_name ? ` + ${shift.paired_staff_name}` : ''})</span>
+                                </>
+                              ) : shift.staff_name ? `${shift.staff_name}${shift.paired_staff_name ? ` + ${shift.paired_staff_name}` : ''}` : 'Unassigned'
+                            )}
                           </p>
-                          <p className="text-sm text-white opacity-90">{shift.start_time} - {shift.end_time}</p>
-                          {shift.service_user_name && (
+                          <p className={`text-sm ${isAvailable ? 'text-slate-500' : 'text-white opacity-90'}`}>{shift.start_time} - {shift.end_time}</p>
+                          {isAvailable && (
+                            <p className="text-xs font-medium text-teal-600 mt-1">Available - Tap to Claim</p>
+                          )}
+                          {!isAvailable && shift.service_user_name && (
                             <p className="text-xs text-white opacity-80">{shift.service_user_name}</p>
                           )}
-                          {shiftCalls.length > 0 && (
+                          {!isAvailable && shiftCalls.length > 0 && (
                             <div className="mt-2">
                               <p className="text-xs text-white opacity-80 mb-1">{shiftCalls.length} call{shiftCalls.length !== 1 ? 's' : ''}</p>
                               <div className="flex gap-0.5">
@@ -194,6 +203,7 @@ export default function WeekView({ currentDate, onShiftClick, onCreateShift, isA
                         const shiftType = shiftTypes.find(st => st.name === shift.shift_name);
                         const shiftColor = shiftType?.color || '#14b8a6';
                         const shiftCalls = getCallsForShift(shift.id);
+                        const isAvailable = !shift.staff_id;
                         return (
                           <button
                             key={shift.id}
@@ -201,28 +211,36 @@ export default function WeekView({ currentDate, onShiftClick, onCreateShift, isA
                               e.stopPropagation();
                               onShiftClick(shift);
                             }}
-                            className="w-full text-left p-2 rounded-lg hover:shadow-lg select-none transition-all"
-                            style={{
-                              backgroundColor: shiftColor
+                            className={`w-full text-left p-2 rounded-lg hover:shadow-lg select-none transition-all ${isAvailable ? 'border-2 border-dashed' : ''}`}
+                            style={isAvailable ? {
+                              borderColor: shiftColor,
+                              backgroundColor: `${shiftColor}15`,
+                            } : {
+                              backgroundColor: shiftColor,
                             }}
                           >
-                            <p className="text-xs font-medium truncate text-white">
-                              {shift.shift_name ? (
-                                <>
-                                  {shift.shift_name}
-                                  <span className="opacity-90"> ({shift.staff_name}{shift.paired_staff_name ? ` + ${shift.paired_staff_name}` : ''})</span>
-                                </>
-                              ) : shift.staff_name ? `${shift.staff_name}${shift.paired_staff_name ? ` + ${shift.paired_staff_name}` : ''}` : 'Unassigned'}
+                            <p className={`text-xs font-medium truncate ${isAvailable ? '' : 'text-white'}`} style={isAvailable ? { color: shiftColor } : {}}>
+                              {isAvailable ? (shift.shift_name || 'Shift') : (
+                                shift.shift_name ? (
+                                  <>
+                                    {shift.shift_name}
+                                    <span className="opacity-90"> ({shift.staff_name}{shift.paired_staff_name ? ` + ${shift.paired_staff_name}` : ''})</span>
+                                  </>
+                                ) : shift.staff_name ? `${shift.staff_name}${shift.paired_staff_name ? ` + ${shift.paired_staff_name}` : ''}` : 'Unassigned'
+                              )}
                             </p>
-                            <p className="text-xs text-white opacity-90">
+                            <p className={`text-xs ${isAvailable ? 'text-slate-500' : 'text-white opacity-90'}`}>
                               {shift.start_time} - {shift.end_time}
                             </p>
-                            {shift.service_user_name && (
+                            {isAvailable && (
+                              <p className="text-[10px] font-medium text-teal-600 mt-0.5">Available</p>
+                            )}
+                            {!isAvailable && shift.service_user_name && (
                               <p className="text-xs text-white opacity-80 truncate">
                                 {shift.service_user_name}
                               </p>
                             )}
-                            {shiftCalls.length > 0 && (
+                            {!isAvailable && shiftCalls.length > 0 && (
                               <div className="mt-1">
                                 <p className="text-[10px] text-white opacity-80">{shiftCalls.length} call{shiftCalls.length !== 1 ? 's' : ''}</p>
                                 <div className="flex gap-0.5 mt-0.5">

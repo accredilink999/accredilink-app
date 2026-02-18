@@ -15,6 +15,7 @@ import DayView from '@/components/rota/DayView';
 import ShiftDetailModal from '@/components/rota/ShiftDetailModal';
 import CreateShiftModal from '@/components/rota/CreateShiftModal';
 import PatternManager from '@/components/rota/PatternManager';
+import ClaimShiftModal from '@/components/rota/ClaimShiftModal';
 import RotaAreaSelector from '@/components/rota/RotaAreaSelector';
 import { ChevronLeft, ChevronRight, Plus, Settings } from 'lucide-react';
 
@@ -33,6 +34,7 @@ export default function Rota() {
   const [selectedAreaId, setSelectedAreaId] = useState(null);
   const [isCreateAreaOpen, setIsCreateAreaOpen] = useState(false);
   const [showMyShiftsOnly, setShowMyShiftsOnly] = useState(filterParam === 'myshifts');
+  const [claimShift, setClaimShift] = useState(null);
   const queryClient = useQueryClient();
   const autoShiftLoaded = useRef(false);
 
@@ -105,6 +107,14 @@ export default function Rota() {
 
   const handleToday = () => {
     setCurrentDate(new Date());
+  };
+
+  const handleShiftClick = (shift) => {
+    if (!shift.staff_id && !canEdit) {
+      setClaimShift(shift);
+    } else {
+      setSelectedShift(shift);
+    }
   };
 
   const handleCreateShift = (date) => {
@@ -243,7 +253,7 @@ export default function Rota() {
         <TabsContent value="month" className="mt-6">
           <MonthView 
             currentDate={currentDate}
-            onShiftClick={setSelectedShift}
+            onShiftClick={handleShiftClick}
             onCreateShift={handleCreateShift}
             onDayClick={handleDayClick}
             isAdmin={canEdit}
@@ -256,7 +266,7 @@ export default function Rota() {
         <TabsContent value="week" className="mt-6">
           <WeekView 
             currentDate={currentDate}
-            onShiftClick={setSelectedShift}
+            onShiftClick={handleShiftClick}
             onCreateShift={handleCreateShift}
             onDayClick={handleDayClick}
             isAdmin={canEdit}
@@ -269,7 +279,7 @@ export default function Rota() {
         <TabsContent value="day" className="mt-6">
           <DayView 
             currentDate={currentDate}
-            onShiftClick={setSelectedShift}
+            onShiftClick={handleShiftClick}
             onCreateShift={handleCreateShift}
             isAdmin={canEdit}
             userId={user?.id}
@@ -305,6 +315,14 @@ export default function Rota() {
         <PatternManager
           open={isPatternManagerOpen}
           onClose={() => setIsPatternManagerOpen(false)}
+        />
+      )}
+
+      {claimShift && (
+        <ClaimShiftModal
+          shift={claimShift}
+          open={!!claimShift}
+          onClose={() => setClaimShift(null)}
         />
       )}
 
