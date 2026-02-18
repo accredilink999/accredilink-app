@@ -7,6 +7,14 @@ class ViewController: CAPBridgeViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+
+        // Force white background on the view and WebView immediately to prevent
+        // a black screen flash while the remote URL (Vercel) loads over the network.
+        view.backgroundColor = .white
+        webView?.isOpaque = false
+        webView?.backgroundColor = .white
+        webView?.scrollView.backgroundColor = .white
+
         requestMicrophonePermission()
     }
 

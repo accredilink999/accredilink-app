@@ -27,9 +27,10 @@ const config: CapacitorConfig = {
       style: 'DARK',
     },
 
-    // App — handle deep links and back button
+    // App — show native splash while remote URL loads over the network.
+    // Prevents black flash between native splash dismiss and WebView render.
     App: {
-      launchShowDuration: 0,
+      launchShowDuration: 3000,
     },
 
     // Push notifications — uses Firebase on Android, APNS on iOS

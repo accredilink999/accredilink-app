@@ -21,7 +21,10 @@ self.addEventListener('install', function(event) {
   self.skipWaiting();
 });
 
-// ─── Activate: claim all clients, force reload ──────────────────────
+// ─── Activate: claim all clients ─────────────────────────────────────
+// NOTE: Do NOT call client.navigate() here — it causes a double-reload
+// race condition on iOS WKWebView (Capacitor) that results in a blank
+// screen. The controllerchange listener in index.html handles the reload.
 self.addEventListener('activate', function(event) {
   console.log('[SW v6] Activating — claiming clients');
   event.waitUntil(
@@ -31,12 +34,6 @@ self.addEventListener('activate', function(event) {
       }));
     }).then(function() {
       return self.clients.claim();
-    }).then(function() {
-      return self.clients.matchAll({ type: 'window' });
-    }).then(function(windowClients) {
-      windowClients.forEach(function(client) {
-        client.navigate(client.url);
-      });
     })
   );
 });
