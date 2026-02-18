@@ -122,8 +122,8 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
     },
     onSuccess: async (createdPattern) => {
       queryClient.invalidateQueries({ queryKey: ['shift-patterns'] });
-      // For rolling rotas, assign staff to matching blank shifts
-      if (isRollingRota && !pattern) {
+      // Deploy pattern: assign staff to matching blank shifts on the rota
+      if (!pattern) {
         try {
           await createShiftsFromPattern(createdPattern, formData.repeat_count);
         } catch (error) {
@@ -131,7 +131,7 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
           toast.error('Pattern saved but shift deployment failed: ' + error.message);
         }
       } else {
-        toast.success(pattern ? 'Pattern updated' : 'Pattern created');
+        toast.success('Pattern updated');
       }
       localStorage.removeItem(DRAFT_KEY);
       skipDraftSave.current = true;
@@ -200,10 +200,14 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
         const targetDate = new Date(cycleStart);
         targetDate.setDate(targetDate.getDate() + daysUntil);
 
+        // Find shift type name for fallback matching
+        const shiftTypeName = shiftTypes.find(st => st.id === shift.shift_type)?.name || shift.shift_type;
+
         targets.push({
           date: targetDate.toISOString().split('T')[0],
           start_time: shift.start_time,
           end_time: shift.end_time,
+          shift_name: shiftTypeName,
         });
       });
     }
@@ -211,12 +215,30 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
     // Match targets to blank shifts and assign staff
     let assigned = 0;
     for (const target of targets) {
-      const match = blankShifts.find(bs =>
+      // First try exact time match, then fall back to matching by shift name
+      let match = blankShifts.find(bs =>
         bs.date === target.date &&
         bs.start_time === target.start_time &&
         bs.end_time === target.end_time &&
         !bs._used
       );
+
+      // Fallback: match by date + shift_name if exact times didn't match
+      if (!match && target.shift_name) {
+        match = blankShifts.find(bs =>
+          bs.date === target.date &&
+          bs.shift_name === target.shift_name &&
+          !bs._used
+        );
+      }
+
+      // Last fallback: match any blank shift on that date in the same area
+      if (!match) {
+        match = blankShifts.find(bs =>
+          bs.date === target.date &&
+          !bs._used
+        );
+      }
 
       if (match) {
         match._used = true;
@@ -490,9 +512,8 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
               </Select>
             </div>
 
-            {isRollingRota && (
               <div className="space-y-2">
-                <Label>Number of Repetitions</Label>
+                <Label>Deploy for how many weeks?</Label>
                 <Select
                   value={formData.repeat_count.toString()}
                   onValueChange={(value) => setFormData({ ...formData, repeat_count: parseInt(value) })}
@@ -503,13 +524,12 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
                   <SelectContent>
                     {Array.from({ length: 56 }, (_, i) => i + 1).map((num) => (
                       <SelectItem key={num} value={num.toString()}>
-                        {num} {num === 1 ? 'repeat' : 'repeats'}
+                        {num} {num === 1 ? 'week' : 'weeks'}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            )}
           </div>
 
           {formData.pattern_type === 'weekly' ? (
@@ -605,10 +625,10 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
 
           <Button
             onClick={handleSubmit}
-            disabled={!formData.pattern_name || !formData.staff_id || formData.shifts.length === 0 || createPatternMutation.isPending || (isRollingRota && !formData.rota_area_id)}
+            disabled={!formData.pattern_name || !formData.staff_id || !formData.rota_area_id || formData.shifts.length === 0 || createPatternMutation.isPending}
             className="bg-teal-600 hover:bg-teal-700"
           >
-            {createPatternMutation.isPending ? (pattern ? 'Saving...' : isRollingRota ? 'Creating & Deploying...' : 'Creating...') : (pattern ? 'Save Changes' : isRollingRota ? 'Create & Deploy Pattern' : 'Create Pattern')}
+            {createPatternMutation.isPending ? (pattern ? 'Saving...' : 'Creating & Deploying...') : (pattern ? 'Save Changes' : 'Create & Deploy Pattern')}
           </Button>
         </DialogFooter>
 
