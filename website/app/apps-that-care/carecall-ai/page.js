@@ -9,9 +9,9 @@ export const metadata = {
 const features = [
   {
     title: 'Real-Time GPS Control Room',
-    description: 'Track your entire care team in real-time on an interactive map. See who\u2019s on shift, where they are, and which service users they\u2019re visiting. The control room gives coordinators complete operational visibility with live location updates every 15 seconds.',
+    description: 'Track your entire care team in real-time on an interactive map. See who\u2019s on shift, where they are, and which service users they\u2019re visiting.',
     icon: (
-      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
       </svg>
@@ -19,150 +19,316 @@ const features = [
     color: 'from-blue-500 to-cyan-500',
     bg: 'bg-blue-50',
     textColor: 'text-blue-600',
+    preview: (
+      <div className="bg-gradient-to-br from-green-100 via-green-50 to-blue-50 h-full relative overflow-hidden">
+        <div className="absolute top-3 left-4 w-16 h-[1px] bg-slate-300/50" /><div className="absolute top-6 left-6 w-12 h-[1px] bg-slate-300/50" /><div className="absolute top-3 left-12 w-[1px] h-8 bg-slate-300/50" />
+        <div className="absolute top-4 left-8 w-4 h-4 rounded-full bg-green-500 border-2 border-white shadow flex items-center justify-center"><span className="text-[5px] font-bold text-white">SJ</span></div>
+        <div className="absolute top-8 left-20 w-4 h-4 rounded-full bg-green-500 border-2 border-white shadow flex items-center justify-center"><span className="text-[5px] font-bold text-white">KL</span></div>
+        <div className="absolute top-14 left-12 w-4 h-4 rounded-full bg-blue-500 border-2 border-white shadow flex items-center justify-center"><span className="text-[5px] font-bold text-white">RW</span></div>
+        <div className="absolute top-6 right-6 w-4 h-4 rounded-full bg-green-500 border-2 border-white shadow flex items-center justify-center"><span className="text-[5px] font-bold text-white">AM</span></div>
+        <div className="absolute top-3 left-16 w-3 h-3 rounded-full bg-rose-400 border border-white shadow-sm" />
+        <div className="absolute top-11 left-24 w-3 h-3 rounded-full bg-rose-400 border border-white shadow-sm" />
+        <div className="absolute bottom-1 left-1 bg-white/80 rounded px-1.5 py-0.5 flex items-center gap-1.5">
+          <div className="flex items-center gap-0.5"><div className="w-1.5 h-1.5 rounded-full bg-green-500" /><span className="text-[5px] text-slate-500">Active</span></div>
+          <div className="flex items-center gap-0.5"><div className="w-1.5 h-1.5 rounded-full bg-blue-500" /><span className="text-[5px] text-slate-500">En Route</span></div>
+        </div>
+      </div>
+    ),
   },
   {
     title: 'Integrated Care Documentation',
-    description: 'Carers clock in and out of visits with automatic GPS verification. Each visit captures mood assessments, food and fluid intake, personal care tasks, and detailed notes — creating a comprehensive care record that satisfies CIW requirements.',
+    description: 'Carers clock in and out of visits with automatic GPS verification. Each visit captures mood, food and fluid intake, personal care tasks, and detailed notes.',
     icon: (
-      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
       </svg>
     ),
     color: 'from-green-500 to-emerald-500',
     bg: 'bg-green-50',
     textColor: 'text-green-600',
+    preview: (
+      <div className="bg-white h-full p-2 space-y-1.5">
+        <div className="flex items-center justify-between"><p className="text-[6px] font-bold text-slate-700">Mrs. Williams — Visit Log</p><span className="text-[5px] px-1 py-0.5 rounded bg-green-100 text-green-700">08:45</span></div>
+        <div className="flex gap-1"><span className="text-[5px] px-1 py-0.5 rounded bg-green-100 text-green-700">GPS Verified</span><span className="text-[5px] px-1 py-0.5 rounded bg-blue-100 text-blue-700">Clocked In</span></div>
+        <div className="flex items-center gap-2"><span className="text-xs">😊</span><span className="text-[5px] text-slate-500">Mood: Happy</span></div>
+        <div className="grid grid-cols-2 gap-1">
+          <div className="bg-green-50 rounded px-1 py-0.5"><span className="text-[5px] text-green-700">Food: Good</span></div>
+          <div className="bg-green-50 rounded px-1 py-0.5"><span className="text-[5px] text-green-700">Fluid: Good</span></div>
+        </div>
+        <div className="flex gap-0.5">{['Wash','Dress','Meds'].map(t=><span key={t} className="text-[5px] px-1 py-0.5 rounded-full bg-blue-100 text-blue-700">{t}</span>)}</div>
+        <div className="bg-slate-50 rounded px-1 py-0.5"><span className="text-[5px] text-slate-500 italic">Good spirits today, ate well...</span></div>
+      </div>
+    ),
   },
   {
     title: 'Incident & Safeguarding Hub',
-    description: 'Structured incident reporting covering falls, medication errors, injuries, near misses, safeguarding concerns, and complaints. Each report captures severity, witnesses, medical attention, and whether the incident is CQC/CIW notifiable — with full audit trails.',
+    description: 'Structured incident reporting covering falls, medication errors, safeguarding concerns, and complaints — with severity levels, witnesses, and CIW notification tracking.',
     icon: (
-      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
       </svg>
     ),
     color: 'from-red-500 to-rose-500',
     bg: 'bg-red-50',
     textColor: 'text-red-600',
+    preview: (
+      <div className="bg-white h-full p-2 space-y-1">
+        <div className="flex items-center justify-between"><p className="text-[6px] font-bold text-slate-700">Open Incidents</p><span className="text-[5px] px-1 py-0.5 rounded bg-red-100 text-red-700">2 Open</span></div>
+        <div className="bg-red-50 rounded p-1.5 border border-red-100">
+          <div className="flex items-center gap-1 mb-0.5"><span className="text-[7px]">⚠️</span><span className="text-[6px] font-semibold text-slate-800">Fall — Mrs. Williams</span></div>
+          <div className="flex gap-1"><span className="text-[5px] px-1 py-0.5 rounded bg-amber-100 text-amber-700">Medium</span><span className="text-[5px] px-1 py-0.5 rounded bg-red-100 text-red-700">CIW Notifiable</span></div>
+        </div>
+        <div className="bg-slate-50 rounded p-1.5 border border-slate-100">
+          <div className="flex items-center gap-1 mb-0.5"><span className="text-[7px]">📋</span><span className="text-[6px] font-semibold text-slate-800">Near Miss — Medication</span></div>
+          <div className="flex gap-1"><span className="text-[5px] px-1 py-0.5 rounded bg-green-100 text-green-700">Low</span><span className="text-[5px] px-1 py-0.5 rounded bg-slate-100 text-slate-600">Internal</span></div>
+        </div>
+        <div className="flex gap-1"><span className="text-[5px] px-1 py-0.5 rounded bg-blue-50 text-blue-600">Full Audit Trail</span><span className="text-[5px] px-1 py-0.5 rounded bg-blue-50 text-blue-600">Witness Records</span></div>
+      </div>
+    ),
   },
   {
     title: 'Intelligent Rota Management',
-    description: 'Build and manage rotas with month, week, and day views. Create recurring shift patterns, assign staff to areas, and manage allocations. Staff see their schedules instantly on mobile with real-time updates when changes are made.',
+    description: 'Build and manage rotas with month, week, and day views. Create recurring shift patterns, assign staff to areas, and manage allocations instantly.',
     icon: (
-      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
       </svg>
     ),
     color: 'from-purple-500 to-violet-500',
     bg: 'bg-purple-50',
     textColor: 'text-purple-600',
+    preview: (
+      <div className="bg-white h-full p-2">
+        <div className="flex items-center justify-between mb-1"><p className="text-[6px] font-bold text-slate-700">Feb 2026</p><div className="flex gap-0.5">{['M','W','D'].map(v=><span key={v} className={`text-[5px] px-1 py-0.5 rounded ${v==='W'?'bg-purple-500 text-white':'bg-slate-100 text-slate-500'}`}>{v}</span>)}</div></div>
+        <div className="grid grid-cols-7 gap-[1px] mb-1">{['M','T','W','T','F','S','S'].map((d,i)=><div key={i} className="text-center text-[4px] text-slate-400 py-0.5">{d}</div>)}</div>
+        {['Sarah','Katie','Rob','Amy'].map(name=>(
+          <div key={name} className="grid grid-cols-8 gap-[1px] items-center mb-[2px]">
+            <span className="text-[4px] text-slate-600 truncate">{name}</span>
+            {[['bg-green-200 text-green-800','E'],['bg-blue-200 text-blue-800','L'],['bg-amber-200 text-amber-800','Lg'],['','–'],['bg-green-200 text-green-800','E'],['bg-purple-200 text-purple-800','N'],['','–']].map(([cls,lbl],j)=>(
+              <div key={j} className={`rounded text-center py-0.5 text-[4px] font-medium ${cls||'bg-slate-50 text-slate-300'}`}>{lbl}</div>
+            ))}
+          </div>
+        ))}
+      </div>
+    ),
   },
   {
     title: 'Training Academy & AI Course Builder',
-    description: 'A built-in learning management system with course library, assignment tracking, completion analytics, and certificate management. The AI Course Builder lets managers create professional training courses in minutes — no instructional design expertise needed.',
+    description: 'Built-in LMS with course library, AI-powered course creation, assignment tracking, completion analytics, and certificate management.',
     icon: (
-      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
       </svg>
     ),
     color: 'from-amber-500 to-orange-500',
     bg: 'bg-amber-50',
     textColor: 'text-amber-600',
+    preview: (
+      <div className="bg-white h-full p-2 space-y-1">
+        <div className="flex items-center justify-between"><p className="text-[6px] font-bold text-slate-700">Training Academy</p><span className="text-[5px] px-1 py-0.5 rounded bg-amber-500 text-white">AI Builder</span></div>
+        <div className="grid grid-cols-2 gap-1">
+          {[{t:'Manual Handling',c:'bg-blue-500',p:85},{t:'Safeguarding',c:'bg-rose-500',p:62},{t:'Medication',c:'bg-amber-500',p:100},{t:'Infection Ctrl',c:'bg-green-500',p:40}].map(course=>(
+            <div key={course.t} className="bg-slate-50 rounded overflow-hidden border border-slate-100">
+              <div className={`${course.c} h-0.5`} />
+              <div className="p-1"><p className="text-[5px] font-semibold text-slate-800">{course.t}</p><div className="w-full bg-slate-100 rounded-full h-1 mt-0.5"><div className={`${course.c} h-1 rounded-full`} style={{width:`${course.p}%`}} /></div><p className="text-[4px] text-slate-400 mt-0.5">{course.p}%</p></div>
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-3 gap-1">{[['18','Up to Date','text-green-600'],['4','Due Soon','text-amber-500'],['2','Overdue','text-rose-500']].map(([n,l,c])=><div key={l} className="text-center"><p className={`text-[7px] font-bold ${c}`}>{n}</p><p className="text-[4px] text-slate-400">{l}</p></div>)}</div>
+      </div>
+    ),
   },
   {
     title: 'Advanced Analytics & Reporting',
-    description: 'Comprehensive dashboards with bar charts, pie charts, line graphs, and scatter plots covering shifts, incidents, staff performance, training completion, leave patterns, payroll, and expenses. Filter by 7, 30, or 90-day periods with export capabilities.',
+    description: 'Dashboards with bar charts, pie charts, and line graphs covering shifts, incidents, training, payroll, and expenses. Export for CIW.',
     icon: (
-      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
       </svg>
     ),
     color: 'from-teal-500 to-cyan-500',
     bg: 'bg-teal-50',
     textColor: 'text-teal-600',
+    preview: (
+      <div className="bg-white h-full p-2 space-y-1">
+        <div className="flex items-center justify-between"><p className="text-[6px] font-bold text-slate-700">Analytics</p><div className="flex gap-0.5">{['7d','30d','90d'].map(v=><span key={v} className={`text-[4px] px-1 py-0.5 rounded ${v==='30d'?'bg-teal-500 text-white':'bg-slate-100 text-slate-400'}`}>{v}</span>)}</div></div>
+        <div className="bg-slate-50 rounded p-1.5 border border-slate-100">
+          <p className="text-[5px] text-slate-500 mb-1">Shifts Completed</p>
+          <div className="flex items-end gap-[2px] h-8">{[65,72,58,80,75,90,85,70,78,92,88,76].map((h,i)=><div key={i} className="flex-1 rounded-t" style={{height:`${h}%`,background:'linear-gradient(to top, #0D9488, #14B8A6)'}} />)}</div>
+        </div>
+        <div className="grid grid-cols-3 gap-1">{[['847','Shifts','text-teal-600'],['98.2%','Attend','text-blue-600'],['12','Incidents','text-amber-500']].map(([n,l,c])=><div key={l} className="bg-slate-50 rounded p-1 text-center border border-slate-100"><p className={`text-[7px] font-bold ${c}`}>{n}</p><p className="text-[4px] text-slate-400">{l}</p></div>)}</div>
+      </div>
+    ),
   },
   {
     title: 'Priority Messaging & Announcements',
-    description: 'Built-in communication hub with personal messaging, team chat, and priority-based announcements. Managers can broadcast critical, high, normal, or low priority messages with acknowledgement tracking to ensure important updates are read by every team member.',
+    description: 'Built-in communication hub with 1-to-1 messaging, team chat, and priority announcements with read-receipt tracking.',
     icon: (
-      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
       </svg>
     ),
     color: 'from-indigo-500 to-blue-500',
     bg: 'bg-indigo-50',
     textColor: 'text-indigo-600',
+    preview: (
+      <div className="bg-slate-50 h-full p-2 space-y-1">
+        <div className="bg-red-50 rounded p-1 border border-red-100"><div className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-red-500" /><span className="text-[5px] font-bold text-red-700">CRITICAL</span></div><p className="text-[5px] text-slate-700 mt-0.5">Icy Roads Warning — Extra Care</p><span className="text-[4px] text-slate-400">18/24 read</span></div>
+        <div className="flex gap-1"><div className="w-3 h-3 rounded-full bg-slate-300 flex items-center justify-center text-[4px] font-bold text-slate-600 flex-shrink-0">KL</div><div className="bg-white rounded-lg px-1.5 py-1 border border-slate-200 max-w-[70%]"><p className="text-[5px] text-slate-700">Is Mrs. Williams&apos; meds the same?</p><p className="text-[4px] text-slate-400">09:14</p></div></div>
+        <div className="flex justify-end"><div className="bg-indigo-600 rounded-lg px-1.5 py-1 max-w-[70%]"><p className="text-[5px] text-white">Yes, same dosage as last week.</p><p className="text-[4px] text-white/60 text-right">09:15 ✓✓</p></div></div>
+        <div className="flex gap-1"><div className="w-3 h-3 rounded-full bg-slate-300 flex items-center justify-center text-[4px] font-bold text-slate-600 flex-shrink-0">KL</div><div className="bg-white rounded-lg px-1.5 py-1 border border-slate-200"><p className="text-[5px] text-slate-700">Perfect, thanks!</p></div></div>
+      </div>
+    ),
   },
   {
-    title: 'Leave, Expenses & Payroll',
-    description: 'Integrated leave request system with approval workflows, expense claim tracking, and payroll period management. Managers can approve or reject requests, track hours worked, manage pay rates, and maintain complete financial oversight of their team.',
+    title: 'Leave & Absence Management',
+    description: 'Staff submit leave requests in-app. Managers approve/reject instantly with Bradford Factor scoring, absence pattern reports, and rota conflict detection.',
     icon: (
-      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
       </svg>
     ),
     color: 'from-emerald-500 to-green-500',
     bg: 'bg-emerald-50',
     textColor: 'text-emerald-600',
+    preview: (
+      <div className="bg-white h-full p-2 space-y-1">
+        <div className="flex items-center justify-between"><p className="text-[6px] font-bold text-slate-700">Leave Requests</p><span className="text-[5px] px-1 py-0.5 rounded bg-amber-100 text-amber-700">3 Pending</span></div>
+        {[{n:'Katie L.',t:'Annual',d:'24–28 Feb',s:'Pending',sc:'bg-amber-100 text-amber-700'},{n:'Rob W.',t:'Sick',d:'17 Feb',s:'Pending',sc:'bg-amber-100 text-amber-700'},{n:'Sarah J.',t:'Annual',d:'10–12 Mar',s:'Approved',sc:'bg-green-100 text-green-700'}].map(r=>(
+          <div key={r.n} className="bg-slate-50 rounded p-1 border border-slate-100">
+            <div className="flex items-center justify-between"><span className="text-[5px] font-semibold text-slate-800">{r.n} — {r.t}</span><span className={`text-[4px] px-1 py-0.5 rounded-full font-medium ${r.sc}`}>{r.s}</span></div>
+            <span className="text-[4px] text-slate-400">{r.d}</span>
+          </div>
+        ))}
+        <div className="flex gap-1">{[{n:'Sarah',s:12,c:'bg-green-400'},{n:'Rob',s:48,c:'bg-amber-400'},{n:'Dan',s:96,c:'bg-red-400'}].map(b=><div key={b.n} className="flex-1"><div className="flex items-center gap-1"><span className="text-[4px] text-slate-500">{b.n}</span><div className="flex-1 bg-slate-100 rounded-full h-1"><div className={`${b.c} h-1 rounded-full`} style={{width:`${b.s}%`}} /></div></div></div>)}</div>
+      </div>
+    ),
   },
   {
     title: 'Mobile App — Works Offline',
-    description: 'Carers access everything from their phone with our Progressive Web App that also runs natively on iOS and Android. Biometric login, offline capability, push notifications, GPS tracking, and a clean mobile-first interface designed for use in the field.',
+    description: 'PWA + native iOS and Android. Biometric login, offline capability, push notifications, GPS tracking, and a clean mobile-first interface.',
     icon: (
-      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
       </svg>
     ),
     color: 'from-slate-500 to-slate-700',
     bg: 'bg-slate-100',
     textColor: 'text-slate-600',
+    preview: (
+      <div className="bg-slate-800 h-full flex items-center justify-center p-2">
+        <div className="w-16 bg-slate-900 rounded-lg p-1 border border-slate-700">
+          <div className="w-6 h-1 bg-slate-700 rounded-full mx-auto mb-0.5" />
+          <div className="bg-white rounded overflow-hidden">
+            <div className="bg-green-600 px-1 py-0.5"><span className="text-[4px] font-semibold text-white">CareCall AI</span></div>
+            <div className="p-1 space-y-0.5">
+              <p className="text-[4px] font-bold text-slate-800">Hi Sarah</p>
+              <div className="bg-green-50 rounded p-0.5 border border-green-100"><p className="text-[3px] font-semibold text-green-800">Current Visit</p><p className="text-[4px] font-bold text-slate-800">Mrs. Williams</p><span className="text-[3px] px-0.5 rounded bg-green-200 text-green-800">Clocked In</span></div>
+              <div className="grid grid-cols-2 gap-0.5">{['Log Care','Clock Out','Incident','Messages'].map(a=><div key={a} className="bg-slate-50 rounded py-0.5 text-center border border-slate-100"><p className="text-[3px] text-slate-600">{a}</p></div>)}</div>
+            </div>
+            <div className="flex justify-around py-0.5 border-t border-slate-100">{['Home','Rota','Chat'].map(t=><span key={t} className={`text-[3px] ${t==='Home'?'text-green-600':'text-slate-400'}`}>{t}</span>)}</div>
+          </div>
+        </div>
+      </div>
+    ),
   },
   {
     title: 'CIW Compliance Suite',
-    description: 'Purpose-built for Welsh care providers. Incident reporting follows CIW notification requirements, training tracking meets regulatory standards, care documentation captures everything inspectors look for, and full audit trails provide evidence of compliance.',
+    description: 'Purpose-built for Welsh care providers. Incident reporting, training tracking, care documentation, and audit trails all follow CIW requirements.',
     icon: (
-      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
       </svg>
     ),
     color: 'from-welsh-red to-rose-600',
     bg: 'bg-red-50',
     textColor: 'text-welsh-red',
+    preview: (
+      <div className="bg-white h-full p-2 space-y-1">
+        <div className="flex items-center gap-1"><div className="w-4 h-4 rounded bg-green-600 flex items-center justify-center"><svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg></div><p className="text-[6px] font-bold text-slate-700">CIW Compliance</p></div>
+        {[{t:'Incident Reporting',s:'Compliant'},{t:'Care Documentation',s:'Compliant'},{t:'Training Records',s:'Compliant'},{t:'Staff Qualifications',s:'Compliant'},{t:'Audit Trail',s:'Active'}].map(item=>(
+          <div key={item.t} className="flex items-center justify-between bg-green-50/50 rounded px-1.5 py-0.5 border border-green-100">
+            <span className="text-[5px] text-slate-700">{item.t}</span>
+            <div className="flex items-center gap-0.5"><div className="w-1.5 h-1.5 rounded-full bg-green-500" /><span className="text-[4px] text-green-700 font-medium">{item.s}</span></div>
+          </div>
+        ))}
+      </div>
+    ),
   },
   {
     title: 'Fuel & Mileage Tracking',
-    description: 'Staff log fuel purchases and mileage directly in the app with receipt photo uploads. Automatic mileage calculation between client visits using GPS data, HMRC-rate reimbursement calculations, and full expense reporting — giving managers complete visibility of travel costs across the team.',
+    description: 'GPS auto-mileage between visits, fuel receipt uploads, HMRC-rate calculations, and full expense reporting for travel costs.',
     icon: (
-      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
       </svg>
     ),
     color: 'from-orange-500 to-amber-500',
     bg: 'bg-orange-50',
     textColor: 'text-orange-600',
+    preview: (
+      <div className="bg-white h-full p-2 space-y-1">
+        <div className="flex items-center justify-between"><p className="text-[6px] font-bold text-slate-700">Fuel & Mileage</p><span className="text-[5px] px-1 py-0.5 rounded bg-orange-500 text-white">+ Log</span></div>
+        <div className="grid grid-cols-3 gap-1">{[['£342','Fuel','text-orange-600'],['1,847mi','Miles','text-blue-600'],['£831','HMRC','text-green-600']].map(([n,l,c])=><div key={l} className="bg-slate-50 rounded p-1 text-center border border-slate-100"><p className={`text-[6px] font-bold ${c}`}>{n}</p><p className="text-[4px] text-slate-400">{l}</p></div>)}</div>
+        {[{n:'Sarah J.',t:'🚗 47mi — 6 visits',a:'£21.15',s:'Auto',sc:'bg-green-100 text-green-700'},{n:'Katie L.',t:'⛽ BP Denbigh',a:'£52.40',s:'Pending',sc:'bg-amber-100 text-amber-700'}].map(e=>(
+          <div key={e.n} className="bg-slate-50 rounded p-1 border border-slate-100">
+            <div className="flex items-center justify-between"><span className="text-[5px] font-semibold text-slate-800">{e.n}</span><span className="text-[5px] font-bold text-slate-800">{e.a}</span></div>
+            <div className="flex items-center justify-between"><span className="text-[4px] text-slate-500">{e.t}</span><span className={`text-[4px] px-1 py-0.5 rounded-full font-medium ${e.sc}`}>{e.s}</span></div>
+          </div>
+        ))}
+        <div className="bg-orange-50 rounded p-1 border border-orange-100 flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-orange-500" /><span className="text-[4px] text-orange-700 font-medium">GPS Auto-Mileage Active</span></div>
+      </div>
+    ),
   },
   {
-    title: 'Automatic Payroll & Payslip Generation',
-    description: 'CareCall AI automatically calculates pay based on clocked hours, shift types, overtime, enhancements, and deductions. Generate professional payslips for every staff member at the click of a button. Pay periods, tax breakdowns, holiday pay, and pension contributions — all handled automatically.',
+    title: 'Automatic Payroll & Payslips',
+    description: 'Auto-calculated pay from clocked hours with shift enhancements, tax, NI, pension deductions. Generate professional PDF payslips instantly.',
     icon: (
-      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
       </svg>
     ),
     color: 'from-cyan-500 to-blue-500',
     bg: 'bg-cyan-50',
     textColor: 'text-cyan-600',
+    preview: (
+      <div className="bg-white h-full p-2 space-y-1">
+        <div className="flex items-center justify-between"><p className="text-[6px] font-bold text-slate-700">Payroll — Feb 2026</p><span className="text-[5px] px-1 py-0.5 rounded bg-cyan-500 text-white">Generate</span></div>
+        <div className="grid grid-cols-3 gap-1">{[['£18.4k','Gross','text-cyan-600'],['£4.1k','Deductions','text-red-500'],['£14.3k','Net','text-green-600']].map(([n,l,c])=><div key={l} className="bg-slate-50 rounded p-1 text-center border border-slate-100"><p className={`text-[6px] font-bold ${c}`}>{n}</p><p className="text-[4px] text-slate-400">{l}</p></div>)}</div>
+        {[{n:'Sarah J.',h:'152h',net:'£1,456'},{n:'Katie L.',h:'144h',net:'£1,382'}].map(s=>(
+          <div key={s.n} className="bg-slate-50 rounded p-1 border border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-cyan-100 flex items-center justify-center text-[4px] font-bold text-cyan-700">{s.n.split(' ').map(x=>x[0]).join('')}</div><span className="text-[5px] text-slate-700">{s.n}</span></div>
+            <div className="flex items-center gap-1.5"><span className="text-[4px] text-slate-400">{s.h}</span><span className="text-[5px] font-bold text-green-600">{s.net}</span></div>
+          </div>
+        ))}
+        <div className="bg-cyan-50 rounded p-1 border border-cyan-100"><p className="text-[4px] font-semibold text-cyan-800">Payslip: Tax −£218 | NI −£156 | Pension −£97</p></div>
+      </div>
+    ),
   },
   {
     title: 'Automatic Invoicing System',
-    description: 'Generate invoices automatically based on completed visits, shift hours, and service agreements. CareCall AI creates professional, itemised invoices for local authorities, private clients, or funding bodies — with automatic scheduling, PDF export, payment tracking, and ageing reports.',
+    description: 'Auto-generated invoices from completed visits matched to service agreements. Professional PDFs, payment tracking, and ageing reports.',
     icon: (
-      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
       </svg>
     ),
     color: 'from-violet-500 to-purple-500',
     bg: 'bg-violet-50',
     textColor: 'text-violet-600',
+    preview: (
+      <div className="bg-white h-full p-2 space-y-1">
+        <div className="flex items-center justify-between"><p className="text-[6px] font-bold text-slate-700">Invoices — Feb 2026</p><span className="text-[5px] px-1 py-0.5 rounded bg-violet-500 text-white">+ Generate</span></div>
+        <div className="grid grid-cols-4 gap-0.5">{[['12','Invoices','text-violet-600'],['£28k','Invoiced','text-green-600'],['£19k','Paid','text-blue-600'],['£9k','Due','text-amber-600']].map(([n,l,c])=><div key={l} className="bg-slate-50 rounded p-0.5 text-center border border-slate-100"><p className={`text-[5px] font-bold ${c}`}>{n}</p><p className="text-[3px] text-slate-400">{l}</p></div>)}</div>
+        {[{r:'INV-0047',c:'Denbighshire CC',a:'£8,420',s:'Paid',sc:'bg-green-100 text-green-700'},{r:'INV-0048',c:'Conwy BC',a:'£6,180',s:'Sent',sc:'bg-blue-100 text-blue-700'},{r:'INV-0050',c:'Flintshire CC',a:'£4,860',s:'Draft',sc:'bg-slate-100 text-slate-600'}].map(inv=>(
+          <div key={inv.r} className="bg-slate-50 rounded p-1 border border-slate-100">
+            <div className="flex items-center justify-between"><span className="text-[5px] font-semibold text-slate-800">{inv.c}</span><span className={`text-[4px] px-1 py-0.5 rounded-full font-medium ${inv.sc}`}>{inv.s}</span></div>
+            <div className="flex items-center justify-between"><span className="text-[4px] text-slate-400">{inv.r}</span><span className="text-[5px] font-bold text-slate-800">{inv.a}</span></div>
+          </div>
+        ))}
+        <div className="bg-violet-50 rounded p-1 border border-violet-100 flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-violet-500" /><span className="text-[4px] text-violet-700 font-medium">Auto-Generation Active</span></div>
+      </div>
+    ),
   },
 ];
 
@@ -397,18 +563,22 @@ export default function CareCallAIPage() {
             </div>
           </AnimateOnScroll>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((feature, i) => (
               <AnimateOnScroll key={feature.title} animation="fade-up" delay={i * 50}>
-                <div className="bg-white rounded-2xl border border-slate-200 p-6 hover:shadow-lg transition-all hover:border-slate-300 h-full">
-                  <div className="flex items-start gap-4">
-                    <div className={`w-12 h-12 rounded-xl ${feature.bg} ${feature.textColor} flex items-center justify-center flex-shrink-0`}>
+                <div className="group bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl transition-all hover:border-slate-300 h-full flex flex-col">
+                  {/* Mini app preview */}
+                  <div className="relative h-36 sm:h-40 overflow-hidden border-b border-slate-100">
+                    {feature.preview}
+                    {/* Icon badge overlay */}
+                    <div className={`absolute bottom-2 right-2 w-9 h-9 rounded-xl bg-gradient-to-br ${feature.color} text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300`}>
                       {feature.icon}
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-slate-900 text-lg mb-2">{feature.title}</h3>
-                      <p className="text-slate-600 text-sm leading-relaxed">{feature.description}</p>
-                    </div>
+                  </div>
+                  {/* Content */}
+                  <div className="p-5 flex-1 flex flex-col">
+                    <h3 className="font-semibold text-slate-900 text-base mb-2 group-hover:text-welsh-green transition-colors">{feature.title}</h3>
+                    <p className="text-slate-600 text-sm leading-relaxed flex-1">{feature.description}</p>
                   </div>
                 </div>
               </AnimateOnScroll>
