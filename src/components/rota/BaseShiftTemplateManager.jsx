@@ -98,16 +98,39 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
         end: parseISO(endDate),
       });
 
+      // Fetch existing shifts in this area for the date range to avoid duplicates
+      const existingShifts = await ShiftApi.list('-created_date', 5000);
+      const existingSet = new Set();
+      for (const s of existingShifts) {
+        if (!s.date) continue;
+        const sArea = s.rota_area_id || s.area_id;
+        if (sArea === template.area_id) {
+          // Key: date + shift_name + start_time + end_time
+          existingSet.add(`${s.date}|${s.shift_name}|${s.start_time}|${s.end_time}`);
+        }
+      }
+
       const templateDays = new Set(template.days_of_week || []);
       const shiftsToCreate = [];
+      let skipped = 0;
 
       for (const day of days) {
         const dayName = DAY_NAME_MAP[day.getDay()];
         if (!templateDays.has(dayName)) continue;
+
+        const dateStr = format(day, 'yyyy-MM-dd');
+        const key = `${dateStr}|${template.shift_type_name}|${template.start_time}|${template.end_time}`;
+
+        // Skip if a shift with the same type/time already exists on this day
+        if (existingSet.has(key)) {
+          skipped++;
+          continue;
+        }
+
         shiftsToCreate.push({
           staff_id: null,
           staff_name: null,
-          date: format(day, 'yyyy-MM-dd'),
+          date: dateStr,
           start_time: template.start_time,
           end_time: template.end_time,
           shift_name: template.shift_type_name,
@@ -118,14 +141,18 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
       }
 
       if (shiftsToCreate.length === 0) {
-        toast.error('No matching days in the selected range');
+        toast.error(skipped > 0
+          ? `All ${skipped} day${skipped !== 1 ? 's' : ''} already have this shift — nothing to create`
+          : 'No matching days in the selected range');
         setGenerating(false);
         return;
       }
 
       await ShiftApi.bulkCreate(shiftsToCreate);
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
-      toast.success(`${shiftsToCreate.length} available shift${shiftsToCreate.length !== 1 ? 's' : ''} created`);
+      const msg = `${shiftsToCreate.length} available shift${shiftsToCreate.length !== 1 ? 's' : ''} created` +
+        (skipped > 0 ? ` (${skipped} skipped — already exist)` : '');
+      toast.success(msg);
       setGenerateId(null);
     } catch (e) {
       toast.error('Failed to generate shifts: ' + e.message);
