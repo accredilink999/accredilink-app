@@ -1,5 +1,15 @@
 import { useRef, useEffect, useState } from 'react';
 
+function getScrollParent(el) {
+  let node = el.parentElement;
+  while (node) {
+    const style = window.getComputedStyle(node);
+    if (/(auto|scroll)/.test(style.overflow + style.overflowY)) return node;
+    node = node.parentElement;
+  }
+  return document.documentElement;
+}
+
 export function usePullToRefresh(onRefresh, threshold = 100) {
   const containerRef = useRef(null);
   const [isPulling, setIsPulling] = useState(false);
@@ -11,9 +21,11 @@ export function usePullToRefresh(onRefresh, threshold = 100) {
     const container = containerRef.current;
     if (!container) return;
 
+    const scrollParent = getScrollParent(container);
+
     const handleTouchStart = (e) => {
-      const scrollTop = container.scrollTop;
-      isScrolledRef.current = scrollTop > 0;
+      // Check the actual scroll parent, not the container itself
+      isScrolledRef.current = scrollParent.scrollTop > 0;
       if (!isScrolledRef.current) {
         startYRef.current = e.touches[0].clientY;
       }

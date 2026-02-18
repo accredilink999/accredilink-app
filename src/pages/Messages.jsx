@@ -417,7 +417,7 @@ export default function Messages() {
   };
 
   return (
-    <div ref={containerRef} className="space-y-4 sm:space-y-6" style={{ overscrollBehavior: 'none' }}>
+    <div ref={containerRef} className="space-y-4 sm:space-y-6">
       <PageHeader 
         title="Messaging Centre" 
         subtitle="Manage announcements, alerts, and notifications"
