@@ -110,7 +110,14 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
       });
 
       // Count existing shifts per key (supports multiple staff slots)
-      const existingShifts = await ShiftApi.list('-created_date', 5000);
+      // Query only the date range we're deploying to — avoids Supabase row limits
+      const { data: existingShifts = [], error: fetchErr } = await supabase
+        .from('shifts')
+        .select('id, date, shift_name, start_time, end_time, rota_area_id, area_id, staff_id')
+        .gte('date', deployAllStartDate)
+        .lte('date', deployAllEndDate);
+      if (fetchErr) throw fetchErr;
+
       const existingCount = {};
       for (const s of existingShifts) {
         if (!s.date) continue;
@@ -188,20 +195,22 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
 
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
 
+      // Show per-template breakdown for ALL templates
+      const breakdown = results
+        .map(r => {
+          if (r.error) return `${r.name}: FAILED (${r.error})`;
+          if (r.created > 0 && r.skipped > 0) return `${r.name}: ${r.created} created, ${r.skipped} skipped`;
+          if (r.created > 0) return `${r.name}: ${r.created} created`;
+          if (r.skipped > 0) return `${r.name}: ${r.skipped} skipped`;
+          return `${r.name}: 0`;
+        })
+        .join('\n');
+      console.log('[DeployAll] Results:\n' + breakdown);
+
       if (totalCreated === 0) {
-        const detail = results
-          .filter(r => r.error || r.skipped > 0)
-          .map(r => r.error ? `${r.name}: ${r.error}` : `${r.name}: ${r.skipped} already exist`)
-          .join(', ');
-        toast.error(`No shifts created. ${detail || 'All days already covered.'}`);
+        toast.error(`No shifts created.\n${breakdown}`);
       } else {
-        // Show per-template breakdown
-        const breakdown = results
-          .filter(r => r.created > 0 || r.error)
-          .map(r => r.error ? `${r.name} (failed)` : `${r.name}: ${r.created}`)
-          .join(', ');
-        const skipMsg = totalSkipped > 0 ? ` (${totalSkipped} skipped)` : '';
-        toast.success(`${totalCreated} shifts created${skipMsg} — ${breakdown}`);
+        toast.success(`${totalCreated} shifts created (${totalSkipped} skipped)\n${breakdown}`);
       }
       setShowDeployAll(false);
     } catch (e) {
@@ -262,7 +271,14 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
       });
 
       // Count existing shifts per key in this area (supports multiple staff slots)
-      const existingShifts = await ShiftApi.list('-created_date', 5000);
+      // Query only shifts in the date range + area — avoids Supabase row limits
+      const { data: existingShifts = [], error: fetchErr } = await supabase
+        .from('shifts')
+        .select('id, date, shift_name, start_time, end_time, rota_area_id, area_id')
+        .gte('date', startDate)
+        .lte('date', endDate);
+      if (fetchErr) throw fetchErr;
+
       const existingCount = {};
       // Also count how many templates share the same params to know total slots needed
       const sameTemplateCount = templates.filter(t =>
