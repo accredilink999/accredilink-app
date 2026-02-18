@@ -77,12 +77,19 @@ export const ShiftApi = {
   },
 
   async bulkCreate(records) {
-    const { data, error } = await supabase
-      .from('shifts')
-      .insert(records)
-      .select()
-    if (error) throw error
-    return data || []
+    // Batch inserts to avoid 500 errors on large payloads
+    const BATCH_SIZE = 50
+    const allData = []
+    for (let i = 0; i < records.length; i += BATCH_SIZE) {
+      const batch = records.slice(i, i + BATCH_SIZE)
+      const { data, error } = await supabase
+        .from('shifts')
+        .insert(batch)
+        .select()
+      if (error) throw error
+      if (data) allData.push(...data)
+    }
+    return allData
   },
 
   subscribe(callback) {
