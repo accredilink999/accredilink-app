@@ -77,6 +77,23 @@ export async function notifyClaimApproved({ claim, adminName, areaId }) {
 }
 
 /**
+ * Leave approved → shifts released as available → notify area admins
+ */
+export async function notifyShiftsReleased({ staffName, shiftCount, startDate, endDate, areaId }) {
+  try {
+    const adminIds = await getAreaAdminIds(areaId, [])
+    await sendPush({
+      recipientIds: adminIds,
+      title: 'Shifts Available for Claiming',
+      message: `${staffName} is on leave ${startDate} to ${endDate}. ${shiftCount} shift(s) are now available to claim.`,
+      actionUrl: '/Rota',
+    })
+  } catch (e) {
+    console.warn('[ClaimNotify] ShiftsReleased failed:', e)
+  }
+}
+
+/**
  * Admin rejected the claim → notify claiming staff
  */
 export async function notifyClaimRejected({ claim, adminName, areaId }) {

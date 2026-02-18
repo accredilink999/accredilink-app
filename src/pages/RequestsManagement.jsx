@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { ShiftApi, ShiftCallApi } from '@/api/rotaApi';
@@ -12,7 +12,8 @@ import PageHeader from '@/components/ui/PageHeader';
 import EmptyState from '@/components/ui/EmptyState';
 import { toast } from 'sonner';
 import { notifySwapApproved, notifySwapRejected } from '@/utils/shiftSwapNotifications';
-import { notifyClaimApproved, notifyClaimRejected } from '@/utils/shiftClaimNotifications';
+import { notifyClaimApproved, notifyClaimRejected, notifyShiftsReleased } from '@/utils/shiftClaimNotifications';
+import { supabase } from '@/api/supabaseClient';
 import { getMatchingCallsForShift } from '@/utils/shiftCallAutoAssign';
 import {
   Calendar,
@@ -50,6 +51,30 @@ export default function RequestsManagement() {
     queryFn: () => base44.entities.ShiftClaimRequest.list('-created_date'),
   });
 
+  // Fetch affected shift counts for pending leave requests
+  const [leaveShiftCounts, setLeaveShiftCounts] = useState({});
+  const pendingLeaveIds = leaveRequests.filter(r => r.status === 'pending').map(r => r.id).join(',');
+  useEffect(() => {
+    const pending = leaveRequests.filter(r => r.status === 'pending');
+    if (pending.length === 0) { setLeaveShiftCounts({}); return; }
+    let cancelled = false;
+    (async () => {
+      const counts = {};
+      for (const req of pending) {
+        const { count } = await supabase
+          .from('shifts')
+          .select('id', { count: 'exact', head: true })
+          .eq('staff_id', req.staff_id)
+          .gte('date', req.start_date)
+          .lte('date', req.end_date);
+        if (cancelled) return;
+        counts[req.id] = count || 0;
+      }
+      setLeaveShiftCounts(counts);
+    })();
+    return () => { cancelled = true; };
+  }, [pendingLeaveIds]);
+
   const updateSwapMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.ShiftSwapRequest.update(id, data),
     onSuccess: () => {
@@ -57,15 +82,6 @@ export default function RequestsManagement() {
       queryClient.invalidateQueries({ queryKey: ['pendingSwaps'] });
       queryClient.invalidateQueries({ queryKey: ['mySwapRequests'] });
       queryClient.invalidateQueries({ queryKey: ['incomingSwapRequests'] });
-      setReviewNotes({});
-      setProcessingId(null);
-    },
-  });
-
-  const updateLeaveMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.LeaveRequest.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['leaveRequests'] });
       setReviewNotes({});
       setProcessingId(null);
     },
@@ -167,15 +183,80 @@ export default function RequestsManagement() {
 
   const handleLeaveDecision = async (request, status) => {
     setProcessingId(request.id);
-    updateLeaveMutation.mutate({
-      id: request.id,
-      data: {
-        status,
-        reviewed_by: user.id,
-        reviewed_by_name: user.gps_map_name || user.full_name,
-        review_notes: reviewNotes[request.id] || ''
+    const adminName = user.gps_map_name || user.staff_full_name || user.full_name;
+
+    if (status === 'approved') {
+      try {
+        // 1. Find all shifts for this staff in the leave date range
+        const { data: affectedShifts = [] } = await supabase
+          .from('shifts')
+          .select('id, date, start_time, end_time, shift_name, rota_area_id')
+          .eq('staff_id', request.staff_id)
+          .gte('date', request.start_date)
+          .lte('date', request.end_date);
+
+        // 2. For each shift: delete client calls, then clear staff assignment
+        for (const shift of affectedShifts) {
+          await supabase
+            .from('shift_calls')
+            .delete()
+            .eq('shift_id', shift.id);
+
+          await supabase
+            .from('shifts')
+            .update({ staff_id: null, staff_name: null, paired_staff_id: null, paired_staff_name: null })
+            .eq('id', shift.id);
+        }
+
+        // 3. Update leave request status
+        await base44.entities.LeaveRequest.update(request.id, {
+          status: 'approved',
+          reviewed_by: user.id,
+          reviewed_by_name: adminName,
+          reviewed_at: new Date().toISOString(),
+          review_notes: reviewNotes[request.id] || '',
+        });
+
+        // 4. Invalidate caches
+        queryClient.invalidateQueries({ queryKey: ['shifts'] });
+        queryClient.invalidateQueries({ queryKey: ['shift-calls'] });
+        queryClient.invalidateQueries({ queryKey: ['leaveRequests'] });
+        queryClient.invalidateQueries({ queryKey: ['todayShifts'] });
+
+        // 5. Toast with count
+        const shiftCount = affectedShifts.length;
+        toast.success(
+          `Leave approved${shiftCount > 0 ? ` — ${shiftCount} shift(s) released as available` : ''}`
+        );
+
+        // 6. Notify area admins about released shifts
+        if (shiftCount > 0) {
+          notifyShiftsReleased({
+            staffName: request.staff_name,
+            shiftCount,
+            startDate: request.start_date,
+            endDate: request.end_date,
+            areaId: affectedShifts[0]?.rota_area_id,
+          });
+        }
+      } catch (err) {
+        console.error('Leave approval error:', err);
+        toast.error('Failed to approve leave: ' + (err.message || 'Unknown error'));
       }
-    });
+    } else {
+      // Rejected — no shift changes needed
+      await base44.entities.LeaveRequest.update(request.id, {
+        status: 'rejected',
+        reviewed_by: user.id,
+        reviewed_by_name: adminName,
+        reviewed_at: new Date().toISOString(),
+        review_notes: reviewNotes[request.id] || '',
+      });
+      queryClient.invalidateQueries({ queryKey: ['leaveRequests'] });
+      toast.success('Leave request rejected');
+    }
+    setProcessingId(null);
+    setReviewNotes({});
   };
 
   const SIT_IN_NAMES = new Set(['Sit In L', 'Sit In E', 'Sit In FD']);
@@ -527,6 +608,15 @@ export default function RequestsManagement() {
                       {request.start_date} to {request.end_date}
                     </p>
                   </div>
+
+                  {leaveShiftCounts[request.id] > 0 && (
+                    <div className="mb-3 p-2 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-amber-600" />
+                      <p className="text-sm text-amber-700 font-medium">
+                        Approving will release {leaveShiftCounts[request.id]} shift(s) as available
+                      </p>
+                    </div>
+                  )}
 
                   {request.reason && (
                     <div className="mb-4">
