@@ -814,6 +814,10 @@ export default function Layout({ children, currentPageName }) {
                   <Settings className="w-4 h-4 mr-2" />
                   Settings
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate(createPageUrl('LeaveManagement'))} className="cursor-pointer touch-manipulation min-h-[44px]">
+                  <CalendarOff className="w-4 h-4 mr-2" />
+                  Leave / Sick
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={async () => { await base44.auth.logout(); }}
