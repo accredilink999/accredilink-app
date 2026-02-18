@@ -53,21 +53,25 @@ export default function ShiftStatusOverview() {
     return () => clearInterval(interval);
   }, []);
 
+  // Compute shift IDs for today's shifts — used by both careLogs and shiftCalls queries
+  const shiftIds = shiftsToday.map(s => s.id);
+
   const { data: careLogs = [] } = useQuery({
-    queryKey: ['careLogs', selectedDate],
+    queryKey: ['careLogs', shiftIds.join(',')],
     queryFn: async () => {
+      if (shiftIds.length === 0) return [];
       const { data, error } = await supabase
         .from('care_logs')
         .select('*')
-        .eq('visit_date', selectedDate);
+        .in('shift_id', shiftIds);
       if (error) throw error;
       return data || [];
     },
+    enabled: shiftIds.length > 0,
     refetchInterval: 15000,
   });
 
   // Fetch shift_calls for today's shifts only (direct supabase query for accuracy)
-  const shiftIds = shiftsToday.map(s => s.id);
   const { data: shiftCalls = [] } = useQuery({
     queryKey: ['shiftCalls', shiftIds.join(',')],
     queryFn: async () => {
@@ -156,7 +160,7 @@ export default function ShiftStatusOverview() {
   const onShift = shiftsToday.filter(s => getShiftStatus(s) === 'booked_on').length;
   const bookedOn = shiftsToday.filter(s => s.staff_id).length;
   const notBooked = shiftsToday.filter(s => !s.staff_id).length;
-  const completedLogs = shiftsToday.filter(s => getLogStatus(s.id) === 'submitted').length;
+  const completedLogs = careLogs.filter(l => l.status === 'submitted').length;
   const overdueLogs = shiftsToday.filter(s => getLogStatus(s.id) === 'overdue').length;
 
   return (

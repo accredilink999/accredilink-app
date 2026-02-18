@@ -168,7 +168,10 @@ export default function Messages() {
 
       // Send push notification to all staff for announcements and weather warnings
       if (data.type === 'announcement' || data.type === 'weather_warning') {
-        const activeStaff = staff.filter(s => s.is_active !== false && s.id !== user?.id);
+        // Weather warnings go to ALL staff including the creator (they need it on all devices)
+        const activeStaff = data.type === 'weather_warning'
+          ? staff.filter(s => s.is_active !== false)
+          : staff.filter(s => s.is_active !== false && s.id !== user?.id);
         const recipientIds = activeStaff.map(s => s.id);
         console.log(`[Push] Sending ${data.type} push to ${recipientIds.length} recipients`);
         if (recipientIds.length > 0) {

@@ -708,16 +708,15 @@ export default function Layout({ children, currentPageName }) {
 
   const unreadNotificationCount = messages.filter(msg => {
     if (isWeatherWarningExpired(msg)) return false;
-    // Weather warnings stay active until admin cancels them
-    if (msg.type === 'weather_warning' && msg.priority === 'urgent') {
-      return !msg.is_cancelled;
-    }
+    // Weather warnings don't count here — staff can't clear them.
+    // They show via hasWeatherWarning header instead.
+    if (msg.type === 'weather_warning') return false;
     // Other urgent messages use read_by
     return msg.priority === 'urgent' && (!msg.read_by || !msg.read_by.includes(user?.id));
   }).length;
 
   const hasWeatherWarning = messages.some(msg =>
-    msg.type === 'weather_warning' && msg.priority === 'urgent' &&
+    msg.type === 'weather_warning' &&
     !msg.is_cancelled &&
     !isWeatherWarningExpired(msg)
   );
@@ -836,8 +835,8 @@ export default function Layout({ children, currentPageName }) {
               <img src={companySettings.company_logo} alt="Company logo" className="h-[83px] max-w-full w-auto object-contain" />
             )}
             {hasWeatherWarning && (
-              <Link to={createPageUrl('Messages')} className={`font-semibold truncate ${unreadNotificationCount > 0 ? 'text-red-600' : 'text-slate-900'}`}>
-                Weather Alert
+              <Link to={createPageUrl('Messages')} className="font-semibold truncate text-red-600 flash-red">
+                ⚠ Weather Alert
               </Link>
             )}
             {unreadNotificationCount > 0 && (

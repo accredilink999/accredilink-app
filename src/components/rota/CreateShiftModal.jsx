@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { ShiftTypeApi } from '@/api/shiftTypeApi';
 import { ShiftApi, ShiftCallApi } from '@/api/rotaApi';
+import { useFormPersistence } from '@/hooks/useFormPersistence';
+import DraftRecoveryPrompt from '@/components/ui/DraftRecoveryPrompt';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -47,14 +49,19 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
   const [showSitInTimePopup, setShowSitInTimePopup] = useState(false);
   const [sitInTimeOn, setSitInTimeOn] = useState('');
   const [sitInTimeOff, setSitInTimeOff] = useState('');
-  const [formData, setFormData] = useState({
+  const shiftInitialData = {
       shift_name: '',
       staff_id: '',
       service_user_id: '',
       start_time: '09:00',
       end_time: '17:00',
       visit_details: '',
-    });
+    };
+
+  const { formData, setFormData, hasDraft, restoreDraft, discardDraft, clearDraft } = useFormPersistence(
+    `draft:createShift:${selectedDate ? format(selectedDate, 'yyyy-MM-dd') : 'new'}`,
+    shiftInitialData
+  );
 
   const { data: staff = [] } = useQuery({
     queryKey: ['staff'],
@@ -276,6 +283,7 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
        return { shifts, totalCalls };
      },
     onSuccess: ({ shifts, totalCalls }) => {
+      clearDraft();
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       queryClient.invalidateQueries({ queryKey: ['shift-calls'] });
       const callMsg = totalCalls > 0 ? ` with ${totalCalls} call${totalCalls !== 1 ? 's' : ''} auto-assigned` : '';
@@ -363,6 +371,7 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
 
   return (
     <>
+    <DraftRecoveryPrompt open={open && hasDraft} onRestore={restoreDraft} onDiscard={discardDraft} />
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>

@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react'
 import { supabase } from '@/api/supabaseClient'
 import { isBiometricEnabled } from '@/utils/biometric'
+import { clearAllDrafts } from '@/hooks/useFormPersistence'
 
 const AuthContext = createContext()
 
@@ -94,6 +95,8 @@ export const AuthProvider = ({ children }) => {
     } catch (e) {
       console.error('signOut error (continuing):', e)
     }
+    // Clear any saved form drafts
+    clearAllDrafts()
     // Clear any cached Supabase tokens from localStorage
     const keys = Object.keys(localStorage)
     for (const key of keys) {

@@ -16,6 +16,8 @@ import { createPageUrl } from '@/utils';
 import CareLogViewer from './CareLogViewer';
 import { notifyAdminsOfActivity } from '@/utils/adminNotifications';
 import SpeechButton from '@/components/ui/SpeechButton';
+import { useFormPersistence } from '@/hooks/useFormPersistence';
+import DraftRecoveryPrompt from '@/components/ui/DraftRecoveryPrompt';
 
 export default function CareLogForm({ shift, serviceUser, open, onClose, callId, scheduledTime }) {
   const queryClient = useQueryClient();
@@ -25,7 +27,7 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
     queryKey: ['currentUser'],
     queryFn: () => base44.auth.me(),
   });
-  const [formData, setFormData] = useState({
+  const initialFormData = {
     mood: '',
     food_intake: '',
     fluid_intake: '',
@@ -67,7 +69,12 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
     notes: '',
     duration_minutes: shift?.end_time ? calculateDuration(shift) : '',
     timestamp: new Date().toISOString()
-    });
+  };
+
+  const { formData, setFormData, hasDraft, restoreDraft, discardDraft, clearDraft } = useFormPersistence(
+    `draft:careLog:${shift?.id || 'new'}`,
+    initialFormData
+  );
 
   const [showMARPopup, setShowMARPopup] = useState(false);
   const [expandedMedicationOutcome, setExpandedMedicationOutcome] = useState(false);
@@ -101,51 +108,12 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
   }
 
   useEffect(() => {
-    if (open) {
+    if (open && !hasDraft) {
       setFormData({
-        mood: '',
-        food_intake: '',
-        fluid_intake: '',
-        welfare_impression_on_arrival: '',
-        personal_care: '',
-        personal_care_description: '',
-        continence_care_provided: '',
-        continence_care_monitoring: [],
-        catheter_care_provided: '',
-        catheter_care_description: '',
-        repositioned_on_visit: '',
-        repositioned_description: '',
-        skincare_provided: '',
-        skincare_description: '',
-        skin_integrity_concerns: '',
-        skin_integrity_description: '',
-        food_offered: '',
-        food_accepted: '',
-        food_given: '',
-        food_outcome: '',
-        drinks_offered: '',
-        drinks_accepted: '',
-        drinks_given: '',
-        drinks_outcome: '',
-        add_medication_round: '',
-        medication_round_outcome: '',
-        medication_concerns: '',
-        medication_concerns_details: '',
-        healthcare_visit_required: '',
-        healthcare_visit_type: '',
-        staff_grade: '',
-        double_handed_call: '',
-        staff_1: '',
-        staff_2: '',
-        extended_notes: '',
-        further_concerns: '',
-        further_concerns_details: '',
-        health_observations: '',
-        notes: '',
+        ...initialFormData,
         duration_minutes: shift?.end_time ? calculateDuration(shift) : '',
         timestamp: new Date().toISOString()
-        });
-
+      });
     }
   }, [open, shift]);
 
@@ -231,6 +199,7 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
       return careLog;
     },
     onSuccess: async (careLog) => {
+      clearDraft();
       toast.success('Care log submitted successfully');
 
       // Auto clock out the call
@@ -385,6 +354,7 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
 
   return (
     <>
+      <DraftRecoveryPrompt open={open && hasDraft} onRestore={restoreDraft} onDiscard={discardDraft} />
       <Dialog open={open} onOpenChange={onClose}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>

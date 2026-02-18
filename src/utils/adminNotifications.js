@@ -8,17 +8,25 @@ import { base44 } from '@/api/base44Client'
 
 /**
  * Send a shift-activity notification to all admins (except excludeUserId).
+ * If areaId is provided, only notifies admins who have a RotaPermission for that area.
  * Silently swallows errors — callers should not await this.
  */
-export async function notifyAdminsOfActivity({ title, message, excludeUserId, actionUrl = '/Rota' }) {
+export async function notifyAdminsOfActivity({ title, message, excludeUserId, actionUrl = '/Rota', areaId }) {
   try {
     const allUsers = await base44.entities.User.list()
-    const admins = allUsers.filter(u =>
+    let admins = allUsers.filter(u =>
       u.is_active !== false &&
       (u.role === 'admin' || u.job_title === 'admin' || u.job_title === 'manager') &&
       u.id !== excludeUserId &&
       u.shift_activity_notifications !== false   // default true if column is null
     )
+
+    // Filter to admins on the relevant area team
+    if (areaId && admins.length > 0) {
+      const areaPermissions = await base44.entities.RotaPermission.filter({ rota_area_id: areaId })
+      const areaStaffIds = new Set(areaPermissions.map(p => p.staff_id))
+      admins = admins.filter(a => areaStaffIds.has(a.id))
+    }
 
     if (admins.length === 0) return
 

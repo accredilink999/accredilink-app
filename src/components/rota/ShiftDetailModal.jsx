@@ -165,6 +165,13 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
     enabled: !!shift.paired_shift_id,
   });
 
+  // Fetch paired shift calls for cross-referencing partner-completed logs
+  const { data: pairedCalls = [] } = useQuery({
+    queryKey: ['shift-calls-paired', shift.paired_shift_id],
+    queryFn: () => shift.paired_shift_id ? ShiftCallApi.filter({ shift_id: shift.paired_shift_id }, 'scheduled_time', 100) : [],
+    enabled: !!shift.paired_shift_id,
+  });
+
   const { data: rotaAreas = [] } = useQuery({
     queryKey: ['rotaAreas'],
     queryFn: () => base44.entities.RotaArea.filter({ is_active: true }, 'name'),
@@ -277,9 +284,20 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
     }
 
     // Outstanding logs = calls without a care log (exclude sitin_cover)
+    // Also exclude logs already completed by the shift partner on shared shifts
     const outstandingLogs = regularCalls.filter(c => {
       if (c.status === 'missed') return false; // missed calls don't need logs
-      const hasLog = shiftCareLogs.some(log => log.id === c.care_log_id || log.shift_call_id === c.id);
+      const hasLog = shiftCareLogs.some(log => {
+        if (log.id === c.care_log_id || log.shift_call_id === c.id) return true;
+        // Partner-completed: match via the partner's call for same client + same scheduled time
+        if (log.shift_call_id && log.status === 'submitted') {
+          const partnerCall = pairedCalls.find(pc => pc.id === log.shift_call_id);
+          if (partnerCall && partnerCall.service_user_id === c.service_user_id && partnerCall.scheduled_time === c.scheduled_time) {
+            return true;
+          }
+        }
+        return false;
+      });
       return !hasLog;
     });
 
@@ -392,12 +410,25 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
       toast.success('Shift Completed', { duration: 5000 });
       setShiftSummaryOpen(false);
 
-      // Notify admins
-      notifyAdminsOfActivity({
-        title: `Shift completed: ${shift.staff_name || 'Staff'}`,
-        message: `${shift.staff_name || 'Staff'} has clocked off their shift.`,
-        excludeUserId: shift.staff_id,
-      });
+      // Notify admins — include outstanding logs warning if any
+      const summary = getShiftSummary();
+      const outstandingCount = summary.outstandingLogs.length;
+      const shiftAreaId = shift.rota_area_id || shift.area_id;
+      if (outstandingCount > 0) {
+        const logNames = summary.outstandingLogs.map(c => `${c.service_user_name} (${c.scheduled_time})`).join(', ');
+        notifyAdminsOfActivity({
+          title: `⚠️ Shift ended with ${outstandingCount} missing log${outstandingCount !== 1 ? 's' : ''}`,
+          message: `${shift.staff_name || 'Staff'} clocked off with outstanding care logs: ${logNames}`,
+          excludeUserId: shift.staff_id,
+          areaId: shiftAreaId,
+        });
+      } else {
+        notifyAdminsOfActivity({
+          title: `Shift completed: ${shift.staff_name || 'Staff'}`,
+          message: `${shift.staff_name || 'Staff'} has clocked off their shift.`,
+          excludeUserId: shift.staff_id,
+        });
+      }
 
       // Close modal after a brief delay so user sees the toast
       setTimeout(() => {
@@ -1104,7 +1135,14 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
                      <div className="bg-slate-50 rounded-lg p-3 space-y-2">
                        <p className="font-semibold text-slate-900 text-sm">Calls Attended</p>
                        {summary.callDetails.map((call, i) => {
-                         const hasLog = shiftCareLogs.some(log => log.id === call.care_log_id || log.shift_call_id === call.id);
+                         const hasLog = shiftCareLogs.some(log => {
+                           if (log.id === call.care_log_id || log.shift_call_id === call.id) return true;
+                           if (log.shift_call_id && log.status === 'submitted') {
+                             const partnerCall = pairedCalls.find(pc => pc.id === log.shift_call_id);
+                             if (partnerCall && partnerCall.service_user_id === call.service_user_id && partnerCall.scheduled_time === call.scheduled_time) return true;
+                           }
+                           return false;
+                         });
                          return (
                            <div key={call.id} className="flex items-center justify-between py-1 border-b border-slate-200 last:border-0">
                              <div className="flex items-center gap-2 min-w-0">

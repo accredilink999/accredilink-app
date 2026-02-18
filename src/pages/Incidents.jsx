@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { format } from 'date-fns';
 import { usePullToRefresh } from '@/components/hooks/usePullToRefresh';
+import { useFormPersistence } from '@/hooks/useFormPersistence';
+import DraftRecoveryPrompt from '@/components/ui/DraftRecoveryPrompt';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,7 +58,7 @@ export default function Incidents() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedIncident, setSelectedIncident] = useState(null);
   const [viewMode, setViewMode] = useState('form');
-  const [formData, setFormData] = useState({
+  const incidentInitialData = {
     title: '',
     type: 'other',
     severity: 'medium',
@@ -73,7 +75,12 @@ export default function Incidents() {
     gp_notified: false,
     cqc_notifiable: false,
     follow_up_actions: ''
-  });
+  };
+
+  const { formData, setFormData, hasDraft, restoreDraft, discardDraft, clearDraft } = useFormPersistence(
+    'draft:incident',
+    incidentInitialData
+  );
 
   const { data: user } = useQuery({
     queryKey: ['currentUser'],
@@ -109,23 +116,11 @@ export default function Incidents() {
   });
 
   const resetForm = () => {
+    clearDraft();
     setFormData({
-      title: '',
-      type: 'other',
-      severity: 'medium',
-      service_user_id: '',
+      ...incidentInitialData,
       incident_date: format(new Date(), 'yyyy-MM-dd'),
       incident_time: format(new Date(), 'HH:mm'),
-      location: '',
-      description: '',
-      immediate_action_taken: '',
-      witnesses: '',
-      injuries_sustained: '',
-      medical_attention_required: false,
-      family_notified: false,
-      gp_notified: false,
-      cqc_notifiable: false,
-      follow_up_actions: ''
     });
   };
 
@@ -272,6 +267,8 @@ export default function Incidents() {
           ))}
         </div>
       )}
+
+      <DraftRecoveryPrompt open={isDialogOpen && viewMode === 'form' && hasDraft} onRestore={restoreDraft} onDiscard={discardDraft} />
 
       {/* Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
