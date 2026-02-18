@@ -214,34 +214,34 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
     if (!clearStartDate || !clearEndDate) return;
     setClearing(true);
     try {
-      // Query unassigned shifts directly from Supabase with date range filter
-      // This avoids the 1000-row default limit issue with generic list()
-      const { data: toDelete, error } = await supabase
+      // Count how many will be deleted first
+      const { count, error: countErr } = await supabase
         .from('shifts')
-        .select('id, date, shift_name, start_time, end_time, staff_id')
+        .select('id', { count: 'exact', head: true })
         .is('staff_id', null)
         .gte('date', clearStartDate)
         .lte('date', clearEndDate);
 
-      if (error) throw error;
+      if (countErr) throw countErr;
 
-      if (!toDelete || toDelete.length === 0) {
+      if (!count || count === 0) {
         toast.error('No available (unassigned) shifts found in that date range');
         setClearing(false);
         return;
       }
 
-      // Bulk delete using Supabase directly — much faster than one-by-one
-      const ids = toDelete.map(s => s.id);
+      // Delete directly using the same filters — no ID array needed
       const { error: delError } = await supabase
         .from('shifts')
         .delete()
-        .in('id', ids);
+        .is('staff_id', null)
+        .gte('date', clearStartDate)
+        .lte('date', clearEndDate);
 
       if (delError) throw delError;
 
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
-      toast.success(`Cleared ${ids.length} available shift${ids.length !== 1 ? 's' : ''}`);
+      toast.success(`Cleared ${count} available shift${count !== 1 ? 's' : ''}`);
       setShowClearAll(false);
     } catch (e) {
       toast.error('Failed to clear shifts: ' + e.message);
