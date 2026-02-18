@@ -12,7 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Calendar, Play, Pencil, X, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Calendar, Play, Pencil, X, Loader2, AlertTriangle } from 'lucide-react';
 import { format, eachDayOfInterval, parseISO } from 'date-fns';
 
 const DAYS_OF_WEEK = [
@@ -89,6 +89,10 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
   const [deployAllStartDate, setDeployAllStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [deployAllEndDate, setDeployAllEndDate] = useState('');
   const [deployingAll, setDeployingAll] = useState(false);
+  const [showClearAll, setShowClearAll] = useState(false);
+  const [clearStartDate, setClearStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [clearEndDate, setClearEndDate] = useState('');
+  const [clearing, setClearing] = useState(false);
 
   const handleDeployAll = async () => {
     if (!deployAllStartDate || !deployAllEndDate) return;
@@ -203,6 +207,47 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
       toast.error('Failed to deploy all: ' + e.message);
     }
     setDeployingAll(false);
+  };
+
+  const handleClearAvailable = async () => {
+    if (!clearStartDate || !clearEndDate) return;
+    setClearing(true);
+    try {
+      const allShifts = await ShiftApi.list('-created_date', 5000);
+      const startD = parseISO(clearStartDate);
+      const endD = parseISO(clearEndDate);
+
+      // Find blank/available shifts (no staff assigned) in the date range
+      const toDelete = allShifts.filter(s => {
+        if (!s.date || s.staff_id) return false;
+        const d = parseISO(s.date);
+        return d >= startD && d <= endD;
+      });
+
+      if (toDelete.length === 0) {
+        toast.error('No available (unassigned) shifts found in that date range');
+        setClearing(false);
+        return;
+      }
+
+      // Delete them one by one (no bulk delete available)
+      let deleted = 0;
+      for (const shift of toDelete) {
+        try {
+          await ShiftApi.delete(shift.id);
+          deleted++;
+        } catch (err) {
+          console.error('Failed to delete shift', shift.id, err);
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      toast.success(`Cleared ${deleted} available shift${deleted !== 1 ? 's' : ''}`);
+      setShowClearAll(false);
+    } catch (e) {
+      toast.error('Failed to clear shifts: ' + e.message);
+    }
+    setClearing(false);
   };
 
   const handleGenerate = async () => {
@@ -442,6 +487,52 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
           </Card>
         )}
 
+        {/* Clear Available Shifts Dialog */}
+        {showClearAll && (
+          <Card className="p-4 border-2 border-red-200 bg-red-50 space-y-3">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-600" />
+              <p className="text-sm font-medium text-red-800">Clear Available Shifts</p>
+            </div>
+            <p className="text-xs text-red-600">
+              This will delete all unassigned/available shifts in the selected date range.
+              Shifts that already have staff assigned will NOT be affected.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">Start Date</Label>
+                <Input
+                  type="date"
+                  value={clearStartDate}
+                  onChange={(e) => setClearStartDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">End Date</Label>
+                <Input
+                  type="date"
+                  value={clearEndDate}
+                  onChange={(e) => setClearEndDate(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={handleClearAvailable}
+                disabled={!clearStartDate || !clearEndDate || clearing}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {clearing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Trash2 className="w-4 h-4 mr-1" />}
+                {clearing ? 'Clearing...' : 'Clear Shifts'}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setShowClearAll(false)}>
+                Cancel
+              </Button>
+            </div>
+          </Card>
+        )}
+
         {/* Create/Edit Form */}
         {showForm && (
           <Card className="p-4 space-y-3 border-2 border-blue-200 bg-blue-50">
@@ -545,14 +636,25 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
                 Add Template
               </Button>
               {templates.length > 0 && (
-                <Button
-                  onClick={() => { setShowDeployAll(true); setDeployAllEndDate(''); }}
-                  className="flex-1 gap-2 bg-orange-600 hover:bg-orange-700"
-                  size="sm"
-                >
-                  <Play className="w-4 h-4" />
-                  Deploy All
-                </Button>
+                <>
+                  <Button
+                    onClick={() => { setShowDeployAll(true); setDeployAllEndDate(''); }}
+                    className="flex-1 gap-2 bg-orange-600 hover:bg-orange-700"
+                    size="sm"
+                  >
+                    <Play className="w-4 h-4" />
+                    Deploy All
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => { setShowClearAll(true); setClearEndDate(''); }}
+                    className="gap-2 border-red-300 text-red-600 hover:bg-red-50"
+                    size="sm"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Clear
+                  </Button>
+                </>
               )}
             </div>
           )}
