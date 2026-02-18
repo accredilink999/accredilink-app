@@ -106,7 +106,7 @@ export default function PatternManager({ open, onClose }) {
       console.log('Starting deploy for pattern:', pattern);
       const shiftsToCreate = [];
       const startDate = new Date();
-      const daysPerCycle = pattern.pattern_type === 'weekly' ? 7 : 
+      const daysPerCycle = pattern.pattern_type === 'weekly' ? 7 :
                            pattern.pattern_type === 'two_week' ? 14 :
                            pattern.pattern_type === 'three_week' ? 21 : 28;
 
@@ -134,21 +134,69 @@ export default function PatternManager({ open, onClose }) {
       }
 
       console.log('Shifts to create:', shiftsToCreate);
+
+      // Fetch existing shifts to find blank/available ones we can replace
+      const areaId = pattern.rota_area_id || 'default';
+      const existingShifts = areaId !== 'default'
+        ? await ShiftApi.list('-created_date', 5000)
+        : [];
+      // Build lookup: date|start_time|end_time → blank shift (no staff_id)
+      const blankShiftMap = {};
+      for (const s of existingShifts) {
+        if (!s.date || s.staff_id) continue;
+        const sArea = s.rota_area_id || s.area_id;
+        if (sArea !== areaId) continue;
+        const key = `${s.date}|${s.start_time}|${s.end_time}`;
+        blankShiftMap[key] = s;
+      }
+
+      const allShifts = []; // track created or updated shifts for call assignment
+      let replaced = 0;
+
       if (shiftsToCreate.length > 0) {
-        const createdShifts = await ShiftApi.bulkCreate(shiftsToCreate);
-        
-        // Add client calls to newly created shifts
-        if (pattern.rota_area_id && pattern.rota_area_id !== 'default') {
+        const toCreate = [];
+
+        for (const shiftData of shiftsToCreate) {
+          const key = `${shiftData.date}|${shiftData.start_time}|${shiftData.end_time}`;
+          const blank = blankShiftMap[key];
+
+          if (blank) {
+            // Replace the blank shift by assigning staff to it
+            const updated = await ShiftApi.update(blank.id, {
+              staff_id: shiftData.staff_id,
+              staff_name: shiftData.staff_name,
+              shift_pattern_id: shiftData.shift_pattern_id,
+              status: 'scheduled',
+            });
+            allShifts.push({ ...blank, ...updated, start_time: blank.start_time, end_time: blank.end_time, date: blank.date });
+            replaced++;
+            // Remove from map so second shift at same time creates fresh
+            delete blankShiftMap[key];
+          } else {
+            toCreate.push(shiftData);
+          }
+        }
+
+        if (toCreate.length > 0) {
+          const created = await ShiftApi.bulkCreate(toCreate);
+          allShifts.push(...created);
+        }
+
+        // Add client calls to all shifts (created + replaced)
+        if (areaId !== 'default') {
           const serviceUsers = await base44.entities.ServiceUser.filter({ status: 'active' });
-          const areaServiceUsers = serviceUsers.filter(su => su.rota_area_id === pattern.rota_area_id);
-          
-          for (let i = 0; i < createdShifts.length; i++) {
-            const shift = createdShifts[i];
+          const areaServiceUsers = serviceUsers.filter(su => (su.rota_area_id || su.area_id) === areaId);
+
+          for (const shift of allShifts) {
+            // Check if shift already has calls (replaced blank shifts might)
+            const existingCalls = await base44.entities.ClientCall.filter({ shift_id: shift.id });
+            if (existingCalls.length > 0) continue;
+
             const matchingCalls = [];
-            
+
             for (const serviceUser of areaServiceUsers) {
               if (!serviceUser.call_times || !Array.isArray(serviceUser.call_times)) continue;
-              
+
               serviceUser.call_times.forEach(callTime => {
                 try {
                   const callStart = parseInt(callTime.time.split(':')[0]) * 60 + parseInt(callTime.time.split(':')[1]);
@@ -180,12 +228,15 @@ export default function PatternManager({ open, onClose }) {
           }
         }
       }
-      return shiftsToCreate;
+      return { total: shiftsToCreate.length, replaced };
     },
-    onSuccess: () => {
+    onSuccess: ({ total, replaced }) => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       queryClient.invalidateQueries({ queryKey: ['clientCalls'] });
-      toast.success('Pattern deployed with client calls');
+      const msg = replaced > 0
+        ? `Pattern deployed: ${replaced} available shift${replaced !== 1 ? 's' : ''} filled in, ${total - replaced} new shift${total - replaced !== 1 ? 's' : ''} created`
+        : 'Pattern deployed with client calls';
+      toast.success(msg);
     },
     onError: (error) => {
       toast.error('Error deploying pattern: ' + error.message);

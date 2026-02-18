@@ -183,11 +183,45 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
     mutationFn: async (shiftsData) => {
        console.log('[CreateShift] Creating shifts:', shiftsData.map(s => ({ date: s.date, area: s.rota_area_id, times: s.start_time + '-' + s.end_time })));
        console.log('[CreateShift] Service users available:', serviceUsers.length);
+
+       // Fetch existing shifts to find blank/available ones we can replace
+       const existingShifts = await ShiftApi.list('-created_date', 5000);
+       // Build lookup: areaId|date|start_time|end_time → blank shift
+       const blankShiftMap = {};
+       for (const s of existingShifts) {
+         if (!s.date || s.staff_id) continue;
+         const sArea = s.rota_area_id || s.area_id;
+         const key = `${sArea}|${s.date}|${s.start_time}|${s.end_time}`;
+         blankShiftMap[key] = s;
+       }
+
        const shifts = [];
        let totalCalls = 0;
+       let replaced = 0;
        for (const rawShiftData of shiftsData) {
          const { _sitInCover, ...shiftData } = rawShiftData;
-         const shift = await ShiftApi.create(shiftData);
+
+         // Check if there's a blank shift we can replace
+         const areaId = shiftData.rota_area_id || 'default';
+         const blankKey = `${areaId}|${shiftData.date}|${shiftData.start_time}|${shiftData.end_time}`;
+         const blankShift = blankShiftMap[blankKey];
+         let shift;
+
+         if (blankShift && shiftData.staff_id) {
+           // Replace blank shift by assigning staff to it
+           const updated = await ShiftApi.update(blankShift.id, {
+             staff_id: shiftData.staff_id,
+             staff_name: shiftData.staff_name,
+             shift_name: shiftData.shift_name || blankShift.shift_name,
+             visit_details: shiftData.visit_details,
+             status: 'scheduled',
+           });
+           shift = { ...blankShift, ...updated, date: blankShift.date, start_time: blankShift.start_time, end_time: blankShift.end_time };
+           replaced++;
+           delete blankShiftMap[blankKey];
+         } else {
+           shift = await ShiftApi.create(shiftData);
+         }
          shifts.push(shift);
 
          // Sit-in shifts don't get client calls
@@ -279,15 +313,16 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
            });
          }
        }
-       console.log('[CreateShift] Done. Total calls auto-assigned:', totalCalls);
-       return { shifts, totalCalls };
+       console.log('[CreateShift] Done. Total calls auto-assigned:', totalCalls, 'Replaced blank shifts:', replaced);
+       return { shifts, totalCalls, replaced };
      },
-    onSuccess: ({ shifts, totalCalls }) => {
+    onSuccess: ({ shifts, totalCalls, replaced }) => {
       clearDraft();
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       queryClient.invalidateQueries({ queryKey: ['shift-calls'] });
       const callMsg = totalCalls > 0 ? ` with ${totalCalls} call${totalCalls !== 1 ? 's' : ''} auto-assigned` : '';
-      toast.success(`${shifts.length} shift${shifts.length !== 1 ? 's' : ''} created${callMsg}`);
+      const replaceMsg = replaced > 0 ? ` (${replaced} filled available slot${replaced !== 1 ? 's' : ''})` : '';
+      toast.success(`${shifts.length} shift${shifts.length !== 1 ? 's' : ''} created${callMsg}${replaceMsg}`);
       setShiftsToCreate([]);
       setTimeout(() => onClose(), 100);
     },
