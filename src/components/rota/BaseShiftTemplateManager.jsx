@@ -85,6 +85,94 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
   });
 
   const [generating, setGenerating] = useState(false);
+  const [showDeployAll, setShowDeployAll] = useState(false);
+  const [deployAllStartDate, setDeployAllStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [deployAllEndDate, setDeployAllEndDate] = useState('');
+  const [deployingAll, setDeployingAll] = useState(false);
+
+  const handleDeployAll = async () => {
+    if (!deployAllStartDate || !deployAllEndDate) return;
+    if (templates.length === 0) {
+      toast.error('No templates to deploy');
+      return;
+    }
+
+    setDeployingAll(true);
+    try {
+      const days = eachDayOfInterval({
+        start: parseISO(deployAllStartDate),
+        end: parseISO(deployAllEndDate),
+      });
+
+      // Fetch all existing shifts once to check for duplicates
+      const existingShifts = await ShiftApi.list('-created_date', 5000);
+      const existingSet = new Set();
+      for (const s of existingShifts) {
+        if (!s.date) continue;
+        const sArea = s.rota_area_id || s.area_id;
+        existingSet.add(`${sArea}|${s.date}|${s.shift_name}|${s.start_time}|${s.end_time}`);
+      }
+
+      const allShiftsToCreate = [];
+      let totalSkipped = 0;
+      let templatesUsed = 0;
+
+      for (const template of templates) {
+        if (template.is_active === false) continue;
+        const templateDays = new Set(template.days_of_week || []);
+        let templateCreated = 0;
+
+        for (const day of days) {
+          const dayName = DAY_NAME_MAP[day.getDay()];
+          if (!templateDays.has(dayName)) continue;
+
+          const dateStr = format(day, 'yyyy-MM-dd');
+          const key = `${template.area_id}|${dateStr}|${template.shift_type_name}|${template.start_time}|${template.end_time}`;
+
+          if (existingSet.has(key)) {
+            totalSkipped++;
+            continue;
+          }
+
+          // Add to existing set so templates with same params don't duplicate each other
+          existingSet.add(key);
+
+          allShiftsToCreate.push({
+            staff_id: null,
+            staff_name: null,
+            date: dateStr,
+            start_time: template.start_time,
+            end_time: template.end_time,
+            shift_name: template.shift_type_name,
+            rota_area_id: template.area_id,
+            status: 'scheduled',
+            is_base_shift: true,
+          });
+          templateCreated++;
+        }
+
+        if (templateCreated > 0) templatesUsed++;
+      }
+
+      if (allShiftsToCreate.length === 0) {
+        toast.error(totalSkipped > 0
+          ? `All shifts already exist for this date range (${totalSkipped} skipped)`
+          : 'No matching days across any templates');
+        setDeployingAll(false);
+        return;
+      }
+
+      await ShiftApi.bulkCreate(allShiftsToCreate);
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      const msg = `${allShiftsToCreate.length} available shift${allShiftsToCreate.length !== 1 ? 's' : ''} created from ${templatesUsed} template${templatesUsed !== 1 ? 's' : ''}` +
+        (totalSkipped > 0 ? ` (${totalSkipped} skipped — already exist)` : '');
+      toast.success(msg);
+      setShowDeployAll(false);
+    } catch (e) {
+      toast.error('Failed to deploy all: ' + e.message);
+    }
+    setDeployingAll(false);
+  };
 
   const handleGenerate = async () => {
     if (!generateId || !startDate || !endDate) return;
@@ -270,6 +358,49 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
           </Card>
         )}
 
+        {/* Deploy All Dialog */}
+        {showDeployAll && (
+          <Card className="p-4 border-2 border-orange-200 bg-orange-50 space-y-3">
+            <p className="text-sm font-medium text-orange-800">Deploy All Templates</p>
+            <p className="text-xs text-orange-600">
+              Generates available shifts for ALL {templates.length} template{templates.length !== 1 ? 's' : ''} at once.
+              Each template's area and day rules will be applied. Existing shifts are skipped.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">Start Date</Label>
+                <Input
+                  type="date"
+                  value={deployAllStartDate}
+                  onChange={(e) => setDeployAllStartDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">End Date</Label>
+                <Input
+                  type="date"
+                  value={deployAllEndDate}
+                  onChange={(e) => setDeployAllEndDate(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={handleDeployAll}
+                disabled={!deployAllStartDate || !deployAllEndDate || deployingAll}
+                className="bg-orange-600 hover:bg-orange-700"
+              >
+                {deployingAll ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Play className="w-4 h-4 mr-1" />}
+                {deployingAll ? 'Deploying...' : 'Deploy All'}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setShowDeployAll(false)}>
+                Cancel
+              </Button>
+            </div>
+          </Card>
+        )}
+
         {/* Create/Edit Form */}
         {showForm && (
           <Card className="p-4 space-y-3 border-2 border-blue-200 bg-blue-50">
@@ -362,15 +493,27 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
         {/* Template List */}
         <div className="space-y-2">
           {!showForm && (
-            <Button
-              variant="outline"
-              onClick={() => { resetForm(); setShowForm(true); }}
-              className="w-full gap-2"
-              size="sm"
-            >
-              <Plus className="w-4 h-4" />
-              Add Template
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => { resetForm(); setShowForm(true); }}
+                className="flex-1 gap-2"
+                size="sm"
+              >
+                <Plus className="w-4 h-4" />
+                Add Template
+              </Button>
+              {templates.length > 0 && (
+                <Button
+                  onClick={() => { setShowDeployAll(true); setDeployAllEndDate(''); }}
+                  className="flex-1 gap-2 bg-orange-600 hover:bg-orange-700"
+                  size="sm"
+                >
+                  <Play className="w-4 h-4" />
+                  Deploy All
+                </Button>
+              )}
+            </div>
           )}
 
           {isLoading ? (
