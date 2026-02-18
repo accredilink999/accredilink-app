@@ -914,6 +914,10 @@ export default function Layout({ children, currentPageName }) {
                                     ...prev,
                                     [notification.id]: true
                                   }));
+                                  // Mark as dismissed in DB so it doesn't beep again on next app open
+                                  try {
+                                    base44.entities.Notification.update(notification.id, { is_dismissed: true });
+                                  } catch (e) { /* ignore */ }
                                 }}
                               />
                             )

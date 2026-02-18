@@ -827,7 +827,7 @@ export default function Messages() {
               <Label>Type</Label>
               <Select 
                 value={formData.type} 
-                onValueChange={(value) => setFormData({...formData, type: value})}
+                onValueChange={(value) => setFormData(prev => ({...prev, type: value}))}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -845,7 +845,7 @@ export default function Messages() {
                 <Label>Recipient</Label>
                 <Select 
                   value={formData.recipient_id} 
-                  onValueChange={(value) => setFormData({...formData, recipient_id: value})}
+                  onValueChange={(value) => setFormData(prev => ({...prev, recipient_id: value}))}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select staff member" />
@@ -865,7 +865,7 @@ export default function Messages() {
                   <Label>Title</Label>
                   <Input
                     value={formData.title}
-                    onChange={(e) => setFormData({...formData, title: e.target.value})}
+                    onChange={(e) => setFormData(prev => ({...prev, title: e.target.value}))}
                     placeholder="Message title"
                   />
                 </div>
@@ -873,7 +873,7 @@ export default function Messages() {
                   <Label>Priority</Label>
                   <Select 
                     value={formData.priority} 
-                    onValueChange={(value) => setFormData({...formData, priority: value})}
+                    onValueChange={(value) => setFormData(prev => ({...prev, priority: value}))}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -903,7 +903,7 @@ export default function Messages() {
               <Label>Message *</Label>
               <Textarea
                 value={formData.content}
-                onChange={(e) => setFormData({...formData, content: e.target.value})}
+                onChange={(e) => setFormData(prev => ({...prev, content: e.target.value}))}
                 placeholder="Write your message..."
                 className="min-h-[120px]"
               />
