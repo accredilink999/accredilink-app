@@ -22,12 +22,12 @@ export default function FileUploadDownload({ platform, fieldName }) {
     queryKey: ['adminUsers', fieldName],
     queryFn: async () => {
       const users = await base44.entities.User.list();
-      return users.filter(u => u.role === 'admin' || ['admin', 'manager', 'supervisor'].includes(u.job_title));
+      return users.filter(u => u.role === 'admin' || u.role === 'super_admin' || ['admin', 'manager', 'supervisor'].includes(u.job_title));
     },
     enabled: !!user,
   });
 
-  const isAdmin = user?.role === 'admin' || ['admin', 'manager', 'supervisor'].includes(user?.job_title);
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || ['admin', 'manager', 'supervisor'].includes(user?.job_title);
   
   // Get drive link from current user or any admin user
   const driveLink = React.useMemo(() => {

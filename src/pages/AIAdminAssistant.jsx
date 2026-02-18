@@ -113,7 +113,7 @@ export default function AIAdminAssistant() {
                 // Send email to admins
                 const allUsers = await base44.entities.User.list();
                 const adminEmails = allUsers
-                  .filter(u => u.role === 'admin' || u.job_title === 'admin' || u.job_title === 'manager')
+                  .filter(u => u.role === 'admin' || u.role === 'super_admin' || u.job_title === 'admin' || u.job_title === 'manager')
                   .map(u => u.email)
                   .filter(Boolean);
 
@@ -185,7 +185,7 @@ export default function AIAdminAssistant() {
                 // Send urgent email to all admins and managers
                 const allUsers = await base44.entities.User.list();
                 const adminEmails = allUsers
-                  .filter(u => u.role === 'admin' || u.job_title === 'admin' || u.job_title === 'manager' || u.job_title === 'supervisor')
+                  .filter(u => u.role === 'admin' || u.role === 'super_admin' || u.job_title === 'admin' || u.job_title === 'manager' || u.job_title === 'supervisor')
                   .map(u => u.email)
                   .filter(Boolean);
 

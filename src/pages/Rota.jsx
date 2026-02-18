@@ -54,7 +54,7 @@ export default function Rota() {
     queryFn: () => base44.auth.me(),
   });
 
-  const isAdmin = user?.role === 'admin' || user?.job_title === 'admin' || ['manager', 'supervisor'].includes(user?.job_title);
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.job_title === 'admin' || ['manager', 'supervisor'].includes(user?.job_title);
 
   // Auto-open shift from URL param (set by ActiveShiftAutoOpen on app start)
   const { data: autoShiftData } = useQuery({

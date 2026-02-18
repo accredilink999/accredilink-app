@@ -26,7 +26,7 @@ export default function CareLogViewer({ careLog, open, onOpenChange, isAdmin = f
     },
   });
 
-  const userIsAdmin = isAdmin || currentUser?.role === 'admin';
+  const userIsAdmin = isAdmin || currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
   
   const getStaffName = (staffId) => {
     const staff = staffMembers.find(s => s.id === staffId);

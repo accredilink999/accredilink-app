@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
-import { Button } from "@/components/ui/button";
 import PageHeader from '@/components/ui/PageHeader';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -32,6 +31,13 @@ import {
       } from 'lucide-react';
 
 export default function AdminDashboard() {
+  const { data: user } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: () => base44.auth.me(),
+  });
+
+  const isSuperAdmin = user?.role === 'super_admin';
+
   return (
     <div className="max-w-6xl mx-auto pb-6">
       {/* Header */}
@@ -101,10 +107,12 @@ export default function AdminDashboard() {
               <Receipt className="w-5 h-5 text-teal-600 fill-teal-600" />
               Invoicing
             </Link>
-            <Link to={createPageUrl('Payroll')} className="flex items-center gap-2 text-emerald-600 hover:text-emerald-700 font-bold text-base py-2">
-              <PoundSterling className="w-5 h-5 text-emerald-600 fill-emerald-600" />
-              Payroll
-            </Link>
+            {isSuperAdmin && (
+              <Link to={createPageUrl('Payroll')} className="flex items-center gap-2 text-emerald-600 hover:text-emerald-700 font-bold text-base py-2">
+                <PoundSterling className="w-5 h-5 text-emerald-600 fill-emerald-600" />
+                Payroll
+              </Link>
+            )}
             <Link to={createPageUrl('ComplianceManagement')} className="flex items-center gap-2 text-red-600 hover:text-red-700 font-bold text-base py-2">
               <Shield className="w-5 h-5 text-red-600 fill-red-600" />
               Compliance Management

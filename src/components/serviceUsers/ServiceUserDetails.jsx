@@ -78,7 +78,7 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
     queryFn: () => base44.auth.me(),
   });
 
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
 
   const updateStatusMutation = useMutation({
     mutationFn: (newStatus) => base44.entities.ServiceUser.update(serviceUser.id, { status: newStatus }),

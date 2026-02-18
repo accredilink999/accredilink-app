@@ -80,7 +80,7 @@ export default function Dashboard() {
     queryFn: () => base44.auth.me()
   });
 
-  const isAdmin = user?.role === 'admin' || ['admin', 'manager', 'supervisor'].includes(user?.job_title);
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || ['admin', 'manager', 'supervisor'].includes(user?.job_title);
 
   const { data: todayShifts = [], isLoading: shiftsLoading } = useQuery({
     queryKey: ['todayShifts', today, user?.id],

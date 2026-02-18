@@ -24,12 +24,12 @@ export default function Payroll() {
     queryFn: () => base44.entities.PayPeriod?.list('-created_date', 1).then(data => data?.[0]),
   });
 
-  const isAdmin = user?.role === 'admin' || ['admin', 'manager'].includes(user?.job_title);
+  const isSuperAdmin = user?.role === 'super_admin';
 
-  if (!isAdmin) {
+  if (!isSuperAdmin) {
     return (
       <div className="p-8 text-center">
-        <p className="text-slate-500">You don't have permission to access payroll</p>
+        <p className="text-slate-500">Only Super Admins can access payroll</p>
       </div>
     );
   }

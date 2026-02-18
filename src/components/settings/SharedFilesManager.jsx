@@ -34,7 +34,7 @@ export default function SharedFilesManager() {
     enabled: !!user,
   });
 
-  const isAdmin = user?.role === 'admin' || ['admin', 'manager', 'supervisor'].includes(user?.job_title);
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || ['admin', 'manager', 'supervisor'].includes(user?.job_title);
 
   const uploadFileMutation = useMutation({
     mutationFn: async ({ file, title, description, category }) => {

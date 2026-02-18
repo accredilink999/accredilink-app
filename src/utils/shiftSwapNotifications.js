@@ -12,7 +12,7 @@ async function getAreaAdminIds(areaId, excludeIds = []) {
   const allUsers = await base44.entities.User.list()
   let admins = allUsers.filter(u =>
     u.is_active !== false &&
-    (u.role === 'admin' || u.job_title === 'admin' || u.job_title === 'manager') &&
+    (u.role === 'admin' || u.role === 'super_admin' || u.job_title === 'admin' || u.job_title === 'manager') &&
     !excludeIds.includes(u.id)
   )
 

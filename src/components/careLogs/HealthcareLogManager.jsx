@@ -39,7 +39,7 @@ export default function HealthcareLogManager({ serviceUser, logType = 'communica
     queryFn: () => base44.entities.User.list(),
   });
 
-  const isAdmin = currentUser?.role === 'admin' || currentUser?.job_title === 'admin' || currentUser?.job_title === 'manager';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin' || currentUser?.job_title === 'admin' || currentUser?.job_title === 'manager';
 
 
   const { data: logs = [] } = useQuery({

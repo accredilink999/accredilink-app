@@ -18,7 +18,7 @@ export default function CompanyLogoUploader() {
     queryFn: () => base44.auth.me(),
   });
 
-  const isAdmin = user?.role === 'admin' || user?.job_title === 'admin' || user?.job_title === 'manager';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.job_title === 'admin' || user?.job_title === 'manager';
 
   const saveMutation = useMutation({
     mutationFn: async () => {

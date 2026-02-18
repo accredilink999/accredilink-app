@@ -42,7 +42,7 @@ export default function ControlRoom() {
     queryFn: () => base44.auth.me(),
   });
 
-  const isAdmin = user?.role === 'admin' || user?.job_title === 'admin' || user?.job_title === 'manager' || user?.job_title === 'supervisor';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.job_title === 'admin' || user?.job_title === 'manager' || user?.job_title === 'supervisor';
 
   const { data: messages = [] } = useQuery({
     queryKey: ['messages'],

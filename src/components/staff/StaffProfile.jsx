@@ -39,6 +39,13 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
     queryFn: () => base44.entities.RotaArea.filter({ is_active: true }, 'name'),
   });
 
+  const { data: currentUser } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: () => base44.auth.me(),
+  });
+
+  const viewerIsSuperAdmin = currentUser?.role === 'super_admin';
+
   const updateRoleMutation = useMutation({
     mutationFn: async (newRole) => {
       // Update BOTH users and profiles tables — me() reads profiles,
@@ -155,8 +162,8 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
                   {staff?.employment_status?.replace(/_/g, ' ')}
                 </Badge>
                 <Badge variant="outline">{staff?.employment_type?.replace(/_/g, ' ')}</Badge>
-                <Badge className={staff?.role === 'admin' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-800'}>
-                  {staff?.role}
+                <Badge className={staff?.role === 'super_admin' ? 'bg-amber-100 text-amber-800 border border-amber-300' : staff?.role === 'admin' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-800'}>
+                  {staff?.role === 'super_admin' ? 'super admin' : staff?.role}
                 </Badge>
                 {staffArea && (
                   <Badge className="bg-orange-100 text-orange-800">
@@ -173,12 +180,12 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
                <Button
                  variant="outline"
                  size="sm"
-                 onClick={() => handleRoleChange(staff?.role === 'admin' ? 'user' : 'admin')}
+                 onClick={() => handleRoleChange(staff?.role === 'admin' || staff?.role === 'super_admin' ? 'user' : 'admin')}
                  className="w-full sm:w-auto"
                >
                  <Shield className="w-4 h-4 mr-2" />
-                 <span className="hidden sm:inline">{staff?.role === 'admin' ? 'Remove Admin' : 'Make Admin'}</span>
-                 <span className="sm:hidden">{staff?.role === 'admin' ? 'Remove' : 'Make'}</span>
+                 <span className="hidden sm:inline">{staff?.role === 'admin' || staff?.role === 'super_admin' ? 'Remove Admin' : 'Make Admin'}</span>
+                 <span className="sm:hidden">{staff?.role === 'admin' || staff?.role === 'super_admin' ? 'Remove' : 'Make'}</span>
                </Button>
                <Select
                  value={staff?.area_id || ''}
@@ -258,8 +265,9 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
           <AlertDialogHeader>
             <AlertDialogTitle>Change User Role?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to change {staff?.full_name}'s role to <strong>{targetRole}</strong>?
-              {targetRole === 'admin' && ' This will give them full administrative access.'}
+              Are you sure you want to change {staff?.full_name}'s role to <strong>{targetRole === 'super_admin' ? 'Super Admin' : targetRole}</strong>?
+              {targetRole === 'admin' && ' This will give them administrative access.'}
+              {targetRole === 'user' && staff?.role === 'super_admin' && ' This will remove their Super Admin and admin access.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex gap-2">

@@ -52,7 +52,7 @@ export default function RotaManagement() {
     }
   }, [rotaAreas, selectedAreaId]);
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   React.useEffect(() => {
     const handleKeyPress = (e) => {

@@ -62,6 +62,13 @@ export default function AddStaffDialog({ open, onClose }) {
   const [selectedChatGroups, setSelectedChatGroups] = useState([]);
   const [createdUser, setCreatedUser] = useState(null);
 
+  const { data: currentUser } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: () => base44.auth.me(),
+  });
+
+  const viewerIsSuperAdmin = currentUser?.role === 'super_admin';
+
   const { data: rotaAreas = [] } = useQuery({
     queryKey: ['rotaAreas'],
     queryFn: () => base44.entities.RotaArea.filter({ is_active: true }, 'name'),
@@ -361,13 +368,25 @@ export default function AddStaffDialog({ open, onClose }) {
                 <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border">
                   <div>
                     <p className="text-sm font-medium text-slate-700">Admin Access</p>
-                    <p className="text-xs text-slate-500">Full administrative permissions</p>
+                    <p className="text-xs text-slate-500">Administrative permissions</p>
                   </div>
                   <Switch
-                    checked={formData.role === 'admin'}
+                    checked={formData.role === 'admin' || formData.role === 'super_admin'}
                     onCheckedChange={(checked) => setFormData({ ...formData, role: checked ? 'admin' : 'user' })}
                   />
                 </div>
+                {viewerIsSuperAdmin && (formData.role === 'admin' || formData.role === 'super_admin') && (
+                  <div className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200">
+                    <div>
+                      <p className="text-sm font-medium text-amber-800">Super Admin</p>
+                      <p className="text-xs text-amber-600">Access to payroll, payslips & can assign Super Admin</p>
+                    </div>
+                    <Switch
+                      checked={formData.role === 'super_admin'}
+                      onCheckedChange={(checked) => setFormData({ ...formData, role: checked ? 'super_admin' : 'admin' })}
+                    />
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label className="flex items-center gap-1.5">
                     <MapPin className="w-3.5 h-3.5" /> Rota Area

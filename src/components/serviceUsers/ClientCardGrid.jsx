@@ -24,7 +24,7 @@ export default function ClientCardGrid({ filteredUsers, careLogs, onSelectUser, 
     queryFn: () => base44.entities.RotaArea.filter({ is_active: true }, 'name'),
   });
 
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
 
   const updateAreaMutation = useMutation({
     mutationFn: async ({ userId, areaId }) => {

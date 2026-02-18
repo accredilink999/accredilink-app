@@ -24,7 +24,7 @@ export default function Documents() {
     queryFn: () => base44.auth.me(),
   });
 
-  const isAdmin = user?.role === 'admin' || ['admin', 'manager', 'supervisor'].includes(user?.job_title);
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || ['admin', 'manager', 'supervisor'].includes(user?.job_title);
 
   return (
     <div className="space-y-6">

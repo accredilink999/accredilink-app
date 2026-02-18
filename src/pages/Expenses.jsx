@@ -16,7 +16,7 @@ export default function Expenses() {
     queryFn: () => base44.auth.me(),
   });
 
-  const isAdmin = user?.role === 'admin' || ['admin', 'manager'].includes(user?.job_title);
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || ['admin', 'manager'].includes(user?.job_title);
 
   return (
     <div className="space-y-6">

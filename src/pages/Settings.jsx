@@ -968,7 +968,7 @@ export default function Settings() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [companyName, setCompanyName] = useState('');
   const [companyLogo, setCompanyLogo] = useState(null);
-  const isAdmin = user?.role === 'admin' || user?.job_title === 'admin' || user?.job_title === 'manager';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.job_title === 'admin' || user?.job_title === 'manager';
   const [shiftActivityNotifs, setShiftActivityNotifs] = useState(true);
   const { isPasswordRecovery, clearPasswordRecovery } = useAuth();
 

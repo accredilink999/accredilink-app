@@ -64,7 +64,7 @@ export default function AIAssistant() {
      queryFn: () => base44.auth.me(),
    });
 
-   const isAdmin = user?.role === 'admin';
+   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   // Load conversations
   useEffect(() => {
@@ -179,7 +179,7 @@ export default function AIAssistant() {
 
        PERMISSION-BASED ACCESS:`;
 
-        if (user?.role === 'admin') {
+        if (user?.role === 'admin' || user?.role === 'super_admin') {
           return basePrompt + `
 
        ADMIN LEVEL - Full System Access:
@@ -257,7 +257,7 @@ export default function AIAssistant() {
          <div className="flex items-center gap-2 mt-2">
            <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 rounded border border-blue-200">
              <CheckCircle2 className="w-3 h-3 text-blue-600" />
-             <span className="text-xs font-medium text-blue-700">{user?.role === 'admin' ? 'Admin Access' : 'Staff Access'}</span>
+             <span className="text-xs font-medium text-blue-700">{(user?.role === 'admin' || user?.role === 'super_admin') ? 'Admin Access' : 'Staff Access'}</span>
            </div>
            <Button 
              onClick={createNewConversation}
@@ -314,7 +314,7 @@ export default function AIAssistant() {
             <Bot className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-xs md:text-sm truncate">Task Assistant</p>
-              <p className="text-xs opacity-90 truncate">{user?.role === 'admin' ? 'Admin privileges' : 'Staff level access'}</p>
+              <p className="text-xs opacity-90 truncate">{(user?.role === 'admin' || user?.role === 'super_admin') ? 'Admin privileges' : 'Staff level access'}</p>
             </div>
             <div className="hidden md:flex items-center gap-1 px-2 py-1 bg-white/20 rounded text-xs font-medium flex-shrink-0">
               <CheckCircle2 className="w-3 h-3" />
@@ -337,7 +337,7 @@ export default function AIAssistant() {
                  <Alert className="mt-4 md:mt-6 max-w-sm md:max-w-lg bg-blue-50 border-blue-200">
                    <AlertTriangle className="h-3 w-3 md:h-4 md:w-4 text-blue-600 flex-shrink-0" />
                    <AlertDescription className="text-xs md:text-sm text-blue-700">
-                     {user?.role === 'admin' ? 'Full admin access enabled. Review before high-risk actions.' : 'Staff-level access. I can only perform operations you have permission for.'}
+                     {(user?.role === 'admin' || user?.role === 'super_admin') ? 'Full admin access enabled. Review before high-risk actions.' : 'Staff-level access. I can only perform operations you have permission for.'}
                    </AlertDescription>
                  </Alert>
               </div>

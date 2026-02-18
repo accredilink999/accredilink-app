@@ -48,7 +48,7 @@ export default function Chat() {
     queryFn: () => base44.entities.User.list('-created_date', 1000),
   });
 
-  const isAdmin = user?.role === 'admin' || ['admin', 'manager', 'supervisor'].includes(user?.job_title);
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || ['admin', 'manager', 'supervisor'].includes(user?.job_title);
 
   const createConversationMutation = useMutation({
     mutationFn: async () => {

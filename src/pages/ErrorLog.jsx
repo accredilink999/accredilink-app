@@ -44,7 +44,7 @@ export default function ErrorLog() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all'); // all, unresolved, resolved, user_report
-  const isAdmin = user?.role === 'admin' || user?.job_title === 'admin' || user?.job_title === 'manager';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.job_title === 'admin' || user?.job_title === 'manager';
 
   const { data: errors = [], isLoading } = useQuery({
     queryKey: ['errorLogs'],

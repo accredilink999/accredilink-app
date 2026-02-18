@@ -40,7 +40,7 @@ export default function LeaveCalendarPopup({ open, onClose, showInitials = false
     queryFn: () => base44.auth.me(),
   });
 
-  const isAdmin = user?.role === 'admin' || ['admin', 'manager', 'supervisor'].includes(user?.job_title);
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || ['admin', 'manager', 'supervisor'].includes(user?.job_title);
 
   // Refetch leave when calendar opens to ensure latest data
   useEffect(() => {

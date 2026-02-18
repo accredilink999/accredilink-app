@@ -34,7 +34,7 @@ export default function ApprovalsAndFinancials() {
     queryFn: () => base44.auth.me(),
   });
 
-  const isAdmin = user?.role === 'admin' || ['admin', 'manager', 'supervisor'].includes(user?.job_title);
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || ['admin', 'manager', 'supervisor'].includes(user?.job_title);
 
   const { data: payPeriod } = useQuery({
     queryKey: ['payPeriod'],

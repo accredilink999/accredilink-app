@@ -110,7 +110,8 @@ export default function Layout({ children, currentPageName }) {
   }, [userError, user]);
 
   const queryClient = useQueryClient();
-  const isAdmin = user?.role === 'admin' || user?.job_title === 'admin' || user?.job_title === 'manager' || user?.job_title === 'supervisor';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.job_title === 'admin' || user?.job_title === 'manager' || user?.job_title === 'supervisor';
+  const isSuperAdmin = user?.role === 'super_admin';
 
   // Initialize notification manager
   useNotificationManager();

@@ -412,7 +412,7 @@ export default function ComplianceManagement() {
                       <p className="text-sm text-red-600">Overdue: {doc.date}</p>
                     </div>
                     <div className="flex gap-2 flex-shrink-0">
-                      {user?.role === 'admin' && hrDoc && (
+                      {(user?.role === 'admin' || user?.role === 'super_admin') && hrDoc && (
                         <>
                           <Button
                             size="sm"
@@ -459,7 +459,7 @@ export default function ComplianceManagement() {
                       <p className="text-sm text-orange-600">Due: {doc.date}</p>
                     </div>
                     <div className="flex gap-2 flex-shrink-0">
-                      {user?.role === 'admin' && hrDoc && (
+                      {(user?.role === 'admin' || user?.role === 'super_admin') && hrDoc && (
                         <Button
                           size="sm"
                           variant="outline"

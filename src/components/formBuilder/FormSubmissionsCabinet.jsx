@@ -247,7 +247,7 @@ const FormSubmissionsCabinet = forwardRef(function FormSubmissionsCabinet({ subm
     }
   };
 
-  const isAdmin = currentUser?.role === 'admin' || currentUser?.job_title === 'admin' || currentUser?.job_title === 'manager';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin' || currentUser?.job_title === 'admin' || currentUser?.job_title === 'manager';
 
   const handleDeleteMainCabinet = (cabinetId) => {
     if (!isAdmin) return;

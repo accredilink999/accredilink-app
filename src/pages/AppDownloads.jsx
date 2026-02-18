@@ -275,7 +275,7 @@ function PlatformUploadCard({ platform, icon: Icon, title, color, data, onSave, 
 export default function AppDownloads() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const isAdmin = user?.role === 'admin' || user?.job_title === 'admin' || user?.job_title === 'manager';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.job_title === 'admin' || user?.job_title === 'manager';
 
   const { data: settings = [] } = useQuery({
     queryKey: ['appDownloadSettings'],

@@ -35,7 +35,7 @@ export default function ClientManagement() {
     queryFn: () => base44.auth.me(),
   });
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   const { data: serviceUsers = [], isLoading } = useQuery({
     queryKey: ['serviceUsers'],

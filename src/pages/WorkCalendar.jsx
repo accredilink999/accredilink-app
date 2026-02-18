@@ -91,7 +91,7 @@ export default function WorkCalendar() {
     }
   };
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   const typeColors = {
     meeting: '#3b82f6',

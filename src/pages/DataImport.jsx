@@ -127,7 +127,7 @@ export default function DataImport() {
   const [results, setResults] = useState(null);
   const [convertFields, setConvertFields] = useState(true);
 
-  const isAdmin = user?.role === 'admin' || user?.job_title === 'admin' || user?.job_title === 'manager';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.job_title === 'admin' || user?.job_title === 'manager';
 
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0];

@@ -27,7 +27,7 @@ export default function ServiceUserForm({ serviceUser, open, onClose }) {
   
 
   
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
   
   // Initialize call times from serviceUser with proper IDs
   const initialCallTimes = serviceUser?.call_times?.map((call, idx) => ({

@@ -26,7 +26,7 @@ export default function AppDownloadGuide() {
     queryFn: () => base44.auth.me(),
   });
 
-  const isAdmin = user?.role === 'admin' || ['admin', 'manager', 'supervisor'].includes(user?.job_title);
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || ['admin', 'manager', 'supervisor'].includes(user?.job_title);
 
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
