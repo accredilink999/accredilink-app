@@ -113,6 +113,29 @@ export default function Layout({ children, currentPageName }) {
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.job_title === 'admin' || user?.job_title === 'manager' || user?.job_title === 'supervisor';
   const isSuperAdmin = user?.role === 'super_admin';
 
+  // Auto-promote first admin to super_admin if none exists
+  React.useEffect(() => {
+    if (!user || user.role !== 'admin') return;
+    (async () => {
+      try {
+        const { count } = await supabase
+          .from('users')
+          .select('id', { count: 'exact', head: true })
+          .eq('role', 'super_admin');
+        if (count === 0) {
+          await Promise.all([
+            supabase.from('users').update({ role: 'super_admin' }).eq('id', user.id),
+            supabase.from('profiles').update({ role: 'super_admin' }).eq('id', user.id),
+          ]);
+          queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+          console.log('[Layout] Auto-promoted first admin to super_admin');
+        }
+      } catch (e) {
+        console.warn('[Layout] Super admin check failed:', e);
+      }
+    })();
+  }, [user?.id, user?.role]);
+
   // Initialize notification manager
   useNotificationManager();
 
