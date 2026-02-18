@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { ShiftTypeApi } from '@/api/shiftTypeApi';
@@ -11,8 +11,22 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
-import { Plus, Trash2, Clock } from 'lucide-react';
+import { Plus, Trash2, Clock, RotateCcw } from 'lucide-react';
 import PatternPreview from './PatternPreview';
+
+const DRAFT_KEY = 'pattern_modal_draft';
+
+const defaultFormData = {
+  pattern_name: '',
+  staff_id: '',
+  pattern_type: 'weekly',
+  rota_area_id: '',
+  shifts: [],
+  repeat_count: 1,
+};
+
+const hasMeaningfulData = (data) =>
+  data.pattern_name || data.staff_id || data.rota_area_id || data.shifts.length > 0;
 
 export default function CreatePatternModal({ open, onClose, pattern = null }) {
   const queryClient = useQueryClient();
@@ -24,15 +38,61 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
         rota_area_id: pattern.rota_area_id || '',
         shifts: pattern.shifts || [],
         repeat_count: 1,
-      } : {
-        pattern_name: '',
-        staff_id: '',
-        pattern_type: 'weekly',
-        rota_area_id: '',
-        shifts: [],
-        repeat_count: 1,
-      }
+      } : { ...defaultFormData }
     );
+  const [showDraftBanner, setShowDraftBanner] = useState(false);
+  const skipDraftSave = useRef(false);
+
+  // Check for saved draft when modal opens (only for new patterns)
+  useEffect(() => {
+    if (open && !pattern) {
+      try {
+        const saved = localStorage.getItem(DRAFT_KEY);
+        if (saved) {
+          const draft = JSON.parse(saved);
+          if (hasMeaningfulData(draft)) {
+            setShowDraftBanner(true);
+          }
+        }
+      } catch {}
+    }
+    if (!open) {
+      setShowDraftBanner(false);
+    }
+  }, [open, pattern]);
+
+  // Auto-save draft to localStorage on form changes
+  useEffect(() => {
+    if (!open || pattern || skipDraftSave.current) return;
+    if (hasMeaningfulData(formData)) {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(formData));
+    }
+  }, [formData, open, pattern]);
+
+  const restoreDraft = () => {
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (saved) {
+        setFormData(JSON.parse(saved));
+        toast.success('Draft restored');
+      }
+    } catch {}
+    setShowDraftBanner(false);
+  };
+
+  const dismissDraft = () => {
+    localStorage.removeItem(DRAFT_KEY);
+    setShowDraftBanner(false);
+  };
+
+  const clearDraftAndClose = () => {
+    localStorage.removeItem(DRAFT_KEY);
+    skipDraftSave.current = true;
+    setFormData({ ...defaultFormData });
+    setShowDraftBanner(false);
+    onClose();
+    setTimeout(() => { skipDraftSave.current = false; }, 100);
+  };
 
 
   const { data: staff = [] } = useQuery({
@@ -75,17 +135,13 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
         }
       }
       toast.success(pattern ? 'Pattern updated' : 'Pattern created');
+      localStorage.removeItem(DRAFT_KEY);
+      skipDraftSave.current = true;
       onClose();
       if (!pattern) {
-        setFormData({
-          pattern_name: '',
-          staff_id: '',
-          pattern_type: 'weekly',
-          rota_area_id: '',
-          shifts: [],
-          repeat_count: 1,
-        });
+        setFormData({ ...defaultFormData });
       }
+      setTimeout(() => { skipDraftSave.current = false; }, 100);
     },
     onError: (error) => {
       toast.error('Failed: ' + error.message);
@@ -349,6 +405,19 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
           <DialogTitle>{pattern ? 'Edit Shift Pattern' : 'Create Shift Pattern'}</DialogTitle>
         </DialogHeader>
 
+        {showDraftBanner && (
+          <div className="flex-shrink-0 flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
+            <RotateCcw className="w-4 h-4 text-amber-600 flex-shrink-0" />
+            <p className="text-sm text-amber-800 flex-1">You have an unsaved draft from before. Restore it?</p>
+            <Button size="sm" variant="outline" className="h-7 text-xs border-amber-300 text-amber-700 hover:bg-amber-100" onClick={restoreDraft}>
+              Restore
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7 text-xs text-slate-500" onClick={dismissDraft}>
+              Discard
+            </Button>
+          </div>
+        )}
+
         <div className="flex-1 overflow-hidden min-h-0">
           <div className="grid lg:grid-cols-2 gap-6 h-full">
             {/* Form Section */}
@@ -530,7 +599,7 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
         </div>
 
         <DialogFooter className="flex-shrink-0 border-t pt-4 mt-2">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={clearDraftAndClose}>
             Cancel
           </Button>
 
