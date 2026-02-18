@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { ShiftTypeApi } from '@/api/shiftTypeApi';
 import { ShiftApi } from '@/api/rotaApi';
+import { supabase } from '@/api/supabaseClient';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -213,36 +214,34 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
     if (!clearStartDate || !clearEndDate) return;
     setClearing(true);
     try {
-      const allShifts = await ShiftApi.list('-created_date', 5000);
-      const startD = parseISO(clearStartDate);
-      const endD = parseISO(clearEndDate);
+      // Query unassigned shifts directly from Supabase with date range filter
+      // This avoids the 1000-row default limit issue with generic list()
+      const { data: toDelete, error } = await supabase
+        .from('shifts')
+        .select('id, date, shift_name, start_time, end_time, staff_id')
+        .is('staff_id', null)
+        .gte('date', clearStartDate)
+        .lte('date', clearEndDate);
 
-      // Find blank/available shifts (no staff assigned) in the date range
-      const toDelete = allShifts.filter(s => {
-        if (!s.date || s.staff_id) return false;
-        const d = parseISO(s.date);
-        return d >= startD && d <= endD;
-      });
+      if (error) throw error;
 
-      if (toDelete.length === 0) {
+      if (!toDelete || toDelete.length === 0) {
         toast.error('No available (unassigned) shifts found in that date range');
         setClearing(false);
         return;
       }
 
-      // Delete them one by one (no bulk delete available)
-      let deleted = 0;
-      for (const shift of toDelete) {
-        try {
-          await ShiftApi.delete(shift.id);
-          deleted++;
-        } catch (err) {
-          console.error('Failed to delete shift', shift.id, err);
-        }
-      }
+      // Bulk delete using Supabase directly — much faster than one-by-one
+      const ids = toDelete.map(s => s.id);
+      const { error: delError } = await supabase
+        .from('shifts')
+        .delete()
+        .in('id', ids);
+
+      if (delError) throw delError;
 
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
-      toast.success(`Cleared ${deleted} available shift${deleted !== 1 ? 's' : ''}`);
+      toast.success(`Cleared ${ids.length} available shift${ids.length !== 1 ? 's' : ''}`);
       setShowClearAll(false);
     } catch (e) {
       toast.error('Failed to clear shifts: ' + e.message);
