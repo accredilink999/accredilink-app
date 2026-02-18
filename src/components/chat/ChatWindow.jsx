@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo, useLayoutEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -35,10 +35,38 @@ export default function ChatWindow({ conversation, currentUserId, currentUserNam
 
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
+  const chatContainerRef = useRef(null);
   const queryClient = useQueryClient();
   const inputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const presenceChannelRef = useRef(null);
+
+  // iOS keyboard fix — adjust container height when virtual keyboard opens
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const handleResize = () => {
+      const container = chatContainerRef.current;
+      if (!container) return;
+      // Calculate how much height is available from the container's top to the bottom of the visual viewport
+      const containerTop = container.getBoundingClientRect().top;
+      const availableHeight = vv.height - containerTop + vv.offsetTop;
+      if (availableHeight > 0 && availableHeight < window.innerHeight) {
+        container.style.height = `${availableHeight}px`;
+      } else {
+        container.style.height = '';
+      }
+    };
+
+    vv.addEventListener('resize', handleResize);
+    vv.addEventListener('scroll', handleResize);
+    return () => {
+      vv.removeEventListener('resize', handleResize);
+      vv.removeEventListener('scroll', handleResize);
+      if (chatContainerRef.current) chatContainerRef.current.style.height = '';
+    };
+  }, []);
 
   const { data: allUsers = [] } = useQuery({
     queryKey: ['allUsers'],
@@ -481,7 +509,7 @@ export default function ChatWindow({ conversation, currentUserId, currentUserNam
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-[#efeae2] min-w-0 overflow-hidden" style={{ maxWidth: '100%' }}>
+    <div ref={chatContainerRef} className="flex-1 flex flex-col bg-[#efeae2] min-w-0 overflow-hidden" style={{ maxWidth: '100%' }}>
       {/* ── Header ── */}
       <div className="bg-[#f0f2f5] border-b border-slate-200 px-3 py-2 flex items-center gap-3 z-10">
         <Button variant="ghost" size="icon" onClick={onBack} className="lg:hidden h-9 w-9">
@@ -704,6 +732,12 @@ export default function ChatWindow({ conversation, currentUserId, currentUserNam
                 if (e.key === 'Enter' && !e.shiftKey) {
                   handleSend(e);
                 }
+              }}
+              onFocus={() => {
+                // iOS keyboard fix — scroll input into view after keyboard opens
+                setTimeout(() => {
+                  inputRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                }, 350);
               }}
             />
           </div>
