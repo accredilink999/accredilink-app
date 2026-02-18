@@ -432,7 +432,7 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {[1, 2, 3, 4, 5, 6, 12].map((num) => (
+                    {Array.from({ length: 56 }, (_, i) => i + 1).map((num) => (
                       <SelectItem key={num} value={num.toString()}>
                         {num} {num === 1 ? 'repeat' : 'repeats'}
                       </SelectItem>
