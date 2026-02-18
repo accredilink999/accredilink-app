@@ -1341,6 +1341,19 @@ export default function Settings() {
         </Card>
       </SettingsErrorBoundary>
 
+      {/* Admin: Push Notification Credentials (Firebase + APNS keys) */}
+      {isAdmin && (
+        <SettingsErrorBoundary>
+          <Card className="p-5 bg-white border-0 shadow-sm border-l-4 border-l-orange-500">
+            <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+              <Flame className="w-5 h-5 text-orange-600" />
+              Push Notification Credentials
+            </h3>
+            <PushCredentialsManager />
+          </Card>
+        </SettingsErrorBoundary>
+      )}
+
       {/* Appearance */}
       <Card className="p-5 bg-white border-0 shadow-sm">
         <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
