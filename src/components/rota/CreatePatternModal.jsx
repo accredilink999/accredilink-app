@@ -344,15 +344,15 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-[95vw] lg:max-w-[98vw] lg:h-[98vh] max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-[95vw] lg:max-w-[98vw] lg:h-[98vh] max-h-[90vh] flex flex-col overflow-hidden" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>{pattern ? 'Edit Shift Pattern' : 'Create Shift Pattern'}</DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden min-h-0">
           <div className="grid lg:grid-cols-2 gap-6 h-full">
             {/* Form Section */}
-            <div className="space-y-4 overflow-y-auto pr-2" style={{ maxHeight: 'calc(90vh - 180px)' }}>
+            <div className="space-y-4 overflow-y-auto pr-2">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Pattern Name</Label>
@@ -508,7 +508,7 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
             </div>
 
             {/* Preview Section */}
-            <div className="hidden lg:block border-l border-slate-200 pl-6 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 180px)' }}>
+            <div className="hidden lg:block border-l border-slate-200 pl-6 overflow-y-auto">
               <PatternPreview 
                 shifts={formData.shifts}
                 patternType={formData.pattern_type}
@@ -529,7 +529,7 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-shrink-0 border-t pt-4 mt-2">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
