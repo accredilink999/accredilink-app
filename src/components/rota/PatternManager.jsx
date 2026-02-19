@@ -565,6 +565,66 @@ export default function PatternManager({ open, onClose }) {
         }
       }
 
+      // Auto-pair shifts: find other staff on the same date/time/area and link them
+      if (areaId !== 'default' && toFill.length > 0) {
+        toast.info('Pairing shifts...');
+        const pairUpdates = [];
+
+        // Get unique date/time combos from filled shifts
+        const slotKeys = [...new Set(toFill.map(s => `${s.date}|${s.start_time}|${s.end_time}`))];
+
+        // Fetch all assigned shifts in this area for these dates (paginated)
+        const filledDates = [...new Set(toFill.map(s => s.date))].sort();
+        let assignedShifts = [];
+        let pFrom = 0;
+        while (true) {
+          const { data, error } = await supabase
+            .from('shifts')
+            .select('id, date, start_time, end_time, staff_id, staff_name')
+            .not('staff_id', 'is', null)
+            .eq('rota_area_id', areaId)
+            .gte('date', filledDates[0])
+            .lte('date', filledDates[filledDates.length - 1])
+            .range(pFrom, pFrom + 999);
+          if (error || !data || data.length === 0) break;
+          assignedShifts.push(...data);
+          if (data.length < 1000) break;
+          pFrom += 1000;
+        }
+
+        // Group assigned shifts by date|start_time|end_time
+        const shiftsBySlot = {};
+        for (const s of assignedShifts) {
+          const key = `${s.date}|${s.start_time}|${s.end_time}`;
+          if (!shiftsBySlot[key]) shiftsBySlot[key] = [];
+          shiftsBySlot[key].push(s);
+        }
+
+        // For slots with exactly 2 staff, pair them
+        for (const key of Object.keys(shiftsBySlot)) {
+          const shifts = shiftsBySlot[key];
+          if (shifts.length === 2) {
+            const [a, b] = shifts;
+            // Only update if not already paired correctly
+            pairUpdates.push(
+              supabase.from('shifts').update({
+                paired_shift_id: b.id,
+                paired_staff_name: b.staff_name,
+              }).eq('id', a.id),
+              supabase.from('shifts').update({
+                paired_shift_id: a.id,
+                paired_staff_name: a.staff_name,
+              }).eq('id', b.id)
+            );
+          }
+        }
+
+        // Execute pair updates in batches
+        for (let i = 0; i < pairUpdates.length; i += 10) {
+          await Promise.all(pairUpdates.slice(i, i + 10));
+        }
+      }
+
       return { total: toFill.length, replaced: toFill.length };
     },
     onSuccess: ({ total }) => {
