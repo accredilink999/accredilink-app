@@ -7,13 +7,6 @@ class ViewController: CAPBridgeViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-
-        // White background to prevent black flash while remote URL loads
-        view.backgroundColor = .white
-        webView?.isOpaque = false
-        webView?.backgroundColor = .white
-        webView?.scrollView.backgroundColor = .white
-
         requestMicrophonePermission()
     }
 

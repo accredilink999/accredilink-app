@@ -8,26 +8,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // ── One-time fix: delete stale WebKit data from filesystem ─────────
-        // A cached service worker can cause a blank screen in WKWebView.
-        // FileManager.removeItem is SYNCHRONOUS — guaranteed to finish before
-        // any WebView code runs. Only executes once (flagged by UserDefaults).
-        let clearKey = "didNukeWebKitData_v3"
-        if !UserDefaults.standard.bool(forKey: clearKey) {
-            let fm = FileManager.default
-            if let libDir = fm.urls(for: .libraryDirectory, in: .userDomainMask).first {
-                let webkitDir = libDir.appendingPathComponent("WebKit")
-                if fm.fileExists(atPath: webkitDir.path) {
-                    try? fm.removeItem(at: webkitDir)
-                }
-                let cachesDir = libDir.appendingPathComponent("Caches")
-                if fm.fileExists(atPath: cachesDir.path) {
-                    try? fm.removeItem(at: cachesDir)
-                }
-            }
-            UserDefaults.standard.set(true, forKey: clearKey)
-        }
-
         // Set notification delegate for foreground notifications
         UNUserNotificationCenter.current().delegate = self
 
