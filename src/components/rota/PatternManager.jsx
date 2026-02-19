@@ -167,6 +167,8 @@ export default function PatternManager({ open, onClose }) {
   const deployPatternMutation = useMutation({
     mutationFn: async (pattern) => {
       console.log('Starting deploy for pattern:', pattern);
+      toast.info('Deploying pattern...');
+
       const shiftsToCreate = [];
       const startDate = new Date();
       const daysPerCycle = pattern.pattern_type === 'weekly' ? 7 :
@@ -174,123 +176,128 @@ export default function PatternManager({ open, onClose }) {
                            pattern.pattern_type === 'three_week' ? 21 : 28;
 
       // Create shifts for 1 repetition
-      for (let repeat = 0; repeat < 1; repeat++) {
-        pattern.shifts.forEach(shift => {
-          const dayMap = { monday: 0, tuesday: 1, wednesday: 2, thursday: 3, friday: 4, saturday: 5, sunday: 6 };
-          const dayOffset = dayMap[shift.day_of_week] + ((shift.week - 1) * 7);
-          const shiftDate = new Date(startDate);
-          shiftDate.setDate(shiftDate.getDate() + dayOffset + (repeat * daysPerCycle));
+      pattern.shifts.forEach(shift => {
+        const dayMap = { monday: 0, tuesday: 1, wednesday: 2, thursday: 3, friday: 4, saturday: 5, sunday: 6 };
+        const dayOffset = dayMap[shift.day_of_week] + ((shift.week - 1) * 7);
+        const shiftDate = new Date(startDate);
+        shiftDate.setDate(shiftDate.getDate() + dayOffset);
 
-          const dateStr = shiftDate.toISOString().split('T')[0];
-          shiftsToCreate.push({
-            staff_id: pattern.staff_id,
-            staff_name: pattern.staff_name,
-            rota_area_id: pattern.rota_area_id || 'default',
-            rota_area_name: pattern.rota_area_name || 'Default',
-            date: dateStr,
-            start_time: shift.start_time,
-            end_time: shift.end_time,
-            status: 'scheduled',
-            shift_pattern_id: pattern.id,
-          });
+        const dateStr = shiftDate.toISOString().split('T')[0];
+        shiftsToCreate.push({
+          staff_id: pattern.staff_id,
+          staff_name: pattern.staff_name,
+          rota_area_id: pattern.rota_area_id || 'default',
+          rota_area_name: pattern.rota_area_name || 'Default',
+          date: dateStr,
+          start_time: shift.start_time,
+          end_time: shift.end_time,
+          status: 'scheduled',
+          shift_pattern_id: pattern.id,
         });
+      });
+
+      // Fetch blank shifts in this area for matching dates
+      const areaId = pattern.rota_area_id || 'default';
+      const dates = [...new Set(shiftsToCreate.map(s => s.date))];
+      let blankShifts = [];
+      if (areaId !== 'default' && dates.length > 0) {
+        const { data, error } = await supabase
+          .from('shifts')
+          .select('id, date, start_time, end_time, rota_area_id, staff_id')
+          .is('staff_id', null)
+          .eq('rota_area_id', areaId)
+          .in('date', dates);
+        if (!error && data) blankShifts = data;
       }
 
-      console.log('Shifts to create:', shiftsToCreate);
-
-      // Fetch existing shifts to find blank/available ones we can replace
-      const areaId = pattern.rota_area_id || 'default';
-      const existingShifts = areaId !== 'default'
-        ? await ShiftApi.list('-created_at', 5000)
-        : [];
-      // Build lookup: date|start_time|end_time → blank shift (no staff_id)
+      // Build lookup: date|start_time|end_time → blank shift
       const blankShiftMap = {};
-      for (const s of existingShifts) {
-        if (!s.date || s.staff_id) continue;
-        const sArea = s.rota_area_id || s.area_id;
-        if (sArea !== areaId) continue;
+      for (const s of blankShifts) {
         const key = `${s.date}|${s.start_time}|${s.end_time}`;
         blankShiftMap[key] = s;
       }
 
-      const allShifts = []; // track created or updated shifts for call assignment
+      const allShifts = [];
+      const toReplace = []; // { id, ... } for batch update
+      const toCreate = [];
       let replaced = 0;
 
-      if (shiftsToCreate.length > 0) {
-        const toCreate = [];
+      for (const shiftData of shiftsToCreate) {
+        const key = `${shiftData.date}|${shiftData.start_time}|${shiftData.end_time}`;
+        const blank = blankShiftMap[key];
 
-        for (const shiftData of shiftsToCreate) {
-          const key = `${shiftData.date}|${shiftData.start_time}|${shiftData.end_time}`;
-          const blank = blankShiftMap[key];
-
-          if (blank) {
-            // Replace the blank shift by assigning staff to it
-            const updated = await ShiftApi.update(blank.id, {
-              staff_id: shiftData.staff_id,
-              staff_name: shiftData.staff_name,
-              shift_pattern_id: shiftData.shift_pattern_id,
-              status: 'scheduled',
-            });
-            allShifts.push({ ...blank, ...updated, start_time: blank.start_time, end_time: blank.end_time, date: blank.date });
-            replaced++;
-            // Remove from map so second shift at same time creates fresh
-            delete blankShiftMap[key];
-          } else {
-            toCreate.push(shiftData);
-          }
-        }
-
-        if (toCreate.length > 0) {
-          const created = await ShiftApi.bulkCreate(toCreate);
-          allShifts.push(...created);
-        }
-
-        // Add client calls to all shifts (created + replaced)
-        if (areaId !== 'default') {
-          const serviceUsers = await base44.entities.ServiceUser.filter({ status: 'active' });
-          const areaServiceUsers = serviceUsers.filter(su => (su.rota_area_id || su.area_id) === areaId);
-
-          for (const shift of allShifts) {
-            // Check if shift already has calls (replaced blank shifts might)
-            const existingCalls = await base44.entities.ClientCall.filter({ shift_id: shift.id });
-            if (existingCalls.length > 0) continue;
-
-            const matchingCalls = [];
-
-            for (const serviceUser of areaServiceUsers) {
-              if (!serviceUser.call_times || !Array.isArray(serviceUser.call_times)) continue;
-
-              serviceUser.call_times.forEach(callTime => {
-                try {
-                  const callStart = parseInt(callTime.time.split(':')[0]) * 60 + parseInt(callTime.time.split(':')[1]);
-                  const shiftStart = parseInt(shift.start_time.split(':')[0]) * 60 + parseInt(shift.start_time.split(':')[1]);
-                  const shiftEnd = parseInt(shift.end_time.split(':')[0]) * 60 + parseInt(shift.end_time.split(':')[1]);
-                  const callDuration = parseInt(callTime.duration) || 60;
-                  const callEnd = callStart + callDuration;
-
-                  if (callStart >= shiftStart && callEnd <= shiftEnd) {
-                    matchingCalls.push({
-                      shift_id: shift.id,
-                      service_user_id: serviceUser.id,
-                      service_user_name: serviceUser.full_name,
-                      scheduled_time: callTime.time,
-                      date: shift.date,
-                      type: callTime.type || 'visit',
-                      duration_minutes: callDuration,
-                    });
-                  }
-                } catch (e) {
-                  console.error('Error processing call time:', e);
-                }
-              });
-            }
-
-            if (matchingCalls.length > 0) {
-              await base44.entities.ClientCall.bulkCreate(matchingCalls);
-            }
-          }
+        if (blank) {
+          toReplace.push(blank);
+          allShifts.push({ ...blank, staff_id: shiftData.staff_id, staff_name: shiftData.staff_name });
+          replaced++;
+          delete blankShiftMap[key];
+        } else {
+          toCreate.push(shiftData);
         }
       }
+
+      // Batch update all blank shifts at once (in chunks of 50)
+      const BATCH_SIZE = 50;
+      for (let i = 0; i < toReplace.length; i += BATCH_SIZE) {
+        const batch = toReplace.slice(i, i + BATCH_SIZE);
+        const ids = batch.map(s => s.id);
+        await supabase
+          .from('shifts')
+          .update({
+            staff_id: pattern.staff_id,
+            staff_name: pattern.staff_name,
+            shift_pattern_id: pattern.id,
+            status: 'scheduled',
+          })
+          .in('id', ids);
+      }
+
+      if (toCreate.length > 0) {
+        const created = await ShiftApi.bulkCreate(toCreate);
+        allShifts.push(...created);
+      }
+
+      // Add client calls to all shifts — collect all then bulk insert
+      if (areaId !== 'default' && allShifts.length > 0) {
+        const serviceUsers = await base44.entities.ServiceUser.filter({ status: 'active' });
+        const areaServiceUsers = serviceUsers.filter(su => (su.rota_area_id || su.area_id) === areaId);
+
+        const allCallsToCreate = [];
+        for (const shift of allShifts) {
+          for (const serviceUser of areaServiceUsers) {
+            if (!serviceUser.call_times || !Array.isArray(serviceUser.call_times)) continue;
+
+            serviceUser.call_times.forEach(callTime => {
+              try {
+                const callStart = parseInt(callTime.time.split(':')[0]) * 60 + parseInt(callTime.time.split(':')[1]);
+                const shiftStart = parseInt(shift.start_time.split(':')[0]) * 60 + parseInt(shift.start_time.split(':')[1]);
+                const shiftEnd = parseInt(shift.end_time.split(':')[0]) * 60 + parseInt(shift.end_time.split(':')[1]);
+                const callDuration = parseInt(callTime.duration) || 60;
+                const callEnd = callStart + callDuration;
+
+                if (callStart >= shiftStart && callEnd <= shiftEnd) {
+                  allCallsToCreate.push({
+                    shift_id: shift.id,
+                    service_user_id: serviceUser.id,
+                    service_user_name: serviceUser.full_name,
+                    scheduled_time: callTime.time,
+                    date: shift.date,
+                    type: callTime.type || 'visit',
+                    duration_minutes: callDuration,
+                  });
+                }
+              } catch (e) {
+                console.error('Error processing call time:', e);
+              }
+            });
+          }
+        }
+
+        if (allCallsToCreate.length > 0) {
+          await base44.entities.ClientCall.bulkCreate(allCallsToCreate);
+        }
+      }
+
       return { total: shiftsToCreate.length, replaced };
     },
     onSuccess: ({ total, replaced }) => {

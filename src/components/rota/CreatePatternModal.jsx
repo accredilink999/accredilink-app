@@ -169,6 +169,8 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
                          formData.pattern_type === 'two_week' ? 14 :
                          formData.pattern_type === 'three_week' ? 21 : 28;
 
+    toast.info(`Deploying pattern for ${numRepeats} week${numRepeats !== 1 ? 's' : ''}...`);
+
     // Calculate the full date range we need to cover
     const totalDays = daysPerCycle * numRepeats;
     const endDate = new Date(startDate);
@@ -201,19 +203,16 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
     const targets = [];
     for (let repeat = 0; repeat < numRepeats; repeat++) {
       formData.shifts.forEach(shift => {
-        // Calculate target date based on day_of_week and week number
-        const targetDayJS = dayMap[shift.day_of_week]; // JS day (0=Sun)
+        const targetDayJS = dayMap[shift.day_of_week];
         const cycleStart = new Date(startDate);
         cycleStart.setDate(cycleStart.getDate() + (repeat * daysPerCycle) + ((shift.week - 1) * 7));
 
-        // Find the next occurrence of this day of week from cycleStart
         const currentDay = cycleStart.getDay();
         let daysUntil = targetDayJS - currentDay;
         if (daysUntil < 0) daysUntil += 7;
         const targetDate = new Date(cycleStart);
         targetDate.setDate(targetDate.getDate() + daysUntil);
 
-        // Find shift type name for fallback matching
         const shiftTypeName = shiftTypes.find(st => st.id === shift.shift_type)?.name || shift.shift_type;
 
         targets.push({
@@ -225,86 +224,105 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
       });
     }
 
-    // Match targets to blank shifts and assign staff
-    let assigned = 0;
-    let totalCalls = 0;
+    // Match targets to blank shifts — collect all matches first (no API calls yet)
+    // Priority: date + shift_name (shift type), then date + exact times
+    const matchedShifts = []; // { blankShift, target }
     for (const target of targets) {
-      // First try exact time match, then fall back to matching by shift name
-      let match = blankShifts.find(bs =>
-        bs.date === target.date &&
-        bs.start_time === target.start_time &&
-        bs.end_time === target.end_time &&
-        !bs._used
-      );
+      // Priority 1: date + shift type name (e.g. "Early", "Late", "Night")
+      let match = target.shift_name
+        ? blankShifts.find(bs =>
+            bs.date === target.date &&
+            bs.shift_name === target.shift_name &&
+            !bs._used
+          )
+        : null;
 
-      // Fallback: match by date + shift_name if exact times didn't match
-      if (!match && target.shift_name) {
-        match = blankShifts.find(bs =>
-          bs.date === target.date &&
-          bs.shift_name === target.shift_name &&
-          !bs._used
-        );
-      }
-
-      // Last fallback: match any blank shift on that date in the same area
+      // Priority 2: date + exact start_time + end_time
       if (!match) {
         match = blankShifts.find(bs =>
           bs.date === target.date &&
+          bs.start_time === target.start_time &&
+          bs.end_time === target.end_time &&
           !bs._used
         );
       }
 
       if (match) {
         match._used = true;
-        const { error: updateError } = await supabase
-          .from('shifts')
-          .update({ staff_id: formData.staff_id, staff_name: staffName, shift_pattern_id: patternId || null })
-          .eq('id', match.id);
-        if (updateError) {
-          console.error('Failed to assign shift', match.id, updateError);
-        } else {
-          assigned++;
-          // Auto-populate client calls for this shift
-          const matchingCalls = getMatchingCallsForShift(
-            serviceUsers,
-            formData.rota_area_id,
-            match.start_time,
-            match.end_time
-          );
-          for (const call of matchingCalls) {
-            const ct = callTypesData.find(c => c.name === call.call_type);
-            const tasks = ct?.default_tasks?.length
-              ? ct.default_tasks.map(text => ({ text, completed: false }))
-              : [];
-            try {
-              await ShiftCallApi.create({
-                shift_id: match.id,
-                service_user_id: call.service_user_id,
-                service_user_name: call.service_user_name,
-                service_user_address: call.service_user_address,
-                scheduled_time: call.scheduled_time,
-                call_time: call.scheduled_time,
-                duration_minutes: call.duration_minutes,
-                call_type: call.call_type,
-                call_types: call.call_types || [call.call_type],
-                tasks,
-                call_date: match.date,
-                status: 'pending',
-                notes: call.notes || '',
-              });
-              totalCalls++;
-            } catch (err) {
-              console.error('Failed to create call for shift', match.id, err);
-            }
-          }
-        }
+        matchedShifts.push({ blankShift: match, target });
+      } else {
+        console.log('No blank shift match for:', target.date, target.start_time, '-', target.end_time, target.shift_name);
+      }
+    }
+
+    if (matchedShifts.length === 0) {
+      toast.info('No matching blank shifts found for the pattern times');
+      return;
+    }
+
+    // Batch update all matched shifts in chunks of 50
+    const BATCH_SIZE = 50;
+    let assigned = 0;
+    for (let i = 0; i < matchedShifts.length; i += BATCH_SIZE) {
+      const batch = matchedShifts.slice(i, i + BATCH_SIZE);
+      const ids = batch.map(m => m.blankShift.id);
+      const { error: updateError } = await supabase
+        .from('shifts')
+        .update({ staff_id: formData.staff_id, staff_name: staffName, shift_pattern_id: patternId || null })
+        .in('id', ids);
+      if (updateError) {
+        console.error('Batch shift update error:', updateError);
+      } else {
+        assigned += batch.length;
+      }
+    }
+
+    // Collect all client calls for all matched shifts, then bulk insert
+    const allCallsToCreate = [];
+    for (const { blankShift } of matchedShifts) {
+      const matchingCalls = getMatchingCallsForShift(
+        serviceUsers,
+        formData.rota_area_id,
+        blankShift.start_time,
+        blankShift.end_time
+      );
+      for (const call of matchingCalls) {
+        const ct = callTypesData.find(c => c.name === call.call_type);
+        const tasks = ct?.default_tasks?.length
+          ? ct.default_tasks.map(text => ({ text, completed: false }))
+          : [];
+        allCallsToCreate.push({
+          shift_id: blankShift.id,
+          service_user_id: call.service_user_id,
+          service_user_name: call.service_user_name,
+          service_user_address: call.service_user_address,
+          scheduled_time: call.scheduled_time,
+          call_time: call.scheduled_time,
+          duration_minutes: call.duration_minutes,
+          call_type: call.call_type,
+          call_types: call.call_types || [call.call_type],
+          tasks,
+          call_date: blankShift.date,
+          status: 'pending',
+          notes: call.notes || '',
+        });
+      }
+    }
+
+    // Bulk create all calls in batches
+    let totalCalls = 0;
+    if (allCallsToCreate.length > 0) {
+      try {
+        await ShiftCallApi.bulkCreate(allCallsToCreate);
+        totalCalls = allCallsToCreate.length;
+      } catch (err) {
+        console.error('Bulk call creation error:', err);
+        toast.error('Some client calls failed to create');
       }
     }
 
     if (assigned > 0) {
       toast.success(`Assigned ${staffName} to ${assigned} shift${assigned !== 1 ? 's' : ''} with ${totalCalls} call${totalCalls !== 1 ? 's' : ''}`);
-    } else {
-      toast.info('No matching blank shifts found for the pattern times');
     }
 
     queryClient.invalidateQueries({ queryKey: ['shifts'] });

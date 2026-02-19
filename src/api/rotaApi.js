@@ -155,6 +155,21 @@ export const ShiftCallApi = {
     return data
   },
 
+  async bulkCreate(records) {
+    const BATCH_SIZE = 50
+    const allData = []
+    for (let i = 0; i < records.length; i += BATCH_SIZE) {
+      const batch = records.slice(i, i + BATCH_SIZE)
+      const { data, error } = await supabase
+        .from('shift_calls')
+        .insert(batch)
+        .select()
+      if (error) throw error
+      if (data) allData.push(...data)
+    }
+    return allData
+  },
+
   async delete(id) {
     const { error } = await supabase
       .from('shift_calls')
