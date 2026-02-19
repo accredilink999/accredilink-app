@@ -18,7 +18,7 @@ export default function PatternManager({ open, onClose }) {
 
   const { data: patterns = [] } = useQuery({
     queryKey: ['shift-patterns'],
-    queryFn: () => ShiftPatternApi.list('-created_date', 100),
+    queryFn: () => ShiftPatternApi.list('-created_at', 100),
   });
 
   const deletePatternMutation = useMutation({
@@ -138,7 +138,7 @@ export default function PatternManager({ open, onClose }) {
       // Fetch existing shifts to find blank/available ones we can replace
       const areaId = pattern.rota_area_id || 'default';
       const existingShifts = areaId !== 'default'
-        ? await ShiftApi.list('-created_date', 5000)
+        ? await ShiftApi.list('-created_at', 5000)
         : [];
       // Build lookup: date|start_time|end_time → blank shift (no staff_id)
       const blankShiftMap = {};
