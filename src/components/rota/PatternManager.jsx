@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import CreatePatternModal from '@/components/rota/CreatePatternModal';
 import { Plus, Trash2, Play, Square, Calendar, Edit, Zap, Eraser, UserX } from 'lucide-react';
 import { toast } from 'sonner';
+import { deployPatternShifts, clearPatternShifts } from '@/utils/deployPattern';
 
 export default function PatternManager({ open, onClose }) {
   const queryClient = useQueryClient();
@@ -326,311 +327,28 @@ export default function PatternManager({ open, onClose }) {
 
   const deployPatternMutation = useMutation({
     mutationFn: async (pattern) => {
-      console.log('Starting deploy for pattern:', pattern);
-
-      // Auto-clear previous deployed shifts for this pattern first
       toast.info('Clearing previous shifts...');
-      const today = new Date().toISOString().split('T')[0];
-      const BATCH_SIZE = 50;
+      const cleared = await clearPatternShifts({
+        patternId: pattern.id,
+        staffId: pattern.staff_id,
+        areaId: pattern.rota_area_id,
+      });
+      if (cleared > 0) toast.info(`Cleared ${cleared} previous shifts`);
 
-      // Find shifts by shift_pattern_id — fetch shift_name to know which were originals vs created new
-      const { data: patternShifts } = await supabase
-        .from('shifts')
-        .select('id, shift_name')
-        .eq('shift_pattern_id', pattern.id)
-        .gte('date', today);
-
-      if (patternShifts && patternShifts.length > 0) {
-        // Shifts WITH shift_name were originally blank template slots — revert them to blank
-        const toRevert = patternShifts.filter(s => s.shift_name).map(s => s.id);
-        // Shifts WITHOUT shift_name were created new by the deploy — delete them entirely
-        const toDelete = patternShifts.filter(s => !s.shift_name).map(s => s.id);
-
-        // Delete shift_calls for all
-        const allIds = patternShifts.map(s => s.id);
-        for (let i = 0; i < allIds.length; i += BATCH_SIZE) {
-          const batch = allIds.slice(i, i + BATCH_SIZE);
-          await supabase.from('shift_calls').delete().in('shift_id', batch);
-        }
-
-        // Revert original template shifts back to blank
-        for (let i = 0; i < toRevert.length; i += BATCH_SIZE) {
-          const batch = toRevert.slice(i, i + BATCH_SIZE);
-          await supabase
-            .from('shifts')
-            .update({ staff_id: null, staff_name: null, shift_pattern_id: null })
-            .in('id', batch);
-        }
-
-        // Delete shifts that were created new (not from templates)
-        for (let i = 0; i < toDelete.length; i += BATCH_SIZE) {
-          const batch = toDelete.slice(i, i + BATCH_SIZE);
-          await supabase.from('shifts').delete().in('id', batch);
-        }
-      }
-
-      // Also find orphaned shifts by staff_id + area — revert these to blank
-      if (pattern.staff_id) {
-        let fallbackQuery = supabase
-          .from('shifts')
-          .select('id')
-          .eq('staff_id', pattern.staff_id)
-          .gte('date', today);
-        if (pattern.rota_area_id) {
-          fallbackQuery = fallbackQuery.eq('rota_area_id', pattern.rota_area_id);
-        }
-        const { data: staffShifts } = await fallbackQuery;
-        if (staffShifts && staffShifts.length > 0) {
-          const ids = staffShifts.map(s => s.id);
-          for (let i = 0; i < ids.length; i += BATCH_SIZE) {
-            const batch = ids.slice(i, i + BATCH_SIZE);
-            await supabase.from('shift_calls').delete().in('shift_id', batch);
-          }
-          for (let i = 0; i < ids.length; i += BATCH_SIZE) {
-            const batch = ids.slice(i, i + BATCH_SIZE);
-            await supabase
-              .from('shifts')
-              .update({ staff_id: null, staff_name: null, shift_pattern_id: null })
-              .in('id', batch);
-          }
-        }
-      }
-
-      toast.info('Deploying pattern...');
-
-      // === REVERSE MATCHING APPROACH ===
-      // Instead of generating dates and finding blanks, we:
-      // 1. Fetch ALL blank shifts in the area/date range
-      // 2. For each blank, check if the pattern wants to fill it
-      // 3. Only fill existing blanks — never create new shifts
-
-      // Helpers
-      const toDateStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-      const daysBetween = (ds1, ds2) => {
-        const [y1,m1,d1] = ds1.split('-').map(Number);
-        const [y2,m2,d2] = ds2.split('-').map(Number);
-        // Use noon to avoid DST edge cases
-        return Math.round((new Date(y2, m2-1, d2, 12) - new Date(y1, m1-1, d1, 12)) / 86400000);
-      };
-
-      const actualStartStr = pattern.start_date || toDateStr(new Date());
-      const [sy, sm, sd] = actualStartStr.split('-').map(Number);
-      // Anchor to Sunday of the start week
-      const anchorLocal = new Date(sy, sm - 1, sd);
-      const anchorSundayLocal = new Date(sy, sm - 1, sd - anchorLocal.getDay());
-      const anchorStr = toDateStr(anchorSundayLocal);
-
-      const numRepeats = pattern.repeat_count || 1;
-      const weeksInPattern = pattern.pattern_type === 'weekly' ? 1 :
-                              pattern.pattern_type === 'two_week' ? 2 :
-                              pattern.pattern_type === 'three_week' ? 3 : 4;
-      const daysPerCycle = weeksInPattern * 7;
-
-      // Calculate end date
-      const endLocal = new Date(sy, sm - 1, sd - anchorLocal.getDay() + (numRepeats * daysPerCycle) - 1);
-      const endStr = toDateStr(endLocal);
-
-      toast.info(`Deploying ${actualStartStr} to ${endStr}...`);
-
-      // Build pattern lookup: "week|day_of_week|start_time|end_time" → true
-      const patternLookup = new Set();
-      for (const shift of pattern.shifts) {
-        const key = `${shift.week}|${shift.day_of_week}|${shift.start_time}|${shift.end_time}`;
-        patternLookup.add(key);
-      }
-
-      console.log('Pattern lookup keys:', [...patternLookup]);
-
-      // Fetch ALL blank shifts in this area for the date range (paginated)
-      const areaId = pattern.rota_area_id || 'default';
-      let blankShifts = [];
-      if (areaId !== 'default') {
-        let from = 0;
-        const PAGE = 1000;
-        while (true) {
-          const { data, error } = await supabase
-            .from('shifts')
-            .select('id, date, start_time, end_time, shift_name')
-            .is('staff_id', null)
-            .eq('rota_area_id', areaId)
-            .gte('date', actualStartStr)
-            .lte('date', endStr)
-            .range(from, from + PAGE - 1);
-          if (error || !data || data.length === 0) break;
-          blankShifts.push(...data);
-          if (data.length < PAGE) break;
-          from += PAGE;
-        }
-      }
-
-      console.log(`Fetched ${blankShifts.length} blank shifts`);
-
-      // For each blank shift, check if the pattern wants to fill it
-      const toFill = [];
-      const filledSlots = new Set(); // track "date|start|end" to only fill one blank per slot
-
-      for (const blank of blankShifts) {
-        // Get day of week from the date string (no timezone issues)
-        const [by, bm, bd] = blank.date.split('-').map(Number);
-        const blankDow = new Date(by, bm - 1, bd, 12).getDay();
-        const dayName = dayNames[blankDow];
-
-        // Which week of the cycle is this blank in?
-        const daysSinceAnchor = daysBetween(anchorStr, blank.date);
-        const weekInCycle = (Math.floor(daysSinceAnchor / 7) % weeksInPattern) + 1;
-
-        // Does the pattern have a shift for this week + day + times?
-        const key = `${weekInCycle}|${dayName}|${blank.start_time}|${blank.end_time}`;
-
-        if (patternLookup.has(key)) {
-          // Only fill one blank per date/time slot
-          const slotKey = `${blank.date}|${blank.start_time}|${blank.end_time}`;
-          if (!filledSlots.has(slotKey)) {
-            toFill.push(blank);
-            filledSlots.add(slotKey);
-          }
-        }
-      }
-
-      console.log(`Matched ${toFill.length} blanks to fill`);
-
-      // Batch update blanks to assign staff
-      const BATCH_SIZE = 50;
-      for (let i = 0; i < toFill.length; i += BATCH_SIZE) {
-        const batch = toFill.slice(i, i + BATCH_SIZE);
-        const ids = batch.map(s => s.id);
-        await supabase
-          .from('shifts')
-          .update({
-            staff_id: pattern.staff_id,
-            staff_name: pattern.staff_name,
-            shift_pattern_id: pattern.id,
-            status: 'scheduled',
-          })
-          .in('id', ids);
-      }
-
-      // Add client calls to filled shifts
-      const allShifts = toFill.map(b => ({ ...b, staff_id: pattern.staff_id, staff_name: pattern.staff_name }));
-
-      if (areaId !== 'default' && allShifts.length > 0) {
-        // Delete existing shift_calls first
-        const allShiftIds = allShifts.map(s => s.id);
-        for (let i = 0; i < allShiftIds.length; i += BATCH_SIZE) {
-          const batch = allShiftIds.slice(i, i + BATCH_SIZE);
-          await supabase.from('shift_calls').delete().in('shift_id', batch);
-        }
-
-        const serviceUsers = await base44.entities.ServiceUser.filter({ status: 'active' });
-        const areaServiceUsers = serviceUsers.filter(su => (su.rota_area_id || su.area_id) === areaId);
-
-        const allCallsToCreate = [];
-        for (const shift of allShifts) {
-          for (const serviceUser of areaServiceUsers) {
-            if (!serviceUser.call_times || !Array.isArray(serviceUser.call_times)) continue;
-
-            serviceUser.call_times.forEach(callTime => {
-              try {
-                const callStart = parseInt(callTime.time.split(':')[0]) * 60 + parseInt(callTime.time.split(':')[1]);
-                const shiftStart = parseInt(shift.start_time.split(':')[0]) * 60 + parseInt(shift.start_time.split(':')[1]);
-                const shiftEnd = parseInt(shift.end_time.split(':')[0]) * 60 + parseInt(shift.end_time.split(':')[1]);
-                const callDuration = parseInt(callTime.duration) || 60;
-                const callEnd = callStart + callDuration;
-
-                if (callStart >= shiftStart && callEnd <= shiftEnd) {
-                  allCallsToCreate.push({
-                    shift_id: shift.id,
-                    service_user_id: serviceUser.id,
-                    service_user_name: serviceUser.full_name,
-                    scheduled_time: callTime.time,
-                    call_time: callTime.time,
-                    call_date: shift.date,
-                    call_type: callTime.type || 'visit',
-                    call_types: [callTime.type || 'visit'],
-                    duration_minutes: callDuration,
-                    status: 'pending',
-                    notes: '',
-                  });
-                }
-              } catch (e) {
-                console.error('Error processing call time:', e);
-              }
-            });
-          }
-        }
-
-        if (allCallsToCreate.length > 0) {
-          await ShiftCallApi.bulkCreate(allCallsToCreate);
-        }
-      }
-
-      // Auto-pair shifts: find other staff on the same date/time/area and link them
-      if (areaId !== 'default' && toFill.length > 0) {
-        toast.info('Pairing shifts...');
-        const pairUpdates = [];
-
-        // Get unique date/time combos from filled shifts
-        const slotKeys = [...new Set(toFill.map(s => `${s.date}|${s.start_time}|${s.end_time}`))];
-
-        // Fetch all assigned shifts in this area for these dates (paginated)
-        const filledDates = [...new Set(toFill.map(s => s.date))].sort();
-        let assignedShifts = [];
-        let pFrom = 0;
-        while (true) {
-          const { data, error } = await supabase
-            .from('shifts')
-            .select('id, date, start_time, end_time, staff_id, staff_name')
-            .not('staff_id', 'is', null)
-            .eq('rota_area_id', areaId)
-            .gte('date', filledDates[0])
-            .lte('date', filledDates[filledDates.length - 1])
-            .range(pFrom, pFrom + 999);
-          if (error || !data || data.length === 0) break;
-          assignedShifts.push(...data);
-          if (data.length < 1000) break;
-          pFrom += 1000;
-        }
-
-        // Group assigned shifts by date|start_time|end_time
-        const shiftsBySlot = {};
-        for (const s of assignedShifts) {
-          const key = `${s.date}|${s.start_time}|${s.end_time}`;
-          if (!shiftsBySlot[key]) shiftsBySlot[key] = [];
-          shiftsBySlot[key].push(s);
-        }
-
-        // For slots with exactly 2 staff, pair them
-        for (const key of Object.keys(shiftsBySlot)) {
-          const shifts = shiftsBySlot[key];
-          if (shifts.length === 2) {
-            const [a, b] = shifts;
-            // Only update if not already paired correctly
-            pairUpdates.push(
-              supabase.from('shifts').update({
-                paired_shift_id: b.id,
-                paired_staff_name: b.staff_name,
-              }).eq('id', a.id),
-              supabase.from('shifts').update({
-                paired_shift_id: a.id,
-                paired_staff_name: a.staff_name,
-              }).eq('id', b.id)
-            );
-          }
-        }
-
-        // Execute pair updates in batches
-        for (let i = 0; i < pairUpdates.length; i += 10) {
-          await Promise.all(pairUpdates.slice(i, i + 10));
-        }
-      }
-
-      return { total: toFill.length, replaced: toFill.length };
+      return deployPatternShifts({
+        pattern,
+        staffId: pattern.staff_id,
+        staffName: pattern.staff_name,
+        repeatCount: pattern.repeat_count || 1,
+        patternId: pattern.id,
+      });
     },
-    onSuccess: ({ total }) => {
+    onSuccess: ({ filled, calls }) => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       queryClient.invalidateQueries({ queryKey: ['clientCalls'] });
-      toast.success(`Pattern deployed: ${total} blank shift${total !== 1 ? 's' : ''} filled`);
+      queryClient.invalidateQueries({ queryKey: ['shiftCalls'] });
+      queryClient.invalidateQueries({ queryKey: ['assigned-staff-shifts'] });
+      toast.success(`Pattern deployed: ${filled} shifts filled, ${calls} calls created`);
     },
     onError: (error) => {
       toast.error('Error deploying pattern: ' + error.message);

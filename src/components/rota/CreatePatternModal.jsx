@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { supabase } from '@/api/supabaseClient';
 import { ShiftTypeApi } from '@/api/shiftTypeApi';
-import { ShiftPatternApi, ShiftCallApi } from '@/api/rotaApi';
-import { getMatchingCallsForShift } from '@/utils/shiftCallAutoAssign';
+import { ShiftPatternApi } from '@/api/rotaApi';
+import { deployPatternShifts } from '@/utils/deployPattern';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -109,16 +108,6 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
     queryFn: () => base44.entities.RotaArea.filter({ is_active: true }, 'name'),
   });
 
-  const { data: serviceUsers = [] } = useQuery({
-    queryKey: ['serviceUsers'],
-    queryFn: () => base44.entities.ServiceUser.filter({ status: 'active' }),
-  });
-
-  const { data: callTypesData = [] } = useQuery({
-    queryKey: ['callTypes'],
-    queryFn: () => base44.entities.CallType.list(),
-  });
-
   const { data: shiftTypes = [] } = useQuery({
     queryKey: ['shiftTypes'],
     queryFn: () => ShiftTypeApi.list(),
@@ -164,188 +153,23 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
   const createShiftsFromPattern = async (patternData, numRepeats, patternId) => {
     const staffMember = staff.find(s => s.id === formData.staff_id);
     const staffName = staffMember?.staff_full_name || staffMember?.full_name;
-    const actualStart = formData.start_date ? new Date(formData.start_date + 'T00:00:00') : new Date();
-    // Anchor to Sunday of the start week for day-of-week calculation
-    const weekAnchor = new Date(actualStart);
-    weekAnchor.setDate(weekAnchor.getDate() - weekAnchor.getDay());
-    const dayMap = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 };
-    // Local date formatter to avoid BST/UTC timezone shift
-    const toDateStr = (d) => {
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${y}-${m}-${day}`;
-    };
 
-    const actualStartStr = toDateStr(actualStart);
+    const result = await deployPatternShifts({
+      pattern: {
+        ...patternData,
+        shifts: formData.shifts,
+        start_date: formData.start_date,
+        pattern_type: formData.pattern_type,
+        rota_area_id: formData.rota_area_id,
+      },
+      staffId: formData.staff_id,
+      staffName,
+      repeatCount: numRepeats,
+      patternId,
+    });
 
-    const daysPerCycle = formData.pattern_type === 'weekly' ? 7 :
-                         formData.pattern_type === 'two_week' ? 14 :
-                         formData.pattern_type === 'three_week' ? 21 : 28;
-
-    toast.info(`Deploying pattern for ${numRepeats} repeat${numRepeats !== 1 ? 's' : ''}...`);
-
-    // Calculate the full date range we need to cover
-    const totalDays = daysPerCycle * numRepeats;
-    const endDate = new Date(weekAnchor);
-    endDate.setDate(endDate.getDate() + totalDays);
-
-    const endStr = toDateStr(endDate);
-
-    // Fetch all blank (unassigned) shifts in this area for the date range
-    // Fetch ALL blank shifts (paginated to avoid 1000 row limit)
-    let blankShifts = [];
-    let from = 0;
-    const PAGE = 1000;
-    while (true) {
-      let query = supabase
-        .from('shifts')
-        .select('id, date, start_time, end_time, shift_name, rota_area_id, staff_id')
-        .is('staff_id', null)
-        .gte('date', actualStartStr)
-        .lte('date', endStr)
-        .range(from, from + PAGE - 1);
-
-      if (formData.rota_area_id) {
-        query = query.eq('rota_area_id', formData.rota_area_id);
-      }
-
-      const { data, error: fetchError } = await query;
-      if (fetchError) throw fetchError;
-      if (!data || data.length === 0) break;
-      blankShifts.push(...data);
-      if (data.length < PAGE) break;
-      from += PAGE;
-    }
-
-    if (blankShifts.length === 0) {
-      toast.info('No blank shifts found in that area/date range to assign');
-      return;
-    }
-
-    // Build a list of target dates + times from the pattern
-    const targets = [];
-    for (let repeat = 0; repeat < numRepeats; repeat++) {
-      formData.shifts.forEach(shift => {
-        const targetDayJS = dayMap[shift.day_of_week];
-        // Calculate date: Sunday anchor + (repeat * cycle) + (week offset) + day offset
-        const shiftDate = new Date(weekAnchor);
-        shiftDate.setDate(shiftDate.getDate() + (repeat * daysPerCycle) + ((shift.week - 1) * 7) + targetDayJS);
-
-        // Skip any dates before the actual start date
-        const dateStr = toDateStr(shiftDate);
-        if (dateStr < actualStartStr) return;
-
-        const shiftTypeName = shiftTypes.find(st => st.id === shift.shift_type)?.name || shift.shift_type;
-
-        targets.push({
-          date: dateStr,
-          start_time: shift.start_time,
-          end_time: shift.end_time,
-          shift_name: shiftTypeName,
-        });
-      });
-    }
-
-    // Match targets to blank shifts — collect all matches first (no API calls yet)
-    // Priority: date + shift_name (shift type), then date + exact times
-    const matchedShifts = []; // { blankShift, target }
-    for (const target of targets) {
-      // Priority 1: date + shift type name (e.g. "Early", "Late", "Night")
-      let match = target.shift_name
-        ? blankShifts.find(bs =>
-            bs.date === target.date &&
-            bs.shift_name === target.shift_name &&
-            !bs._used
-          )
-        : null;
-
-      // Priority 2: date + exact start_time + end_time
-      if (!match) {
-        match = blankShifts.find(bs =>
-          bs.date === target.date &&
-          bs.start_time === target.start_time &&
-          bs.end_time === target.end_time &&
-          !bs._used
-        );
-      }
-
-      if (match) {
-        match._used = true;
-        matchedShifts.push({ blankShift: match, target });
-      } else {
-        console.log('No blank shift match for:', target.date, target.start_time, '-', target.end_time, target.shift_name);
-      }
-    }
-
-    if (matchedShifts.length === 0) {
-      toast.info('No matching blank shifts found for the pattern times');
-      return;
-    }
-
-    // Batch update all matched shifts in chunks of 50
-    const BATCH_SIZE = 50;
-    let assigned = 0;
-    for (let i = 0; i < matchedShifts.length; i += BATCH_SIZE) {
-      const batch = matchedShifts.slice(i, i + BATCH_SIZE);
-      const ids = batch.map(m => m.blankShift.id);
-      const { error: updateError } = await supabase
-        .from('shifts')
-        .update({ staff_id: formData.staff_id, staff_name: staffName, shift_pattern_id: patternId || null })
-        .in('id', ids);
-      if (updateError) {
-        console.error('Batch shift update error:', updateError);
-      } else {
-        assigned += batch.length;
-      }
-    }
-
-    // Collect all client calls for all matched shifts, then bulk insert
-    const allCallsToCreate = [];
-    for (const { blankShift } of matchedShifts) {
-      const matchingCalls = getMatchingCallsForShift(
-        serviceUsers,
-        formData.rota_area_id,
-        blankShift.start_time,
-        blankShift.end_time
-      );
-      for (const call of matchingCalls) {
-        const ct = callTypesData.find(c => c.name === call.call_type);
-        const tasks = ct?.default_tasks?.length
-          ? ct.default_tasks.map(text => ({ text, completed: false }))
-          : [];
-        allCallsToCreate.push({
-          shift_id: blankShift.id,
-          service_user_id: call.service_user_id,
-          service_user_name: call.service_user_name,
-          service_user_address: call.service_user_address,
-          scheduled_time: call.scheduled_time,
-          call_time: call.scheduled_time,
-          duration_minutes: call.duration_minutes,
-          call_type: call.call_type,
-          call_types: call.call_types || [call.call_type],
-          tasks,
-          call_date: blankShift.date,
-          status: 'pending',
-          notes: call.notes || '',
-        });
-      }
-    }
-
-    // Bulk create all calls in batches
-    let totalCalls = 0;
-    if (allCallsToCreate.length > 0) {
-      try {
-        await ShiftCallApi.bulkCreate(allCallsToCreate);
-        totalCalls = allCallsToCreate.length;
-      } catch (err) {
-        console.error('Bulk call creation error:', err);
-        toast.error('Some client calls failed to create');
-      }
-    }
-
-    if (assigned > 0) {
-      toast.success(`Assigned ${staffName} to ${assigned} shift${assigned !== 1 ? 's' : ''} with ${totalCalls} call${totalCalls !== 1 ? 's' : ''}`);
+    if (result.filled > 0) {
+      toast.success(`Assigned ${staffName} to ${result.filled} shifts with ${result.calls} calls`);
     }
 
     queryClient.invalidateQueries({ queryKey: ['shifts'] });
