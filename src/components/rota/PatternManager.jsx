@@ -370,9 +370,10 @@ export default function PatternManager({ open, onClose }) {
       toast.info('Deploying pattern...');
       const shiftsToCreate = [];
       const rawStart = pattern.start_date ? new Date(pattern.start_date + 'T00:00:00') : new Date();
-      // Anchor to the Sunday of the start_date week so days land correctly (Sun-Sat)
+      // Anchor to Sunday (snap forward if not already Sunday)
       const startDate = new Date(rawStart);
-      startDate.setDate(startDate.getDate() - startDate.getDay());
+      const startDay = startDate.getDay();
+      if (startDay !== 0) startDate.setDate(startDate.getDate() + (7 - startDay));
 
       const numRepeats = pattern.repeat_count || 1;
       const daysPerCycle = pattern.pattern_type === 'weekly' ? 7 :

@@ -25,7 +25,7 @@ const defaultFormData = {
   rota_area_id: '',
   shifts: [],
   repeat_count: 1,
-  start_date: (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay()); return d.toISOString().split('T')[0]; })(),
+  start_date: (() => { const d = new Date(); const day = d.getDay(); if (day !== 0) d.setDate(d.getDate() + (7 - day)); return d.toISOString().split('T')[0]; })(),
 };
 
 const hasMeaningfulData = (data) =>
@@ -165,9 +165,10 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
     const staffMember = staff.find(s => s.id === formData.staff_id);
     const staffName = staffMember?.staff_full_name || staffMember?.full_name;
     const rawStart = formData.start_date ? new Date(formData.start_date + 'T00:00:00') : new Date();
-    // Anchor to Sunday of the start week
+    // Anchor to Sunday (snap forward if not already Sunday)
     const startDate = new Date(rawStart);
-    startDate.setDate(startDate.getDate() - startDate.getDay());
+    const startDay = startDate.getDay();
+    if (startDay !== 0) startDate.setDate(startDate.getDate() + (7 - startDay));
     const dayMap = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 };
 
     const daysPerCycle = formData.pattern_type === 'weekly' ? 7 :
@@ -615,8 +616,8 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
                     const picked = new Date(e.target.value + 'T00:00:00');
                     const day = picked.getDay();
                     if (day !== 0) {
-                      // Snap back to previous Sunday
-                      picked.setDate(picked.getDate() - day);
+                      // Snap forward to next Sunday
+                      picked.setDate(picked.getDate() + (7 - day));
                     }
                     setFormData({ ...formData, start_date: picked.toISOString().split('T')[0] });
                   }}
