@@ -25,7 +25,7 @@ const defaultFormData = {
   rota_area_id: '',
   shifts: [],
   repeat_count: 1,
-  start_date: new Date().toISOString().split('T')[0],
+  start_date: (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay()); return d.toISOString().split('T')[0]; })(),
 };
 
 const hasMeaningfulData = (data) =>
@@ -164,8 +164,11 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
   const createShiftsFromPattern = async (patternData, numRepeats, patternId) => {
     const staffMember = staff.find(s => s.id === formData.staff_id);
     const staffName = staffMember?.staff_full_name || staffMember?.full_name;
-    const startDate = formData.start_date ? new Date(formData.start_date + 'T00:00:00') : new Date();
-    const dayMap = { monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6, sunday: 0 };
+    const rawStart = formData.start_date ? new Date(formData.start_date + 'T00:00:00') : new Date();
+    // Anchor to Sunday of the start week
+    const startDate = new Date(rawStart);
+    startDate.setDate(startDate.getDate() - startDate.getDay());
+    const dayMap = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 };
 
     const daysPerCycle = formData.pattern_type === 'weekly' ? 7 :
                          formData.pattern_type === 'two_week' ? 14 :
@@ -604,12 +607,21 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
             </div>
 
               <div className="space-y-2">
-                <Label>Start Date</Label>
+                <Label>Start Date (must be a Sunday)</Label>
                 <Input
                   type="date"
                   value={formData.start_date}
-                  onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                  onChange={(e) => {
+                    const picked = new Date(e.target.value + 'T00:00:00');
+                    const day = picked.getDay();
+                    if (day !== 0) {
+                      // Snap back to previous Sunday
+                      picked.setDate(picked.getDate() - day);
+                    }
+                    setFormData({ ...formData, start_date: picked.toISOString().split('T')[0] });
+                  }}
                 />
+                <p className="text-xs text-slate-400">Weeks run Sunday to Saturday. Date will snap to the nearest Sunday.</p>
               </div>
 
               <div className="space-y-2">
