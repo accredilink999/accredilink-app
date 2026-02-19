@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import CreatePatternModal from '@/components/rota/CreatePatternModal';
-import { Plus, Trash2, Play, Square, Calendar, Edit, Zap } from 'lucide-react';
+import { Plus, Trash2, Play, Square, Calendar, Edit, Zap, Eraser } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function PatternManager({ open, onClose }) {
@@ -27,6 +27,7 @@ export default function PatternManager({ open, onClose }) {
   const [addingCallsToPattern, setAddingCallsToPattern] = useState(null);
   const [redeployConfirmPattern, setRedeployConfirmPattern] = useState(null);
   const [deleteConfirmPattern, setDeleteConfirmPattern] = useState(null);
+  const [clearShiftsConfirmPattern, setClearShiftsConfirmPattern] = useState(null);
 
   const { data: patterns = [] } = useQuery({
     queryKey: ['shift-patterns'],
@@ -88,6 +89,79 @@ export default function PatternManager({ open, onClose }) {
     },
     onError: (error) => {
       toast.error('Failed to delete pattern: ' + error.message);
+    },
+  });
+
+  const clearShiftsMutation = useMutation({
+    mutationFn: async (pattern) => {
+      toast.info(`Clearing shifts for ${pattern.staff_name}...`);
+      let totalCleared = 0;
+
+      // 1. Find shifts by shift_pattern_id
+      const { data: patternShifts } = await supabase
+        .from('shifts')
+        .select('id')
+        .eq('shift_pattern_id', pattern.id)
+        .gte('date', new Date().toISOString().split('T')[0]);
+
+      if (patternShifts && patternShifts.length > 0) {
+        const ids = patternShifts.map(s => s.id);
+        // Delete shift_calls in batches
+        for (let i = 0; i < ids.length; i += 50) {
+          const batch = ids.slice(i, i + 50);
+          await supabase.from('shift_calls').delete().in('shift_id', batch);
+        }
+        // Revert shifts to blank
+        for (let i = 0; i < ids.length; i += 50) {
+          const batch = ids.slice(i, i + 50);
+          await supabase
+            .from('shifts')
+            .update({ staff_id: null, staff_name: null, shift_pattern_id: null })
+            .in('id', batch);
+        }
+        totalCleared += patternShifts.length;
+      }
+
+      // 2. Fallback: also find by staff_id + rota_area_id + staff_name for orphaned shifts
+      if (pattern.staff_id) {
+        let fallbackQuery = supabase
+          .from('shifts')
+          .select('id')
+          .eq('staff_id', pattern.staff_id)
+          .gte('date', new Date().toISOString().split('T')[0]);
+
+        if (pattern.rota_area_id) {
+          fallbackQuery = fallbackQuery.eq('rota_area_id', pattern.rota_area_id);
+        }
+
+        const { data: staffShifts } = await fallbackQuery;
+        if (staffShifts && staffShifts.length > 0) {
+          const ids = staffShifts.map(s => s.id);
+          for (let i = 0; i < ids.length; i += 50) {
+            const batch = ids.slice(i, i + 50);
+            await supabase.from('shift_calls').delete().in('shift_id', batch);
+          }
+          for (let i = 0; i < ids.length; i += 50) {
+            const batch = ids.slice(i, i + 50);
+            await supabase
+              .from('shifts')
+              .update({ staff_id: null, staff_name: null, shift_pattern_id: null })
+              .in('id', batch);
+          }
+          totalCleared += staffShifts.length;
+        }
+      }
+
+      return { totalCleared };
+    },
+    onSuccess: ({ totalCleared }) => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      queryClient.invalidateQueries({ queryKey: ['shiftCalls'] });
+      queryClient.invalidateQueries({ queryKey: ['clientCalls'] });
+      toast.success(`Cleared ${totalCleared} shift${totalCleared !== 1 ? 's' : ''} back to available`);
+    },
+    onError: (error) => {
+      toast.error('Failed to clear shifts: ' + error.message);
     },
   });
 
@@ -402,6 +476,16 @@ export default function PatternManager({ open, onClose }) {
                       </Button>
                       <Button
                         size="sm"
+                        variant="outline"
+                        className="text-orange-600 border-orange-300 hover:bg-orange-50"
+                        onClick={() => setClearShiftsConfirmPattern(pattern)}
+                        disabled={clearShiftsMutation.isPending}
+                      >
+                        <Eraser className="w-3 h-3 mr-1" />
+                        {clearShiftsMutation.isPending ? 'Clearing...' : 'Clear Shifts'}
+                      </Button>
+                      <Button
+                        size="sm"
                         variant="ghost"
                         onClick={() => setDeleteConfirmPattern(pattern)}
                       >
@@ -474,6 +558,30 @@ export default function PatternManager({ open, onClose }) {
               }}
             >
               Yes, Delete
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Clear shifts confirmation */}
+      <AlertDialog open={!!clearShiftsConfirmPattern} onOpenChange={(open) => !open && setClearShiftsConfirmPattern(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear Deployed Shifts?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will revert all future shifts for <strong>{clearShiftsConfirmPattern?.staff_name}</strong> back to blank/available and remove their client calls. The pattern itself will be kept.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex justify-end gap-2 mt-4">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-orange-600 hover:bg-orange-700"
+              onClick={() => {
+                clearShiftsMutation.mutate(clearShiftsConfirmPattern);
+                setClearShiftsConfirmPattern(null);
+              }}
+            >
+              Yes, Clear Shifts
             </AlertDialogAction>
           </div>
         </AlertDialogContent>
