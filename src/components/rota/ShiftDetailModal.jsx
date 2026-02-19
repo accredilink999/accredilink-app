@@ -196,28 +196,33 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
   });
 
   const { data: availableShifts = [], isLoading: shiftsLoading } = useQuery({
-    queryKey: ['availableShifts', shift.date, shift.id],
+    queryKey: ['availableShifts', shift.date, shift.start_time, shift.end_time, shift.id],
     queryFn: async () => {
       try {
-        // Query shifts on same date directly from Supabase (server-side filter)
-        const { data: dateShifts, error } = await supabase
+        console.log('[Pairing] Looking for shifts on', shift.date, 'at', shift.start_time, '-', shift.end_time);
+        const { data: matchingShifts, error } = await supabase
           .from('shifts')
           .select('*')
           .eq('date', shift.date)
+          .eq('start_time', shift.start_time)
+          .eq('end_time', shift.end_time)
           .not('staff_id', 'is', null)
           .neq('id', shift.id);
         if (error) throw error;
+        console.log('[Pairing] Found', matchingShifts?.length, 'shifts before filtering:', matchingShifts?.map(s => s.staff_name));
         // Filter out already paired and same-staff shifts
-        return (dateShifts || []).filter(s =>
+        const result = (matchingShifts || []).filter(s =>
           (!s.paired_shift_id || s.paired_shift_id === '') &&
           s.staff_id !== shift.staff_id
         );
+        console.log('[Pairing] After filtering:', result.length, 'available:', result.map(s => s.staff_name));
+        return result;
       } catch (error) {
-        console.error('Error fetching available shifts:', error);
+        console.error('[Pairing] Error fetching available shifts:', error);
         return [];
       }
     },
-    enabled: !!shift.date && isAdmin && !editMode,
+    enabled: !!shift.date && !!shift.start_time && !!shift.end_time && isAdmin && !editMode,
   });
 
   // Care logs for shift summary on clock-off
