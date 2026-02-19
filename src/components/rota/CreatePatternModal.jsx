@@ -185,21 +185,32 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
     const endStr = endDate.toISOString().split('T')[0];
 
     // Fetch all blank (unassigned) shifts in this area for the date range
-    let query = supabase
-      .from('shifts')
-      .select('id, date, start_time, end_time, shift_name, rota_area_id, staff_id')
-      .is('staff_id', null)
-      .gte('date', actualStartStr)
-      .lte('date', endStr);
+    // Fetch ALL blank shifts (paginated to avoid 1000 row limit)
+    let blankShifts = [];
+    let from = 0;
+    const PAGE = 1000;
+    while (true) {
+      let query = supabase
+        .from('shifts')
+        .select('id, date, start_time, end_time, shift_name, rota_area_id, staff_id')
+        .is('staff_id', null)
+        .gte('date', actualStartStr)
+        .lte('date', endStr)
+        .range(from, from + PAGE - 1);
 
-    if (formData.rota_area_id) {
-      query = query.eq('rota_area_id', formData.rota_area_id);
+      if (formData.rota_area_id) {
+        query = query.eq('rota_area_id', formData.rota_area_id);
+      }
+
+      const { data, error: fetchError } = await query;
+      if (fetchError) throw fetchError;
+      if (!data || data.length === 0) break;
+      blankShifts.push(...data);
+      if (data.length < PAGE) break;
+      from += PAGE;
     }
 
-    const { data: blankShifts, error: fetchError } = await query;
-    if (fetchError) throw fetchError;
-
-    if (!blankShifts || blankShifts.length === 0) {
+    if (blankShifts.length === 0) {
       toast.info('No blank shifts found in that area/date range to assign');
       return;
     }

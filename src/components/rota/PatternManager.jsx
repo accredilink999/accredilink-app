@@ -407,19 +407,27 @@ export default function PatternManager({ open, onClose }) {
         });
       }
 
-      // Fetch blank shifts in this area for the date range
+      // Fetch ALL blank shifts in this area for the date range (paginated to avoid 1000 row limit)
       const areaId = pattern.rota_area_id || 'default';
       const dates = [...new Set(shiftsToCreate.map(s => s.date))].sort();
       let blankShifts = [];
       if (areaId !== 'default' && dates.length > 0) {
-        const { data, error } = await supabase
-          .from('shifts')
-          .select('id, date, start_time, end_time, rota_area_id, staff_id')
-          .is('staff_id', null)
-          .eq('rota_area_id', areaId)
-          .gte('date', dates[0])
-          .lte('date', dates[dates.length - 1]);
-        if (!error && data) blankShifts = data;
+        let from = 0;
+        const PAGE = 1000;
+        while (true) {
+          const { data, error } = await supabase
+            .from('shifts')
+            .select('id, date, start_time, end_time, rota_area_id, staff_id')
+            .is('staff_id', null)
+            .eq('rota_area_id', areaId)
+            .gte('date', dates[0])
+            .lte('date', dates[dates.length - 1])
+            .range(from, from + PAGE - 1);
+          if (error || !data || data.length === 0) break;
+          blankShifts.push(...data);
+          if (data.length < PAGE) break;
+          from += PAGE;
+        }
       }
 
       // Build lookup: date|start_time|end_time → blank shift
