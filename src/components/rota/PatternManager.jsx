@@ -289,7 +289,7 @@ export default function PatternManager({ open, onClose }) {
         }
 
         if (matchingCalls.length > 0) {
-          await base44.entities.ClientCall.bulkCreate(matchingCalls);
+          await ShiftCallApi.bulkCreate(matchingCalls);
           totalCallsAdded += matchingCalls.length;
         }
       }
@@ -436,7 +436,7 @@ export default function PatternManager({ open, onClose }) {
         }
 
         if (allCallsToCreate.length > 0) {
-          await base44.entities.ClientCall.bulkCreate(allCallsToCreate);
+          await ShiftCallApi.bulkCreate(allCallsToCreate);
         }
       }
 
