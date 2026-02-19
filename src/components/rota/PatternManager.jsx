@@ -315,7 +315,11 @@ export default function PatternManager({ open, onClose }) {
       toast.info('Deploying pattern...');
 
       const shiftsToCreate = [];
-      const startDate = pattern.start_date ? new Date(pattern.start_date + 'T00:00:00') : new Date();
+      const rawStart = pattern.start_date ? new Date(pattern.start_date + 'T00:00:00') : new Date();
+      // Anchor to the Sunday of the start_date week so days land correctly (Sun-Sat)
+      const startDate = new Date(rawStart);
+      startDate.setDate(startDate.getDate() - startDate.getDay());
+
       const numRepeats = pattern.repeat_count || 1;
       const daysPerCycle = pattern.pattern_type === 'weekly' ? 7 :
                            pattern.pattern_type === 'two_week' ? 14 :
@@ -328,21 +332,15 @@ export default function PatternManager({ open, onClose }) {
       for (let repeat = 0; repeat < numRepeats; repeat++) {
         pattern.shifts.forEach(shift => {
           const targetDayJS = dayMap[shift.day_of_week];
-          const cycleStart = new Date(startDate);
-          cycleStart.setDate(cycleStart.getDate() + (repeat * daysPerCycle) + ((shift.week - 1) * 7));
-
-          const currentDay = cycleStart.getDay();
-          let daysUntil = targetDayJS - currentDay;
-          if (daysUntil < 0) daysUntil += 7;
-          const shiftDate = new Date(cycleStart);
-          shiftDate.setDate(shiftDate.getDate() + daysUntil);
+          // Each cycle: startDate + (repeat * cycle length) + (week offset within pattern) + day offset
+          const shiftDate = new Date(startDate);
+          shiftDate.setDate(shiftDate.getDate() + (repeat * daysPerCycle) + ((shift.week - 1) * 7) + targetDayJS);
 
           const dateStr = shiftDate.toISOString().split('T')[0];
           shiftsToCreate.push({
             staff_id: pattern.staff_id,
             staff_name: pattern.staff_name,
             rota_area_id: pattern.rota_area_id || 'default',
-            rota_area_name: pattern.rota_area_name || 'Default',
             date: dateStr,
             start_time: shift.start_time,
             end_time: shift.end_time,
@@ -352,9 +350,9 @@ export default function PatternManager({ open, onClose }) {
         });
       }
 
-      // Fetch blank shifts in this area for matching dates
+      // Fetch blank shifts in this area for the date range
       const areaId = pattern.rota_area_id || 'default';
-      const dates = [...new Set(shiftsToCreate.map(s => s.date))];
+      const dates = [...new Set(shiftsToCreate.map(s => s.date))].sort();
       let blankShifts = [];
       if (areaId !== 'default' && dates.length > 0) {
         const { data, error } = await supabase
@@ -362,7 +360,8 @@ export default function PatternManager({ open, onClose }) {
           .select('id, date, start_time, end_time, rota_area_id, staff_id')
           .is('staff_id', null)
           .eq('rota_area_id', areaId)
-          .in('date', dates);
+          .gte('date', dates[0])
+          .lte('date', dates[dates.length - 1]);
         if (!error && data) blankShifts = data;
       }
 
