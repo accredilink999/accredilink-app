@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import {
   Send, Paperclip, ArrowLeft, MoreVertical, Users, UserPlus,
-  Smile, X, ArrowDown, Pin, VolumeX, Volume2, Trash2
+  Smile, X, ArrowDown, Pin, VolumeX, Volume2, Trash2, CheckCheck, Camera
 } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 import VoiceRecorder from './VoiceRecorder';
@@ -32,6 +32,9 @@ export default function ChatWindow({ conversation, currentUserId, currentUserNam
   const [selectedNewMembers, setSelectedNewMembers] = useState([]);
   const [showMembersDialog, setShowMembersDialog] = useState(false);
   const [editingMessage, setEditingMessage] = useState(null);
+  const [readByMessage, setReadByMessage] = useState(null);
+  const [uploadingGroupPhoto, setUploadingGroupPhoto] = useState(false);
+  const groupPhotoInputRef = useRef(null);
 
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
@@ -407,6 +410,21 @@ export default function ChatWindow({ conversation, currentUserId, currentUserNam
     queryClient.invalidateQueries({ queryKey: ['conversations'] });
   };
 
+  const handleGroupPhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !conversation) return;
+    setUploadingGroupPhoto(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      await base44.entities.Conversation.update(conversation.id, { group_photo_url: file_url });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    } catch (err) {
+      console.error('Failed to upload group photo:', err);
+    }
+    setUploadingGroupPhoto(false);
+    e.target.value = '';
+  };
+
   // ── Send handlers ──
   const handleSend = async (e) => {
     e.preventDefault();
@@ -534,6 +552,9 @@ export default function ChatWindow({ conversation, currentUserId, currentUserNam
 
   return (
     <div ref={chatContainerRef} className="flex-1 flex flex-col bg-[#efeae2] min-w-0 overflow-hidden" style={{ maxWidth: '100%' }}>
+      {/* Hidden group photo input */}
+      <input ref={groupPhotoInputRef} type="file" accept="image/*" className="hidden" onChange={handleGroupPhotoUpload} />
+
       {/* ── Header ── */}
       <div className="bg-[#f0f2f5] border-b border-slate-200 px-3 py-2 flex items-center gap-3 z-10">
         <Button variant="ghost" size="icon" onClick={onBack} className="lg:hidden h-9 w-9">
@@ -542,13 +563,28 @@ export default function ChatWindow({ conversation, currentUserId, currentUserNam
 
         <div className="cursor-pointer flex items-center gap-3 flex-1 min-w-0" onClick={() => onOpenInfo?.()}>
           {isGroup ? (
-            conversation.group_photo_url ? (
-              <img src={conversation.group_photo_url} alt={displayName} className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center flex-shrink-0">
-                <Users className="w-5 h-5 text-white" />
-              </div>
-            )
+            <div
+              className="relative flex-shrink-0 group/photo"
+              onClick={(e) => {
+                if (isAdmin) {
+                  e.stopPropagation();
+                  groupPhotoInputRef.current?.click();
+                }
+              }}
+            >
+              {conversation.group_photo_url ? (
+                <img src={conversation.group_photo_url} alt={displayName} className="w-10 h-10 rounded-full object-cover" />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center">
+                  <Users className="w-5 h-5 text-white" />
+                </div>
+              )}
+              {isAdmin && (
+                <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover/photo:opacity-100 transition-opacity flex items-center justify-center">
+                  <Camera className="w-4 h-4 text-white" />
+                </div>
+              )}
+            </div>
           ) : (
             <Avatar name={displayName} size="md" />
           )}
@@ -579,6 +615,11 @@ export default function ChatWindow({ conversation, currentUserId, currentUserNam
             {isGroup && (
               <DropdownMenuItem onClick={() => setShowAddMembersDialog(true)}>
                 <UserPlus className="w-4 h-4 mr-2" /> Add Members
+              </DropdownMenuItem>
+            )}
+            {isGroup && isAdmin && (
+              <DropdownMenuItem onClick={() => groupPhotoInputRef.current?.click()} disabled={uploadingGroupPhoto}>
+                <Camera className="w-4 h-4 mr-2" /> {uploadingGroupPhoto ? 'Uploading...' : 'Change Group Photo'}
               </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
@@ -657,6 +698,7 @@ export default function ChatWindow({ conversation, currentUserId, currentUserNam
                 inputRef.current?.focus();
               }}
               onForward={() => {}}
+              onViewReadBy={(msg) => setReadByMessage(msg)}
             />
           );
         })}
@@ -871,6 +913,56 @@ export default function ChatWindow({ conversation, currentUserId, currentUserNam
                 {addMembersMutation.isPending ? 'Adding...' : 'Add Members'}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* ── Read By Dialog ── */}
+      <Dialog open={!!readByMessage} onOpenChange={() => setReadByMessage(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCheck className="w-5 h-5 text-[#53bdeb]" />
+              Read by
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-1 max-h-64 overflow-y-auto">
+            {(() => {
+              const readIds = (readByMessage?.read_by || []).filter(id => id !== readByMessage?.sender_id);
+              const notReadIds = (conversation?.participants || []).filter(id => id !== readByMessage?.sender_id && !readIds.includes(id));
+              return (
+                <>
+                  {readIds.length === 0 && notReadIds.length === 0 && (
+                    <p className="text-sm text-slate-500 text-center py-4">No other participants</p>
+                  )}
+                  {readIds.map(id => {
+                    const user = allUsers.find(u => u.id === id);
+                    const name = user?.staff_full_name || user?.full_name || 'Unknown';
+                    return (
+                      <div key={id} className="flex items-center gap-3 p-2 rounded-lg">
+                        <Avatar name={name} size="sm" src={user?.photo_url} />
+                        <span className="text-sm font-medium text-slate-900 flex-1">{name}</span>
+                        <CheckCheck className="w-4 h-4 text-[#53bdeb]" />
+                      </div>
+                    );
+                  })}
+                  {notReadIds.length > 0 && readIds.length > 0 && (
+                    <div className="border-t border-slate-200 mt-2 pt-2">
+                      <p className="text-xs text-slate-400 px-2 mb-1">Not yet read</p>
+                    </div>
+                  )}
+                  {notReadIds.map(id => {
+                    const user = allUsers.find(u => u.id === id);
+                    const name = user?.staff_full_name || user?.full_name || 'Unknown';
+                    return (
+                      <div key={id} className="flex items-center gap-3 p-2 rounded-lg opacity-50">
+                        <Avatar name={name} size="sm" src={user?.photo_url} />
+                        <span className="text-sm text-slate-600 flex-1">{name}</span>
+                      </div>
+                    );
+                  })}
+                </>
+              );
+            })()}
           </div>
         </DialogContent>
       </Dialog>

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { cn } from "@/lib/utils";
 import { format } from 'date-fns';
-import { Check, CheckCheck, Reply, Forward, Copy, Trash2, Pencil, X } from 'lucide-react';
+import { Check, CheckCheck, Reply, Forward, Copy, Trash2, Pencil, X, Eye } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Avatar from '@/components/ui/Avatar';
 import VoiceNotePlayer from './VoiceNotePlayer';
@@ -38,6 +38,7 @@ const MessageBubble = React.memo(({
   onEdit,
   onReply,
   onForward,
+  onViewReadBy,
   currentUserId,
   conversationParticipants,
   participantNames,
@@ -91,9 +92,21 @@ const MessageBubble = React.memo(({
     }, 500);
   };
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = (e) => {
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
+      // If it was a quick tap (not a long press) on own message, open context menu
+      if (isOwn && !showContextMenu) {
+        const touch = e.changedTouches?.[0];
+        if (touch && touchStartRef.current) {
+          const dx = Math.abs(touch.clientX - touchStartRef.current.x);
+          const dy = Math.abs(touch.clientY - touchStartRef.current.y);
+          if (dx < 10 && dy < 10) {
+            setMenuPosition({ x: touch.clientX, y: touch.clientY });
+            setShowContextMenu(true);
+          }
+        }
+      }
       longPressTimerRef.current = null;
     }
   };
@@ -164,6 +177,13 @@ const MessageBubble = React.memo(({
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
           onTouchMove={handleTouchMove}
+          onClick={(e) => {
+            if (isOwn && !showContextMenu) {
+              e.stopPropagation();
+              setMenuPosition({ x: e.clientX, y: e.clientY });
+              setShowContextMenu(true);
+            }
+          }}
         >
           {/* Bubble tail */}
           <div className={cn(
@@ -330,6 +350,9 @@ const MessageBubble = React.memo(({
             <ContextMenuItem icon={Reply} label="Reply" onClick={() => { onReply?.(message); setShowContextMenu(false); }} />
             <ContextMenuItem icon={Forward} label="Forward" onClick={() => { onForward?.(message); setShowContextMenu(false); }} />
             <ContextMenuItem icon={Copy} label="Copy" onClick={handleCopy} />
+            {isOwn && (
+              <ContextMenuItem icon={Eye} label="Read by" onClick={() => { onViewReadBy?.(message); setShowContextMenu(false); }} />
+            )}
             {isOwn && !message.attachment_url && (
               <ContextMenuItem icon={Pencil} label="Edit" onClick={() => { onEdit?.(message); setShowContextMenu(false); }} />
             )}
