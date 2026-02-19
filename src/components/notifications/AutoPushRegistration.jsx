@@ -6,7 +6,7 @@
  * NATIVE (Android/iOS):
  * - On first launch: requests ALL permissions (notifications, location, camera)
  *   in one go so the user doesn't have to visit Settings manually.
- * - On subsequent launches: silently refreshes the FCM token.
+ * - On subsequent launches: silently refreshes the push token.
  *
  * WEB:
  * - If notification permission is already granted → auto-refresh FCM token (no UI)
@@ -17,7 +17,8 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
+import { invokeFunction } from '@/api/functions';
 import { initFirebaseMessaging, requestFCMToken } from '@/lib/firebaseMessaging';
 import { Bell, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -34,9 +35,19 @@ function getPlatform() {
   return window.Capacitor?.getPlatform?.() === 'ios' ? 'ios' : 'android';
 }
 
-/** Save APNS token via edge function (uses service key to bypass RLS) */
+/** Save APNS token directly via Supabase edge function */
 async function saveApnsToken(token) {
-  await base44.functions.invoke('manageFirebaseSubscription', { apnsToken: token, platform: 'ios' });
+  console.log('[APNS] Saving token to server...');
+  const result = await invokeFunction('manageFirebaseSubscription', { apnsToken: token, platform: 'ios' });
+  console.log('[APNS] Save result:', JSON.stringify(result));
+  return result;
+}
+
+/** Save FCM token via Supabase edge function */
+async function saveFcmToken(token, platform) {
+  const result = await invokeFunction('manageFirebaseSubscription', { firebaseToken: token, platform });
+  console.log('[FCM] Save result:', JSON.stringify(result));
+  return result;
 }
 
 /**
@@ -90,9 +101,6 @@ async function requestAllNativePermissions() {
     if (perm.receive !== 'granted') {
       const result = await PushNotifications.requestPermissions();
       console.log('[AutoPerms] Permission request result:', result.receive);
-      if (result.receive === 'granted') {
-        console.log('[AutoPerms] Notifications granted');
-      }
     }
 
     // Register for push and save token
@@ -101,16 +109,17 @@ async function requestAllNativePermissions() {
       const token = await registerAndGetToken(PushNotifications);
       if (platform === 'ios') {
         await saveApnsToken(token);
-        console.log('[AutoPerms] iOS APNS token saved to server');
+        toast.success('iOS push notifications registered');
       } else {
-        await base44.functions.invoke('manageFirebaseSubscription', { firebaseToken: token, platform });
-        console.log('[AutoPerms] Native FCM token saved');
+        await saveFcmToken(token, platform);
       }
     } else {
       console.warn('[AutoPerms] Push permission not granted, skipping registration');
+      toast.error('Push permission not granted');
     }
   } catch (e) {
     console.warn('[AutoPerms] Push setup failed:', e?.message || e);
+    toast.error('Push setup failed: ' + (e?.message || 'unknown error'));
   }
 
   // 2. Location — trigger the native permission dialog
@@ -118,7 +127,6 @@ async function requestAllNativePermissions() {
     await new Promise((resolve, reject) => {
       navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 });
     });
-    console.log('[AutoPerms] Location granted');
   } catch (e) {
     console.warn('[AutoPerms] Location:', e?.message || 'denied or unavailable');
   }
@@ -127,7 +135,6 @@ async function requestAllNativePermissions() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ video: true });
     stream.getTracks().forEach(t => t.stop());
-    console.log('[AutoPerms] Camera granted');
   } catch (e) {
     console.warn('[AutoPerms] Camera:', e?.message || 'denied or unavailable');
   }
@@ -137,7 +144,7 @@ async function requestAllNativePermissions() {
 }
 
 /**
- * Silently refresh the FCM token (no permission prompts).
+ * Silently refresh the push token (no permission prompts).
  * Called on subsequent native launches or when web permission is already granted.
  */
 async function silentTokenRefresh() {
@@ -148,23 +155,23 @@ async function silentTokenRefresh() {
       const { PushNotifications } = await import('@capacitor/push-notifications');
       const perm = await PushNotifications.checkPermissions();
       console.log('[AutoPush] Silent refresh — permission:', perm.receive, 'platform:', platform);
-      if (perm.receive !== 'granted') return;
+      if (perm.receive !== 'granted') {
+        console.warn('[AutoPush] Permission not granted, cannot refresh token');
+        return;
+      }
 
       const token = await registerAndGetToken(PushNotifications);
       if (platform === 'ios') {
         await saveApnsToken(token);
-        console.log('[AutoPush] iOS APNS token refreshed on server');
       } else {
-        await base44.functions.invoke('manageFirebaseSubscription', { firebaseToken: token, platform });
-        console.log('[AutoPush] Native token refreshed');
+        await saveFcmToken(token, platform);
       }
     } else {
       const messaging = await initFirebaseMessaging();
       if (!messaging) return;
       const token = await requestFCMToken();
       if (!token) return;
-      await base44.functions.invoke('manageFirebaseSubscription', { firebaseToken: token, platform });
-      console.log('[AutoPush] Web token refreshed');
+      await saveFcmToken(token, platform);
     }
   } catch (e) {
     console.warn('[AutoPush] Silent refresh failed:', e?.message || e);
@@ -177,15 +184,9 @@ export default function AutoPushRegistration() {
 
   useEffect(() => {
     if (isNativePlatform()) {
-      // Native: check if first launch
-      const alreadyDone = localStorage.getItem(NATIVE_PERMISSIONS_DONE_KEY);
-      if (!alreadyDone) {
-        // First launch — request all permissions automatically
-        requestAllNativePermissions();
-      } else {
-        // Subsequent launch — just refresh the token silently
-        silentTokenRefresh();
-      }
+      // Native: always re-request permissions and refresh token on every launch
+      // (previously only did this on first launch, which left stale tokens)
+      requestAllNativePermissions();
       return;
     }
 
@@ -230,10 +231,7 @@ export default function AutoPushRegistration() {
         return;
       }
 
-      await base44.functions.invoke('manageFirebaseSubscription', {
-        firebaseToken: token,
-        platform: 'web',
-      });
+      await saveFcmToken(token, 'web');
 
       toast.success('Push notifications enabled!');
       setShowBanner(false);
