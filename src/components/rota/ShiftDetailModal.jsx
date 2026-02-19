@@ -196,15 +196,13 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
   });
 
   const { data: availableShifts = [], isLoading: shiftsLoading } = useQuery({
-    queryKey: ['availableShifts', shift.date, shift.start_time, shift.end_time, shift.id],
+    queryKey: ['availableShifts', shift.date, shift.id],
     queryFn: async () => {
       try {
-        const allShifts = await ShiftApi.list('-created_date', 500);
-        const filtered = allShifts.filter(s => 
-          s.date === shift.date && 
-          s.start_time === shift.start_time && 
-          s.end_time === shift.end_time && 
-          s.id !== shift.id && 
+        const allShifts = await ShiftApi.list('-created_at', 500);
+        const filtered = allShifts.filter(s =>
+          s.date === shift.date &&
+          s.id !== shift.id &&
           (!s.paired_shift_id || s.paired_shift_id === '') &&
           s.staff_id && s.staff_id !== shift.staff_id
         );
@@ -214,7 +212,7 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
         return [];
       }
     },
-    enabled: !!shift.date && !!shift.start_time && !!shift.end_time && isAdmin && !editMode,
+    enabled: !!shift.date && isAdmin && !editMode,
   });
 
   // Care logs for shift summary on clock-off
