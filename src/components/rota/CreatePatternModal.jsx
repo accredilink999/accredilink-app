@@ -137,7 +137,7 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
       if (!pattern) {
         toast.success('Pattern saved successfully!');
         try {
-          await createShiftsFromPattern(createdPattern, formData.repeat_count);
+          await createShiftsFromPattern(createdPattern, formData.repeat_count, createdPattern.id);
         } catch (error) {
           console.error('Error deploying shifts:', error);
           toast.error('Pattern saved but shift deployment failed: ' + error.message);
@@ -159,7 +159,7 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
     },
   });
 
-  const createShiftsFromPattern = async (patternData, numRepeats) => {
+  const createShiftsFromPattern = async (patternData, numRepeats, patternId) => {
     const staffMember = staff.find(s => s.id === formData.staff_id);
     const staffName = staffMember?.staff_full_name || staffMember?.full_name;
     const startDate = new Date();
@@ -258,7 +258,7 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
         match._used = true;
         const { error: updateError } = await supabase
           .from('shifts')
-          .update({ staff_id: formData.staff_id, staff_name: staffName })
+          .update({ staff_id: formData.staff_id, staff_name: staffName, shift_pattern_id: patternId || null })
           .eq('id', match.id);
         if (updateError) {
           console.error('Failed to assign shift', match.id, updateError);

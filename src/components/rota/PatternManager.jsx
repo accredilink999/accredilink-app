@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { ShiftApi, ShiftPatternApi } from '@/api/rotaApi';
+import { ShiftApi, ShiftPatternApi, ShiftCallApi } from '@/api/rotaApi';
+import { supabase } from '@/api/supabaseClient';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -22,9 +23,60 @@ export default function PatternManager({ open, onClose }) {
   });
 
   const deletePatternMutation = useMutation({
-    mutationFn: (patternId) => ShiftPatternApi.delete(patternId),
+    mutationFn: async (pattern) => {
+      // 1. Find shifts created by this pattern and revert them to blank
+      const { data: patternShifts } = await supabase
+        .from('shifts')
+        .select('id')
+        .eq('shift_pattern_id', pattern.id);
+
+      if (patternShifts && patternShifts.length > 0) {
+        const shiftIds = patternShifts.map(s => s.id);
+        // Delete any shift_calls for these shifts
+        for (const shiftId of shiftIds) {
+          await supabase.from('shift_calls').delete().eq('shift_id', shiftId);
+        }
+        // Revert shifts back to blank (available to claim)
+        await supabase
+          .from('shifts')
+          .update({ staff_id: null, staff_name: null, shift_pattern_id: null })
+          .eq('shift_pattern_id', pattern.id);
+      }
+
+      // 2. Also try matching by staff_id + rota_area_id (for shifts created before pattern tracking)
+      if (pattern.staff_id && pattern.rota_area_id) {
+        const { data: staffShifts } = await supabase
+          .from('shifts')
+          .select('id, shift_pattern_id')
+          .eq('staff_id', pattern.staff_id)
+          .eq('rota_area_id', pattern.rota_area_id)
+          .is('shift_pattern_id', null)
+          .gte('date', new Date().toISOString().split('T')[0]);
+
+        // Only revert future shifts that have no pattern_id (legacy)
+        if (staffShifts && staffShifts.length > 0) {
+          for (const s of staffShifts) {
+            await supabase.from('shift_calls').delete().eq('shift_id', s.id);
+          }
+          const legacyIds = staffShifts.map(s => s.id);
+          await supabase
+            .from('shifts')
+            .update({ staff_id: null, staff_name: null })
+            .in('id', legacyIds);
+        }
+      }
+
+      // 3. Delete the pattern itself
+      await ShiftPatternApi.delete(pattern.id);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shift-patterns'] });
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      queryClient.invalidateQueries({ queryKey: ['shiftCalls'] });
+      toast.success('Pattern deleted and shifts reverted to available');
+    },
+    onError: (error) => {
+      toast.error('Failed to delete pattern: ' + error.message);
     },
   });
 
@@ -334,8 +386,8 @@ export default function PatternManager({ open, onClose }) {
                         size="sm"
                         variant="ghost"
                         onClick={() => {
-                          if (confirm('Delete this pattern?')) {
-                            deletePatternMutation.mutate(pattern.id);
+                          if (confirm('Delete this pattern? This will revert all shifts it created back to available.')) {
+                            deletePatternMutation.mutate(pattern);
                           }
                         }}
                       >
