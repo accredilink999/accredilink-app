@@ -3,7 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { ShiftTypeApi } from '@/api/shiftTypeApi';
-import { ShiftPatternApi } from '@/api/rotaApi';
+import { ShiftPatternApi, ShiftCallApi } from '@/api/rotaApi';
+import { getMatchingCallsForShift } from '@/utils/shiftCallAutoAssign';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -104,6 +105,16 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
   const { data: rotaAreas = [] } = useQuery({
     queryKey: ['rotaAreas'],
     queryFn: () => base44.entities.RotaArea.filter({ is_active: true }, 'name'),
+  });
+
+  const { data: serviceUsers = [] } = useQuery({
+    queryKey: ['serviceUsers'],
+    queryFn: () => base44.entities.ServiceUser.filter({ status: 'active' }),
+  });
+
+  const { data: callTypesData = [] } = useQuery({
+    queryKey: ['callTypes'],
+    queryFn: () => base44.entities.CallType.list(),
   });
 
   const { data: shiftTypes = [] } = useQuery({
@@ -214,6 +225,7 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
 
     // Match targets to blank shifts and assign staff
     let assigned = 0;
+    let totalCalls = 0;
     for (const target of targets) {
       // First try exact time match, then fall back to matching by shift name
       let match = blankShifts.find(bs =>
@@ -250,17 +262,51 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
           console.error('Failed to assign shift', match.id, updateError);
         } else {
           assigned++;
+          // Auto-populate client calls for this shift
+          const matchingCalls = getMatchingCallsForShift(
+            serviceUsers,
+            formData.rota_area_id,
+            match.start_time,
+            match.end_time
+          );
+          for (const call of matchingCalls) {
+            const ct = callTypesData.find(c => c.name === call.call_type);
+            const tasks = ct?.default_tasks?.length
+              ? ct.default_tasks.map(text => ({ text, completed: false }))
+              : [];
+            try {
+              await ShiftCallApi.create({
+                shift_id: match.id,
+                service_user_id: call.service_user_id,
+                service_user_name: call.service_user_name,
+                service_user_address: call.service_user_address,
+                scheduled_time: call.scheduled_time,
+                call_time: call.scheduled_time,
+                duration_minutes: call.duration_minutes,
+                call_type: call.call_type,
+                call_types: call.call_types || [call.call_type],
+                tasks,
+                call_date: match.date,
+                status: 'pending',
+                notes: call.notes || '',
+              });
+              totalCalls++;
+            } catch (err) {
+              console.error('Failed to create call for shift', match.id, err);
+            }
+          }
         }
       }
     }
 
     if (assigned > 0) {
-      toast.success(`Assigned ${staffName} to ${assigned} shift${assigned !== 1 ? 's' : ''}`);
+      toast.success(`Assigned ${staffName} to ${assigned} shift${assigned !== 1 ? 's' : ''} with ${totalCalls} call${totalCalls !== 1 ? 's' : ''}`);
     } else {
       toast.info('No matching blank shifts found for the pattern times');
     }
 
     queryClient.invalidateQueries({ queryKey: ['shifts'] });
+    queryClient.invalidateQueries({ queryKey: ['shiftCalls'] });
   };
 
 
@@ -268,11 +314,21 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
   const handleSubmit = async () => {
     const staffMember = staff.find(s => s.id === formData.staff_id);
     const { repeat_count, ...patternFields } = formData;
+    const area = rotaAreas.find(a => a.id === formData.rota_area_id);
+
+    // Compute derived fields for PatternManager display
+    const uniqueDays = [...new Set(formData.shifts.map(s => s.day_of_week))];
+    const allStartTimes = formData.shifts.map(s => s.start_time).sort();
+    const allEndTimes = formData.shifts.map(s => s.end_time).sort();
 
     createPatternMutation.mutate({
       ...patternFields,
       staff_name: staffMember?.staff_full_name || staffMember?.full_name,
+      rota_area_name: area?.name || '',
       is_active: true,
+      days_of_week: uniqueDays,
+      start_time: allStartTimes[0] || '',
+      end_time: allEndTimes[allEndTimes.length - 1] || '',
     });
   };
 
