@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Download } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function FinancialReports({ invoices, payments, clients, settings }) {
   const [timePeriod, setTimePeriod] = useState('month');
@@ -47,7 +48,7 @@ export default function FinancialReports({ invoices, payments, clients, settings
   }, [invoices]);
 
   const handleExportPDF = () => {
-    alert('PDF export feature coming soon');
+    toast.info('PDF export feature coming soon');
   };
 
   const handleExportCSV = () => {

@@ -14,6 +14,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import StatusBadge from '@/components/ui/StatusBadge';
 import Avatar from '@/components/ui/Avatar';
 import EmptyState from '@/components/ui/EmptyState';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import CourseLibrary from '@/components/training/CourseLibrary';
 import MyCoursesView from '@/components/training/MyCoursesView';
 import TrainingAnalytics from '@/components/training/TrainingAnalytics';
@@ -47,6 +48,7 @@ export default function Training() {
   const [selectedCourseId, setSelectedCourseId] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [enhancingAllCourses, setEnhancingAllCourses] = useState(false);
+  const [enhanceConfirmOpen, setEnhanceConfirmOpen] = useState(false);
   const [formData, setFormData] = useState({
     staff_id: '',
     training_name: '',
@@ -135,10 +137,6 @@ export default function Training() {
   };
 
   const handleEnhanceAllCourses = async () => {
-    if (!confirm('This will enhance ALL courses with additional AI-generated content from the internet. This may take several minutes. Continue?')) {
-      return;
-    }
-
     setEnhancingAllCourses(true);
     toast.info('Starting course enhancement...');
 
@@ -355,8 +353,8 @@ Return ONLY valid JSON (no markdown) with this COMPLETE structure:
               <Sparkles className="w-4 h-4 mr-2" />
               AI Course Builder
             </Button>
-            <Button 
-              onClick={handleEnhanceAllCourses}
+            <Button
+              onClick={() => setEnhanceConfirmOpen(true)}
               disabled={enhancingAllCourses}
               variant="outline"
               className="border-amber-300 text-amber-700 hover:bg-amber-50"
@@ -724,10 +722,20 @@ Return ONLY valid JSON (no markdown) with this COMPLETE structure:
       />
 
       {/* Course Player Modal */}
-      <CoursePlayer 
-        isOpen={!!selectedCourseId} 
-        onClose={() => setSelectedCourseId(null)} 
-        courseId={selectedCourseId} 
+      <CoursePlayer
+        isOpen={!!selectedCourseId}
+        onClose={() => setSelectedCourseId(null)}
+        courseId={selectedCourseId}
+      />
+
+      <ConfirmDialog
+        open={enhanceConfirmOpen}
+        onOpenChange={setEnhanceConfirmOpen}
+        title="Enhance All Courses?"
+        description="This will enhance ALL courses with additional AI-generated content from the internet. This may take several minutes. Continue?"
+        confirmLabel="Yes, Enhance All"
+        variant="default"
+        onConfirm={() => handleEnhanceAllCourses()}
       />
       </div>
       );

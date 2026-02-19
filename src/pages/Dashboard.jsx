@@ -209,6 +209,15 @@ export default function Dashboard() {
     enabled: !!user?.id
   });
 
+  const { data: unreadNotifications = [] } = useQuery({
+    queryKey: ['unreadNotifications', user?.id],
+    queryFn: async () => {
+      const all = await base44.entities.Notification.filter({ recipient_id: user?.id }, '-created_date', 50);
+      return all.filter(n => !n.is_read);
+    },
+    enabled: !!user?.id
+  });
+
   const createCareLogMutation = useMutation({
     mutationFn: (data) => base44.entities.CareLog.create(data),
     onSuccess: () => {
@@ -248,6 +257,40 @@ export default function Dashboard() {
           </h1>
          <p className="text-slate-500 mt-1 text-sm sm:text-base">{format(new Date(), 'EEEE, d MMMM yyyy')}</p>
        </div>
+
+      {/* Unread Notifications & Announcements Banner */}
+      {(unreadNotifications.length > 0 || unacknowledgedAnnouncements.length > 0) && (
+        <Card className="p-4 sm:p-5 bg-gradient-to-br from-teal-50 to-cyan-50 border-0 shadow-sm">
+          <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2 text-sm sm:text-base">
+            <Bell className="w-4 h-4 text-teal-600 flex-shrink-0" />
+            You Have Updates
+          </h3>
+          <div className="space-y-2">
+            {unreadNotifications.length > 0 && (
+              <Link to={createPageUrl('Messages')}>
+                <div className="flex items-center gap-3 p-3 bg-white/80 rounded-lg hover:bg-white transition-colors">
+                  <Bell className="w-5 h-5 text-teal-500" />
+                  <span className="text-sm font-medium flex-1">
+                    {unreadNotifications.length} unread notification{unreadNotifications.length > 1 ? 's' : ''}
+                  </span>
+                  <Badge variant="secondary" className="bg-teal-100 text-teal-700 text-xs flex-shrink-0">View</Badge>
+                </div>
+              </Link>
+            )}
+            {unacknowledgedAnnouncements.length > 0 && (
+              <Link to={createPageUrl('Messages')}>
+                <div className="flex items-center gap-3 p-3 bg-white/80 rounded-lg hover:bg-white transition-colors">
+                  <AlertTriangle className="w-5 h-5 text-amber-500" />
+                  <span className="text-sm font-medium flex-1">
+                    {unacknowledgedAnnouncements.length} announcement{unacknowledgedAnnouncements.length > 1 ? 's' : ''} to acknowledge
+                  </span>
+                  <Badge variant="secondary" className="bg-amber-100 text-amber-700 text-xs flex-shrink-0">Action Needed</Badge>
+                </div>
+              </Link>
+            )}
+          </div>
+        </Card>
+      )}
 
       {/* Alerts Banner */}
       {(openIncidents.length > 0 || (pendingLeave.length > 0 && isAdmin) || (pendingClaimsAdmin.length > 0 && isAdmin)) &&

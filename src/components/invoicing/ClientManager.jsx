@@ -7,11 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Plus, Edit2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 export default function ClientManager({ clients, invoices }) {
   const [showDialog, setShowDialog] = useState(false);
   const [editingClient, setEditingClient] = useState(null);
   const [search, setSearch] = useState('');
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState({
@@ -143,9 +146,8 @@ export default function ClientManager({ clients, invoices }) {
                     size="sm"
                     className="text-red-600 hover:text-red-700"
                     onClick={() => {
-                      if (confirm('Delete this client?')) {
-                        deleteMutation.mutate(client.id);
-                      }
+                      setPendingDeleteId(client.id);
+                      setConfirmOpen(true);
                     }}
                   >
                     <Trash2 className="w-4 h-4" />
@@ -221,6 +223,21 @@ export default function ClientManager({ clients, invoices }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Delete this client?"
+        description="This action cannot be undone."
+        confirmLabel="Yes, Delete"
+        variant="destructive"
+        onConfirm={() => {
+          if (pendingDeleteId) {
+            deleteMutation.mutate(pendingDeleteId);
+            setPendingDeleteId(null);
+          }
+        }}
+      />
     </div>
   );
 }

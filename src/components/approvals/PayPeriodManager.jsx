@@ -4,6 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function PayPeriodManager({ payPeriod, onUpdate }) {
   const [editing, setEditing] = useState(false);
@@ -23,7 +24,7 @@ export default function PayPeriodManager({ payPeriod, onUpdate }) {
       onUpdate();
       setEditing(false);
     } catch (error) {
-      alert('Error saving pay period');
+      toast.error('Error saving pay period');
     }
   };
 

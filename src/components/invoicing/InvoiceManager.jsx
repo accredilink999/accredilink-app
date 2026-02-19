@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import InvoiceLineItemEditor from './InvoiceLineItemEditor';
 import InvoiceCalculations from './InvoiceCalculations';
 import DaySpecificItems from './DaySpecificItems';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 export default function InvoiceManager({ invoices, clients, settings }) {
   const [showDialog, setShowDialog] = useState(false);
@@ -20,6 +21,8 @@ export default function InvoiceManager({ invoices, clients, settings }) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [showRecurringDialog, setShowRecurringDialog] = useState(false);
   const [recurringInvoiceData, setRecurringInvoiceData] = useState(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const queryClient = useQueryClient();
 
   // Subscribe to invoice updates
@@ -669,9 +672,8 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                     size="sm"
                     className="text-red-600 hover:text-red-700"
                     onClick={() => {
-                      if (confirm('Delete this invoice?')) {
-                        deleteMutation.mutate(invoice.id);
-                      }
+                      setPendingDeleteId(invoice.id);
+                      setConfirmOpen(true);
                     }}
                   >
                     <Trash2 className="w-4 h-4" />
@@ -1096,6 +1098,21 @@ export default function InvoiceManager({ invoices, clients, settings }) {
           )}
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Delete this invoice?"
+        description="This action cannot be undone."
+        confirmLabel="Yes, Delete"
+        variant="destructive"
+        onConfirm={() => {
+          if (pendingDeleteId) {
+            deleteMutation.mutate(pendingDeleteId);
+            setPendingDeleteId(null);
+          }
+        }}
+      />
     </div>
   );
 }

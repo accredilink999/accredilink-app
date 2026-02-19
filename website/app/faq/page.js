@@ -153,7 +153,7 @@ export default function FAQPage() {
 
           <div className="mt-12 p-6 bg-slate-50 rounded-2xl border border-slate-200 text-center">
             <p className="text-slate-600 mb-4">
-              Can't find what you're looking for? We're happy to help.
+              Can&apos;t find what you&apos;re looking for? We&apos;re happy to help.
             </p>
             <Link
               href="/contact"
@@ -161,6 +161,11 @@ export default function FAQPage() {
             >
               Contact Us
             </Link>
+            <p className="text-sm text-slate-500 mt-4">
+              Or email{' '}
+              <a href="mailto:enquiries@accredilinkcare.co.uk" className="text-welsh-red font-medium hover:underline">enquiries@accredilinkcare.co.uk</a>
+              {' '}and we&apos;ll get back to you.
+            </p>
           </div>
         </div>
       </section>

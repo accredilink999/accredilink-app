@@ -10,6 +10,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Upload, Download, Trash2, FileText, Loader2, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 export default function SharedFilesManager() {
   const [uploading, setUploading] = useState(false);
@@ -21,6 +22,8 @@ export default function SharedFilesManager() {
     category: 'other',
     file: null
   });
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
   const queryClient = useQueryClient();
 
   const { data: user } = useQuery({
@@ -271,9 +274,8 @@ export default function SharedFilesManager() {
                     size="sm"
                     variant="outline"
                     onClick={() => {
-                      if (confirm('Delete this file?')) {
-                        deleteFileMutation.mutate(file.id);
-                      }
+                      setPendingAction(() => () => deleteFileMutation.mutate(file.id));
+                      setConfirmOpen(true);
                     }}
                     className="text-red-600 hover:text-red-700"
                   >
@@ -285,6 +287,16 @@ export default function SharedFilesManager() {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Delete this file?"
+        description="This action cannot be undone. The file will be permanently deleted."
+        confirmLabel="Yes, Delete"
+        variant="destructive"
+        onConfirm={() => pendingAction?.()}
+      />
     </Card>
   );
 }

@@ -8,11 +8,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Edit2, Trash2, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 export default function PaymentTracker({ payments, invoices, clients }) {
   const [showDialog, setShowDialog] = useState(false);
   const [editingPayment, setEditingPayment] = useState(null);
   const [search, setSearch] = useState('');
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState({
@@ -237,9 +240,8 @@ export default function PaymentTracker({ payments, invoices, clients }) {
                         size="sm"
                         className="text-red-600 hover:text-red-700"
                         onClick={() => {
-                          if (confirm('Delete this payment?')) {
-                            deleteMutation.mutate(payment.id);
-                          }
+                          setPendingDeleteId(payment.id);
+                          setConfirmOpen(true);
                         }}
                       >
                         <Trash2 className="w-4 h-4" />
@@ -337,6 +339,21 @@ export default function PaymentTracker({ payments, invoices, clients }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Delete this payment?"
+        description="This action cannot be undone."
+        confirmLabel="Yes, Delete"
+        variant="destructive"
+        onConfirm={() => {
+          if (pendingDeleteId) {
+            deleteMutation.mutate(pendingDeleteId);
+            setPendingDeleteId(null);
+          }
+        }}
+      />
     </div>
   );
 }

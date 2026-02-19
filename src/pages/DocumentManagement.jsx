@@ -7,6 +7,7 @@ import { createPageUrl } from '@/utils';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import PageHeader from '@/components/ui/PageHeader';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import EmptyState from '@/components/ui/EmptyState';
 import FormSubmissionsCabinet from '@/components/formBuilder/FormSubmissionsCabinet';
 import SubmissionViewer from '@/components/formBuilder/SubmissionViewer';
@@ -17,6 +18,8 @@ export default function DocumentManagement() {
   const queryClient = useQueryClient();
   const cabinetRef = useRef(null);
   const [viewingSubmission, setViewingSubmission] = useState(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDeleteSubmission, setPendingDeleteSubmission] = useState(null);
 
   const { data: user } = useQuery({
     queryKey: ['currentUser'],
@@ -48,9 +51,8 @@ export default function DocumentManagement() {
   };
 
   const handleDeleteSubmission = (submission) => {
-    if (window.confirm(`Delete this submission from ${submission.submitter_email}?`)) {
-      deleteSubmissionMutation.mutate(submission.id);
-    }
+    setPendingDeleteSubmission(submission);
+    setConfirmOpen(true);
   };
 
   const handleMoveSubmission = (submission, targetCabinet) => {
@@ -102,7 +104,7 @@ export default function DocumentManagement() {
         <h3 className="text-2xl font-bold text-slate-900">Filing Cabinets</h3>
       </div>
 
-      <FormSubmissionsCabinet 
+      <FormSubmissionsCabinet
         ref={cabinetRef}
         submissions={submissions}
         forms={forms}
@@ -111,6 +113,21 @@ export default function DocumentManagement() {
         onMove={handleMoveSubmission}
         onUpdateCabinet={(id, cabinet) => base44.entities.FormSubmission.update(id, { cabinet })}
         currentUser={user}
+      />
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Delete submission?"
+        description={`Delete this submission from ${pendingDeleteSubmission?.submitter_email || 'this user'}?`}
+        confirmLabel="Yes, Delete"
+        variant="destructive"
+        onConfirm={() => {
+          if (pendingDeleteSubmission) {
+            deleteSubmissionMutation.mutate(pendingDeleteSubmission.id);
+            setPendingDeleteSubmission(null);
+          }
+        }}
       />
     </div>
   );

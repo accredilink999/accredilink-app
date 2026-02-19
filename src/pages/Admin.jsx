@@ -27,7 +27,8 @@ import {
         CheckSquare,
         Download,
         Bug,
-        FileSpreadsheet
+        FileSpreadsheet,
+        Video
       } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -150,6 +151,10 @@ export default function AdminDashboard() {
             <Link to={createPageUrl('Messages')} className="flex items-center gap-2 text-pink-600 hover:text-pink-700 font-bold text-base py-2">
               <MessageCircle className="w-5 h-5 text-pink-600 fill-pink-600" />
               Communication Management
+            </Link>
+            <Link to={createPageUrl('Communications')} className="flex items-center gap-2 text-blue-500 hover:text-blue-600 font-bold text-base py-2">
+              <Video className="w-5 h-5 text-blue-500 fill-blue-500" />
+              Video Communications
             </Link>
 
             <Link to={createPageUrl('PushNotificationManagement')} className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-bold text-base py-2">

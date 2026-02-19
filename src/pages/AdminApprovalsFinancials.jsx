@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import PageHeader from '@/components/ui/PageHeader';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -60,6 +61,8 @@ export default function AdminApprovalsFinancials() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('leave');
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
 
   const { data: leaveRequests = [] } = useQuery({
     queryKey: ['allLeaveRequests'],
@@ -123,11 +126,12 @@ export default function AdminApprovalsFinancials() {
     });
   };
 
-  const deleteLeaveRequest = async (id) => {
-    if (confirm('Delete this leave request?')) {
+  const deleteLeaveRequest = (id) => {
+    setPendingAction(() => async () => {
       await base44.entities.LeaveRequest.delete(id);
       queryClient.invalidateQueries({ queryKey: ['allLeaveRequests'] });
-    }
+    });
+    setConfirmOpen(true);
   };
 
   const handleApproveSwap = (request) => {
@@ -532,6 +536,16 @@ export default function AdminApprovalsFinancials() {
       </Tabs>
 
       <LeaveCalendarPopup open={calendarOpen} onClose={() => setCalendarOpen(false)} showInitials={false} />
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Delete leave request?"
+        description="This action cannot be undone."
+        confirmLabel="Yes, Delete"
+        variant="destructive"
+        onConfirm={() => pendingAction?.()}
+      />
     </div>
   );
 }

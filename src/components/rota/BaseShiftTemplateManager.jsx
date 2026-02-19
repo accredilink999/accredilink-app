@@ -13,6 +13,7 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { Plus, Trash2, Calendar, Play, Pencil, X, Loader2, AlertTriangle } from 'lucide-react';
 import { format, eachDayOfInterval, parseISO } from 'date-fns';
 
@@ -86,6 +87,8 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
   });
 
   const [generating, setGenerating] = useState(false);
+  const [deleteTemplateConfirmOpen, setDeleteTemplateConfirmOpen] = useState(false);
+  const [pendingDeleteTemplateId, setPendingDeleteTemplateId] = useState(null);
   const [showDeployAll, setShowDeployAll] = useState(false);
   const [deployAllStartDate, setDeployAllStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [deployAllEndDate, setDeployAllEndDate] = useState('');
@@ -751,7 +754,8 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
                       size="icon"
                       className="h-7 w-7"
                       onClick={() => {
-                        if (confirm('Delete this template?')) deleteMutation.mutate(template.id);
+                        setPendingDeleteTemplateId(template.id);
+                        setDeleteTemplateConfirmOpen(true);
                       }}
                       title="Delete"
                     >
@@ -763,6 +767,21 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
             ))
           )}
         </div>
+
+        <ConfirmDialog
+          open={deleteTemplateConfirmOpen}
+          onOpenChange={setDeleteTemplateConfirmOpen}
+          title="Delete Template?"
+          description="Are you sure you want to delete this template? This action cannot be undone."
+          confirmLabel="Yes, Delete"
+          variant="destructive"
+          onConfirm={() => {
+            if (pendingDeleteTemplateId) {
+              deleteMutation.mutate(pendingDeleteTemplateId);
+              setPendingDeleteTemplateId(null);
+            }
+          }}
+        />
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Close</Button>

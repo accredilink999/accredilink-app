@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card } from "@/components/ui/card";
 import { AlertCircle, Calendar } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { toast } from 'sonner';
 
 export default function ClientRotaSetup({ serviceUser, isOpen, onClose, onComplete }) {
   const [recurrence, setRecurrence] = useState('month');
@@ -67,7 +68,7 @@ export default function ClientRotaSetup({ serviceUser, isOpen, onClose, onComple
       onClose?.();
     } catch (error) {
       console.error('Failed to create calls:', error);
-      alert(`Error: ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     } finally {
       setLoading(false);
     }

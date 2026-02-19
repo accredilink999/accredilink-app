@@ -19,6 +19,7 @@ import {
 import { CheckCircle2, Clock, XCircle, DollarSign, Plus, Calendar } from 'lucide-react';
 import LeaveCalendarPopup from '@/components/leave/LeaveCalendarPopup';
 import { formatDistanceToNow, format, parseISO, isWithinInterval } from 'date-fns';
+import { toast } from 'sonner';
 
 export default function ApprovalsAndFinancials() {
   const [leaveTab, setLeaveTab] = useState('my');
@@ -178,7 +179,7 @@ export default function ApprovalsAndFinancials() {
   const handleSubmitExpense = (e) => {
     e.preventDefault();
     if (!expenseForm.description || !expenseForm.amount) {
-      alert('Please fill in all required fields');
+      toast.error('Please fill in all required fields');
       return;
     }
     submitExpenseMutation.mutate({
@@ -203,7 +204,7 @@ export default function ApprovalsAndFinancials() {
   const handleSubmitLeave = (e) => {
     e.preventDefault();
     if (!leaveForm.type || !leaveForm.start_date || !leaveForm.end_date) {
-      alert('Please fill in all required fields');
+      toast.error('Please fill in all required fields');
       return;
     }
     submitLeaveMutation.mutate({

@@ -1,15 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { Check, X, Trash2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 export default function LeaveRequests({ staffId, isAdmin }) {
   const queryClient = useQueryClient();
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
 
   const { data: requests = [] } = useQuery({
     queryKey: ['leave-requests', staffId, isAdmin],
@@ -135,9 +138,8 @@ export default function LeaveRequests({ staffId, isAdmin }) {
                       size="sm"
                       variant="destructive"
                       onClick={() => {
-                        if (confirm('Delete this approved leave request?')) {
-                          deleteMutation.mutate(request.id);
-                        }
+                        setPendingDeleteId(request.id);
+                        setDeleteConfirmOpen(true);
                       }}
                     >
                       <Trash2 className="w-4 h-4" />
@@ -149,6 +151,20 @@ export default function LeaveRequests({ staffId, isAdmin }) {
           </Card>
         ))
       )}
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Delete Leave Request?"
+        description="Delete this approved leave request? This action cannot be undone."
+        confirmLabel="Yes, Delete"
+        variant="destructive"
+        onConfirm={() => {
+          if (pendingDeleteId) {
+            deleteMutation.mutate(pendingDeleteId);
+            setPendingDeleteId(null);
+          }
+        }}
+      />
     </div>
   );
 }

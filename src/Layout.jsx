@@ -16,8 +16,6 @@ import OnboardingModal from '@/components/OnboardingModal';
 import AppDownloadPrompt from '@/components/AppDownloadPrompt';
 import PWAInstallButton from '@/components/PWAInstallButton';
 import PWAInstallPrompt from '@/components/PWAInstallPrompt';
-import { useNotificationManager } from '@/components/hooks/useNotificationManager';
-import { useNotifications } from '@/hooks/useNotifications';
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -29,7 +27,6 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import Avatar from '@/components/ui/Avatar';
-import NotificationBanner from '@/components/notifications/NotificationBanner';
 import AppUpdateBanner from '@/components/AppUpdateBanner';
 import GpsWarningBanner from '@/components/GpsWarningBanner';
 import OfflineManager from '@/components/OfflineManager';
@@ -79,10 +76,6 @@ const ROOT_PAGES = ['Dashboard'];
 
 export default function Layout({ children, currentPageName }) {
   const navigate = useNavigate();
-  const [showMessageFlash, setShowMessageFlash] = useState(false);
-    const [flashType, setFlashType] = useState(null); // 'chat' or 'notification'
-    const [flashLink, setFlashLink] = useState(null); // page to link to
-    const messageFlashTimeoutRef = React.useRef(null);
 
 
   
@@ -136,12 +129,6 @@ export default function Layout({ children, currentPageName }) {
     })();
   }, [user?.id, user?.role]);
 
-  // Initialize notification manager
-  useNotificationManager();
-
-  // In-app toast notifications + sound rules
-  useNotifications({ user, currentPageName });
-
   const { data: pendingSwaps = [] } = useQuery({
     queryKey: ['pendingSwaps'],
     queryFn: () => base44.entities.ShiftSwapRequest.filter({ status: 'pending_admin' }),
@@ -182,109 +169,6 @@ export default function Layout({ children, currentPageName }) {
 
 
 
-  const playMessageAlert = () => {
-    try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const now = audioContext.currentTime;
-      for (let i = 0; i < 3; i++) {
-        const osc = audioContext.createOscillator();
-        const gain = audioContext.createGain();
-        osc.connect(gain);
-        gain.connect(audioContext.destination);
-        osc.frequency.value = i === 0 ? 800 : (i === 1 ? 1000 : 1200);
-        osc.type = 'sine';
-        gain.gain.setValueAtTime(0.3, now + (i * 0.2));
-        gain.gain.exponentialRampToValueAtTime(0.01, now + (i * 0.2) + 0.15);
-        osc.start(now + (i * 0.2));
-        osc.stop(now + (i * 0.2) + 0.15);
-      }
-    } catch (err) {
-      console.log('Audio alert error:', err);
-    }
-  };
-
-  // Play audio notification when message flash is shown
-  React.useEffect(() => {
-    if (showMessageFlash && currentPageName !== 'Chat') {
-      try {
-        const utterance = new SpeechSynthesisUtterance('You have a new notification');
-        utterance.rate = 1;
-        utterance.pitch = 1;
-        speechSynthesis.speak(utterance);
-      } catch (err) {
-        console.log('Audio notification error:', err);
-      }
-    }
-  }, [showMessageFlash, currentPageName]);
-
-  // Reset flash when on Chat page or when unread conversations is empty
-  React.useEffect(() => {
-    if (currentPageName === 'Chat' || unreadConversations.length === 0) {
-      setShowMessageFlash(false);
-      if (messageFlashTimeoutRef.current) clearTimeout(messageFlashTimeoutRef.current);
-    }
-  }, [currentPageName, unreadConversations.length]);
-
-  // Subscribe to chat messages and notifications - show flash and voice alert when new ones arrive
-    React.useEffect(() => {
-      if (!user?.id) return;
-
-      const unsubscribeMessages = base44.entities.ChatMessage.subscribe((event) => {
-            // Only trigger on new messages from other users
-            if (event.type === 'create' && event.data?.sender_id !== user.id) {
-              // Voice announcement and flash - only when not on Chat page
-              if (currentPageName !== 'Chat') {
-                setFlashType('chat');
-                setFlashLink('Chat');
-                setShowMessageFlash(true);
-                playMessageAlert();
-                if (messageFlashTimeoutRef.current) clearTimeout(messageFlashTimeoutRef.current);
-                messageFlashTimeoutRef.current = setTimeout(() => {
-                  setShowMessageFlash(false);
-                }, 10000);
-              }
-            }
-            // Always refresh conversations to update unread counts
-            queryClient.invalidateQueries({ 
-              queryKey: ['conversations', user.id],
-              exact: true 
-            });
-          });
-
-      const unsubscribeNotifications = base44.entities.Notification.subscribe((event) => {
-            // Show flash for new notifications
-            if (event.type === 'create') {
-              // Map notification type to page
-              const notificationType = event.data?.type || 'notification';
-              let pageName = 'NotificationCenter';
-              if (notificationType.includes('incident')) pageName = 'Incidents';
-              if (notificationType.includes('leave')) pageName = 'LeaveManagement';
-              if (notificationType.includes('shift')) pageName = 'Rota';
-              if (notificationType.includes('training')) pageName = 'Training';
-              if (notificationType.includes('document')) pageName = 'Documents';
-
-              setFlashType('notification');
-              setFlashLink(pageName);
-              setShowMessageFlash(true);
-              playMessageAlert();
-              if (messageFlashTimeoutRef.current) clearTimeout(messageFlashTimeoutRef.current);
-              messageFlashTimeoutRef.current = setTimeout(() => {
-                setShowMessageFlash(false);
-              }, 10000);
-            }
-            queryClient.invalidateQueries({ 
-              queryKey: ['criticalNotifications', user.id],
-              exact: true 
-            });
-          });
-
-      return () => {
-        unsubscribeMessages();
-        unsubscribeNotifications();
-        if (messageFlashTimeoutRef.current) clearTimeout(messageFlashTimeoutRef.current);
-      };
-    }, [user?.id, currentPageName, queryClient]);
-
   const { data: trackingSettings = [] } = useQuery({
     queryKey: ['trackingSettings'],
     queryFn: () => base44.entities.SystemSettings.filter({ setting_key: 'gps_tracking_enabled' }),
@@ -307,85 +191,6 @@ export default function Layout({ children, currentPageName }) {
    },
   });
 
-  // Handle offline pending notifications and detect new chat messages
-  React.useEffect(() => {
-    if (!user?.id) return;
-
-    const handleOfflineNotifications = async () => {
-      try {
-        let hasNewChatMessages = false;
-
-        // Check for unread chat messages
-        const convs = await base44.entities.Conversation.list();
-        const newChatMessages = convs.some(conv => (conv.unread_count?.[user.id] || 0) > 0);
-
-        // Show flash and play announcement if new chat messages detected (but not on Chat page)
-        if (newChatMessages && currentPageName !== 'Chat') {
-          setFlashType('chat');
-          setFlashLink('Chat');
-          setShowMessageFlash(true);
-          playMessageAlert();
-          if (messageFlashTimeoutRef.current) clearTimeout(messageFlashTimeoutRef.current);
-          messageFlashTimeoutRef.current = setTimeout(() => {
-            setShowMessageFlash(false);
-          }, 10000);
-        }
-
-        // Refresh conversations to update unread counts
-        await queryClient.invalidateQueries({ 
-          queryKey: ['conversations', user.id],
-          exact: true 
-        });
-
-        // Handle pending offline notifications
-        const pendingNotifications = localStorage.getItem('pending_notifications');
-        if (pendingNotifications) {
-          const notifications = JSON.parse(pendingNotifications);
-          
-          for (const notification of notifications) {
-            try {
-              const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-              const now = audioContext.currentTime;
-              for (let i = 0; i < 2; i++) {
-                const osc = audioContext.createOscillator();
-                const gain = audioContext.createGain();
-                osc.connect(gain);
-                gain.connect(audioContext.destination);
-                osc.frequency.value = i === 0 ? 800 : 1000;
-                osc.type = 'sine';
-                gain.gain.setValueAtTime(0.3, now + (i * 0.3));
-                gain.gain.exponentialRampToValueAtTime(0.01, now + (i * 0.3) + 0.25);
-                osc.start(now + (i * 0.3));
-                osc.stop(now + (i * 0.3) + 0.25);
-              }
-            } catch (err) {
-              console.log('Offline notification audio error:', err);
-            }
-          }
-
-          await base44.functions.invoke('handleOfflineNotifications', {
-            pending_notifications: notifications
-          });
-          localStorage.removeItem('pending_notifications');
-        }
-      } catch (error) {
-        console.log('Error processing offline notifications:', error);
-      }
-    };
-
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        handleOfflineNotifications();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    handleOfflineNotifications();
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [user?.id, currentPageName]);
 
   // Request all permissions early (notifications, GPS, camera)
   React.useEffect(() => {
@@ -661,8 +466,6 @@ export default function Layout({ children, currentPageName }) {
     };
   }, [user?.id, isAdmin, queryClient]);
 
-  const [visibleBanners, setVisibleBanners] = useState({});
-
   const { data: companySettings = {} } = useQuery({
     queryKey: ['companySettings'],
     queryFn: async () => {
@@ -674,34 +477,6 @@ export default function Layout({ children, currentPageName }) {
       return result;
     }
   });
-
-  const { data: criticalNotifications = [] } = useQuery({
-    queryKey: ['criticalNotifications', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return [];
-      const notifications = await base44.entities.Notification.filter({
-        recipient_id: user.id,
-        priority: 'critical',
-        is_read: false,
-        is_dismissed: false
-      }, '-created_date', 10);
-      return notifications;
-    },
-    enabled: !!user?.id,
-    staleTime: 30000,
-  });
-
-  React.useEffect(() => {
-    if (!user?.id) return;
-    
-    const unsubscribe = base44.entities.Notification.subscribe((event) => {
-      if (event.type === 'create') {
-        queryClient.invalidateQueries({ queryKey: ['criticalNotifications', user.id] });
-      }
-    });
-    
-    return unsubscribe;
-  }, [user?.id]);
 
   const isWeatherWarningExpired = (warning) => {
     if (!warning.warning_end) return false;
@@ -905,19 +680,6 @@ export default function Layout({ children, currentPageName }) {
       {/* PWA Install Prompt */}
       <PWAInstallPrompt />
 
-      {/* Message Received Flash */}
-      {showMessageFlash && (
-        <div className="fixed bottom-32 left-1/2 transform -translate-x-1/2 z-40">
-          <Link to={createPageUrl(flashLink || 'Chat')}>
-            <div className={`text-white px-8 py-4 rounded-lg shadow-2xl font-semibold hover:opacity-90 transition-colors cursor-pointer animate-pulse text-lg ${
-              flashType === 'chat' ? 'bg-green-500 hover:bg-green-600' : 'bg-blue-500 hover:bg-blue-600'
-            }`}>
-              {flashType === 'chat' ? 'New Chat Message' : 'New Notification'}
-            </div>
-          </Link>
-        </div>
-      )}
-
       {/* Main Content — scrolls internally to prevent browser chrome from appearing */}
                    <main className="flex-1 overflow-y-auto overflow-x-hidden lg:pb-0" style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', paddingBottom: 'calc(5rem + env(safe-area-inset-bottom))' }}>
                                      {/* App Update Banner */}
@@ -932,29 +694,6 @@ export default function Layout({ children, currentPageName }) {
                                          exit={{ opacity: 0, y: -10 }}
                                          transition={{ duration: 0.2 }}
                                        >
-                                      {/* Critical Notifications Banner */}
-                                      {criticalNotifications.length > 0 && (
-                                      <div className="mb-2 space-y-1">
-                          {criticalNotifications.map(notification => (
-                            !visibleBanners[notification.id] && (
-                              <NotificationBanner
-                                key={notification.id}
-                                notification={notification}
-                                onDismiss={() => {
-                                  setVisibleBanners(prev => ({
-                                    ...prev,
-                                    [notification.id]: true
-                                  }));
-                                  // Mark as dismissed in DB so it doesn't beep again on next app open
-                                  try {
-                                    base44.entities.Notification.update(notification.id, { is_dismissed: true });
-                                  } catch (e) { /* ignore */ }
-                                }}
-                              />
-                            )
-                          ))}
-                        </div>
-                      )}
                       {/* Offstage Pattern with Suspense - Keep tab pages mounted to preserve state */}
                       <Suspense fallback={<div className="flex items-center justify-center h-96"><div className="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin"></div></div>}>
                         <div style={{ display: currentPageName === 'Dashboard' ? 'block' : 'none' }}>

@@ -266,7 +266,7 @@ export default function AppsThatCarePage() {
             <p className="text-lg text-white/80 mb-10 max-w-2xl mx-auto">
               Join care agencies across Wales who are already using CareCall AI to deliver better care, stay compliant, and empower their teams.
             </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
               <Link
                 href="/contact"
                 className="px-8 py-4 bg-white text-welsh-red font-semibold rounded-xl hover:bg-slate-100 transition-colors text-base"
@@ -280,6 +280,12 @@ export default function AppsThatCarePage() {
                 Explore CareCall AI
               </Link>
             </div>
+            <p className="text-sm text-white/60">
+              Or email{' '}
+              <a href="mailto:enquiries@accredilinkcare.co.uk" className="text-white/90 font-medium hover:underline">
+                enquiries@accredilinkcare.co.uk
+              </a>
+            </p>
           </AnimateOnScroll>
         </div>
       </section>

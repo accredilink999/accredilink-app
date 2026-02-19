@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Pill, Plus, Edit, Trash2, Check, Archive } from 'lucide-react';
 import { format, addDays, startOfWeek } from 'date-fns';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import MedicationInfoPopup from './MedicationInfoPopup';
 import ArchivedMARCharts from './ArchivedMARCharts';
 
@@ -30,6 +31,8 @@ export default function MARChart({ serviceUser, isAdmin }) {
   const [selectedMedInfo, setSelectedMedInfo] = useState(null);
   const [showMedInfoPopup, setShowMedInfoPopup] = useState(false);
   const [showArchivedCharts, setShowArchivedCharts] = useState(false);
+  const [deleteMedConfirmOpen, setDeleteMedConfirmOpen] = useState(false);
+  const [pendingDeleteMedId, setPendingDeleteMedId] = useState(null);
 
   const { data: medications = [] } = useQuery({
     queryKey: ['medications', serviceUser?.id],
@@ -281,9 +284,8 @@ export default function MARChart({ serviceUser, isAdmin }) {
                              size="icon"
                              className="h-7 w-7 text-red-600 hover:text-red-700"
                              onClick={() => {
-                               if (confirm('Delete this medication?')) {
-                                 deleteMedMutation.mutate(med.id);
-                               }
+                               setPendingDeleteMedId(med.id);
+                               setDeleteMedConfirmOpen(true);
                              }}
                            >
                              <Trash2 className="w-3 h-3" />
@@ -459,10 +461,25 @@ export default function MARChart({ serviceUser, isAdmin }) {
         />
         )}
 
-        <ArchivedMARCharts 
+        <ArchivedMARCharts
           serviceUserId={serviceUser?.id}
           open={showArchivedCharts}
           onOpenChange={setShowArchivedCharts}
+        />
+
+        <ConfirmDialog
+          open={deleteMedConfirmOpen}
+          onOpenChange={setDeleteMedConfirmOpen}
+          title="Delete Medication?"
+          description="Are you sure you want to delete this medication? This action cannot be undone."
+          confirmLabel="Yes, Delete"
+          variant="destructive"
+          onConfirm={() => {
+            if (pendingDeleteMedId) {
+              deleteMedMutation.mutate(pendingDeleteMedId);
+              setPendingDeleteMedId(null);
+            }
+          }}
         />
         </div>
         );

@@ -14,6 +14,7 @@ import Chat from './pages/Chat';
 import ClientManagement from './pages/ClientManagement';
 import ClockInOut from './pages/ClockInOut';
 import CommunicationArchive from './pages/CommunicationArchive';
+import Communications from './pages/Communications';
 import ComplianceManagement from './pages/ComplianceManagement';
 import DataImport from './pages/DataImport';
 import Dashboard from './pages/Dashboard';
@@ -60,6 +61,7 @@ export const PAGES = {
     "ClientManagement": ClientManagement,
     "ClockInOut": ClockInOut,
     "CommunicationArchive": CommunicationArchive,
+    "Communications": Communications,
     "ComplianceManagement": ComplianceManagement,
     "DataImport": DataImport,
     "Dashboard": Dashboard,

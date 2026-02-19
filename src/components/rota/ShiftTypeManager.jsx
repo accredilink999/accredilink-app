@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Trash2, Plus, Edit2 } from 'lucide-react';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 const DEFAULT_TYPES = ['Early', 'Late', 'Sit In E', 'Sit In L', 'Sit In FD', 'SSCC'];
 
@@ -22,6 +23,9 @@ export default function ShiftTypeManager({ open, onClose }) {
   const [editStartTime, setEditStartTime] = useState('');
   const [editEndTime, setEditEndTime] = useState('');
   const [editColor, setEditColor] = useState('#14b8a6');
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
+  const [pendingDeleteName, setPendingDeleteName] = useState('');
 
   const { data: shiftTypes = [] } = useQuery({
     queryKey: ['shiftTypes'],
@@ -240,9 +244,9 @@ export default function ShiftTypeManager({ open, onClose }) {
                           size="sm"
                           variant="ghost"
                           onClick={() => {
-                            if (confirm(`Delete "${type.name}"?`)) {
-                              deleteMutation.mutate(type.id);
-                            }
+                            setPendingDeleteId(type.id);
+                            setPendingDeleteName(type.name);
+                            setConfirmOpen(true);
                           }}
                           disabled={deleteMutation.isPending}
                         >
@@ -317,6 +321,22 @@ export default function ShiftTypeManager({ open, onClose }) {
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title={`Delete "${pendingDeleteName}"?`}
+        description="This action cannot be undone."
+        confirmLabel="Yes, Delete"
+        variant="destructive"
+        onConfirm={() => {
+          if (pendingDeleteId) {
+            deleteMutation.mutate(pendingDeleteId);
+            setPendingDeleteId(null);
+            setPendingDeleteName('');
+          }
+        }}
+      />
     </Dialog>
   );
 }

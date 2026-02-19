@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Plus, X, Edit2, Trash2, Play, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 export default function CourseEditor({ isOpen, onClose, courseId, onSuccess }) {
   const queryClient = useQueryClient();
@@ -22,6 +23,7 @@ export default function CourseEditor({ isOpen, onClose, courseId, onSuccess }) {
   const [newModuleTitle, setNewModuleTitle] = useState('');
   const [newLessonData, setNewLessonData] = useState({ moduleId: null, title: '', content_type: 'text', video_url: '' });
   const [enhancing, setEnhancing] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const { data: course, isLoading } = useQuery({
     queryKey: ['course', courseId],
@@ -148,11 +150,11 @@ export default function CourseEditor({ isOpen, onClose, courseId, onSuccess }) {
     });
   };
 
-  const handleEnhance = async () => {
-    if (!confirm('This will enhance the course with AI-generated content from the internet. Continue?')) {
-      return;
-    }
+  const handleEnhance = () => {
+    setConfirmOpen(true);
+  };
 
+  const doEnhance = async () => {
     setEnhancing(true);
     toast.info('Enhancing course with AI...');
 
@@ -676,6 +678,16 @@ Return ONLY valid JSON with this exact structure:
             {updateMutation.isPending ? 'Saving...' : 'Save Course'}
           </Button>
         </DialogFooter>
+
+        <ConfirmDialog
+          open={confirmOpen}
+          onOpenChange={setConfirmOpen}
+          title="Enhance with AI?"
+          description="This will enhance the course with AI-generated content from the internet. Existing modules will be replaced with expanded content. Continue?"
+          confirmLabel="Yes, Enhance"
+          variant="default"
+          onConfirm={() => doEnhance()}
+        />
       </DialogContent>
     </Dialog>
   );

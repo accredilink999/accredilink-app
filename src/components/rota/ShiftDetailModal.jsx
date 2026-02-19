@@ -53,8 +53,6 @@ function timeToMinutes(t) {
 }
 
 export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId, isEditMode = false }) {
-  console.log('[ShiftDetailModal] shift:', JSON.stringify({ id: shift?.id, date: shift?.date, start_time: shift?.start_time, end_time: shift?.end_time, shift_name: shift?.shift_name, staff_name: shift?.staff_name, staff_id: shift?.staff_id, paired_shift_id: shift?.paired_shift_id }));
-  console.log('[ShiftDetailModal] isAdmin:', isAdmin, 'isEditMode:', isEditMode);
   const queryClient = useQueryClient();
   const isSitIn = SIT_IN_NAMES.has(shift?.shift_name);
   const [activeTab, setActiveTab] = useState(isSitIn ? 'sitting-logs' : 'calls');
@@ -201,7 +199,6 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
     queryKey: ['availableShifts', shift.date, shift.start_time, shift.end_time, shift.id],
     queryFn: async () => {
       try {
-        console.log('[Pairing] Looking for shifts on', shift.date, 'at', shift.start_time, '-', shift.end_time);
         const { data: matchingShifts, error } = await supabase
           .from('shifts')
           .select('*')
@@ -211,14 +208,10 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
           .not('staff_id', 'is', null)
           .neq('id', shift.id);
         if (error) throw error;
-        console.log('[Pairing] Found', matchingShifts?.length, 'shifts before filtering:', matchingShifts?.map(s => s.staff_name));
-        // Filter out already paired and same-staff shifts
-        const result = (matchingShifts || []).filter(s =>
+        return (matchingShifts || []).filter(s =>
           (!s.paired_shift_id || s.paired_shift_id === '') &&
           s.staff_id !== shift.staff_id
         );
-        console.log('[Pairing] After filtering:', result.length, 'available:', result.map(s => s.staff_name));
-        return result;
       } catch (error) {
         console.error('[Pairing] Error fetching available shifts:', error);
         return [];
@@ -1036,7 +1029,6 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
           {isAdmin && (
             <Card className="p-4">
               <h4 className="font-semibold text-slate-900 mb-3">Staff Pairing</h4>
-              <p className="text-xs text-red-500 mb-2 font-mono">DEBUG: date={shift.date} start={shift.start_time || 'NULL'} end={shift.end_time || 'NULL'} editMode={String(editMode)} found={availableShifts?.length ?? '?'}</p>
               {currentShift.paired_shift_id ? (
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">

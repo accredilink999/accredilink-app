@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Eye, Trash2, ChevronDown, Download, Plus, Folder, X, Edit2 } from 'lucide-react';
 import { cn } from "@/lib/utils";
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 const FormSubmissionsCabinet = forwardRef(function FormSubmissionsCabinet({ submissions, onView, onDelete, onMove, onUpdateCabinet, currentUser, forms = [] }, ref) {
   const queryClient = useQueryClient();
@@ -55,6 +56,10 @@ const FormSubmissionsCabinet = forwardRef(function FormSubmissionsCabinet({ subm
   const [showNewCabinetInput, setShowNewCabinetInput] = useState(false);
   const [renamingCabinet, setRenamingCabinet] = useState(null);
   const [renameValue, setRenameValue] = useState('');
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTitle, setConfirmTitle] = useState('');
+  const [confirmDescription, setConfirmDescription] = useState('');
+  const [pendingAction, setPendingAction] = useState(null);
 
   const getSubCabinetsForMainCabinet = (mainCabinetName) => {
     const cabinet = cabinets.find(c => c.name === mainCabinetName);
@@ -252,26 +257,31 @@ const FormSubmissionsCabinet = forwardRef(function FormSubmissionsCabinet({ subm
   const handleDeleteMainCabinet = (cabinetId) => {
     if (!isAdmin) return;
     const cabinet = cabinets.find(c => c.id === cabinetId);
-    if (window.confirm(`Delete "${cabinet.name}" filing cabinet?`)) {
+    setConfirmTitle(`Delete "${cabinet.name}" filing cabinet?`);
+    setConfirmDescription('This will permanently delete the filing cabinet.');
+    setPendingAction(() => () => {
       setCabinets(cabinets.filter(c => c.id !== cabinetId));
       const structure = cabinetStructures.find(c => c.main_cabinet_name === cabinet.name);
       if (structure) {
         deleteCabinetMutation.mutate(structure.id);
       }
-    }
+    });
+    setConfirmOpen(true);
   };
 
   const handleDeleteSubCabinet = (mainCabinetName, subCabinetName) => {
     if (!isAdmin) return;
-    if (window.confirm(`Delete "${subCabinetName}" cabinet? Submissions will be moved to General.`)) {
-      const cabinetSubmissions = submissions.filter(s => 
+    setConfirmTitle(`Delete "${subCabinetName}" cabinet?`);
+    setConfirmDescription('Submissions will be moved to General.');
+    setPendingAction(() => () => {
+      const cabinetSubmissions = submissions.filter(s =>
         s.main_cabinet === mainCabinetName && (s.cabinet || 'General') === subCabinetName
       );
       cabinetSubmissions.forEach(submission => {
         onUpdateCabinet(submission.id, 'General');
       });
-      const updatedCabinets = cabinets.map(c => 
-        c.name === mainCabinetName 
+      const updatedCabinets = cabinets.map(c =>
+        c.name === mainCabinetName
           ? { ...c, subCabinets: c.subCabinets.filter(sc => sc !== subCabinetName) }
           : c
       );
@@ -284,7 +294,8 @@ const FormSubmissionsCabinet = forwardRef(function FormSubmissionsCabinet({ subm
           }
         });
       }
-    }
+    });
+    setConfirmOpen(true);
   };
 
   const handleRenameMainCabinet = (cabinetId, newName) => {
@@ -754,6 +765,16 @@ const FormSubmissionsCabinet = forwardRef(function FormSubmissionsCabinet({ subm
 
       {/* Filing Cabinets */}
       {cabinets.map(cabinet => renderMainCabinet(cabinet))}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title={confirmTitle}
+        description={confirmDescription}
+        confirmLabel="Yes, Delete"
+        variant="destructive"
+        onConfirm={() => pendingAction?.()}
+      />
     </div>
   );
 });

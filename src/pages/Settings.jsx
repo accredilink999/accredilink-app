@@ -681,7 +681,7 @@ function AppInfoCard({ userEmail }) {
             <button
               onClick={() => {
                 navigator.clipboard.writeText(downloadUrl).catch(() => {});
-                alert('Download link copied! Open it in Chrome to install.');
+                toast.success('Download link copied! Open it in Chrome to install.');
               }}
               className="w-full flex items-center justify-center gap-2 px-4 py-2 text-xs text-slate-500 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
             >

@@ -358,4 +358,8 @@ export const entities = {
   SharedFile:                  buildEntity('shared_files'),
   Payment:                     buildEntity('payments'),
   HolidayAllowance:            buildEntity('holiday_allowances'),
+
+  // Communications / Meetings
+  Meeting:                     buildEntity('meetings'),
+  MeetingParticipant:          buildEntity('meeting_participants'),
 }

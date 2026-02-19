@@ -7,12 +7,15 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, BookOpen, Clock, Users, Edit2, Trash2 } from 'lucide-react';
 import EmptyState from '@/components/ui/EmptyState';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import CourseEditor from './CourseEditor';
 
 export default function CourseLibrary({ onSelectCourse, isAdmin }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [editingCourseId, setEditingCourseId] = useState(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
   const queryClient = useQueryClient();
 
   const { data: courses = [], isLoading } = useQuery({
@@ -30,9 +33,8 @@ export default function CourseLibrary({ onSelectCourse, isAdmin }) {
   });
 
   const handleDelete = (courseId) => {
-    if (confirm('Are you sure you want to delete this course? This action cannot be undone.')) {
-      deleteMutation.mutate(courseId);
-    }
+    setPendingAction(() => () => deleteMutation.mutate(courseId));
+    setConfirmOpen(true);
   };
 
   const filteredCourses = courses.filter(c => {
@@ -145,6 +147,16 @@ export default function CourseLibrary({ onSelectCourse, isAdmin }) {
           onSuccess={() => setEditingCourseId(null)}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Delete Course?"
+        description="Are you sure you want to delete this course? This action cannot be undone."
+        confirmLabel="Yes, Delete"
+        variant="destructive"
+        onConfirm={() => pendingAction?.()}
+      />
     </div>
   );
 }

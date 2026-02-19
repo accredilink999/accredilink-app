@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import Avatar from '@/components/ui/Avatar';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import CareLogViewer from '../careLogs/CareLogViewer';
 import HealthcareLogManager from '../careLogs/HealthcareLogManager';
 import MARChart from '../medications/MARChart';
@@ -44,6 +45,7 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
     const [pendingStatus, setPendingStatus] = useState(null);
     const [statusConfirmOpen, setStatusConfirmOpen] = useState(false);
     const [marFullscreen, setMARFullscreen] = useState(false);
+    const [deleteServiceUserConfirmOpen, setDeleteServiceUserConfirmOpen] = useState(false);
     const [showCommunicationPastLogs, setShowCommunicationPastLogs] = useState(false);
     const [showSittingPastLogs, setShowSittingPastLogs] = useState(false);
     const [displayedLogs, setDisplayedLogs] = useState([]);
@@ -341,14 +343,10 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
                  <Edit className="w-3 h-3 mr-1" />
                  Edit
                </Button>
-               <Button 
-                 variant="destructive" 
+               <Button
+                 variant="destructive"
                  size="sm"
-                 onClick={() => {
-                   if (confirm('Are you sure you want to delete this service user?')) {
-                     deleteMutation.mutate();
-                   }
-                 }}
+                 onClick={() => setDeleteServiceUserConfirmOpen(true)}
                >
                  <Trash2 className="w-3 h-3" />
                </Button>
@@ -847,6 +845,16 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
            </TabsContent>
            </Tabs>
            </div>
+
+           <ConfirmDialog
+             open={deleteServiceUserConfirmOpen}
+             onOpenChange={setDeleteServiceUserConfirmOpen}
+             title="Delete Service User?"
+             description="Are you sure you want to delete this service user? This action cannot be undone."
+             confirmLabel="Yes, Delete"
+             variant="destructive"
+             onConfirm={() => deleteMutation.mutate()}
+           />
            </DialogContent>
            </Dialog>
            );

@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Plus, ArrowLeft, Eye, Code, Trash2, Copy, WandSparkles } from 'lucide-react';
@@ -21,6 +22,8 @@ export default function FormBuilder() {
   const [formTitle, setFormTitle] = useState('');
   const [previewId, setPreviewId] = useState(null);
   const [subCabinets, setSubCabinets] = useState([]);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDeleteForm, setPendingDeleteForm] = useState(null);
   const queryClient = useQueryClient();
 
   const { data: forms = [] } = useQuery({
@@ -67,9 +70,8 @@ export default function FormBuilder() {
   };
 
   const handleDeleteForm = (form) => {
-    if (window.confirm(`Delete "${form.title}"?`)) {
-      deleteMutation.mutate(form.id);
-    }
+    setPendingDeleteForm(form);
+    setConfirmOpen(true);
   };
 
   const handleLiveSubmission = (form) => {
@@ -166,6 +168,21 @@ export default function FormBuilder() {
           }}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title={`Delete "${pendingDeleteForm?.title || ''}"?`}
+        description="This form will be permanently deleted."
+        confirmLabel="Yes, Delete"
+        variant="destructive"
+        onConfirm={() => {
+          if (pendingDeleteForm) {
+            deleteMutation.mutate(pendingDeleteForm.id);
+            setPendingDeleteForm(null);
+          }
+        }}
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Button } from "@/components/ui/button";
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -72,6 +73,8 @@ export default function Assets() {
     photo_url: ''
   });
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
 
   const queryClient = useQueryClient();
 
@@ -344,9 +347,8 @@ export default function Assets() {
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    if (confirm('Delete this asset?')) {
-                      deleteMutation.mutate(asset.id);
-                    }
+                    setPendingAction(() => () => deleteMutation.mutate(asset.id));
+                    setConfirmOpen(true);
                   }}
                   className="text-red-600 hover:text-red-700"
                 >
@@ -359,6 +361,16 @@ export default function Assets() {
       </div>
 
 
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Delete this asset?"
+        description="This action cannot be undone."
+        confirmLabel="Yes, Delete"
+        variant="destructive"
+        onConfirm={() => pendingAction?.()}
+      />
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={(open) => !open && resetForm()}>

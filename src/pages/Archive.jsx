@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { ShiftApi } from '@/api/rotaApi';
 import PageHeader from '@/components/ui/PageHeader';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,8 @@ export default function Archive() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('all');
   const [viewingItem, setViewingItem] = useState(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
   const queryClient = useQueryClient();
 
   const { data: archivedItems = [] } = useQuery({
@@ -229,9 +232,8 @@ export default function Archive() {
                       size="sm"
                       variant="destructive"
                       onClick={() => {
-                        if (confirm('Are you sure? This will permanently delete this item and it cannot be recovered.')) {
-                          permanentDeleteMutation.mutate(item.id);
-                        }
+                        setPendingAction(() => () => permanentDeleteMutation.mutate(item.id));
+                        setConfirmOpen(true);
                       }}
                       disabled={permanentDeleteMutation.isPending}
                       className="gap-2"
@@ -278,6 +280,16 @@ export default function Archive() {
           )}
         </TabsContent>
       </Tabs>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Permanently delete?"
+        description="Are you sure? This will permanently delete this item and it cannot be recovered."
+        confirmLabel="Yes, Delete"
+        variant="destructive"
+        onConfirm={() => pendingAction?.()}
+      />
     </div>
   );
 }

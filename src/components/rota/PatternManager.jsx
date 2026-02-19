@@ -4,6 +4,15 @@ import { base44 } from '@/api/base44Client';
 import { ShiftApi, ShiftPatternApi, ShiftCallApi } from '@/api/rotaApi';
 import { supabase } from '@/api/supabaseClient';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +25,8 @@ export default function PatternManager({ open, onClose }) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingPattern, setEditingPattern] = useState(null);
   const [addingCallsToPattern, setAddingCallsToPattern] = useState(null);
+  const [redeployConfirmPattern, setRedeployConfirmPattern] = useState(null);
+  const [deleteConfirmPattern, setDeleteConfirmPattern] = useState(null);
 
   const { data: patterns = [] } = useQuery({
     queryKey: ['shift-patterns'],
@@ -367,11 +378,11 @@ export default function PatternManager({ open, onClose }) {
                       <Button
                         size="sm"
                         className="bg-teal-600 hover:bg-teal-700 text-white"
-                        onClick={() => deployPatternMutation.mutate(pattern)}
+                        onClick={() => setRedeployConfirmPattern(pattern)}
                         disabled={deployPatternMutation.isPending}
                       >
                         <Play className="w-3 h-3 mr-1" />
-                        {deployPatternMutation.isPending ? 'Deploying...' : 'Deploy'}
+                        {deployPatternMutation.isPending ? 'Deploying...' : 'Re-deploy'}
                       </Button>
                       <Button
                         size="sm"
@@ -385,11 +396,7 @@ export default function PatternManager({ open, onClose }) {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => {
-                          if (confirm('Delete this pattern? This will revert all shifts it created back to available.')) {
-                            deletePatternMutation.mutate(pattern);
-                          }
-                        }}
+                        onClick={() => setDeleteConfirmPattern(pattern)}
                       >
                         <Trash2 className="w-3 h-3" />
                       </Button>
@@ -416,6 +423,54 @@ export default function PatternManager({ open, onClose }) {
           pattern={editingPattern}
         />
       )}
+
+      {/* Re-deploy confirmation */}
+      <AlertDialog open={!!redeployConfirmPattern} onOpenChange={(open) => !open && setRedeployConfirmPattern(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Re-deploy Pattern?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This pattern has already been deployed. Re-deploying may create duplicate shifts. Only use this after editing the pattern or adding new shifts.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex justify-end gap-2 mt-4">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-teal-600 hover:bg-teal-700"
+              onClick={() => {
+                deployPatternMutation.mutate(redeployConfirmPattern);
+                setRedeployConfirmPattern(null);
+              }}
+            >
+              Yes, Re-deploy
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deleteConfirmPattern} onOpenChange={(open) => !open && setDeleteConfirmPattern(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Pattern?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will delete the pattern and revert all shifts it created back to available. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex justify-end gap-2 mt-4">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => {
+                deletePatternMutation.mutate(deleteConfirmPattern);
+                setDeleteConfirmPattern(null);
+              }}
+            >
+              Yes, Delete
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
