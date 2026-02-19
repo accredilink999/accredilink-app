@@ -248,7 +248,21 @@ export default function ChatWindow({ conversation, currentUserId, currentUserNam
     // Only update when there are actually unread messages from others.
     // Running this unconditionally causes a race condition with the send mutation
     // (it overwrites the recipient's freshly-incremented count back to 0).
-    if (unreadMessages.length === 0) return;
+    if (unreadMessages.length === 0) {
+      // Still reset stale conversation unread_count if it's stuck > 0
+      const staleCount = conversation.unread_count?.[currentUserId];
+      if (staleCount && staleCount > 0) {
+        base44.entities.Conversation.update(conversation.id, {
+          unread_count: {
+            ...(typeof conversation.unread_count === 'object' ? conversation.unread_count : {}),
+            [currentUserId]: 0
+          }
+        }).then(() => {
+          queryClient.invalidateQueries({ queryKey: ['conversations'] });
+        });
+      }
+      return;
+    }
 
     Promise.all(unreadMessages.map(msg =>
       base44.entities.ChatMessage.update(msg.id, { read_by: [...(msg.read_by || []), currentUserId] })
