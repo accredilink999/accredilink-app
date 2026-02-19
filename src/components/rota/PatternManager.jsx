@@ -399,8 +399,15 @@ export default function PatternManager({ open, onClose }) {
         allShifts.push(...created);
       }
 
-      // Add client calls to all shifts — collect all then bulk insert
+      // Add client calls to all shifts — delete existing first to prevent duplicates, then bulk insert
       if (areaId !== 'default' && allShifts.length > 0) {
+        // Delete any existing shift_calls for these shifts to prevent duplicates on re-deploy
+        const allShiftIds = allShifts.map(s => s.id);
+        for (let i = 0; i < allShiftIds.length; i += BATCH_SIZE) {
+          const batch = allShiftIds.slice(i, i + BATCH_SIZE);
+          await supabase.from('shift_calls').delete().in('shift_id', batch);
+        }
+
         const serviceUsers = await base44.entities.ServiceUser.filter({ status: 'active' });
         const areaServiceUsers = serviceUsers.filter(su => (su.rota_area_id || su.area_id) === areaId);
 
@@ -423,9 +430,13 @@ export default function PatternManager({ open, onClose }) {
                     service_user_id: serviceUser.id,
                     service_user_name: serviceUser.full_name,
                     scheduled_time: callTime.time,
-                    date: shift.date,
-                    type: callTime.type || 'visit',
+                    call_time: callTime.time,
+                    call_date: shift.date,
+                    call_type: callTime.type || 'visit',
+                    call_types: [callTime.type || 'visit'],
                     duration_minutes: callDuration,
+                    status: 'pending',
+                    notes: '',
                   });
                 }
               } catch (e) {
