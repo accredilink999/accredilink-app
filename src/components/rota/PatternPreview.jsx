@@ -8,13 +8,13 @@ import { cn } from "@/lib/utils";
 export default function PatternPreview({ shifts, patternType, staffName, patternName }) {
   const [viewMode, setViewMode] = useState('weekly'); // 'weekly' or 'daily'
   const days = [
+    { value: 'sunday', label: 'Sun' },
     { value: 'monday', label: 'Mon' },
     { value: 'tuesday', label: 'Tue' },
     { value: 'wednesday', label: 'Wed' },
     { value: 'thursday', label: 'Thu' },
     { value: 'friday', label: 'Fri' },
     { value: 'saturday', label: 'Sat' },
-    { value: 'sunday', label: 'Sun' },
   ];
 
   const getWeekCount = () => {

@@ -370,13 +370,13 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
 
 
   const days = [
+    { value: 'sunday', label: 'Sun' },
     { value: 'monday', label: 'Mon' },
     { value: 'tuesday', label: 'Tue' },
     { value: 'wednesday', label: 'Wed' },
     { value: 'thursday', label: 'Thu' },
     { value: 'friday', label: 'Fri' },
     { value: 'saturday', label: 'Sat' },
-    { value: 'sunday', label: 'Sun' },
   ];
 
   const addShift = (day, week = 1) => {
