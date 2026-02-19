@@ -358,7 +358,7 @@ export default function PatternManager({ open, onClose }) {
   return (
     <>
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] !pb-4 overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Shift Pattern Manager</DialogTitle>
           </DialogHeader>
@@ -458,7 +458,7 @@ export default function PatternManager({ open, onClose }) {
                       </div>
                     )}
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <Button
                         size="sm"
                         variant="outline"
