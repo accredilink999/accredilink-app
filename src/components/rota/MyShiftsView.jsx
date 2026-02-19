@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { ShiftApi, ShiftCallApi } from '@/api/rotaApi';
+import { supabase } from '@/api/supabaseClient';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, addDays, isSameDay } from 'date-fns';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -42,8 +43,17 @@ export default function MyShiftsView({ currentDate, userId, view, onShiftClick, 
     queryFn: async () => {
       const shiftIds = shifts.map(s => s.id);
       if (shiftIds.length === 0) return [];
-      const allCalls = await ShiftCallApi.list('-scheduled_time', 500);
-      return allCalls.filter(call => shiftIds.includes(call.shift_id));
+      let allResults = [];
+      for (let i = 0; i < shiftIds.length; i += 50) {
+        const batch = shiftIds.slice(i, i + 50);
+        const { data, error } = await supabase
+          .from('shift_calls')
+          .select('*')
+          .in('shift_id', batch)
+          .order('scheduled_time');
+        if (!error && data) allResults.push(...data);
+      }
+      return allResults;
     },
     enabled: shifts.length > 0,
   });

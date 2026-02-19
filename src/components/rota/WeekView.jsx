@@ -56,8 +56,18 @@ export default function WeekView({ currentDate, onShiftClick, onCreateShift, isA
     queryFn: async () => {
       const shiftIds = shifts.map(s => s.id);
       if (shiftIds.length === 0) return [];
-      const calls = await ShiftCallApi.list('-scheduled_time', 500);
-      return calls.filter(call => shiftIds.includes(call.shift_id));
+      // Fetch calls directly by shift IDs (batched to avoid query limits)
+      let allResults = [];
+      for (let i = 0; i < shiftIds.length; i += 50) {
+        const batch = shiftIds.slice(i, i + 50);
+        const { data, error } = await supabase
+          .from('shift_calls')
+          .select('*')
+          .in('shift_id', batch)
+          .order('scheduled_time');
+        if (!error && data) allResults.push(...data);
+      }
+      return allResults;
     },
     enabled: shifts.length > 0,
   });

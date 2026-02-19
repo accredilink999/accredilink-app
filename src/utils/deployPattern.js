@@ -309,3 +309,103 @@ export async function clearPatternShifts({ patternId, staffId, areaId }) {
 
   return total;
 }
+
+/**
+ * Deploy a single client's call times to all future assigned shifts in their area.
+ * Deletes existing future calls for this client first, then re-creates from call_times.
+ *
+ * @param {Object} opts
+ * @param {string} opts.serviceUserId - Service user ID
+ * @param {string} opts.serviceUserName - Display name
+ * @param {string} opts.serviceUserAddress - Address
+ * @param {string} opts.areaId - Rota area ID
+ * @param {Array} opts.callTimes - Array of { time, duration, type, types, notes }
+ * @returns {Promise<{created: number, deleted: number}>}
+ */
+export async function deployClientCallsToRota({ serviceUserId, serviceUserName, serviceUserAddress, areaId, callTimes }) {
+  if (!areaId || !callTimes || callTimes.length === 0) {
+    return { created: 0, deleted: 0 };
+  }
+
+  const today = new Date().toISOString().split('T')[0];
+
+  // 1. Delete all future shift_calls for this service user
+  let existing = [];
+  let offset = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from('shift_calls')
+      .select('id')
+      .eq('service_user_id', serviceUserId)
+      .gte('call_date', today)
+      .range(offset, offset + PAGE - 1);
+    if (error || !data || data.length === 0) break;
+    existing.push(...data);
+    if (data.length < PAGE) break;
+    offset += PAGE;
+  }
+
+  if (existing.length > 0) {
+    const ids = existing.map(c => c.id);
+    for (let i = 0; i < ids.length; i += BATCH) {
+      await supabase.from('shift_calls').delete().in('id', ids.slice(i, i + BATCH));
+    }
+  }
+
+  // 2. Fetch all future assigned shifts in this area
+  let shifts = [];
+  offset = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from('shifts')
+      .select('id, date, start_time, end_time')
+      .not('staff_id', 'is', null)
+      .eq('rota_area_id', areaId)
+      .gte('date', today)
+      .range(offset, offset + PAGE - 1);
+    if (error || !data || data.length === 0) break;
+    shifts.push(...data);
+    if (data.length < PAGE) break;
+    offset += PAGE;
+  }
+
+  // 3. Match call times to shift windows
+  const callsToCreate = [];
+  for (const shift of shifts) {
+    const [sh, sm] = shift.start_time.split(':').map(Number);
+    const [eh, em] = shift.end_time.split(':').map(Number);
+    const shiftStartMins = sh * 60 + sm;
+    const shiftEndMins = eh * 60 + em;
+
+    for (const ct of callTimes) {
+      if (!ct.time) continue;
+      const [ch, cm] = ct.time.split(':').map(Number);
+      const callMins = ch * 60 + cm;
+      const dur = parseInt(ct.duration) || 60;
+
+      if (callMins >= shiftStartMins && callMins + dur <= shiftEndMins) {
+        callsToCreate.push({
+          shift_id: shift.id,
+          service_user_id: serviceUserId,
+          service_user_name: serviceUserName || '',
+          service_user_address: serviceUserAddress || '',
+          scheduled_time: ct.time,
+          call_time: ct.time,
+          call_date: shift.date,
+          call_type: ct.type || (ct.types && ct.types[0]) || 'visit',
+          call_types: ct.types || [ct.type || 'visit'],
+          duration_minutes: dur,
+          status: 'pending',
+          notes: ct.notes || '',
+        });
+      }
+    }
+  }
+
+  // 4. Bulk create
+  if (callsToCreate.length > 0) {
+    await ShiftCallApi.bulkCreate(callsToCreate);
+  }
+
+  return { created: callsToCreate.length, deleted: existing.length };
+}

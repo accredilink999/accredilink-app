@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Loader2, Plus, Trash2, FileIcon, Download, X, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
+import { deployClientCallsToRota } from '@/utils/deployPattern';
 import MARChart from '@/components/medications/MARChart';
 import ClientRotaSetup from '@/components/serviceUsers/ClientRotaSetup';
 
@@ -244,10 +245,33 @@ export default function ServiceUserForm({ serviceUser, open, onClose }) {
       }
       return result;
     },
-    onSuccess: () => {
+    onSuccess: async (result) => {
       queryClient.invalidateQueries({ queryKey: ['serviceUsers'] });
       toast.success(isEdit ? 'Client updated successfully' : 'Client created successfully');
       onClose();
+
+      // Auto-deploy call times to rota shifts
+      try {
+        const suId = result?.id || serviceUser?.id;
+        const suAreaId = result?.area_id || serviceUser?.area_id || formData.area_id;
+        const suCallTimes = result?.call_times || callTimes.map(({ id, ...c }) => ({ ...c, duration: String(c.duration) }));
+        if (suId && suAreaId && suCallTimes.length > 0) {
+          const { created } = await deployClientCallsToRota({
+            serviceUserId: suId,
+            serviceUserName: formData.full_name || serviceUser?.full_name || '',
+            serviceUserAddress: formData.address || serviceUser?.address || '',
+            areaId: suAreaId,
+            callTimes: suCallTimes,
+          });
+          if (created > 0) {
+            toast.success(`${created} calls deployed to rota`);
+            queryClient.invalidateQueries({ queryKey: ['shiftCalls'] });
+            queryClient.invalidateQueries({ queryKey: ['clientCalls'] });
+          }
+        }
+      } catch (err) {
+        console.error('Auto-deploy calls error:', err);
+      }
     },
     onError: (error) => {
       console.error('Client save error:', error);

@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from 'sonner';
 import { notifyAdminsOfActivity } from '@/utils/adminNotifications';
+import { deployClientCallsToRota } from '@/utils/deployPattern';
 import { ShiftCallApi } from '@/api/rotaApi';
 import CallTypeManager from '../rota/CallTypeManager';
 import {
@@ -142,9 +143,30 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
   const updateCallTimesMutation = useMutation({
     mutationFn: (newCallTimes) =>
       base44.entities.ServiceUser.update(serviceUser.id, { call_times: newCallTimes }),
-    onSuccess: async () => {
+    onSuccess: async (_, savedCallTimes) => {
       queryClient.invalidateQueries({ queryKey: ['serviceUsers'] });
       toast.success('Call times updated');
+
+      // Auto-deploy calls to rota shifts
+      try {
+        const suAreaId = serviceUser.area_id;
+        if (suAreaId && savedCallTimes && savedCallTimes.length > 0) {
+          const { created } = await deployClientCallsToRota({
+            serviceUserId: serviceUser.id,
+            serviceUserName: serviceUser.full_name || '',
+            serviceUserAddress: serviceUser.address || '',
+            areaId: suAreaId,
+            callTimes: savedCallTimes,
+          });
+          if (created > 0) {
+            toast.success(`${created} calls deployed to rota`);
+            queryClient.invalidateQueries({ queryKey: ['shiftCalls'] });
+            queryClient.invalidateQueries({ queryKey: ['clientCalls'] });
+          }
+        }
+      } catch (err) {
+        console.error('Auto-deploy calls error:', err);
+      }
 
       // Notify admins
       const clientName = serviceUser.full_name || 'Client';
