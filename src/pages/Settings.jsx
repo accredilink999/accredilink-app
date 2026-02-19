@@ -676,18 +676,9 @@ function AppInfoCard({ userEmail }) {
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-colors"
             >
               <Download className="w-4 h-4" />
-              Download Update (v{latestVersion})
+              Update App (v{latestVersion})
             </button>
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(downloadUrl).catch(() => {});
-                toast.success('Download link copied! Open it in Chrome to install.');
-              }}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 text-xs text-slate-500 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
-            >
-              <Copy className="w-3.5 h-3.5" />
-              Copy download link
-            </button>
+            <p className="text-xs text-slate-400 text-center">Opens in Chrome to download the update</p>
           </div>
         )}
       </div>
