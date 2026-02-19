@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import CreatePatternModal from '@/components/rota/CreatePatternModal';
-import { Plus, Trash2, Play, Square, Calendar, Edit, Zap, Eraser } from 'lucide-react';
+import { Plus, Trash2, Play, Square, Calendar, Edit, Zap, Eraser, UserX } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function PatternManager({ open, onClose }) {
@@ -28,10 +28,78 @@ export default function PatternManager({ open, onClose }) {
   const [redeployConfirmPattern, setRedeployConfirmPattern] = useState(null);
   const [deleteConfirmPattern, setDeleteConfirmPattern] = useState(null);
   const [clearShiftsConfirmPattern, setClearShiftsConfirmPattern] = useState(null);
+  const [cleanupStaffId, setCleanupStaffId] = useState('');
+  const [cleanupConfirmOpen, setCleanupConfirmOpen] = useState(false);
 
   const { data: patterns = [] } = useQuery({
     queryKey: ['shift-patterns'],
     queryFn: () => ShiftPatternApi.list('-created_at', 100),
+  });
+
+  // Fetch distinct staff who have assigned future shifts (for orphan cleanup)
+  const today = new Date().toISOString().split('T')[0];
+  const { data: assignedStaff = [] } = useQuery({
+    queryKey: ['assigned-staff-shifts', today],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('shifts')
+        .select('staff_id, staff_name')
+        .not('staff_id', 'is', null)
+        .gte('date', today)
+        .order('staff_name');
+      if (error) throw error;
+      // Deduplicate by staff_id
+      const seen = new Set();
+      return (data || []).filter(s => {
+        if (seen.has(s.staff_id)) return false;
+        seen.add(s.staff_id);
+        return true;
+      });
+    },
+    enabled: open,
+  });
+
+  const cleanupStaffMutation = useMutation({
+    mutationFn: async (staffId) => {
+      const staffName = assignedStaff.find(s => s.staff_id === staffId)?.staff_name || 'Unknown';
+      toast.info(`Clearing all future shifts for ${staffName}...`);
+
+      // Find all future shifts for this staff member
+      const { data: staffShifts, error } = await supabase
+        .from('shifts')
+        .select('id')
+        .eq('staff_id', staffId)
+        .gte('date', today);
+      if (error) throw error;
+      if (!staffShifts || staffShifts.length === 0) return { totalCleared: 0, staffName };
+
+      const ids = staffShifts.map(s => s.id);
+      // Delete shift_calls in batches
+      for (let i = 0; i < ids.length; i += 50) {
+        const batch = ids.slice(i, i + 50);
+        await supabase.from('shift_calls').delete().in('shift_id', batch);
+      }
+      // Revert shifts to blank in batches
+      for (let i = 0; i < ids.length; i += 50) {
+        const batch = ids.slice(i, i + 50);
+        await supabase
+          .from('shifts')
+          .update({ staff_id: null, staff_name: null, shift_pattern_id: null })
+          .in('id', batch);
+      }
+      return { totalCleared: ids.length, staffName };
+    },
+    onSuccess: ({ totalCleared, staffName }) => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      queryClient.invalidateQueries({ queryKey: ['shiftCalls'] });
+      queryClient.invalidateQueries({ queryKey: ['clientCalls'] });
+      queryClient.invalidateQueries({ queryKey: ['assigned-staff-shifts'] });
+      toast.success(`Cleared ${totalCleared} shift${totalCleared !== 1 ? 's' : ''} for ${staffName}`);
+      setCleanupStaffId('');
+    },
+    onError: (error) => {
+      toast.error('Failed to clear shifts: ' + error.message);
+    },
   });
 
   const deletePatternMutation = useMutation({
@@ -404,6 +472,39 @@ export default function PatternManager({ open, onClose }) {
               Create New Pattern
             </Button>
 
+            {/* Staff shift cleanup tool */}
+            {assignedStaff.length > 0 && (
+              <Card className="p-3 bg-orange-50 border-orange-200">
+                <p className="text-xs font-medium text-orange-800 mb-2">
+                  <UserX className="w-3 h-3 inline mr-1" />
+                  Clear Staff Shifts (removes all future shifts for a staff member)
+                </p>
+                <div className="flex gap-2">
+                  <select
+                    value={cleanupStaffId}
+                    onChange={(e) => setCleanupStaffId(e.target.value)}
+                    className="flex-1 text-sm border border-orange-300 rounded px-2 py-1.5 bg-white"
+                  >
+                    <option value="">Select staff member...</option>
+                    {assignedStaff.map((s) => (
+                      <option key={s.staff_id} value={s.staff_id}>
+                        {s.staff_name}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    size="sm"
+                    disabled={!cleanupStaffId || cleanupStaffMutation.isPending}
+                    className="bg-orange-600 hover:bg-orange-700 text-white"
+                    onClick={() => setCleanupConfirmOpen(true)}
+                  >
+                    <Eraser className="w-3 h-3 mr-1" />
+                    {cleanupStaffMutation.isPending ? 'Clearing...' : 'Clear'}
+                  </Button>
+                </div>
+              </Card>
+            )}
+
             {patterns.length === 0 ? (
               <Card className="p-8 text-center">
                 <p className="text-slate-500">No shift patterns created yet</p>
@@ -582,6 +683,30 @@ export default function PatternManager({ open, onClose }) {
               }}
             >
               Yes, Clear Shifts
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Staff cleanup confirmation */}
+      <AlertDialog open={cleanupConfirmOpen} onOpenChange={(open) => !open && setCleanupConfirmOpen(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear All Future Shifts?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will revert ALL future shifts for <strong>{assignedStaff.find(s => s.staff_id === cleanupStaffId)?.staff_name}</strong> back to blank/available and remove their client calls. This is useful for cleaning up orphaned shifts.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex justify-end gap-2 mt-4">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-orange-600 hover:bg-orange-700"
+              onClick={() => {
+                cleanupStaffMutation.mutate(cleanupStaffId);
+                setCleanupConfirmOpen(false);
+              }}
+            >
+              Yes, Clear All Shifts
             </AlertDialogAction>
           </div>
         </AlertDialogContent>
