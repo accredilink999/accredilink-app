@@ -3,9 +3,21 @@ import { ShiftCallApi } from '@/api/rotaApi';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
 
-const VER = 'v4';
+const VER = 'v5';
 const BATCH = 50;
 const PAGE = 1000;
+
+/** Build tasks array for a shift_call from call_time tasks (string[]) */
+function buildTasks(callTime) {
+  const tasks = [];
+  if (callTime.tasks && Array.isArray(callTime.tasks)) {
+    for (const t of callTime.tasks) {
+      if (typeof t === 'string') tasks.push({ text: t, completed: false });
+      else if (t && t.text) tasks.push({ text: t.text, completed: false });
+    }
+  }
+  return tasks;
+}
 
 // ── UK local-time date helpers (noon to avoid BST/GMT midnight edge) ──
 
@@ -225,10 +237,11 @@ export async function deployPatternShifts({
                 call_time: ct.time,
                 call_date: shift.date,
                 call_type: ct.type || 'visit',
-                call_types: [ct.type || 'visit'],
+                call_types: ct.types || [ct.type || 'visit'],
                 duration_minutes: dur,
                 status: 'pending',
-                notes: '',
+                notes: ct.notes || '',
+                tasks: buildTasks(ct),
               });
             }
           } catch {}
@@ -446,6 +459,7 @@ export async function deployClientCallsToRota({ serviceUserId, serviceUserName, 
           duration_minutes: dur,
           status: 'pending',
           notes: ct.notes || '',
+          tasks: buildTasks(ct),
         });
       }
     }

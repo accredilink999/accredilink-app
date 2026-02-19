@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Loader2, Plus, Trash2, FileIcon, Download, X, ChevronDown } from 'lucide-react';
+import { Loader2, Plus, Trash2, FileIcon, Download, X, ChevronDown, ListChecks } from 'lucide-react';
 import { toast } from 'sonner';
 import { deployClientCallsToRota } from '@/utils/deployPattern';
 import MARChart from '@/components/medications/MARChart';
@@ -84,7 +84,8 @@ export default function ServiceUserForm({ serviceUser, open, onClose }) {
 
   const [callTimes, setCallTimes] = useState(initialCallTimes);
   const [editingCallId, setEditingCallId] = useState(null);
-  const [newCall, setNewCall] = useState({ time: '', duration: '', type: 'visit', notes: '' });
+  const [newCall, setNewCall] = useState({ time: '', duration: '', type: 'visit', notes: '', tasks: [] });
+  const [newTaskInput, setNewTaskInput] = useState('');
   
   // Parse person centred plan calls
   const parsePersonCentredCalls = (data) => {
@@ -195,7 +196,8 @@ export default function ServiceUserForm({ serviceUser, open, onClose }) {
          setPersonCentredCalls([]);
        }
        setEditingCallId(null);
-       setNewCall({ time: '', duration: '', type: 'visit', notes: '' });
+       setNewCall({ time: '', duration: '', type: 'visit', notes: '', tasks: [] });
+       setNewTaskInput('');
        setEditingPCCallId(null);
        setNewPersonCentredCall({ call_number: '', section1: '', section2: '', section3: '' });
       if (serviceUser?.risk_assessment_files) {
@@ -279,30 +281,44 @@ export default function ServiceUserForm({ serviceUser, open, onClose }) {
     },
   });
 
+  const handleAddCallTask = () => {
+    const text = newTaskInput.trim();
+    if (!text) return;
+    setNewCall(prev => ({ ...prev, tasks: [...(prev.tasks || []), text] }));
+    setNewTaskInput('');
+  };
+
+  const handleRemoveCallTask = (idx) => {
+    setNewCall(prev => ({ ...prev, tasks: (prev.tasks || []).filter((_, i) => i !== idx) }));
+  };
+
   const handleAddCall = () => {
     if (newCall.time && newCall.duration) {
       if (editingCallId) {
-        setCallTimes(callTimes.map(call => 
+        setCallTimes(callTimes.map(call =>
           call.id === editingCallId ? { ...newCall, id: editingCallId } : call
         ));
         setEditingCallId(null);
       } else {
         setCallTimes([...callTimes, { ...newCall, id: Date.now() }]);
       }
-      setNewCall({ time: '', duration: '', type: 'visit', notes: '' });
+      setNewCall({ time: '', duration: '', type: 'visit', notes: '', tasks: [] });
+      setNewTaskInput('');
     }
   };
 
   const handleEditCall = (call) => {
     setEditingCallId(call.id);
-    setNewCall({ time: call.time, duration: call.duration, type: call.type, notes: call.notes });
+    setNewCall({ time: call.time, duration: call.duration, type: call.type, notes: call.notes, tasks: call.tasks || [] });
+    setNewTaskInput('');
   };
 
   const handleRemoveCall = (id) => {
     setCallTimes(callTimes.filter(call => call.id !== id));
     if (editingCallId === id) {
       setEditingCallId(null);
-      setNewCall({ time: '', duration: '', type: 'visit', notes: '' });
+      setNewCall({ time: '', duration: '', type: 'visit', notes: '', tasks: [] });
+      setNewTaskInput('');
     }
   };
 
@@ -1168,7 +1184,48 @@ ${formData.care_plan ? `CARE PLAN DETAILS:\n${formData.care_plan}` : ''}`;
                     placeholder="Additional notes..."
                   />
                 </div>
-                <Button 
+
+                {/* Recurring Tasks */}
+                <div>
+                  <Label className="flex items-center gap-1">
+                    <ListChecks className="w-3.5 h-3.5" />
+                    Recurring Tasks
+                  </Label>
+                  <div className="p-2 bg-white rounded border mt-1 space-y-1.5">
+                    {(newCall.tasks || []).map((task, i) => (
+                      <div key={i} className="flex items-center justify-between py-1 px-2 bg-slate-50 rounded border text-xs">
+                        <span className="text-slate-700">{task}</span>
+                        <button type="button" onClick={() => handleRemoveCallTask(i)} className="text-red-400 hover:text-red-600 ml-2">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                    <div className="flex gap-1">
+                      <Input
+                        value={newTaskInput}
+                        onChange={(e) => setNewTaskInput(e.target.value)}
+                        placeholder="Add a task (e.g. Give medication)..."
+                        className="h-7 text-xs"
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCallTask(); } }}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={handleAddCallTask}
+                        disabled={!newTaskInput.trim()}
+                        className="h-7 px-2"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </Button>
+                    </div>
+                    {(newCall.tasks || []).length === 0 && (
+                      <p className="text-[10px] text-slate-400 text-center">Tasks added here will appear on every deployed call for this time slot</p>
+                    )}
+                  </div>
+                </div>
+
+                <Button
                   onClick={handleAddCall}
                   disabled={!newCall.time || newCall.duration === ''}
                   className="w-full bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1186,6 +1243,14 @@ ${formData.care_plan ? `CARE PLAN DETAILS:\n${formData.care_plan}` : ''}`;
                       <div className="flex-1">
                         <p className="font-medium text-slate-900">{call.time} - {call.duration} mins ({call.type})</p>
                         {call.notes && <p className="text-sm text-slate-500">{call.notes}</p>}
+                        {call.tasks && call.tasks.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            <ListChecks className="w-3 h-3 text-slate-400 mt-0.5" />
+                            {call.tasks.map((task, ti) => (
+                              <span key={ti} className="text-[10px] bg-slate-100 text-slate-600 rounded px-1.5 py-0.5 border">{task}</span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <div className="flex gap-2">
                         <Button

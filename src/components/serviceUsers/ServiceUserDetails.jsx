@@ -36,7 +36,8 @@ import {
   Loader2,
   X,
   Plus,
-  Clock
+  Clock,
+  ListChecks
 } from 'lucide-react';
 
 export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit, onEditDisabled = false, careLogs = [] }) {
@@ -109,7 +110,8 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
   // ── Call Times editing state ──
   const [callTimesLocal, setCallTimesLocal] = useState([]);
   const [editingCallIdx, setEditingCallIdx] = useState(null);
-  const [newCall, setNewCall] = useState({ time: '09:00', duration: 30, types: [], notes: '' });
+  const [newCall, setNewCall] = useState({ time: '09:00', duration: 30, types: [], notes: '', tasks: [] });
+  const [newTaskInput, setNewTaskInput] = useState('');
   const [isCallTypeManagerOpen, setIsCallTypeManagerOpen] = useState(false);
   const callFormRef = React.useRef(null);
 
@@ -232,7 +234,7 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
       return;
     }
     const updated = [...callTimesLocal];
-    const entry = { time: newCall.time, duration: parseInt(newCall.duration) || 30, types: newCall.types, type: newCall.types[0], notes: newCall.notes };
+    const entry = { time: newCall.time, duration: parseInt(newCall.duration) || 30, types: newCall.types, type: newCall.types[0], notes: newCall.notes, tasks: newCall.tasks || [] };
     if (editingCallIdx !== null) {
       updated[editingCallIdx] = entry;
       setEditingCallIdx(null);
@@ -242,12 +244,24 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
     updated.sort((a, b) => a.time.localeCompare(b.time));
     setCallTimesLocal(updated);
     setCallTimesDirty(true);
-    setNewCall({ time: '09:00', duration: 30, types: [], notes: '' });
+    setNewCall({ time: '09:00', duration: 30, types: [], notes: '', tasks: [] });
+    setNewTaskInput('');
+  };
+
+  const handleAddTask = () => {
+    const text = newTaskInput.trim();
+    if (!text) return;
+    setNewCall(prev => ({ ...prev, tasks: [...(prev.tasks || []), text] }));
+    setNewTaskInput('');
+  };
+
+  const handleRemoveTask = (idx) => {
+    setNewCall(prev => ({ ...prev, tasks: (prev.tasks || []).filter((_, i) => i !== idx) }));
   };
 
   const handleEditCall = (idx) => {
     const call = callTimesLocal[idx];
-    setNewCall({ time: call.time, duration: call.duration, types: normalizeTypes(call), notes: call.notes || '' });
+    setNewCall({ time: call.time, duration: call.duration, types: normalizeTypes(call), notes: call.notes || '', tasks: call.tasks || [] });
     setEditingCallIdx(idx);
     // Scroll to the edit form so it's visible on mobile
     setTimeout(() => {
@@ -629,6 +643,47 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
                     placeholder="e.g. Morning medication round"
                   />
                 </div>
+
+                {/* Recurring Tasks */}
+                <div className="mt-3">
+                  <Label className="text-xs flex items-center gap-1">
+                    <ListChecks className="w-3 h-3" />
+                    Recurring Tasks
+                  </Label>
+                  <div className="p-2 bg-white rounded border mt-1 space-y-1.5">
+                    {(newCall.tasks || []).map((task, i) => (
+                      <div key={i} className="flex items-center justify-between py-1 px-2 bg-slate-50 rounded border text-xs">
+                        <span className="text-slate-700">{task}</span>
+                        <button type="button" onClick={() => handleRemoveTask(i)} className="text-red-400 hover:text-red-600 ml-2">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                    <div className="flex gap-1">
+                      <Input
+                        value={newTaskInput}
+                        onChange={(e) => setNewTaskInput(e.target.value)}
+                        placeholder="Add a task (e.g. Give medication)..."
+                        className="h-7 text-xs"
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddTask(); } }}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={handleAddTask}
+                        disabled={!newTaskInput.trim()}
+                        className="h-7 px-2"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </Button>
+                    </div>
+                    {(newCall.tasks || []).length === 0 && (
+                      <p className="text-[10px] text-slate-400 text-center">Tasks added here will appear on every deployed call for this time slot</p>
+                    )}
+                  </div>
+                </div>
+
                 <div className="flex gap-2 mt-3">
                   <Button
                     onClick={handleSaveCallTime}
@@ -645,7 +700,8 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
                       size="sm"
                       onClick={() => {
                         setEditingCallIdx(null);
-                        setNewCall({ time: '09:00', duration: 30, types: [], notes: '' });
+                        setNewCall({ time: '09:00', duration: 30, types: [], notes: '', tasks: [] });
+                        setNewTaskInput('');
                       }}
                     >
                       Cancel
@@ -678,6 +734,16 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
                         })}
                       </div>
                       {call.notes && <p className="text-sm text-slate-500 mt-1">{call.notes}</p>}
+                      {call.tasks && call.tasks.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          <ListChecks className="w-3 h-3 text-slate-400 mt-0.5" />
+                          {call.tasks.map((task, ti) => (
+                            <Badge key={ti} variant="outline" className="text-[10px] py-0 px-1.5 bg-slate-50">
+                              {task}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     {isAdmin && (
                       <div className="flex gap-1">
