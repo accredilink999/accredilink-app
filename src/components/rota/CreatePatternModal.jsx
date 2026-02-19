@@ -135,6 +135,7 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
       queryClient.invalidateQueries({ queryKey: ['shift-patterns'] });
       // Deploy pattern: assign staff to matching blank shifts on the rota
       if (!pattern) {
+        toast.success('Pattern saved successfully!');
         try {
           await createShiftsFromPattern(createdPattern, formData.repeat_count);
         } catch (error) {
@@ -153,7 +154,8 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
       setTimeout(() => { skipDraftSave.current = false; }, 100);
     },
     onError: (error) => {
-      toast.error('Failed: ' + error.message);
+      console.error('[CreatePatternModal] Save error:', error);
+      toast.error('Failed to save pattern: ' + (error.message || 'Unknown error'));
     },
   });
 
@@ -311,25 +313,37 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
 
 
 
-  const handleSubmit = async () => {
-    const staffMember = staff.find(s => s.id === formData.staff_id);
-    const { repeat_count, ...patternFields } = formData;
-    const area = rotaAreas.find(a => a.id === formData.rota_area_id);
+  const handleSubmit = () => {
+    try {
+      const staffMember = staff.find(s => s.id === formData.staff_id);
+      const { repeat_count, ...patternFields } = formData;
+      const area = rotaAreas.find(a => a.id === formData.rota_area_id);
 
-    // Compute derived fields for PatternManager display
-    const uniqueDays = [...new Set(formData.shifts.map(s => s.day_of_week))];
-    const allStartTimes = formData.shifts.map(s => s.start_time).sort();
-    const allEndTimes = formData.shifts.map(s => s.end_time).sort();
+      // Compute derived fields for PatternManager display
+      const uniqueDays = [...new Set(formData.shifts.map(s => s.day_of_week))];
+      const allStartTimes = formData.shifts.map(s => s.start_time).filter(Boolean).sort();
+      const allEndTimes = formData.shifts.map(s => s.end_time).filter(Boolean).sort();
 
-    createPatternMutation.mutate({
-      ...patternFields,
-      staff_name: staffMember?.staff_full_name || staffMember?.full_name,
-      rota_area_name: area?.name || '',
-      is_active: true,
-      days_of_week: uniqueDays,
-      start_time: allStartTimes[0] || '',
-      end_time: allEndTimes[allEndTimes.length - 1] || '',
-    });
+      const payload = {
+        pattern_name: patternFields.pattern_name,
+        staff_id: patternFields.staff_id,
+        pattern_type: patternFields.pattern_type,
+        rota_area_id: patternFields.rota_area_id,
+        shifts: patternFields.shifts,
+        staff_name: staffMember?.staff_full_name || staffMember?.full_name || '',
+        rota_area_name: area?.name || '',
+        is_active: true,
+        days_of_week: uniqueDays,
+        start_time: allStartTimes[0] || '',
+        end_time: allEndTimes[allEndTimes.length - 1] || '',
+      };
+
+      console.log('[CreatePatternModal] Saving pattern:', payload);
+      createPatternMutation.mutate(payload);
+    } catch (err) {
+      console.error('[CreatePatternModal] handleSubmit error:', err);
+      toast.error('Error preparing pattern: ' + err.message);
+    }
   };
 
 

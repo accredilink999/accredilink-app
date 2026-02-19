@@ -24,10 +24,17 @@ CREATE TABLE IF NOT EXISTS shift_patterns (
 ALTER TABLE shift_patterns ENABLE ROW LEVEL SECURITY;
 
 -- Allow all operations for authenticated users
-CREATE POLICY "shift_patterns_auth_all" ON shift_patterns
-  FOR ALL
-  USING (auth.uid() IS NOT NULL)
-  WITH CHECK (auth.uid() IS NOT NULL);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'shift_patterns' AND policyname = 'shift_patterns_auth_all'
+  ) THEN
+    CREATE POLICY "shift_patterns_auth_all" ON shift_patterns
+      FOR ALL
+      USING (auth.uid() IS NOT NULL)
+      WITH CHECK (auth.uid() IS NOT NULL);
+  END IF;
+END $$;
 
 -- Auto-update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_shift_patterns_updated_at()
@@ -38,6 +45,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS shift_patterns_updated_at ON shift_patterns;
 CREATE TRIGGER shift_patterns_updated_at
   BEFORE UPDATE ON shift_patterns
   FOR EACH ROW

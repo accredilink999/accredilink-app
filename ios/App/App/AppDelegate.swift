@@ -1,6 +1,7 @@
 import UIKit
 import Capacitor
 import UserNotifications
+import WebKit
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterDelegate {
@@ -8,6 +9,25 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        // ── CRITICAL: Clear cached service workers BEFORE WebView loads ────
+        // A stale service worker cached in WKWebView causes a blank/black
+        // screen by intercepting the page load with a broken navigate() call.
+        // Clearing here (in AppDelegate) runs BEFORE the ViewController and
+        // Capacitor bridge set up the WebView, giving the async operation
+        // time to finish before the URL is loaded.
+        let swTypes: Set<String> = [
+            WKWebsiteDataTypeDiskCache,
+            WKWebsiteDataTypeMemoryCache,
+            WKWebsiteDataTypeOfflineWebApplicationCache,
+            WKWebsiteDataTypeServiceWorkerRegistrations,
+        ]
+        WKWebsiteDataStore.default().removeData(
+            ofTypes: swTypes,
+            modifiedSince: Date.distantPast
+        ) {
+            print("[AppDelegate] Cleared WKWebView service workers + caches")
+        }
+
         // Set notification delegate for foreground notifications
         UNUserNotificationCenter.current().delegate = self
 
