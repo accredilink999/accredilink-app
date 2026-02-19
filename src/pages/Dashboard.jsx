@@ -153,7 +153,17 @@ export default function Dashboard() {
     enabled: isAdmin,
   });
 
-  const totalAdminTasks = openIncidents.length + pendingLeave.length;
+  // Pending swap requests needing admin approval
+  const { data: pendingSwapsAdmin = [] } = useQuery({
+    queryKey: ['pendingSwapsAdmin'],
+    queryFn: async () => {
+      const all = await base44.entities.ShiftSwapRequest.filter({ status: 'pending_admin' });
+      return all;
+    },
+    enabled: isAdmin,
+  });
+
+  const totalAdminTasks = (isAdmin ? pendingLeave.length + pendingClaimsAdmin.length + pendingSwapsAdmin.length : 0) + openIncidents.length;
 
   const { data: conversations = [] } = useQuery({
     queryKey: ['conversations', user?.id],
@@ -293,18 +303,20 @@ export default function Dashboard() {
       )}
 
       {/* Alerts Banner */}
-      {(openIncidents.length > 0 || (pendingLeave.length > 0 && isAdmin) || (pendingClaimsAdmin.length > 0 && isAdmin)) &&
+      {totalAdminTasks > 0 &&
       <Card className="bg-gradient-to-br text-card-foreground p-4 rounded-md sm:p-5 from-amber-50 to-orange-50 border-0 shadow-sm">
           <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2 text-sm sm:text-base">
             <Bell className="w-4 h-4 text-amber-600 flex-shrink-0" />
             Attention Required
+            <Badge variant="secondary" className="bg-red-500 text-white text-xs ml-auto">{totalAdminTasks}</Badge>
           </h3>
           <div className="space-y-2">
             {openIncidents.length > 0 &&
           <Link to={createPageUrl('Incidents')}>
                 <div className="flex items-center gap-3 p-3 bg-white/80 rounded-lg hover:bg-white transition-colors">
                   <AlertTriangle className="w-5 h-5 text-red-500" />
-                  <span className="text-sm font-medium">{openIncidents.length} open incident{openIncidents.length > 1 ? 's' : ''}</span>
+                  <span className="text-sm font-medium flex-1">{openIncidents.length} open incident{openIncidents.length > 1 ? 's' : ''}</span>
+                  <Badge variant="secondary" className="bg-red-100 text-red-700 text-xs flex-shrink-0">{openIncidents.length}</Badge>
                 </div>
               </Link>
           }
@@ -312,7 +324,8 @@ export default function Dashboard() {
           <Link to={createPageUrl('LeaveRequests')}>
                 <div className="flex items-center gap-3 p-3 bg-white/80 rounded-lg hover:bg-white transition-colors">
                   <FileText className="w-5 h-5 text-amber-500" />
-                  <span className="text-sm font-medium">{pendingLeave.length} pending leave request{pendingLeave.length > 1 ? 's' : ''}</span>
+                  <span className="text-sm font-medium flex-1">{pendingLeave.length} pending leave request{pendingLeave.length > 1 ? 's' : ''}</span>
+                  <Badge variant="secondary" className="bg-amber-100 text-amber-700 text-xs flex-shrink-0">{pendingLeave.length}</Badge>
                 </div>
               </Link>
           }
@@ -320,7 +333,17 @@ export default function Dashboard() {
           <Link to={createPageUrl('RequestsManagement')}>
                 <div className="flex items-center gap-3 p-3 bg-white/80 rounded-lg hover:bg-white transition-colors">
                   <Hand className="w-5 h-5 text-purple-500" />
-                  <span className="text-sm font-medium">{pendingClaimsAdmin.length} pending shift claim{pendingClaimsAdmin.length > 1 ? 's' : ''}</span>
+                  <span className="text-sm font-medium flex-1">{pendingClaimsAdmin.length} pending shift claim{pendingClaimsAdmin.length > 1 ? 's' : ''}</span>
+                  <Badge variant="secondary" className="bg-purple-100 text-purple-700 text-xs flex-shrink-0">{pendingClaimsAdmin.length}</Badge>
+                </div>
+              </Link>
+          }
+            {pendingSwapsAdmin.length > 0 && isAdmin &&
+          <Link to={createPageUrl('RequestsManagement')}>
+                <div className="flex items-center gap-3 p-3 bg-white/80 rounded-lg hover:bg-white transition-colors">
+                  <ArrowRightLeft className="w-5 h-5 text-blue-500" />
+                  <span className="text-sm font-medium flex-1">{pendingSwapsAdmin.length} shift swap{pendingSwapsAdmin.length > 1 ? 's' : ''} awaiting approval</span>
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-700 text-xs flex-shrink-0">{pendingSwapsAdmin.length}</Badge>
                 </div>
               </Link>
           }
