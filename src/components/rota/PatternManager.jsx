@@ -312,7 +312,7 @@ export default function PatternManager({ open, onClose }) {
       toast.info('Deploying pattern...');
 
       const shiftsToCreate = [];
-      const startDate = new Date();
+      const startDate = pattern.start_date ? new Date(pattern.start_date + 'T00:00:00') : new Date();
       const daysPerCycle = pattern.pattern_type === 'weekly' ? 7 :
                            pattern.pattern_type === 'two_week' ? 14 :
                            pattern.pattern_type === 'three_week' ? 21 : 28;
@@ -523,6 +523,11 @@ export default function PatternManager({ open, onClose }) {
                         <p className="text-sm text-slate-500">
                           {pattern.start_time} - {pattern.end_time}
                         </p>
+                        {pattern.start_date && (
+                          <p className="text-xs text-slate-400">
+                            Starts: {new Date(pattern.start_date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </p>
+                        )}
                       </div>
                       <Badge className={pattern.is_active ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-800'}>
                         {pattern.is_active ? 'Active' : 'Inactive'}

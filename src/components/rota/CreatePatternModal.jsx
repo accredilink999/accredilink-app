@@ -25,6 +25,7 @@ const defaultFormData = {
   rota_area_id: '',
   shifts: [],
   repeat_count: 1,
+  start_date: new Date().toISOString().split('T')[0],
 };
 
 const hasMeaningfulData = (data) =>
@@ -40,6 +41,7 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
         rota_area_id: pattern.rota_area_id || '',
         shifts: pattern.shifts || [],
         repeat_count: 1,
+        start_date: pattern.start_date || new Date().toISOString().split('T')[0],
       } : { ...defaultFormData }
     );
   const [showDraftBanner, setShowDraftBanner] = useState(false);
@@ -162,7 +164,7 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
   const createShiftsFromPattern = async (patternData, numRepeats, patternId) => {
     const staffMember = staff.find(s => s.id === formData.staff_id);
     const staffName = staffMember?.staff_full_name || staffMember?.full_name;
-    const startDate = new Date();
+    const startDate = formData.start_date ? new Date(formData.start_date + 'T00:00:00') : new Date();
     const dayMap = { monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6, sunday: 0 };
 
     const daysPerCycle = formData.pattern_type === 'weekly' ? 7 :
@@ -354,6 +356,7 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
         days_of_week: uniqueDays,
         start_time: allStartTimes[0] || '',
         end_time: allEndTimes[allEndTimes.length - 1] || '',
+        start_date: patternFields.start_date || new Date().toISOString().split('T')[0],
       };
 
       console.log('[CreatePatternModal] Saving pattern:', payload);
@@ -599,6 +602,15 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
                 </SelectContent>
               </Select>
             </div>
+
+              <div className="space-y-2">
+                <Label>Start Date</Label>
+                <Input
+                  type="date"
+                  value={formData.start_date}
+                  onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                />
+              </div>
 
               <div className="space-y-2">
                 <Label>Deploy for how many weeks?</Label>
