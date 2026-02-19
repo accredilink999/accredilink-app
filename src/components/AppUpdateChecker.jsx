@@ -1,11 +1,12 @@
 /**
  * AppUpdateChecker
  *
- * Shows an update popup when a newer APK exists.
+ * Shows an update banner when a newer APK exists.
  * On native (Capacitor): reads the INSTALLED app version from the native
  * binary via @capacitor/app. On web: no-op since Vercel always serves latest.
  *
- * Re-shows on every app open — staff can dismiss but it comes back next session.
+ * Uses localStorage so dismiss persists until a NEW version is released.
+ * Non-blocking banner at top — does not cover the app.
  */
 
 import { useState, useEffect } from 'react';
@@ -13,7 +14,7 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { isUpdateAvailable } from '@/lib/appVersion';
 import { openExternalUrl } from '@/lib/openExternalUrl';
-import { Download, X, Smartphone } from 'lucide-react';
+import { Download, X } from 'lucide-react';
 
 export default function AppUpdateChecker() {
   const [dismissed, setDismissed] = useState(false);
@@ -58,18 +59,17 @@ export default function AppUpdateChecker() {
 
   const latestVersion = latestInfo?.version;
   const downloadUrl = latestInfo?.file_url;
-  const releaseNotes = latestInfo?.notes;
 
   // Compare INSTALLED native version against latest in database
   const updateAvailable = native && installedVersion && latestVersion
     ? isUpdateAvailable(installedVersion, latestVersion)
     : false;
 
-  // Only use sessionStorage — popup comes back every time the app is opened fresh
+  // Persistent dismiss — stays gone until a NEW version is released
   useEffect(() => {
     if (latestVersion) {
-      const key = `update-dismissed-session-${latestVersion}`;
-      if (sessionStorage.getItem(key)) {
+      const key = `update-dismissed-${latestVersion}`;
+      if (localStorage.getItem(key)) {
         setDismissed(true);
       }
     }
@@ -87,8 +87,7 @@ export default function AppUpdateChecker() {
   if (android && !downloadUrl) return null;
 
   const handleDismiss = () => {
-    // Only dismiss for this session — shows again next app open
-    sessionStorage.setItem(`update-dismissed-session-${latestVersion}`, '1');
+    localStorage.setItem(`update-dismissed-${latestVersion}`, '1');
     setDismissed(true);
   };
 
@@ -96,7 +95,6 @@ export default function AppUpdateChecker() {
     setDownloading(true);
     try {
       await openExternalUrl(downloadUrl);
-      // Show success state briefly then dismiss
       setTimeout(() => {
         setDownloading(false);
         handleDismiss();
@@ -108,67 +106,34 @@ export default function AppUpdateChecker() {
   };
 
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 fade-in duration-200">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-teal-500 to-teal-600 p-5 text-white text-center">
-          <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
-            <Smartphone className="w-8 h-8" />
-          </div>
-          <h2 className="font-bold text-xl">App Update Available</h2>
-          <p className="text-teal-100 text-sm mt-1">
-            Version {latestVersion} is ready to install
+    <div className="fixed top-0 left-0 right-0 z-[99999] p-3 animate-in slide-in-from-top duration-300">
+      <div className="bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden max-w-sm mx-auto">
+        <div className="bg-gradient-to-r from-teal-500 to-teal-600 px-4 py-2.5 flex items-center justify-between">
+          <p className="text-white text-sm font-semibold">
+            Update v{latestVersion} available
           </p>
+          <button onClick={handleDismiss} className="text-white/70 hover:text-white p-1">
+            <X className="w-4 h-4" />
+          </button>
         </div>
-
-        {/* Content */}
-        <div className="p-5 space-y-4">
-          {releaseNotes && (
-            <div className="bg-slate-50 rounded-lg p-3">
-              <p className="text-xs font-medium text-slate-500 mb-1">What's new</p>
-              <p className="text-sm text-slate-700">{releaseNotes}</p>
-            </div>
-          )}
-          {!releaseNotes && (
-            <p className="text-sm text-slate-600 text-center">
-              A new version is available with the latest features and bug fixes.
-            </p>
-          )}
-
-          <p className="text-xs text-slate-400 text-center">
-            You have v{installedVersion} installed
+        <div className="px-4 py-3 flex items-center gap-3">
+          <p className="text-xs text-slate-500 flex-1">
+            You have v{installedVersion}.
+            {downloading
+              ? ' Downloading — check notifications to install.'
+              : ios
+                ? ' Open TestFlight to update.'
+                : ' Tap to download the latest version.'}
           </p>
-
-          <div className="space-y-2">
-            {android && (
-              <button
-                onClick={handleDownload}
-                disabled={downloading}
-                className="w-full px-4 py-4 text-base font-bold text-white bg-teal-600 rounded-xl hover:bg-teal-700 active:bg-teal-800 transition-colors flex items-center justify-center gap-3 min-h-[56px] touch-manipulation disabled:opacity-70"
-              >
-                <Download className="w-5 h-5" />
-                {downloading ? 'Downloading... Check notifications' : 'Update Now'}
-              </button>
-            )}
-            {ios && (
-              <div className="bg-blue-50 rounded-lg p-3 text-center">
-                <p className="text-sm text-blue-700">
-                  Open TestFlight to install the latest version.
-                </p>
-              </div>
-            )}
-            {downloading && android && (
-              <p className="text-xs text-green-600 text-center font-medium">
-                The update is downloading. You'll see a notification when it's ready — tap it to install.
-              </p>
-            )}
+          {android && !downloading && (
             <button
-              onClick={handleDismiss}
-              className="w-full px-4 py-2.5 text-sm text-slate-400 hover:text-slate-600 transition-colors"
+              onClick={handleDownload}
+              className="flex-shrink-0 px-3 py-1.5 text-sm font-bold text-white bg-teal-600 rounded-lg hover:bg-teal-700 active:bg-teal-800 transition-colors flex items-center gap-1.5 touch-manipulation"
             >
-              Not now
+              <Download className="w-3.5 h-3.5" />
+              Update
             </button>
-          </div>
+          )}
         </div>
       </div>
     </div>
