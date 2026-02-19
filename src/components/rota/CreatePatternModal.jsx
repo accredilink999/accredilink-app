@@ -458,7 +458,7 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
               </div>
 
               <div className="space-y-2">
-                <Label>Deploy for how many weeks?</Label>
+                <Label>Deploy for how many repeats?</Label>
                 <Select
                   value={formData.repeat_count.toString()}
                   onValueChange={(value) => setFormData({ ...formData, repeat_count: parseInt(value) })}
@@ -469,7 +469,7 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
                   <SelectContent>
                     {Array.from({ length: 56 }, (_, i) => i + 1).map((num) => (
                       <SelectItem key={num} value={num.toString()}>
-                        {num} {num === 1 ? 'week' : 'weeks'}
+                        {num} {num === 1 ? 'repeat' : 'repeats'}
                       </SelectItem>
                     ))}
                   </SelectContent>
