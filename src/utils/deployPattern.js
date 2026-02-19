@@ -312,18 +312,24 @@ export async function deployPatternShifts({
 export async function clearPatternShifts({ patternId, staffId, areaId }) {
   const today = new Date().toISOString().split('T')[0];
   let total = 0;
+  const partnerIds = new Set(); // collect paired shift IDs so we can clear the other side
 
   // 1. By shift_pattern_id (only if staff still matches — skip swapped shifts)
   if (patternId) {
     let q = supabase
       .from('shifts')
-      .select('id, shift_name')
+      .select('id, shift_name, paired_shift_id')
       .eq('shift_pattern_id', patternId)
       .gte('date', today);
     if (staffId) q = q.eq('staff_id', staffId);
     const { data } = await q;
 
     if (data && data.length > 0) {
+      // Collect partner shift IDs before clearing
+      for (const s of data) {
+        if (s.paired_shift_id) partnerIds.add(s.paired_shift_id);
+      }
+
       const toRevert = data.filter(s => s.shift_name).map(s => s.id);
       const toDelete = data.filter(s => !s.shift_name).map(s => s.id);
       const allIds = data.map(s => s.id);
@@ -345,11 +351,16 @@ export async function clearPatternShifts({ patternId, staffId, areaId }) {
 
   // 2. Fallback: by staff_id + area
   if (staffId) {
-    let q = supabase.from('shifts').select('id, shift_name').eq('staff_id', staffId).gte('date', today);
+    let q = supabase.from('shifts').select('id, shift_name, paired_shift_id').eq('staff_id', staffId).gte('date', today);
     if (areaId) q = q.eq('rota_area_id', areaId);
     const { data } = await q;
 
     if (data && data.length > 0) {
+      // Collect partner shift IDs before clearing
+      for (const s of data) {
+        if (s.paired_shift_id) partnerIds.add(s.paired_shift_id);
+      }
+
       // Shifts WITH shift_name = original template slots → revert to blank
       const toRevert = data.filter(s => s.shift_name).map(s => s.id);
       // Shifts WITHOUT shift_name = orphans from old deploy → delete entirely
@@ -368,6 +379,16 @@ export async function clearPatternShifts({ patternId, staffId, areaId }) {
         await supabase.from('shifts').delete().in('id', toDelete.slice(i, i + BATCH));
       }
       total += data.length;
+    }
+  }
+
+  // 3. Clear pairing on partner shifts (e.g. Agnes no longer shows "paired with Sam")
+  if (partnerIds.size > 0) {
+    const ids = [...partnerIds];
+    for (let i = 0; i < ids.length; i += BATCH) {
+      await supabase.from('shifts')
+        .update({ paired_shift_id: null, paired_staff_name: null })
+        .in('id', ids.slice(i, i + BATCH));
     }
   }
 

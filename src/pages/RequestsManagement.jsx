@@ -192,7 +192,7 @@ export default function RequestsManagement() {
         // 1. Find all shifts for this staff in the leave date range
         const { data: affectedShifts = [] } = await supabase
           .from('shifts')
-          .select('id, date, start_time, end_time, shift_name, rota_area_id')
+          .select('id, date, start_time, end_time, shift_name, rota_area_id, paired_shift_id')
           .eq('staff_id', request.staff_id)
           .gte('date', request.start_date)
           .lte('date', request.end_date);
@@ -204,9 +204,17 @@ export default function RequestsManagement() {
             .delete()
             .eq('shift_id', shift.id);
 
+          // Clear pairing on the partner's shift (e.g. Agnes no longer shows "paired with Sam")
+          if (shift.paired_shift_id) {
+            await supabase
+              .from('shifts')
+              .update({ paired_shift_id: null, paired_staff_name: null })
+              .eq('id', shift.paired_shift_id);
+          }
+
           await supabase
             .from('shifts')
-            .update({ staff_id: null, staff_name: null, paired_staff_id: null, paired_staff_name: null, shift_pattern_id: null })
+            .update({ staff_id: null, staff_name: null, paired_shift_id: null, paired_staff_name: null, shift_pattern_id: null })
             .eq('id', shift.id);
         }
 
