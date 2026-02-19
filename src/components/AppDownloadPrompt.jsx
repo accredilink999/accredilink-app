@@ -8,7 +8,8 @@ export default function AppDownloadPrompt() {
 
   useEffect(() => {
     // Check if app is installed via native markers
-    const isNativeApp = window.navigator.standalone === true || 
+    const isNativeApp = window.Capacitor?.isNativePlatform?.() ||
+                        window.navigator.standalone === true ||
                         window.matchMedia('(display-mode: standalone)').matches ||
                         localStorage.getItem('app_installed');
 
