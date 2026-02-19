@@ -82,7 +82,47 @@ export async function deployPatternShifts({
   console.log(`[deploy ${VER}] ${targets.length} targets. First 10:`, targets.slice(0, 10));
   toast.info(`${VER}: ${targets.length} target slots from pattern`);
 
-  // ── Step 2: Fetch ALL blank shifts in area (paginated) ──
+  // ── Step 1b: Fix shifts missing shift_name (set from shift_types by times) ──
+  {
+    const { data: noNameShifts } = await supabase
+      .from('shifts')
+      .select('id, start_time, end_time')
+      .is('shift_name', null)
+      .eq('rota_area_id', areaId)
+      .gte('date', startDate)
+      .lte('date', endDate)
+      .limit(2000);
+
+    if (noNameShifts && noNameShifts.length > 0) {
+      // Fetch shift types to match by times
+      const { data: stTypes } = await supabase.from('shift_types').select('name, start_time, end_time');
+      if (stTypes && stTypes.length > 0) {
+        const typeMap = {};
+        for (const st of stTypes) {
+          typeMap[`${st.start_time}|${st.end_time}`] = st.name;
+        }
+        // Group by matched type for batch updates
+        const byName = {};
+        for (const s of noNameShifts) {
+          const name = typeMap[`${s.start_time}|${s.end_time}`];
+          if (name) {
+            if (!byName[name]) byName[name] = [];
+            byName[name].push(s.id);
+          }
+        }
+        let fixed = 0;
+        for (const [name, ids] of Object.entries(byName)) {
+          for (let i = 0; i < ids.length; i += BATCH) {
+            await supabase.from('shifts').update({ shift_name: name }).in('id', ids.slice(i, i + BATCH));
+          }
+          fixed += ids.length;
+        }
+        if (fixed > 0) toast.info(`${VER}: Fixed shift type on ${fixed} shifts`);
+      }
+    }
+  }
+
+  // ── Step 2: Fetch ALL blank shifts in area with a shift_name (paginated) ──
   let blanks = [];
   let offset = 0;
   while (true) {
@@ -90,6 +130,7 @@ export async function deployPatternShifts({
       .from('shifts')
       .select('id, date, start_time, end_time, shift_name')
       .is('staff_id', null)
+      .not('shift_name', 'is', null)
       .eq('rota_area_id', areaId)
       .gte('date', startDate)
       .lte('date', endDate)
@@ -289,19 +330,27 @@ export async function clearPatternShifts({ patternId, staffId, areaId }) {
 
   // 2. Fallback: by staff_id + area
   if (staffId) {
-    let q = supabase.from('shifts').select('id').eq('staff_id', staffId).gte('date', today);
+    let q = supabase.from('shifts').select('id, shift_name').eq('staff_id', staffId).gte('date', today);
     if (areaId) q = q.eq('rota_area_id', areaId);
     const { data } = await q;
 
     if (data && data.length > 0) {
-      const ids = data.map(s => s.id);
-      for (let i = 0; i < ids.length; i += BATCH) {
-        await supabase.from('shift_calls').delete().in('shift_id', ids.slice(i, i + BATCH));
+      // Shifts WITH shift_name = original template slots → revert to blank
+      const toRevert = data.filter(s => s.shift_name).map(s => s.id);
+      // Shifts WITHOUT shift_name = orphans from old deploy → delete entirely
+      const toDelete = data.filter(s => !s.shift_name).map(s => s.id);
+      const allIds = data.map(s => s.id);
+
+      for (let i = 0; i < allIds.length; i += BATCH) {
+        await supabase.from('shift_calls').delete().in('shift_id', allIds.slice(i, i + BATCH));
       }
-      for (let i = 0; i < ids.length; i += BATCH) {
+      for (let i = 0; i < toRevert.length; i += BATCH) {
         await supabase.from('shifts')
           .update({ staff_id: null, staff_name: null, shift_pattern_id: null, paired_shift_id: null, paired_staff_name: null })
-          .in('id', ids.slice(i, i + BATCH));
+          .in('id', toRevert.slice(i, i + BATCH));
+      }
+      for (let i = 0; i < toDelete.length; i += BATCH) {
+        await supabase.from('shifts').delete().in('id', toDelete.slice(i, i + BATCH));
       }
       total += data.length;
     }
