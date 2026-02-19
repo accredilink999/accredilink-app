@@ -199,14 +199,19 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
     queryKey: ['availableShifts', shift.date, shift.id],
     queryFn: async () => {
       try {
-        const allShifts = await ShiftApi.list('-created_at', 500);
-        const filtered = allShifts.filter(s =>
-          s.date === shift.date &&
-          s.id !== shift.id &&
+        // Query shifts on same date directly from Supabase (server-side filter)
+        const { data: dateShifts, error } = await supabase
+          .from('shifts')
+          .select('*')
+          .eq('date', shift.date)
+          .not('staff_id', 'is', null)
+          .neq('id', shift.id);
+        if (error) throw error;
+        // Filter out already paired and same-staff shifts
+        return (dateShifts || []).filter(s =>
           (!s.paired_shift_id || s.paired_shift_id === '') &&
-          s.staff_id && s.staff_id !== shift.staff_id
+          s.staff_id !== shift.staff_id
         );
-        return filtered;
       } catch (error) {
         console.error('Error fetching available shifts:', error);
         return [];
