@@ -285,65 +285,65 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
                 <p className="text-xs text-slate-400 text-center py-2">No shifts</p>
               ) : (
                 dayShifts.map((shift) => (
-                  <div key={shift.index} className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg">
-                    <Select
-                       value={shift.shift_type}
-                       onValueChange={(value) => {
-                         updateShift(shift.index, 'shift_type', value);
-                         const selectedShiftType = shiftTypes.find(st => st.id === value);
-                         if (selectedShiftType?.start_time && selectedShiftType?.end_time) {
-                           updateShift(shift.index, 'start_time', selectedShiftType.start_time);
-                           updateShift(shift.index, 'end_time', selectedShiftType.end_time);
-                         }
-                       }}
-                     >
-                       <SelectTrigger className="w-28 h-8 text-xs">
-                         <SelectValue />
-                       </SelectTrigger>
-                       <SelectContent>
-                         {shiftTypes.length > 0 ? (
-                           shiftTypes.map((st) => (
-                             <SelectItem key={st.id} value={st.id}>
-                               {st.name}
-                             </SelectItem>
-                           ))
-                         ) : (
-                           <>
-                             <SelectItem value="early">Early</SelectItem>
-                             <SelectItem value="late">Late</SelectItem>
-                             <SelectItem value="night">Night</SelectItem>
-                             <SelectItem value="long_day">Long Day</SelectItem>
-                           </>
-                         )}
-                       </SelectContent>
-                     </Select>
-
+                  <div key={shift.index} className="bg-slate-50 p-2 rounded-lg space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Select
+                         value={shift.shift_type}
+                         onValueChange={(value) => {
+                           updateShift(shift.index, 'shift_type', value);
+                           const selectedShiftType = shiftTypes.find(st => st.id === value);
+                           if (selectedShiftType?.start_time && selectedShiftType?.end_time) {
+                             updateShift(shift.index, 'start_time', selectedShiftType.start_time);
+                             updateShift(shift.index, 'end_time', selectedShiftType.end_time);
+                           }
+                         }}
+                       >
+                         <SelectTrigger className="flex-1 h-8 text-xs">
+                           <SelectValue />
+                         </SelectTrigger>
+                         <SelectContent>
+                           {shiftTypes.length > 0 ? (
+                             shiftTypes.map((st) => (
+                               <SelectItem key={st.id} value={st.id}>
+                                 {st.name}
+                               </SelectItem>
+                             ))
+                           ) : (
+                             <>
+                               <SelectItem value="early">Early</SelectItem>
+                               <SelectItem value="late">Late</SelectItem>
+                               <SelectItem value="night">Night</SelectItem>
+                               <SelectItem value="long_day">Long Day</SelectItem>
+                             </>
+                           )}
+                         </SelectContent>
+                       </Select>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => removeShift(shift.index)}
+                        className="h-7 w-7 p-0 flex-shrink-0"
+                      >
+                        <Trash2 className="w-3 h-3 text-red-600" />
+                      </Button>
+                    </div>
                     <div className="flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-slate-400" />
+                      <Clock className="w-3 h-3 text-slate-400 flex-shrink-0" />
                       <Input
                         type="time"
                         value={shift.start_time}
                         onChange={(e) => updateShift(shift.index, 'start_time', e.target.value)}
-                        className="w-24 h-8 text-xs"
+                        className="flex-1 h-8 text-xs"
                       />
                       <span className="text-xs text-slate-400">-</span>
                       <Input
                         type="time"
                         value={shift.end_time}
                         onChange={(e) => updateShift(shift.index, 'end_time', e.target.value)}
-                        className="w-24 h-8 text-xs"
+                        className="flex-1 h-8 text-xs"
                       />
                     </div>
-
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => removeShift(shift.index)}
-                      className="h-7 w-7 p-0 ml-auto"
-                    >
-                      <Trash2 className="w-3 h-3 text-red-600" />
-                    </Button>
                   </div>
                 ))
               )}
