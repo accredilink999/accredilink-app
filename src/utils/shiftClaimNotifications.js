@@ -77,15 +77,31 @@ export async function notifyClaimApproved({ claim, adminName, areaId }) {
 }
 
 /**
- * Leave approved → shifts released as available → notify area admins
+ * Get all active staff IDs in a given area (for broadcasting shift availability).
  */
-export async function notifyShiftsReleased({ staffName, shiftCount, startDate, endDate, areaId }) {
+async function getAreaStaffIds(areaId, excludeIds = []) {
+  const allUsers = await base44.entities.User.list()
+  let staff = allUsers.filter(u => u.is_active !== false && !excludeIds.includes(u.id))
+
+  if (areaId) {
+    const areaPermissions = await base44.entities.RotaPermission.filter({ rota_area_id: areaId })
+    const areaStaffIds = new Set(areaPermissions.map(p => p.staff_id))
+    staff = staff.filter(s => areaStaffIds.has(s.id))
+  }
+
+  return staff.map(s => s.id)
+}
+
+/**
+ * Leave/sick approved → shifts released as available → notify ALL staff in the area
+ */
+export async function notifyShiftsReleased({ staffName, shiftCount, startDate, endDate, areaId, staffId }) {
   try {
-    const adminIds = await getAreaAdminIds(areaId, [])
+    const areaStaffIds = await getAreaStaffIds(areaId, staffId ? [staffId] : [])
     await sendPush({
-      recipientIds: adminIds,
-      title: 'Shifts Available for Claiming',
-      message: `${staffName} is on leave ${startDate} to ${endDate}. ${shiftCount} shift(s) are now available to claim.`,
+      recipientIds: areaStaffIds,
+      title: 'Shifts Available to Claim',
+      message: `${shiftCount} shift(s) now available ${startDate} to ${endDate} (${staffName} on leave). Open Rota to claim.`,
       actionUrl: '/Rota',
     })
   } catch (e) {

@@ -231,10 +231,11 @@ export default function RequestsManagement() {
           `Leave approved${shiftCount > 0 ? ` — ${shiftCount} shift(s) released as available` : ''}`
         );
 
-        // 6. Notify area admins about released shifts
+        // 6. Notify all staff in the area about available shifts
         if (shiftCount > 0) {
           notifyShiftsReleased({
             staffName: request.staff_name,
+            staffId: request.staff_id,
             shiftCount,
             startDate: request.start_date,
             endDate: request.end_date,
