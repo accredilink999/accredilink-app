@@ -312,8 +312,62 @@ export default function PatternManager({ open, onClose }) {
   const deployPatternMutation = useMutation({
     mutationFn: async (pattern) => {
       console.log('Starting deploy for pattern:', pattern);
-      toast.info('Deploying pattern...');
 
+      // Auto-clear previous deployed shifts for this pattern first
+      toast.info('Clearing previous shifts...');
+      const today = new Date().toISOString().split('T')[0];
+      const BATCH_SIZE = 50;
+
+      // Find shifts by shift_pattern_id
+      const { data: patternShifts } = await supabase
+        .from('shifts')
+        .select('id')
+        .eq('shift_pattern_id', pattern.id)
+        .gte('date', today);
+
+      if (patternShifts && patternShifts.length > 0) {
+        const ids = patternShifts.map(s => s.id);
+        for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+          const batch = ids.slice(i, i + BATCH_SIZE);
+          await supabase.from('shift_calls').delete().in('shift_id', batch);
+        }
+        for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+          const batch = ids.slice(i, i + BATCH_SIZE);
+          await supabase
+            .from('shifts')
+            .update({ staff_id: null, staff_name: null, shift_pattern_id: null })
+            .in('id', batch);
+        }
+      }
+
+      // Also find by staff_id + area for orphaned shifts
+      if (pattern.staff_id) {
+        let fallbackQuery = supabase
+          .from('shifts')
+          .select('id')
+          .eq('staff_id', pattern.staff_id)
+          .gte('date', today);
+        if (pattern.rota_area_id) {
+          fallbackQuery = fallbackQuery.eq('rota_area_id', pattern.rota_area_id);
+        }
+        const { data: staffShifts } = await fallbackQuery;
+        if (staffShifts && staffShifts.length > 0) {
+          const ids = staffShifts.map(s => s.id);
+          for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+            const batch = ids.slice(i, i + BATCH_SIZE);
+            await supabase.from('shift_calls').delete().in('shift_id', batch);
+          }
+          for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+            const batch = ids.slice(i, i + BATCH_SIZE);
+            await supabase
+              .from('shifts')
+              .update({ staff_id: null, staff_name: null, shift_pattern_id: null })
+              .in('id', batch);
+          }
+        }
+      }
+
+      toast.info('Deploying pattern...');
       const shiftsToCreate = [];
       const rawStart = pattern.start_date ? new Date(pattern.start_date + 'T00:00:00') : new Date();
       // Anchor to the Sunday of the start_date week so days land correctly (Sun-Sat)
@@ -659,7 +713,7 @@ export default function PatternManager({ open, onClose }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Re-deploy Pattern?</AlertDialogTitle>
             <AlertDialogDescription>
-              Re-deploying will assign staff to blank shifts. Choose how many repeats to deploy.
+              This will clear all existing future shifts for this pattern and redeploy fresh. Choose how many repeats to deploy.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="my-4 space-y-2">
