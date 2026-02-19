@@ -53,6 +53,8 @@ function timeToMinutes(t) {
 }
 
 export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId, isEditMode = false }) {
+  console.log('[ShiftDetailModal] shift:', JSON.stringify({ id: shift?.id, date: shift?.date, start_time: shift?.start_time, end_time: shift?.end_time, shift_name: shift?.shift_name, staff_name: shift?.staff_name, staff_id: shift?.staff_id, paired_shift_id: shift?.paired_shift_id }));
+  console.log('[ShiftDetailModal] isAdmin:', isAdmin, 'isEditMode:', isEditMode);
   const queryClient = useQueryClient();
   const isSitIn = SIT_IN_NAMES.has(shift?.shift_name);
   const [activeTab, setActiveTab] = useState(isSitIn ? 'sitting-logs' : 'calls');
