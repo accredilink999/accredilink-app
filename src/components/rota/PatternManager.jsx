@@ -369,11 +369,11 @@ export default function PatternManager({ open, onClose }) {
 
       toast.info('Deploying pattern...');
       const shiftsToCreate = [];
-      const rawStart = pattern.start_date ? new Date(pattern.start_date + 'T00:00:00') : new Date();
-      // Anchor to Sunday (snap forward if not already Sunday)
-      const startDate = new Date(rawStart);
-      const startDay = startDate.getDay();
-      if (startDay !== 0) startDate.setDate(startDate.getDate() + (7 - startDay));
+      const actualStart = pattern.start_date ? new Date(pattern.start_date + 'T00:00:00') : new Date();
+      // Anchor to Sunday of the start week for day-of-week calculation
+      const weekAnchor = new Date(actualStart);
+      weekAnchor.setDate(weekAnchor.getDate() - weekAnchor.getDay());
+      const actualStartStr = actualStart.toISOString().split('T')[0];
 
       const numRepeats = pattern.repeat_count || 1;
       const daysPerCycle = pattern.pattern_type === 'weekly' ? 7 :
@@ -387,11 +387,13 @@ export default function PatternManager({ open, onClose }) {
       for (let repeat = 0; repeat < numRepeats; repeat++) {
         pattern.shifts.forEach(shift => {
           const targetDayJS = dayMap[shift.day_of_week];
-          // Each cycle: startDate + (repeat * cycle length) + (week offset within pattern) + day offset
-          const shiftDate = new Date(startDate);
+          // Sunday anchor + (repeat * cycle) + (week offset) + day offset
+          const shiftDate = new Date(weekAnchor);
           shiftDate.setDate(shiftDate.getDate() + (repeat * daysPerCycle) + ((shift.week - 1) * 7) + targetDayJS);
 
           const dateStr = shiftDate.toISOString().split('T')[0];
+          // Skip any dates before the actual start date
+          if (dateStr < actualStartStr) return;
           shiftsToCreate.push({
             staff_id: pattern.staff_id,
             staff_name: pattern.staff_name,

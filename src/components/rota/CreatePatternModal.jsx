@@ -25,7 +25,7 @@ const defaultFormData = {
   rota_area_id: '',
   shifts: [],
   repeat_count: 1,
-  start_date: (() => { const d = new Date(); const day = d.getDay(); if (day !== 0) d.setDate(d.getDate() + (7 - day)); return d.toISOString().split('T')[0]; })(),
+  start_date: new Date().toISOString().split('T')[0],
 };
 
 const hasMeaningfulData = (data) =>
@@ -164,25 +164,24 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
   const createShiftsFromPattern = async (patternData, numRepeats, patternId) => {
     const staffMember = staff.find(s => s.id === formData.staff_id);
     const staffName = staffMember?.staff_full_name || staffMember?.full_name;
-    const rawStart = formData.start_date ? new Date(formData.start_date + 'T00:00:00') : new Date();
-    // Anchor to Sunday (snap forward if not already Sunday)
-    const startDate = new Date(rawStart);
-    const startDay = startDate.getDay();
-    if (startDay !== 0) startDate.setDate(startDate.getDate() + (7 - startDay));
+    const actualStart = formData.start_date ? new Date(formData.start_date + 'T00:00:00') : new Date();
+    // Anchor to Sunday of the start week for day-of-week calculation
+    const weekAnchor = new Date(actualStart);
+    weekAnchor.setDate(weekAnchor.getDate() - weekAnchor.getDay());
     const dayMap = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 };
+    const actualStartStr = actualStart.toISOString().split('T')[0];
 
     const daysPerCycle = formData.pattern_type === 'weekly' ? 7 :
                          formData.pattern_type === 'two_week' ? 14 :
                          formData.pattern_type === 'three_week' ? 21 : 28;
 
-    toast.info(`Deploying pattern for ${numRepeats} week${numRepeats !== 1 ? 's' : ''}...`);
+    toast.info(`Deploying pattern for ${numRepeats} repeat${numRepeats !== 1 ? 's' : ''}...`);
 
     // Calculate the full date range we need to cover
     const totalDays = daysPerCycle * numRepeats;
-    const endDate = new Date(startDate);
+    const endDate = new Date(weekAnchor);
     endDate.setDate(endDate.getDate() + totalDays);
 
-    const startStr = startDate.toISOString().split('T')[0];
     const endStr = endDate.toISOString().split('T')[0];
 
     // Fetch all blank (unassigned) shifts in this area for the date range
@@ -190,7 +189,7 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
       .from('shifts')
       .select('id, date, start_time, end_time, shift_name, rota_area_id, staff_id')
       .is('staff_id', null)
-      .gte('date', startStr)
+      .gte('date', actualStartStr)
       .lte('date', endStr);
 
     if (formData.rota_area_id) {
@@ -210,14 +209,15 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
     for (let repeat = 0; repeat < numRepeats; repeat++) {
       formData.shifts.forEach(shift => {
         const targetDayJS = dayMap[shift.day_of_week];
-        const cycleStart = new Date(startDate);
-        cycleStart.setDate(cycleStart.getDate() + (repeat * daysPerCycle) + ((shift.week - 1) * 7));
+        // Calculate date: Sunday anchor + (repeat * cycle) + (week offset) + day offset
+        const shiftDate = new Date(weekAnchor);
+        shiftDate.setDate(shiftDate.getDate() + (repeat * daysPerCycle) + ((shift.week - 1) * 7) + targetDayJS);
 
-        const currentDay = cycleStart.getDay();
-        let daysUntil = targetDayJS - currentDay;
-        if (daysUntil < 0) daysUntil += 7;
-        const targetDate = new Date(cycleStart);
-        targetDate.setDate(targetDate.getDate() + daysUntil);
+        // Skip any dates before the actual start date
+        const dateStr = shiftDate.toISOString().split('T')[0];
+        if (dateStr < actualStartStr) return;
+
+        const targetDate = shiftDate;
 
         const shiftTypeName = shiftTypes.find(st => st.id === shift.shift_type)?.name || shift.shift_type;
 
@@ -608,21 +608,12 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
             </div>
 
               <div className="space-y-2">
-                <Label>Start Date (must be a Sunday)</Label>
+                <Label>Start Date</Label>
                 <Input
                   type="date"
                   value={formData.start_date}
-                  onChange={(e) => {
-                    const picked = new Date(e.target.value + 'T00:00:00');
-                    const day = picked.getDay();
-                    if (day !== 0) {
-                      // Snap forward to next Sunday
-                      picked.setDate(picked.getDate() + (7 - day));
-                    }
-                    setFormData({ ...formData, start_date: picked.toISOString().split('T')[0] });
-                  }}
+                  onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
                 />
-                <p className="text-xs text-slate-400">Weeks run Sunday to Saturday. Date will snap to the nearest Sunday.</p>
               </div>
 
               <div className="space-y-2">
