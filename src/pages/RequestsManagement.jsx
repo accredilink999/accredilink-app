@@ -119,14 +119,16 @@ export default function RequestsManagement() {
         // Use the first matching shift for the target
         const targetShift = targetShifts[0];
 
-        // Swap staff assignments on both shifts
+        // Swap staff assignments on both shifts (clear pattern link — shift is no longer pattern-managed)
         await ShiftApi.update(requesterShift.id, {
           staff_id: request.swap_with_id,
           staff_name: request.swap_with_name,
+          shift_pattern_id: null,
         });
         await ShiftApi.update(targetShift.id, {
           staff_id: request.requester_id,
           staff_name: request.requester_name,
+          shift_pattern_id: null,
         });
 
         // Update the swap request
@@ -204,7 +206,7 @@ export default function RequestsManagement() {
 
           await supabase
             .from('shifts')
-            .update({ staff_id: null, staff_name: null, paired_staff_id: null, paired_staff_name: null })
+            .update({ staff_id: null, staff_name: null, paired_staff_id: null, paired_staff_name: null, shift_pattern_id: null })
             .eq('id', shift.id);
         }
 

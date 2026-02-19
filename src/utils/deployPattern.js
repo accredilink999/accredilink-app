@@ -313,13 +313,15 @@ export async function clearPatternShifts({ patternId, staffId, areaId }) {
   const today = new Date().toISOString().split('T')[0];
   let total = 0;
 
-  // 1. By shift_pattern_id
+  // 1. By shift_pattern_id (only if staff still matches — skip swapped shifts)
   if (patternId) {
-    const { data } = await supabase
+    let q = supabase
       .from('shifts')
       .select('id, shift_name')
       .eq('shift_pattern_id', patternId)
       .gte('date', today);
+    if (staffId) q = q.eq('staff_id', staffId);
+    const { data } = await q;
 
     if (data && data.length > 0) {
       const toRevert = data.filter(s => s.shift_name).map(s => s.id);
