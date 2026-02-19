@@ -23,14 +23,13 @@ const config: CapacitorConfig = {
 
     // Keyboard — push content up when keyboard opens
     Keyboard: {
-      resize: 'native',
+      resize: 'body',
       style: 'DARK',
     },
 
-    // App — show native splash while remote URL loads over the network.
-    // Prevents black flash between native splash dismiss and WebView render.
+    // App — handle deep links and back button
     App: {
-      launchShowDuration: 3000,
+      launchShowDuration: 0,
     },
 
     // Push notifications — uses Firebase on Android, APNS on iOS
