@@ -9,23 +9,41 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // ── CRITICAL: Clear cached service workers BEFORE WebView loads ────
-        // A stale service worker cached in WKWebView causes a blank/black
-        // screen by intercepting the page load with a broken navigate() call.
-        // Clearing here (in AppDelegate) runs BEFORE the ViewController and
-        // Capacitor bridge set up the WebView, giving the async operation
-        // time to finish before the URL is loaded.
-        let swTypes: Set<String> = [
-            WKWebsiteDataTypeDiskCache,
-            WKWebsiteDataTypeMemoryCache,
-            WKWebsiteDataTypeOfflineWebApplicationCache,
-            WKWebsiteDataTypeServiceWorkerRegistrations,
-        ]
-        WKWebsiteDataStore.default().removeData(
-            ofTypes: swTypes,
-            modifiedSince: Date.distantPast
-        ) {
-            print("[AppDelegate] Cleared WKWebView service workers + caches")
+        // ── NUCLEAR FIX: Synchronously delete WebKit data directory ───────
+        // A stale cached service worker causes a blank/black screen in WKWebView.
+        // Async cache clearing (WKWebsiteDataStore.removeData) doesn't complete
+        // before Capacitor loads the URL, so we delete the files directly from
+        // the filesystem. This is SYNCHRONOUS and guaranteed to finish before
+        // any WebView code runs.
+        // Only runs once per app update (flagged by UserDefaults).
+        let clearKey = "didNukeWebKitData_v3"
+        if !UserDefaults.standard.bool(forKey: clearKey) {
+            let fm = FileManager.default
+            if let libDir = fm.urls(for: .libraryDirectory, in: .userDomainMask).first {
+                // Delete the entire WebKit data directory (service workers, caches, etc.)
+                let webkitDir = libDir.appendingPathComponent("WebKit")
+                if fm.fileExists(atPath: webkitDir.path) {
+                    do {
+                        try fm.removeItem(at: webkitDir)
+                        print("[AppDelegate] DELETED WebKit directory — stale SW removed")
+                    } catch {
+                        print("[AppDelegate] Failed to delete WebKit dir: \(error)")
+                    }
+                }
+                // Also delete Caches directory which can hold stale web content
+                let cachesDir = libDir.appendingPathComponent("Caches")
+                if fm.fileExists(atPath: cachesDir.path) {
+                    do {
+                        try fm.removeItem(at: cachesDir)
+                        print("[AppDelegate] DELETED Caches directory")
+                    } catch {
+                        print("[AppDelegate] Failed to delete Caches dir: \(error)")
+                    }
+                }
+            }
+            UserDefaults.standard.set(true, forKey: clearKey)
+            UserDefaults.standard.synchronize()
+            print("[AppDelegate] One-time WebKit data nuke complete")
         }
 
         // Set notification delegate for foreground notifications
