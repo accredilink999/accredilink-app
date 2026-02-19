@@ -376,10 +376,10 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
           </div>
         )}
 
-        <div className="flex-1 overflow-hidden min-h-0">
-          <div className="grid lg:grid-cols-2 gap-6 h-full">
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="grid lg:grid-cols-2 gap-6 lg:h-full">
             {/* Form Section */}
-            <div className="space-y-4 overflow-y-auto pr-2">
+            <div className="space-y-4 lg:overflow-y-auto lg:pr-2">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Pattern Name</Label>
@@ -542,7 +542,7 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
             </div>
 
             {/* Preview Section */}
-            <div className="hidden lg:block border-l border-slate-200 pl-6 overflow-y-auto">
+            <div className="hidden lg:block border-l border-slate-200 pl-6 overflow-y-auto min-h-0">
               <PatternPreview 
                 shifts={formData.shifts}
                 patternType={formData.pattern_type}
