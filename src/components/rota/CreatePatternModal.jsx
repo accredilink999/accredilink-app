@@ -40,7 +40,7 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
         pattern_type: pattern.pattern_type || 'weekly',
         rota_area_id: pattern.rota_area_id || '',
         shifts: pattern.shifts || [],
-        repeat_count: 1,
+        repeat_count: pattern.repeat_count || 1,
         start_date: pattern.start_date || new Date().toISOString().split('T')[0],
       } : { ...defaultFormData }
     );
@@ -336,7 +336,6 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
   const handleSubmit = () => {
     try {
       const staffMember = staff.find(s => s.id === formData.staff_id);
-      const { repeat_count, ...patternFields } = formData;
       const area = rotaAreas.find(a => a.id === formData.rota_area_id);
 
       // Compute derived fields for PatternManager display
@@ -345,18 +344,19 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
       const allEndTimes = formData.shifts.map(s => s.end_time).filter(Boolean).sort();
 
       const payload = {
-        pattern_name: patternFields.pattern_name,
-        staff_id: patternFields.staff_id,
-        pattern_type: patternFields.pattern_type,
-        rota_area_id: patternFields.rota_area_id,
-        shifts: patternFields.shifts,
+        pattern_name: formData.pattern_name,
+        staff_id: formData.staff_id,
+        pattern_type: formData.pattern_type,
+        rota_area_id: formData.rota_area_id,
+        shifts: formData.shifts,
         staff_name: staffMember?.staff_full_name || staffMember?.full_name || '',
         rota_area_name: area?.name || '',
         is_active: true,
         days_of_week: uniqueDays,
         start_time: allStartTimes[0] || '',
         end_time: allEndTimes[allEndTimes.length - 1] || '',
-        start_date: patternFields.start_date || new Date().toISOString().split('T')[0],
+        start_date: formData.start_date || new Date().toISOString().split('T')[0],
+        repeat_count: formData.repeat_count || 1,
       };
 
       console.log('[CreatePatternModal] Saving pattern:', payload);

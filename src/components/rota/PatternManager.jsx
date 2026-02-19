@@ -16,6 +16,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import CreatePatternModal from '@/components/rota/CreatePatternModal';
 import { Plus, Trash2, Play, Square, Calendar, Edit, Zap, Eraser, UserX } from 'lucide-react';
 import { toast } from 'sonner';
@@ -30,6 +32,7 @@ export default function PatternManager({ open, onClose }) {
   const [clearShiftsConfirmPattern, setClearShiftsConfirmPattern] = useState(null);
   const [cleanupStaffId, setCleanupStaffId] = useState('');
   const [cleanupConfirmOpen, setCleanupConfirmOpen] = useState(false);
+  const [redeployWeeks, setRedeployWeeks] = useState(1);
 
   const { data: patterns = [] } = useQuery({
     queryKey: ['shift-patterns'],
@@ -313,30 +316,41 @@ export default function PatternManager({ open, onClose }) {
 
       const shiftsToCreate = [];
       const startDate = pattern.start_date ? new Date(pattern.start_date + 'T00:00:00') : new Date();
+      const numRepeats = pattern.repeat_count || 1;
       const daysPerCycle = pattern.pattern_type === 'weekly' ? 7 :
                            pattern.pattern_type === 'two_week' ? 14 :
                            pattern.pattern_type === 'three_week' ? 21 : 28;
+      const dayMap = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 };
 
-      // Create shifts for 1 repetition
-      pattern.shifts.forEach(shift => {
-        const dayMap = { monday: 0, tuesday: 1, wednesday: 2, thursday: 3, friday: 4, saturday: 5, sunday: 6 };
-        const dayOffset = dayMap[shift.day_of_week] + ((shift.week - 1) * 7);
-        const shiftDate = new Date(startDate);
-        shiftDate.setDate(shiftDate.getDate() + dayOffset);
+      toast.info(`Deploying pattern for ${numRepeats} repeat${numRepeats !== 1 ? 's' : ''}...`);
 
-        const dateStr = shiftDate.toISOString().split('T')[0];
-        shiftsToCreate.push({
-          staff_id: pattern.staff_id,
-          staff_name: pattern.staff_name,
-          rota_area_id: pattern.rota_area_id || 'default',
-          rota_area_name: pattern.rota_area_name || 'Default',
-          date: dateStr,
-          start_time: shift.start_time,
-          end_time: shift.end_time,
-          status: 'scheduled',
-          shift_pattern_id: pattern.id,
+      // Create shifts for all repetitions
+      for (let repeat = 0; repeat < numRepeats; repeat++) {
+        pattern.shifts.forEach(shift => {
+          const targetDayJS = dayMap[shift.day_of_week];
+          const cycleStart = new Date(startDate);
+          cycleStart.setDate(cycleStart.getDate() + (repeat * daysPerCycle) + ((shift.week - 1) * 7));
+
+          const currentDay = cycleStart.getDay();
+          let daysUntil = targetDayJS - currentDay;
+          if (daysUntil < 0) daysUntil += 7;
+          const shiftDate = new Date(cycleStart);
+          shiftDate.setDate(shiftDate.getDate() + daysUntil);
+
+          const dateStr = shiftDate.toISOString().split('T')[0];
+          shiftsToCreate.push({
+            staff_id: pattern.staff_id,
+            staff_name: pattern.staff_name,
+            rota_area_id: pattern.rota_area_id || 'default',
+            rota_area_name: pattern.rota_area_name || 'Default',
+            date: dateStr,
+            start_time: shift.start_time,
+            end_time: shift.end_time,
+            status: 'scheduled',
+            shift_pattern_id: pattern.id,
+          });
         });
-      });
+      }
 
       // Fetch blank shifts in this area for matching dates
       const areaId = pattern.rota_area_id || 'default';
@@ -539,6 +553,11 @@ export default function PatternManager({ open, onClose }) {
                             Starts: {new Date(pattern.start_date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                           </p>
                         )}
+                        {pattern.repeat_count > 1 && (
+                          <p className="text-xs text-slate-400">
+                            Repeats: {pattern.repeat_count}x
+                          </p>
+                        )}
                       </div>
                       <Badge className={pattern.is_active ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-800'}>
                         {pattern.is_active ? 'Active' : 'Inactive'}
@@ -576,7 +595,7 @@ export default function PatternManager({ open, onClose }) {
                       <Button
                         size="sm"
                         className="bg-teal-600 hover:bg-teal-700 text-white"
-                        onClick={() => setRedeployConfirmPattern(pattern)}
+                        onClick={() => { setRedeployWeeks(pattern.repeat_count || 1); setRedeployConfirmPattern(pattern); }}
                         disabled={deployPatternMutation.isPending}
                       >
                         <Play className="w-3 h-3 mr-1" />
@@ -633,20 +652,41 @@ export default function PatternManager({ open, onClose }) {
       )}
 
       {/* Re-deploy confirmation */}
-      <AlertDialog open={!!redeployConfirmPattern} onOpenChange={(open) => !open && setRedeployConfirmPattern(null)}>
+      <AlertDialog open={!!redeployConfirmPattern} onOpenChange={(open) => {
+        if (!open) setRedeployConfirmPattern(null);
+        else if (redeployConfirmPattern) setRedeployWeeks(redeployConfirmPattern.repeat_count || 1);
+      }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Re-deploy Pattern?</AlertDialogTitle>
             <AlertDialogDescription>
-              This pattern has already been deployed. Re-deploying may create duplicate shifts. Only use this after editing the pattern or adding new shifts.
+              Re-deploying will assign staff to blank shifts. Choose how many repeats to deploy.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="flex justify-end gap-2 mt-4">
+          <div className="my-4 space-y-2">
+            <Label>Deploy for how many repeats?</Label>
+            <Select
+              value={redeployWeeks.toString()}
+              onValueChange={(value) => setRedeployWeeks(parseInt(value))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 56 }, (_, i) => i + 1).map((num) => (
+                  <SelectItem key={num} value={num.toString()}>
+                    {num} {num === 1 ? 'repeat' : 'repeats'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex justify-end gap-2">
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-teal-600 hover:bg-teal-700"
               onClick={() => {
-                deployPatternMutation.mutate(redeployConfirmPattern);
+                deployPatternMutation.mutate({ ...redeployConfirmPattern, repeat_count: redeployWeeks });
                 setRedeployConfirmPattern(null);
               }}
             >
