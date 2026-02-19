@@ -358,7 +358,7 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-[95vw] lg:max-w-[98vw] lg:h-[98vh] max-h-[90vh] !pb-4 flex flex-col overflow-y-auto" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+      <DialogContent className="max-w-[95vw] lg:max-w-[98vw] lg:h-[98vh] max-h-[90vh] !pb-4 !flex !flex-col !overflow-hidden" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>{pattern ? 'Edit Shift Pattern' : 'Create Shift Pattern'}</DialogTitle>
         </DialogHeader>
@@ -376,7 +376,7 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
           </div>
         )}
 
-        <div className="flex-1 min-h-0 lg:overflow-hidden overflow-visible">
+        <div className="flex-1 min-h-0 overflow-y-auto">
           <div className="grid lg:grid-cols-2 gap-6 lg:h-full">
             {/* Form Section */}
             <div className="space-y-4 lg:overflow-y-auto lg:pr-2">
