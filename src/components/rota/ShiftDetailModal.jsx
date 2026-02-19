@@ -1036,6 +1036,7 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
           {isAdmin && (
             <Card className="p-4">
               <h4 className="font-semibold text-slate-900 mb-3">Staff Pairing</h4>
+              <p className="text-xs text-red-500 mb-2 font-mono">DEBUG: date={shift.date} start={shift.start_time || 'NULL'} end={shift.end_time || 'NULL'} editMode={String(editMode)} found={availableShifts?.length ?? '?'}</p>
               {currentShift.paired_shift_id ? (
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
