@@ -216,22 +216,12 @@ Deno.serve(async (req) => {
     // Try both credential_type='apns' and service='apns' since the table
     // may use either column depending on when the data was saved.
     if (!creds) {
-      // Try credential_type column first
-      let { data: ncRow } = await supabaseAdmin
+      // Load from notification_credentials table (uses 'service' column)
+      const { data: ncRow } = await supabaseAdmin
         .from('notification_credentials')
         .select('*')
-        .eq('credential_type', 'apns')
+        .eq('service', 'apns')
         .maybeSingle();
-
-      // If not found, try service column
-      if (!ncRow) {
-        const { data: ncRow2 } = await supabaseAdmin
-          .from('notification_credentials')
-          .select('*')
-          .eq('service', 'apns')
-          .maybeSingle();
-        ncRow = ncRow2;
-      }
 
       if (ncRow) {
         // Check for direct columns first (new format)

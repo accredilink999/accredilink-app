@@ -40,6 +40,42 @@ async function saveApnsToken(token) {
 }
 
 /**
+ * Register for push and wait for the token.
+ * IMPORTANT: Listeners are set up BEFORE calling register() to avoid
+ * a race condition where iOS fires the event before the listener is ready.
+ */
+async function registerAndGetToken(PushNotifications) {
+  // Clean up any stale listeners from previous calls
+  await PushNotifications.removeAllListeners();
+
+  // Set up listeners FIRST, then register — prevents race condition
+  const tokenPromise = new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      console.warn('[Push] Token registration timed out after 15s');
+      reject(new Error('Push token registration timed out'));
+    }, 15000);
+
+    PushNotifications.addListener('registration', (t) => {
+      clearTimeout(timeout);
+      console.log('[Push] Got token:', t.value?.substring(0, 20) + '...');
+      resolve(t.value);
+    });
+
+    PushNotifications.addListener('registrationError', (err) => {
+      clearTimeout(timeout);
+      console.error('[Push] Registration error:', JSON.stringify(err));
+      reject(new Error(err?.error || 'Push registration failed'));
+    });
+  });
+
+  // NOW call register — the listeners are already waiting
+  await PushNotifications.register();
+  console.log('[Push] register() called, waiting for token...');
+
+  return tokenPromise;
+}
+
+/**
  * Request all native permissions on first launch:
  * notifications, location, camera — in sequence.
  */
@@ -50,8 +86,10 @@ async function requestAllNativePermissions() {
   try {
     const { PushNotifications } = await import('@capacitor/push-notifications');
     const perm = await PushNotifications.checkPermissions();
+    console.log('[AutoPerms] Current push permission:', perm.receive);
     if (perm.receive !== 'granted') {
       const result = await PushNotifications.requestPermissions();
+      console.log('[AutoPerms] Permission request result:', result.receive);
       if (result.receive === 'granted') {
         console.log('[AutoPerms] Notifications granted');
       }
@@ -60,25 +98,16 @@ async function requestAllNativePermissions() {
     // Register for push and save token
     const currentPerm = await PushNotifications.checkPermissions();
     if (currentPerm.receive === 'granted') {
-      await PushNotifications.register();
-      const token = await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('timeout')), 15000);
-        PushNotifications.addListener('registration', (t) => {
-          clearTimeout(timeout);
-          resolve(t.value);
-        });
-        PushNotifications.addListener('registrationError', (err) => {
-          clearTimeout(timeout);
-          reject(err);
-        });
-      });
+      const token = await registerAndGetToken(PushNotifications);
       if (platform === 'ios') {
         await saveApnsToken(token);
-        console.log('[AutoPerms] iOS APNS token saved');
+        console.log('[AutoPerms] iOS APNS token saved to server');
       } else {
         await base44.functions.invoke('manageFirebaseSubscription', { firebaseToken: token, platform });
         console.log('[AutoPerms] Native FCM token saved');
       }
+    } else {
+      console.warn('[AutoPerms] Push permission not granted, skipping registration');
     }
   } catch (e) {
     console.warn('[AutoPerms] Push setup failed:', e?.message || e);
@@ -118,22 +147,13 @@ async function silentTokenRefresh() {
     if (isNativePlatform()) {
       const { PushNotifications } = await import('@capacitor/push-notifications');
       const perm = await PushNotifications.checkPermissions();
+      console.log('[AutoPush] Silent refresh — permission:', perm.receive, 'platform:', platform);
       if (perm.receive !== 'granted') return;
-      await PushNotifications.register();
-      const token = await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('timeout')), 10000);
-        PushNotifications.addListener('registration', (t) => {
-          clearTimeout(timeout);
-          resolve(t.value);
-        });
-        PushNotifications.addListener('registrationError', (err) => {
-          clearTimeout(timeout);
-          reject(err);
-        });
-      });
+
+      const token = await registerAndGetToken(PushNotifications);
       if (platform === 'ios') {
         await saveApnsToken(token);
-        console.log('[AutoPush] iOS APNS token refreshed');
+        console.log('[AutoPush] iOS APNS token refreshed on server');
       } else {
         await base44.functions.invoke('manageFirebaseSubscription', { firebaseToken: token, platform });
         console.log('[AutoPush] Native token refreshed');
