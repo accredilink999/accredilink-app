@@ -169,7 +169,15 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
     const weekAnchor = new Date(actualStart);
     weekAnchor.setDate(weekAnchor.getDate() - weekAnchor.getDay());
     const dayMap = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 };
-    const actualStartStr = actualStart.toISOString().split('T')[0];
+    // Local date formatter to avoid BST/UTC timezone shift
+    const toDateStr = (d) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    const actualStartStr = toDateStr(actualStart);
 
     const daysPerCycle = formData.pattern_type === 'weekly' ? 7 :
                          formData.pattern_type === 'two_week' ? 14 :
@@ -182,7 +190,7 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
     const endDate = new Date(weekAnchor);
     endDate.setDate(endDate.getDate() + totalDays);
 
-    const endStr = endDate.toISOString().split('T')[0];
+    const endStr = toDateStr(endDate);
 
     // Fetch all blank (unassigned) shifts in this area for the date range
     // Fetch ALL blank shifts (paginated to avoid 1000 row limit)
@@ -225,15 +233,13 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
         shiftDate.setDate(shiftDate.getDate() + (repeat * daysPerCycle) + ((shift.week - 1) * 7) + targetDayJS);
 
         // Skip any dates before the actual start date
-        const dateStr = shiftDate.toISOString().split('T')[0];
+        const dateStr = toDateStr(shiftDate);
         if (dateStr < actualStartStr) return;
-
-        const targetDate = shiftDate;
 
         const shiftTypeName = shiftTypes.find(st => st.id === shift.shift_type)?.name || shift.shift_type;
 
         targets.push({
-          date: targetDate.toISOString().split('T')[0],
+          date: dateStr,
           start_time: shift.start_time,
           end_time: shift.end_time,
           shift_name: shiftTypeName,

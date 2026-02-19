@@ -168,36 +168,44 @@ export default function PatternManager({ open, onClose }) {
       toast.info(`Clearing shifts for ${pattern.staff_name}...`);
       let totalCleared = 0;
 
-      // 1. Find shifts by shift_pattern_id
+      // 1. Find shifts by shift_pattern_id — check shift_name to know original vs created
       const { data: patternShifts } = await supabase
         .from('shifts')
-        .select('id')
+        .select('id, shift_name')
         .eq('shift_pattern_id', pattern.id)
         .gte('date', new Date().toISOString().split('T')[0]);
 
       if (patternShifts && patternShifts.length > 0) {
-        const ids = patternShifts.map(s => s.id);
-        // Delete shift_calls in batches
-        for (let i = 0; i < ids.length; i += 50) {
-          const batch = ids.slice(i, i + 50);
+        const toRevert = patternShifts.filter(s => s.shift_name).map(s => s.id);
+        const toDelete = patternShifts.filter(s => !s.shift_name).map(s => s.id);
+        const allIds = patternShifts.map(s => s.id);
+
+        // Delete shift_calls for all
+        for (let i = 0; i < allIds.length; i += 50) {
+          const batch = allIds.slice(i, i + 50);
           await supabase.from('shift_calls').delete().in('shift_id', batch);
         }
-        // Revert shifts to blank
-        for (let i = 0; i < ids.length; i += 50) {
-          const batch = ids.slice(i, i + 50);
+        // Revert original template shifts back to blank
+        for (let i = 0; i < toRevert.length; i += 50) {
+          const batch = toRevert.slice(i, i + 50);
           await supabase
             .from('shifts')
             .update({ staff_id: null, staff_name: null, shift_pattern_id: null })
             .in('id', batch);
         }
+        // Delete shifts that were created new by deploy (no shift_name = not a template)
+        for (let i = 0; i < toDelete.length; i += 50) {
+          const batch = toDelete.slice(i, i + 50);
+          await supabase.from('shifts').delete().in('id', batch);
+        }
         totalCleared += patternShifts.length;
       }
 
-      // 2. Fallback: also find by staff_id + rota_area_id + staff_name for orphaned shifts
+      // 2. Fallback: also find by staff_id + rota_area_id for orphaned shifts
       if (pattern.staff_id) {
         let fallbackQuery = supabase
           .from('shifts')
-          .select('id')
+          .select('id, shift_name')
           .eq('staff_id', pattern.staff_id)
           .gte('date', new Date().toISOString().split('T')[0]);
 
@@ -207,17 +215,24 @@ export default function PatternManager({ open, onClose }) {
 
         const { data: staffShifts } = await fallbackQuery;
         if (staffShifts && staffShifts.length > 0) {
-          const ids = staffShifts.map(s => s.id);
-          for (let i = 0; i < ids.length; i += 50) {
-            const batch = ids.slice(i, i + 50);
+          const toRevert = staffShifts.filter(s => s.shift_name).map(s => s.id);
+          const toDelete = staffShifts.filter(s => !s.shift_name).map(s => s.id);
+          const allIds = staffShifts.map(s => s.id);
+
+          for (let i = 0; i < allIds.length; i += 50) {
+            const batch = allIds.slice(i, i + 50);
             await supabase.from('shift_calls').delete().in('shift_id', batch);
           }
-          for (let i = 0; i < ids.length; i += 50) {
-            const batch = ids.slice(i, i + 50);
+          for (let i = 0; i < toRevert.length; i += 50) {
+            const batch = toRevert.slice(i, i + 50);
             await supabase
               .from('shifts')
               .update({ staff_id: null, staff_name: null, shift_pattern_id: null })
               .in('id', batch);
+          }
+          for (let i = 0; i < toDelete.length; i += 50) {
+            const batch = toDelete.slice(i, i + 50);
+            await supabase.from('shifts').delete().in('id', batch);
           }
           totalCleared += staffShifts.length;
         }
@@ -318,29 +333,43 @@ export default function PatternManager({ open, onClose }) {
       const today = new Date().toISOString().split('T')[0];
       const BATCH_SIZE = 50;
 
-      // Find shifts by shift_pattern_id
+      // Find shifts by shift_pattern_id — fetch shift_name to know which were originals vs created new
       const { data: patternShifts } = await supabase
         .from('shifts')
-        .select('id')
+        .select('id, shift_name')
         .eq('shift_pattern_id', pattern.id)
         .gte('date', today);
 
       if (patternShifts && patternShifts.length > 0) {
-        const ids = patternShifts.map(s => s.id);
-        for (let i = 0; i < ids.length; i += BATCH_SIZE) {
-          const batch = ids.slice(i, i + BATCH_SIZE);
+        // Shifts WITH shift_name were originally blank template slots — revert them to blank
+        const toRevert = patternShifts.filter(s => s.shift_name).map(s => s.id);
+        // Shifts WITHOUT shift_name were created new by the deploy — delete them entirely
+        const toDelete = patternShifts.filter(s => !s.shift_name).map(s => s.id);
+
+        // Delete shift_calls for all
+        const allIds = patternShifts.map(s => s.id);
+        for (let i = 0; i < allIds.length; i += BATCH_SIZE) {
+          const batch = allIds.slice(i, i + BATCH_SIZE);
           await supabase.from('shift_calls').delete().in('shift_id', batch);
         }
-        for (let i = 0; i < ids.length; i += BATCH_SIZE) {
-          const batch = ids.slice(i, i + BATCH_SIZE);
+
+        // Revert original template shifts back to blank
+        for (let i = 0; i < toRevert.length; i += BATCH_SIZE) {
+          const batch = toRevert.slice(i, i + BATCH_SIZE);
           await supabase
             .from('shifts')
             .update({ staff_id: null, staff_name: null, shift_pattern_id: null })
             .in('id', batch);
         }
+
+        // Delete shifts that were created new (not from templates)
+        for (let i = 0; i < toDelete.length; i += BATCH_SIZE) {
+          const batch = toDelete.slice(i, i + BATCH_SIZE);
+          await supabase.from('shifts').delete().in('id', batch);
+        }
       }
 
-      // Also find by staff_id + area for orphaned shifts
+      // Also find orphaned shifts by staff_id + area — revert these to blank
       if (pattern.staff_id) {
         let fallbackQuery = supabase
           .from('shifts')
@@ -368,12 +397,20 @@ export default function PatternManager({ open, onClose }) {
       }
 
       toast.info('Deploying pattern...');
+      // Local date formatter to avoid BST/UTC timezone shift
+      const toDateStr = (d) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      };
+
       const shiftsToCreate = [];
       const actualStart = pattern.start_date ? new Date(pattern.start_date + 'T00:00:00') : new Date();
       // Anchor to Sunday of the start week for day-of-week calculation
       const weekAnchor = new Date(actualStart);
       weekAnchor.setDate(weekAnchor.getDate() - weekAnchor.getDay());
-      const actualStartStr = actualStart.toISOString().split('T')[0];
+      const actualStartStr = toDateStr(actualStart);
 
       const numRepeats = pattern.repeat_count || 1;
       const daysPerCycle = pattern.pattern_type === 'weekly' ? 7 :
@@ -391,7 +428,7 @@ export default function PatternManager({ open, onClose }) {
           const shiftDate = new Date(weekAnchor);
           shiftDate.setDate(shiftDate.getDate() + (repeat * daysPerCycle) + ((shift.week - 1) * 7) + targetDayJS);
 
-          const dateStr = shiftDate.toISOString().split('T')[0];
+          const dateStr = toDateStr(shiftDate);
           // Skip any dates before the actual start date
           if (dateStr < actualStartStr) return;
           shiftsToCreate.push({
