@@ -199,7 +199,10 @@
         }
 
         // 3. Register SW and listen for updates
-        if ('serviceWorker' in navigator) {
+        // Skip SW entirely inside Capacitor native apps — it causes reload
+        // race conditions in WKWebView that result in a blank screen.
+        var isNativeApp = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+        if ('serviceWorker' in navigator && !isNativeApp) {
           navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(function(reg) {
             // Check for updates immediately
             reg.update();
@@ -235,6 +238,11 @@
               window.__swReloading = true;
               window.location.reload();
             }
+          });
+        } else if (isNativeApp && 'serviceWorker' in navigator) {
+          // Unregister any existing service workers in the native app
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            registrations.forEach(function(reg) { reg.unregister(); });
           });
         }
 
