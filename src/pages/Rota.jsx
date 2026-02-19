@@ -179,22 +179,19 @@ export default function Rota() {
           />
           <Button
             variant="outline"
-            size="icon"
             onClick={handlePrevious}
-            className="h-9 w-9 sm:h-10 sm:w-10"
+            className="h-9 px-3 sm:h-10 sm:px-4 font-semibold text-sm bg-white border-2 border-slate-300 hover:bg-slate-100 hover:border-slate-400"
           >
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <Button variant="outline" onClick={handleToday} className="text-xs sm:text-sm px-2 sm:px-3 h-9 sm:h-10">
-            Today
+            <ChevronLeft className="w-5 h-5 mr-0.5" />
+            Back
           </Button>
           <Button
             variant="outline"
-            size="icon"
             onClick={handleNext}
-            className="h-9 w-9 sm:h-10 sm:w-10"
+            className="h-9 px-3 sm:h-10 sm:px-4 font-semibold text-sm bg-white border-2 border-slate-300 hover:bg-slate-100 hover:border-slate-400"
           >
-            <ChevronRight className="w-4 h-4" />
+            Next
+            <ChevronRight className="w-5 h-5 ml-0.5" />
           </Button>
           {canEdit && (
             <>
