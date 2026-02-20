@@ -33,6 +33,7 @@ const WRITE_ALIASES = {
 // Per-table column aliases (code name → DB column name)
 // DB columns have been renamed to match code names directly — no per-table aliases needed.
 const TABLE_WRITE_ALIASES = {
+  leave_requests: { type: 'leave_type' },
 }
 
 // Tables that don't have a created_at column — override the default sort
@@ -77,6 +78,7 @@ function mapKeys(data, tableName) {
 // Per-table read aliases (DB column → code name)
 // DB columns have been renamed to match code names directly — no per-table aliases needed.
 const TABLE_READ_ALIASES = {
+  leave_requests: { leave_type: 'type' },
 }
 
 function addAliases(record, tableName) {
