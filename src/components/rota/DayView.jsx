@@ -68,10 +68,12 @@ export default function DayView({ currentDate, onShiftClick, onCreateShift, isAd
 
 
 
+  const isSitIn = (name) => name && /^sit\s*in/i.test(name);
+
   const ShiftCard = ({ shift, onClick }) => {
     const shiftType = shiftTypes.find(st => st.name === shift.shift_name);
     const shiftColor = shiftType?.color || '#14b8a6';
-    const shiftCalls = getCallsForShift(shift.id);
+    const shiftCalls = isSitIn(shift.shift_name) ? [] : getCallsForShift(shift.id);
     const isAvailable = !shift.staff_id;
 
     return (

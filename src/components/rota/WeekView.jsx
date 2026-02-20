@@ -124,7 +124,8 @@ export default function WeekView({ currentDate, onShiftClick, onCreateShift, isA
                     dayShifts.map((shift) => {
                       const shiftType = shiftTypes.find(st => st.name === shift.shift_name);
                       const shiftColor = shiftType?.color || '#14b8a6';
-                      const shiftCalls = getCallsForShift(shift.id);
+                      const isSitIn = shift.shift_name && /^sit\s*in/i.test(shift.shift_name);
+                      const shiftCalls = isSitIn ? [] : getCallsForShift(shift.id);
                       const isAvailable = !shift.staff_id;
                       return (
                         <button
@@ -217,7 +218,8 @@ export default function WeekView({ currentDate, onShiftClick, onCreateShift, isA
                       {dayShifts.map((shift) => {
                         const shiftType = shiftTypes.find(st => st.name === shift.shift_name);
                         const shiftColor = shiftType?.color || '#14b8a6';
-                        const shiftCalls = getCallsForShift(shift.id);
+                        const isSitIn = shift.shift_name && /^sit\s*in/i.test(shift.shift_name);
+                        const shiftCalls = isSitIn ? [] : getCallsForShift(shift.id);
                         const isAvailable = !shift.staff_id;
                         return (
                           <button
