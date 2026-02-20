@@ -54,13 +54,27 @@ export default function ShiftTypeManager({ open, onClose }) {
 
       // Propagate changes to all future shifts using this shift type
       const today = new Date().toISOString().split('T')[0];
-      const updates = {};
+      const shiftUpdates = {};
       const timesChanged = start_time !== oldStartTime || end_time !== oldEndTime;
-      if (start_time !== oldStartTime) updates.start_time = start_time;
-      if (end_time !== oldEndTime) updates.end_time = end_time;
-      if (name !== oldName) updates.shift_name = name;
+      if (start_time !== oldStartTime) shiftUpdates.start_time = start_time;
+      if (end_time !== oldEndTime) shiftUpdates.end_time = end_time;
+      if (name !== oldName) shiftUpdates.shift_name = name;
 
-      if (Object.keys(updates).length > 0) {
+      // Also update base shift templates that reference this shift type
+      const templateUpdates = {};
+      if (name !== oldName) templateUpdates.shift_type_name = name;
+      if (start_time !== oldStartTime) templateUpdates.start_time = start_time;
+      if (end_time !== oldEndTime) templateUpdates.end_time = end_time;
+
+      if (Object.keys(templateUpdates).length > 0) {
+        const { error: tplErr } = await supabase
+          .from('base_shift_templates')
+          .update(templateUpdates)
+          .eq('shift_type_name', oldName);
+        if (tplErr) console.error('[ShiftType] Template propagate error:', tplErr);
+      }
+
+      if (Object.keys(shiftUpdates).length > 0) {
         // If times changed, fetch affected shifts first so we can fix pairing
         let affectedShifts = [];
         if (timesChanged) {
@@ -73,26 +87,29 @@ export default function ShiftTypeManager({ open, onClose }) {
           affectedShifts = affected || [];
         }
 
-        // Update all matching shifts
+        // Update all matching future shifts
         const { data, error } = await supabase
           .from('shifts')
-          .update(updates)
+          .update(shiftUpdates)
           .eq('shift_name', oldName)
-          .gte('date', today);
-        if (error) console.error('[ShiftType] Propagate error:', error);
-        const count = data?.length || 0;
-        if (count > 0) toast.info(`Updated ${count} future shift(s)`);
+          .gte('date', today)
+          .select('id');
+        if (error) {
+          console.error('[ShiftType] Shift propagate error:', error);
+          toast.error('Shift type saved but failed to update existing shifts: ' + error.message);
+        } else {
+          const count = data?.length || 0;
+          if (count > 0) toast.info(`Updated ${count} future shift(s)`);
+        }
 
         // Clear stale pairing on partner shifts that have a different shift type
-        // (partners with the SAME type were also updated so their pairing stays valid)
         if (timesChanged && affectedShifts.length > 0) {
           const affectedIds = new Set(affectedShifts.map(s => s.id));
           const stalePartnerIds = affectedShifts
             .map(s => s.paired_shift_id)
-            .filter(pid => pid && !affectedIds.has(pid)); // partner wasn't also updated
+            .filter(pid => pid && !affectedIds.has(pid));
 
           if (stalePartnerIds.length > 0) {
-            // Clear pairing on both sides
             for (let i = 0; i < stalePartnerIds.length; i += 50) {
               await supabase.from('shifts')
                 .update({ paired_shift_id: null, paired_staff_name: null })
@@ -113,6 +130,7 @@ export default function ShiftTypeManager({ open, onClose }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shiftTypes'] });
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      queryClient.invalidateQueries({ queryKey: ['baseShiftTemplates'] });
       toast.success('Shift type updated');
       setEditingId(null);
     },
