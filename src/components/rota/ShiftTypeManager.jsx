@@ -62,6 +62,8 @@ export default function ShiftTypeManager({ open, onClose }) {
       if (end_time !== oldEndTime) shiftUpdates.end_time = end_time;
       if (name !== oldName) shiftUpdates.shift_name = name;
 
+      const summary = { templates: 0, shifts: 0 };
+
       // Also update base shift templates that reference this shift type
       const templateUpdates = {};
       if (name !== oldName) templateUpdates.shift_type_name = name;
@@ -69,11 +71,17 @@ export default function ShiftTypeManager({ open, onClose }) {
       if (end_time !== oldEndTime) templateUpdates.end_time = end_time;
 
       if (Object.keys(templateUpdates).length > 0) {
-        const { error: tplErr } = await supabase
+        const { data: tplData, error: tplErr } = await supabase
           .from('base_shift_templates')
           .update(templateUpdates)
-          .eq('shift_type_name', oldName);
-        if (tplErr) console.error('[ShiftType] Template propagate error:', tplErr);
+          .eq('shift_type_name', oldName)
+          .select('id');
+        if (tplErr) {
+          console.error('[ShiftType] Template propagate error:', tplErr);
+          toast.error('Failed to update templates: ' + tplErr.message);
+        } else {
+          summary.templates = tplData?.length || 0;
+        }
       }
 
       if (Object.keys(shiftUpdates).length > 0) {
@@ -89,7 +97,7 @@ export default function ShiftTypeManager({ open, onClose }) {
           affectedShifts = affected || [];
         }
 
-        // Update all matching future shifts
+        // Update all matching shifts from today forward
         const { data, error } = await supabase
           .from('shifts')
           .update(shiftUpdates)
@@ -98,10 +106,9 @@ export default function ShiftTypeManager({ open, onClose }) {
           .select('id');
         if (error) {
           console.error('[ShiftType] Shift propagate error:', error);
-          toast.error('Shift type saved but failed to update existing shifts: ' + error.message);
+          toast.error('Shift type saved but failed to update live shifts: ' + error.message);
         } else {
-          const count = data?.length || 0;
-          if (count > 0) toast.info(`Updated ${count} future shift(s)`);
+          summary.shifts = data?.length || 0;
         }
 
         // Clear stale pairing on partner shifts that have a different shift type
@@ -128,12 +135,18 @@ export default function ShiftTypeManager({ open, onClose }) {
           }
         }
       }
+
+      return summary;
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (summary, variables) => {
       queryClient.invalidateQueries({ queryKey: ['shiftTypes'] });
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       queryClient.invalidateQueries({ queryKey: ['baseShiftTemplates'] });
-      toast.success(`Shift type updated: ${variables.name} (${variables.start_time} - ${variables.end_time})`);
+      const parts = [`Shift type saved: ${variables.name} (${variables.start_time} - ${variables.end_time})`];
+      if (summary.shifts > 0) parts.push(`${summary.shifts} live shift(s) updated`);
+      if (summary.templates > 0) parts.push(`${summary.templates} template(s) updated`);
+      if (summary.shifts === 0 && summary.templates === 0) parts.push('No shifts or templates needed updating');
+      toast.success(parts.join(' — '));
       setEditingId(null);
     },
     onError: (error) => {
