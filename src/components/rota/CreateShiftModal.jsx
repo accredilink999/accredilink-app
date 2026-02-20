@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { ShiftTypeApi } from '@/api/shiftTypeApi';
 import { ShiftApi, ShiftCallApi } from '@/api/rotaApi';
+import { supabase } from '@/api/supabaseClient';
 import { useFormPersistence } from '@/hooks/useFormPersistence';
 import DraftRecoveryPrompt from '@/components/ui/DraftRecoveryPrompt';
 import { toast } from 'sonner';
@@ -181,46 +182,84 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
 
   const createShiftMutation = useMutation({
     mutationFn: async (shiftsData) => {
-       console.log('[CreateShift] Creating shifts:', shiftsData.map(s => ({ date: s.date, area: s.rota_area_id, times: s.start_time + '-' + s.end_time })));
-       console.log('[CreateShift] Service users available:', serviceUsers.length);
+       console.log('[CreateShift] Creating shifts:', shiftsData.map(s => ({ date: s.date, area: s.rota_area_id, times: s.start_time + '-' + s.end_time, name: s.shift_name })));
 
-       // Fetch existing shifts to find blank/available ones we can replace
-       const existingShifts = await ShiftApi.list('-created_date', 5000);
-       // Build lookup: areaId|date|start_time|end_time → blank shift
-       const blankShiftMap = {};
-       for (const s of existingShifts) {
-         if (!s.date || s.staff_id) continue;
+       // Fetch blank shifts for the relevant dates/area to find replaceable slots
+       const dates = [...new Set(shiftsData.map(s => s.date))].sort();
+       const areaIds = [...new Set(shiftsData.map(s => s.rota_area_id).filter(Boolean))];
+
+       let allBlanks = [];
+       for (const aid of areaIds) {
+         const { data, error } = await supabase
+           .from('shifts')
+           .select('*')
+           .is('staff_id', null)
+           .eq('rota_area_id', aid)
+           .gte('date', dates[0])
+           .lte('date', dates[dates.length - 1]);
+         if (!error && data) allBlanks.push(...data);
+       }
+       console.log('[CreateShift] Found', allBlanks.length, 'blank shifts in date range');
+
+       // Build lookups: by shift_name and by times
+       const blanksByName = {};  // area|date|shift_name → [blanks]
+       const blanksByTime = {};  // area|date|start_time|end_time → [blanks]
+       for (const s of allBlanks) {
          const sArea = s.rota_area_id || s.area_id;
-         const key = `${sArea}|${s.date}|${s.start_time}|${s.end_time}`;
-         blankShiftMap[key] = s;
+         if (s.shift_name) {
+           const nameKey = `${sArea}|${s.date}|${s.shift_name}`;
+           if (!blanksByName[nameKey]) blanksByName[nameKey] = [];
+           blanksByName[nameKey].push(s);
+         }
+         const timeKey = `${sArea}|${s.date}|${s.start_time}|${s.end_time}`;
+         if (!blanksByTime[timeKey]) blanksByTime[timeKey] = [];
+         blanksByTime[timeKey].push(s);
        }
 
+       const usedBlankIds = new Set();
        const shifts = [];
        let totalCalls = 0;
        let replaced = 0;
        for (const rawShiftData of shiftsData) {
          const { _sitInCover, ...shiftData } = rawShiftData;
 
-         // Check if there's a blank shift we can replace
+         // Find a blank shift to replace — prefer matching by shift_name, fall back to times
          const areaId = shiftData.rota_area_id || 'default';
-         const blankKey = `${areaId}|${shiftData.date}|${shiftData.start_time}|${shiftData.end_time}`;
-         const blankShift = blankShiftMap[blankKey];
-         let shift;
+         let blankShift = null;
 
+         // 1. Try matching by shift name (most reliable)
+         if (shiftData.shift_name) {
+           const nameKey = `${areaId}|${shiftData.date}|${shiftData.shift_name}`;
+           const candidates = blanksByName[nameKey] || [];
+           blankShift = candidates.find(b => !usedBlankIds.has(b.id));
+         }
+
+         // 2. Fall back to matching by exact times
+         if (!blankShift) {
+           const timeKey = `${areaId}|${shiftData.date}|${shiftData.start_time}|${shiftData.end_time}`;
+           const candidates = blanksByTime[timeKey] || [];
+           blankShift = candidates.find(b => !usedBlankIds.has(b.id));
+         }
+
+         let shift;
          if (blankShift && shiftData.staff_id) {
            // Replace blank shift by assigning staff to it
+           usedBlankIds.add(blankShift.id);
            const updated = await ShiftApi.update(blankShift.id, {
              staff_id: shiftData.staff_id,
              staff_name: shiftData.staff_name,
              shift_name: shiftData.shift_name || blankShift.shift_name,
+             start_time: shiftData.start_time,
+             end_time: shiftData.end_time,
              visit_details: shiftData.visit_details,
              status: 'scheduled',
            });
-           shift = { ...blankShift, ...updated, date: blankShift.date, start_time: blankShift.start_time, end_time: blankShift.end_time };
+           shift = { ...blankShift, ...updated, date: blankShift.date };
            replaced++;
-           delete blankShiftMap[blankKey];
+           console.log('[CreateShift] Replaced blank shift', blankShift.id, blankShift.shift_name);
          } else {
            shift = await ShiftApi.create(shiftData);
+           console.log('[CreateShift] Created new shift', shift.id, '(no blank match found)');
          }
          shifts.push(shift);
 
