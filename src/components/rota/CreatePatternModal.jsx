@@ -113,6 +113,26 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
     queryFn: () => ShiftTypeApi.list(),
   });
 
+  // When editing, sync shift times from current shift type definitions
+  // so that recently edited shift type times are reflected
+  const syncedRef = useRef(false);
+  useEffect(() => {
+    if (!pattern || shiftTypes.length === 0 || syncedRef.current) return;
+    syncedRef.current = true;
+    setFormData(prev => {
+      let changed = false;
+      const updated = prev.shifts.map(shift => {
+        const st = shiftTypes.find(t => t.id === shift.shift_type);
+        if (st && (st.start_time !== shift.start_time || st.end_time !== shift.end_time)) {
+          changed = true;
+          return { ...shift, start_time: st.start_time, end_time: st.end_time };
+        }
+        return shift;
+      });
+      return changed ? { ...prev, shifts: updated } : prev;
+    });
+  }, [pattern, shiftTypes]);
+
   const isRollingRota = formData.pattern_type !== 'weekly';
 
   const createPatternMutation = useMutation({
