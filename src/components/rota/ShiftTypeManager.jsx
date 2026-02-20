@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Trash2, Plus, Edit2 } from 'lucide-react';
+import { Trash2, Plus, Edit2, Loader2, Save } from 'lucide-react';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 const DEFAULT_TYPES = ['Early', 'Late', 'Sit In E', 'Sit In L', 'Sit In FD', 'SSCC'];
@@ -231,7 +231,7 @@ export default function ShiftTypeManager({ open, onClose }) {
           )}
 
           {/* Current Types */}
-          <div className="space-y-2 max-h-64 overflow-y-auto">
+          <div className={`space-y-2 overflow-y-auto ${editingId ? 'max-h-[60vh]' : 'max-h-64'}`}>
             {shiftTypes.length === 0 ? (
               <p className="text-sm text-slate-500 text-center py-4">No shift types yet</p>
             ) : (
@@ -280,20 +280,22 @@ export default function ShiftTypeManager({ open, onClose }) {
                           ))}
                         </div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 pt-2 border-t">
                         <Button
-                          size="sm"
                           onClick={handleSaveEdit}
                           disabled={updateMutation.isPending}
-                          className="flex-1 bg-green-600 hover:bg-green-700"
+                          className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium"
                         >
-                          Save
+                          {updateMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <Save className="w-4 h-4 mr-2" />
+                          )}
+                          {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
                         </Button>
                         <Button
-                          size="sm"
                           variant="outline"
                           onClick={() => setEditingId(null)}
-                          className="flex-1"
                         >
                           Cancel
                         </Button>
