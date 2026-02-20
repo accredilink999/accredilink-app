@@ -161,7 +161,11 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
 
   const { data: pairedShift = null } = useQuery({
     queryKey: ['pairedShift', shift.paired_shift_id],
-    queryFn: () => shift.paired_shift_id ? ShiftApi.list().then(shifts => shifts.find(s => s.id === shift.paired_shift_id)) : null,
+    queryFn: async () => {
+      if (!shift.paired_shift_id) return null;
+      const results = await ShiftApi.filter({ id: shift.paired_shift_id });
+      return results[0] || null;
+    },
     enabled: !!shift.paired_shift_id,
   });
 
@@ -664,14 +668,14 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
              <div className="flex items-center gap-3 min-w-0">
                <div className="flex -space-x-2">
                  <Avatar name={currentShift.staff_name} size="md" />
-                 {currentShift.paired_shift_id && pairedShift && (
-                   <Avatar name={pairedShift.staff_name} size="md" />
+                 {currentShift.paired_shift_id && (
+                   <Avatar name={pairedShift?.staff_name || currentShift.paired_staff_name} size="md" />
                  )}
                </div>
                <div className="min-w-0">
                  <h3 className="font-semibold text-slate-900 truncate">{isMyShift ? 'Your Shift' : currentShift.staff_name}</h3>
-                 {currentShift.paired_shift_id && pairedShift && (
-                   <p className="text-sm text-teal-600 truncate">+ {pairedShift.staff_name} (paired)</p>
+                 {currentShift.paired_shift_id && (
+                   <p className="text-sm text-teal-600 truncate">+ {pairedShift?.staff_name || currentShift.paired_staff_name || 'Paired'} (paired)</p>
                  )}
                  <p className="text-sm text-slate-500 truncate">{format(parseISO(currentShift.date), 'd MMM yyyy')}</p>
                </div>
@@ -1043,9 +1047,9 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
               {currentShift.paired_shift_id ? (
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Avatar name={pairedShift?.staff_name} size="sm" />
+                    <Avatar name={pairedShift?.staff_name || currentShift.paired_staff_name} size="sm" />
                     <div>
-                      <p className="text-sm font-medium text-slate-900">{pairedShift?.staff_name}</p>
+                      <p className="text-sm font-medium text-slate-900">{pairedShift?.staff_name || currentShift.paired_staff_name || 'Paired staff'}</p>
                       <p className="text-xs text-slate-500">Paired staff member</p>
                     </div>
                   </div>

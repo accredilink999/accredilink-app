@@ -320,6 +320,7 @@ export default function Rota() {
           shift={claimShift}
           open={!!claimShift}
           onClose={() => setClaimShift(null)}
+          isAdmin={canEdit}
         />
       )}
 

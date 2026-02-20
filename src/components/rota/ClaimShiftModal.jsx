@@ -1,16 +1,20 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { ShiftApi, ShiftCallApi } from '@/api/rotaApi';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2 } from 'lucide-react';
+import { Loader2, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { notifyClaimCreated } from '@/utils/shiftClaimNotifications';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
-export default function ClaimShiftModal({ shift, open, onClose }) {
+export default function ClaimShiftModal({ shift, open, onClose, isAdmin = false }) {
   const queryClient = useQueryClient();
   const [reason, setReason] = useState('');
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const { data: user } = useQuery({
     queryKey: ['currentUser'],
@@ -48,6 +52,24 @@ export default function ClaimShiftModal({ shift, open, onClose }) {
     },
     onError: (e) => {
       console.error('Claim failed:', e);
+    },
+  });
+
+  const deleteShiftMutation = useMutation({
+    mutationFn: async () => {
+      const calls = await ShiftCallApi.filter({ shift_id: shift.id });
+      for (const call of calls) {
+        await ShiftCallApi.delete(call.id);
+      }
+      return ShiftApi.delete(shift.id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      toast.success('Shift deleted');
+      onClose();
+    },
+    onError: (err) => {
+      toast.error(err.message || 'Failed to delete shift');
     },
   });
 
@@ -111,7 +133,18 @@ export default function ClaimShiftModal({ shift, open, onClose }) {
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-col sm:flex-row gap-2">
+          {isAdmin && (
+            <Button
+              variant="destructive"
+              onClick={() => setDeleteConfirmOpen(true)}
+              disabled={deleteShiftMutation.isPending}
+              className="w-full sm:w-auto sm:mr-auto"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete Shift
+            </Button>
+          )}
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
@@ -128,6 +161,16 @@ export default function ClaimShiftModal({ shift, open, onClose }) {
             </Button>
           )}
         </DialogFooter>
+
+        <ConfirmDialog
+          open={deleteConfirmOpen}
+          onOpenChange={setDeleteConfirmOpen}
+          title="Delete Shift?"
+          description="This will permanently delete this available shift. This action cannot be undone."
+          confirmLabel="Delete"
+          variant="destructive"
+          onConfirm={() => deleteShiftMutation.mutate()}
+        />
       </DialogContent>
     </Dialog>
   );

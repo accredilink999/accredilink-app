@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
 import { ShiftApi } from '@/api/rotaApi';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
@@ -228,6 +229,30 @@ export default function Dashboard() {
     enabled: !!user?.id
   });
 
+  // Available shifts to claim in user's areas
+  const { data: availableShifts = [] } = useQuery({
+    queryKey: ['availableShifts', user?.id, today],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const myPerms = await base44.entities.RotaPermission.filter({ staff_id: user.id });
+      const myAreaIds = myPerms.map(p => p.rota_area_id).filter(Boolean);
+      if (myAreaIds.length === 0) return [];
+
+      const { data, error } = await supabase
+        .from('shifts')
+        .select('id, date, start_time, end_time, shift_type, rota_area_id, area_id, shift_name')
+        .is('staff_id', null)
+        .gte('date', today)
+        .order('date', { ascending: true })
+        .limit(50);
+      if (error) throw error;
+
+      const areaSet = new Set(myAreaIds);
+      return (data || []).filter(s => areaSet.has(s.rota_area_id) || areaSet.has(s.area_id));
+    },
+    enabled: !!user?.id,
+  });
+
   const createCareLogMutation = useMutation({
     mutationFn: (data) => base44.entities.CareLog.create(data),
     onSuccess: () => {
@@ -295,6 +320,48 @@ export default function Dashboard() {
                     {unacknowledgedAnnouncements.length} announcement{unacknowledgedAnnouncements.length > 1 ? 's' : ''} to acknowledge
                   </span>
                   <Badge variant="secondary" className="bg-amber-100 text-amber-700 text-xs flex-shrink-0">Action Needed</Badge>
+                </div>
+              </Link>
+            )}
+          </div>
+        </Card>
+      )}
+
+      {/* Available Shifts to Claim */}
+      {availableShifts.length > 0 && (
+        <Card className="p-4 sm:p-5 bg-gradient-to-br from-green-50 to-emerald-50 border-0 shadow-sm">
+          <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2 text-sm sm:text-base">
+            <Hand className="w-4 h-4 text-green-600 flex-shrink-0" />
+            Shifts Available to Claim
+            <Badge variant="secondary" className="bg-green-500 text-white text-xs ml-auto">{availableShifts.length}</Badge>
+          </h3>
+          <div className="space-y-2">
+            {Object.entries(
+              availableShifts.reduce((acc, s) => {
+                if (!acc[s.date]) acc[s.date] = [];
+                acc[s.date].push(s);
+                return acc;
+              }, {})
+            ).slice(0, 5).map(([date, shifts]) => (
+              <Link key={date} to={createPageUrl('Rota')}>
+                <div className="flex items-center gap-3 p-3 bg-white/80 rounded-lg hover:bg-white transition-colors">
+                  <Calendar className="w-5 h-5 text-green-500" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-900">
+                      {format(parseISO(date), 'EEE d MMM')}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {shifts.length} shift{shifts.length > 1 ? 's' : ''} available
+                    </p>
+                  </div>
+                  <Badge variant="secondary" className="bg-green-100 text-green-700 text-xs flex-shrink-0">Claim</Badge>
+                </div>
+              </Link>
+            ))}
+            {Object.keys(availableShifts.reduce((acc, s) => { acc[s.date] = true; return acc; }, {})).length > 5 && (
+              <Link to={createPageUrl('Rota')}>
+                <div className="text-center text-sm text-green-600 font-medium py-1">
+                  View all available shifts
                 </div>
               </Link>
             )}

@@ -353,7 +353,7 @@ export async function clearPatternShifts({ patternId, staffId, areaId }) {
       }
       for (let i = 0; i < toRevert.length; i += BATCH) {
         await supabase.from('shifts')
-          .update({ staff_id: null, staff_name: null, shift_pattern_id: null, paired_shift_id: null, paired_staff_name: null })
+          .update({ staff_id: null, staff_name: null, shift_pattern_id: null, paired_shift_id: null, paired_staff_name: null, is_base_shift: true })
           .in('id', toRevert.slice(i, i + BATCH));
       }
       for (let i = 0; i < toDelete.length; i += BATCH) {
@@ -386,7 +386,7 @@ export async function clearPatternShifts({ patternId, staffId, areaId }) {
       }
       for (let i = 0; i < toRevert.length; i += BATCH) {
         await supabase.from('shifts')
-          .update({ staff_id: null, staff_name: null, shift_pattern_id: null, paired_shift_id: null, paired_staff_name: null })
+          .update({ staff_id: null, staff_name: null, shift_pattern_id: null, paired_shift_id: null, paired_staff_name: null, is_base_shift: true })
           .in('id', toRevert.slice(i, i + BATCH));
       }
       for (let i = 0; i < toDelete.length; i += BATCH) {

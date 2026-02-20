@@ -214,7 +214,7 @@ export default function RequestsManagement() {
 
           await supabase
             .from('shifts')
-            .update({ staff_id: null, staff_name: null, paired_shift_id: null, paired_staff_name: null, shift_pattern_id: null })
+            .update({ staff_id: null, staff_name: null, paired_shift_id: null, paired_staff_name: null, shift_pattern_id: null, is_base_shift: true })
             .eq('id', shift.id);
         }
 
