@@ -55,11 +55,25 @@ export default function ShiftTypeManager({ open, onClose }) {
       // Propagate changes to all future shifts using this shift type
       const today = new Date().toISOString().split('T')[0];
       const updates = {};
+      const timesChanged = start_time !== oldStartTime || end_time !== oldEndTime;
       if (start_time !== oldStartTime) updates.start_time = start_time;
       if (end_time !== oldEndTime) updates.end_time = end_time;
       if (name !== oldName) updates.shift_name = name;
 
       if (Object.keys(updates).length > 0) {
+        // If times changed, fetch affected shifts first so we can fix pairing
+        let affectedShifts = [];
+        if (timesChanged) {
+          const { data: affected } = await supabase
+            .from('shifts')
+            .select('id, paired_shift_id')
+            .eq('shift_name', oldName)
+            .gte('date', today)
+            .not('paired_shift_id', 'is', null);
+          affectedShifts = affected || [];
+        }
+
+        // Update all matching shifts
         const { data, error } = await supabase
           .from('shifts')
           .update(updates)
@@ -67,7 +81,33 @@ export default function ShiftTypeManager({ open, onClose }) {
           .gte('date', today);
         if (error) console.error('[ShiftType] Propagate error:', error);
         const count = data?.length || 0;
-        if (count > 0) toast.info(`Updated ${count} future shift(s) with new times`);
+        if (count > 0) toast.info(`Updated ${count} future shift(s)`);
+
+        // Clear stale pairing on partner shifts that have a different shift type
+        // (partners with the SAME type were also updated so their pairing stays valid)
+        if (timesChanged && affectedShifts.length > 0) {
+          const affectedIds = new Set(affectedShifts.map(s => s.id));
+          const stalePartnerIds = affectedShifts
+            .map(s => s.paired_shift_id)
+            .filter(pid => pid && !affectedIds.has(pid)); // partner wasn't also updated
+
+          if (stalePartnerIds.length > 0) {
+            // Clear pairing on both sides
+            for (let i = 0; i < stalePartnerIds.length; i += 50) {
+              await supabase.from('shifts')
+                .update({ paired_shift_id: null, paired_staff_name: null })
+                .in('id', stalePartnerIds.slice(i, i + 50));
+            }
+            const staleOwnIds = affectedShifts
+              .filter(s => s.paired_shift_id && !affectedIds.has(s.paired_shift_id))
+              .map(s => s.id);
+            for (let i = 0; i < staleOwnIds.length; i += 50) {
+              await supabase.from('shifts')
+                .update({ paired_shift_id: null, paired_staff_name: null })
+                .in('id', staleOwnIds.slice(i, i + 50));
+            }
+          }
+        }
       }
     },
     onSuccess: () => {
