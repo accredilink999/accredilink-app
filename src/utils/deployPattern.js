@@ -202,20 +202,25 @@ export async function deployPatternShifts({
     if (error) console.error(`[deploy ${VER}] Update error:`, error);
   }
 
-  // ── Step 5: Create client calls ──
+  // ── Step 5: Create client calls (skip sit-in shifts — they don't have client visits) ──
   let totalCalls = 0;
+  const isSitIn = (name) => name && /^sit\s*in/i.test(name);
+  const regularShifts = toFill.filter(s => !isSitIn(s.shift_name));
+  const sitInCount = toFill.length - regularShifts.length;
+  if (sitInCount > 0) console.log(`[deploy ${VER}] Skipping client calls for ${sitInCount} sit-in shift(s)`);
+
   try {
     const serviceUsers = await base44.entities.ServiceUser.filter({ status: 'active' });
     const areaUsers = serviceUsers.filter(su => (su.rota_area_id || su.area_id) === areaId);
 
-    // Delete existing calls for these shifts first
-    const allIds = toFill.map(s => s.id);
+    // Delete existing calls for regular shifts first (not sit-in)
+    const allIds = regularShifts.map(s => s.id);
     for (let i = 0; i < allIds.length; i += BATCH) {
       await supabase.from('shift_calls').delete().in('shift_id', allIds.slice(i, i + BATCH));
     }
 
     const callsToCreate = [];
-    for (const shift of toFill) {
+    for (const shift of regularShifts) {
       for (const su of areaUsers) {
         if (!su.call_times || !Array.isArray(su.call_times)) continue;
         for (const ct of su.call_times) {
@@ -259,17 +264,19 @@ export async function deployPatternShifts({
 
   // ── Step 6: Auto-pair newly filled shifts with existing partner (same date+time+area) ──
   // Only pairs the shifts we just deployed — does NOT re-pair existing shifts.
+  // Sit-in shifts are excluded from pairing — they observe, not partner.
   try {
-    const filledIds = new Set(toFill.map(s => s.id));
+    const pairableShifts = toFill.filter(s => !isSitIn(s.shift_name));
+    const filledIds = new Set(pairableShifts.map(s => s.id));
     if (filledIds.size > 0) {
       // For each filled shift, look for exactly ONE other assigned shift in the same slot
-      const filledDates = [...new Set(toFill.map(s => s.date))].sort();
+      const filledDates = [...new Set(pairableShifts.map(s => s.date))].sort();
       let assigned = [];
       let pOff = 0;
       while (true) {
         const { data, error } = await supabase
           .from('shifts')
-          .select('id, date, start_time, end_time, staff_id, staff_name, paired_shift_id')
+          .select('id, date, start_time, end_time, staff_id, staff_name, paired_shift_id, shift_name')
           .not('staff_id', 'is', null)
           .eq('rota_area_id', areaId)
           .gte('date', filledDates[0])
@@ -280,6 +287,9 @@ export async function deployPatternShifts({
         if (data.length < PAGE) break;
         pOff += PAGE;
       }
+
+      // Exclude sit-in shifts from pairing candidates
+      assigned = assigned.filter(s => !isSitIn(s.shift_name));
 
       // Index all assigned shifts by slot
       const bySlot = {};
@@ -451,19 +461,20 @@ export async function deployClientCallsToRota({ serviceUserId, serviceUserName, 
     }
   }
 
-  // 2. Fetch all future assigned shifts in this area
+  // 2. Fetch all future assigned shifts in this area (exclude sit-in shifts)
+  const isSitIn = (name) => name && /^sit\s*in/i.test(name);
   let shifts = [];
   offset = 0;
   while (true) {
     const { data, error } = await supabase
       .from('shifts')
-      .select('id, date, start_time, end_time')
+      .select('id, date, start_time, end_time, shift_name')
       .not('staff_id', 'is', null)
       .eq('rota_area_id', areaId)
       .gte('date', today)
       .range(offset, offset + PAGE - 1);
     if (error || !data || data.length === 0) break;
-    shifts.push(...data);
+    shifts.push(...data.filter(s => !isSitIn(s.shift_name)));
     if (data.length < PAGE) break;
     offset += PAGE;
   }
