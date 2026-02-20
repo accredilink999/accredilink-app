@@ -81,7 +81,7 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
 
   const [showMARPopup, setShowMARPopup] = useState(false);
   const [expandedMedicationOutcome, setExpandedMedicationOutcome] = useState(false);
-  const { data: formConfigData } = useCareLogFormConfig();
+  const { data: formConfigData } = useCareLogFormConfig({ serviceUserId: serviceUser?.id });
   const enabledSections = getEnabledSections(formConfigData);
   const enabledIds = new Set(enabledSections.map(s => s.id));
   const [customFields, setCustomFields] = useState({});

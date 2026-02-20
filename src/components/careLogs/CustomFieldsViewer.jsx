@@ -1,13 +1,25 @@
 import React from 'react';
 
-export default function CustomFieldsViewer({ customFields, formConfig }) {
+export default function CustomFieldsViewer({ customFields, formConfig, allConfigs }) {
   if (!customFields || typeof customFields !== 'object' || Object.keys(customFields).length === 0) {
     return null;
   }
 
   const getSectionConfig = (sectionId) => {
-    if (!formConfig?.sections) return null;
-    return formConfig.sections.find(s => s.id === sectionId && s.type === 'custom') || null;
+    // First try the resolved config
+    if (formConfig?.sections) {
+      const match = formConfig.sections.find(s => s.id === sectionId && s.type === 'custom');
+      if (match) return match;
+    }
+    // Fallback: search across all configs for the section definition
+    if (Array.isArray(allConfigs)) {
+      for (const cfg of allConfigs) {
+        const sections = cfg.config?.sections || [];
+        const match = sections.find(s => s.id === sectionId && s.type === 'custom');
+        if (match) return match;
+      }
+    }
+    return null;
   };
 
   const getFieldConfig = (sectionConfig, fieldId) => {

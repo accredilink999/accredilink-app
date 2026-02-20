@@ -349,6 +349,7 @@ export const entities = {
   Incident:                    buildEntity('incidents'),
   AuditLog:                    buildEntity('audit_logs'),
   SystemSettings:              buildEntity('system_settings'),
+  CareLogFormConfig:           buildEntity('care_log_form_configs'),
   Location:                    buildEntity('locations'),
   Asset:                       buildEntity('assets'),
   CareTeam:                    buildEntity('care_teams'),

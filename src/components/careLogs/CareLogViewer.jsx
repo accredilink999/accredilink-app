@@ -28,7 +28,7 @@ export default function CareLogViewer({ careLog, open, onOpenChange, isAdmin = f
     },
   });
 
-  const { data: formConfigData } = useCareLogFormConfig();
+  const { data: formConfigData, allConfigs } = useCareLogFormConfig({ serviceUserId: careLog.service_user_id });
 
   const userIsAdmin = isAdmin || currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
   
@@ -465,7 +465,7 @@ export default function CareLogViewer({ careLog, open, onOpenChange, isAdmin = f
 
           {/* Custom Fields */}
           {careLog.custom_fields && Object.keys(careLog.custom_fields).length > 0 && (
-            <CustomFieldsViewer customFields={careLog.custom_fields} formConfig={formConfigData} />
+            <CustomFieldsViewer customFields={careLog.custom_fields} formConfig={formConfigData} allConfigs={allConfigs} />
           )}
 
           {/* Footer */}

@@ -36,7 +36,7 @@ export default function CareLogEditForm({ careLog, open, onOpenChange, onClose }
   const [formData, setFormData] = useState(careLog || {});
   const [customFields, setCustomFields] = useState(careLog?.custom_fields || {});
   const queryClient = useQueryClient();
-  const { data: formConfigData } = useCareLogFormConfig();
+  const { data: formConfigData } = useCareLogFormConfig({ serviceUserId: careLog?.service_user_id });
   const enabledSections = getEnabledSections(formConfigData);
   const customSections = enabledSections.filter(s => s.type === 'custom');
   const handleCustomFieldChange = (sectionId) => (fieldId, value) => {
