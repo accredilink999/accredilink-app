@@ -50,7 +50,9 @@ export default function ShiftTypeManager({ open, onClose }) {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, name, start_time, end_time, color, oldName, oldStartTime, oldEndTime }) => {
-      await ShiftTypeApi.update(id, { name, start_time, end_time, color });
+      console.log('[ShiftType] Saving:', { id, name, start_time, end_time, color });
+      const saved = await ShiftTypeApi.update(id, { name, start_time, end_time, color });
+      console.log('[ShiftType] Saved result:', saved);
 
       // Propagate changes to all future shifts using this shift type
       const today = new Date().toISOString().split('T')[0];
@@ -127,15 +129,16 @@ export default function ShiftTypeManager({ open, onClose }) {
         }
       }
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['shiftTypes'] });
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       queryClient.invalidateQueries({ queryKey: ['baseShiftTemplates'] });
-      toast.success('Shift type updated');
+      toast.success(`Shift type updated: ${variables.name} (${variables.start_time} - ${variables.end_time})`);
       setEditingId(null);
     },
     onError: (error) => {
-      toast.error('Failed: ' + error.message);
+      console.error('[ShiftType] Update error:', error);
+      toast.error('Failed to save shift type: ' + error.message);
     },
   });
 
