@@ -18,11 +18,14 @@ import { notifyAdminsOfActivity } from '@/utils/adminNotifications';
 import SpeechButton from '@/components/ui/SpeechButton';
 import { useFormPersistence } from '@/hooks/useFormPersistence';
 import DraftRecoveryPrompt from '@/components/ui/DraftRecoveryPrompt';
+import { useCareLogFormConfig, getActiveConfig, getEnabledSections } from '@/components/hooks/useCareLogFormConfig';
+import { SECTION_REQUIRED_FIELDS } from '@/constants/careLogFormDefaults';
+import CustomSectionRenderer from './CustomSectionRenderer';
 
 export default function CareLogForm({ shift, serviceUser, open, onClose, callId, scheduledTime }) {
   const queryClient = useQueryClient();
   const [submittedCareLog, setSubmittedCareLog] = useState(null);
-  
+
   const { data: user } = useQuery({
     queryKey: ['currentUser'],
     queryFn: () => base44.auth.me(),
@@ -78,6 +81,16 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
 
   const [showMARPopup, setShowMARPopup] = useState(false);
   const [expandedMedicationOutcome, setExpandedMedicationOutcome] = useState(false);
+  const { data: formConfigData } = useCareLogFormConfig();
+  const enabledSections = getEnabledSections(formConfigData);
+  const enabledIds = new Set(enabledSections.map(s => s.id));
+  const [customFields, setCustomFields] = useState({});
+  const handleCustomFieldChange = (sectionId) => (fieldId, value) => {
+    setCustomFields(prev => ({
+      ...prev,
+      [sectionId]: { ...(prev[sectionId] || {}), [fieldId]: value }
+    }));
+  };
 
   const { data: staffMembers = [] } = useQuery({
     queryKey: ['staffMembers'],
@@ -137,6 +150,7 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
     'staff_grade', 'double_handed_call', 'staff_1', 'staff_2',
     'extended_notes', 'further_concerns', 'further_concerns_details',
     'duration_minutes', 'log_timestamp', 'shift_end_time', 'branch',
+    'custom_fields',
   ]);
 
   const mutation = useMutation({
@@ -175,7 +189,8 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
         status: 'submitted',
         submitted_at: new Date().toISOString(),
         branch: shift.branch || '',
-        ...cleanData
+        ...cleanData,
+        custom_fields: Object.keys(customFields).length > 0 ? customFields : undefined,
       };
 
       // Strip any fields not in the care_logs table to prevent DB errors
@@ -297,27 +312,30 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
 
 
   const handleSubmit = () => {
-    const requiredFields = {
-      mood: 'Mood',
-      food_intake: 'Food Intake',
-      fluid_intake: 'Fluid Intake',
-      welfare_impression_on_arrival: 'Welfare Impression',
-      personal_care: 'Personal Care',
-      continence_care_provided: 'Continence Care',
-      catheter_care_provided: 'Catheter Care',
-      repositioned_on_visit: 'Repositioning',
-      skincare_provided: 'Skincare',
-      skin_integrity_concerns: 'Skin Integrity',
-      add_medication_round: 'Medication Round',
-      medication_concerns: 'Medication Concerns',
-      healthcare_visit_required: 'Healthcare Visit',
-      staff_grade: 'Staff Grade',
-      double_handed_call: 'Double Handed Call',
-      extended_notes: 'Extended Notes',
-    };
+    // Build required fields from enabled sections only
+    const requiredFields = {};
+    for (const section of enabledSections) {
+      if (section.type === 'builtin') {
+        const sectionReqs = SECTION_REQUIRED_FIELDS[section.id];
+        if (sectionReqs) Object.assign(requiredFields, sectionReqs);
+      }
+    }
     const missing = Object.entries(requiredFields)
       .filter(([key]) => !formData[key])
       .map(([, label]) => label);
+    // Validate required custom fields
+    for (const section of enabledSections) {
+      if (section.type === 'custom' && section.fields) {
+        for (const field of section.fields) {
+          if (field.required) {
+            const val = customFields[section.id]?.[field.id];
+            if (!val || (Array.isArray(val) && val.length === 0)) {
+              missing.push(field.label);
+            }
+          }
+        }
+      }
+    }
     if (missing.length > 0) {
       toast.error(`Please complete: ${missing.slice(0, 3).join(', ')}${missing.length > 3 ? ` and ${missing.length - 3} more` : ''}`);
       return;
@@ -337,36 +355,13 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
     mutation.mutate(formData);
   };
 
-  if (submittedCareLog) {
-    return (
-      <CareLogViewer
-        careLog={submittedCareLog}
-        open={open}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) {
-            setSubmittedCareLog(null);
-            onClose();
-          }
-        }}
-      />
-    );
-  }
-
-  return (
-    <>
-      <DraftRecoveryPrompt open={open && hasDraft} onRestore={restoreDraft} onDiscard={discardDraft} />
-      <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Care Log - {serviceUser?.full_name}</DialogTitle>
-          <p className="text-sm text-slate-500 mt-1">{shift?.date} • {shift?.start_time} - {shift?.end_time}</p>
-        </DialogHeader>
-
-        <div className="space-y-6">
-          {/* Essential Observations */}
-          <div className="space-y-4">
+  const renderBuiltinSection = (sectionId) => {
+    switch (sectionId) {
+      case 'core_observations':
+        return (
+          <div className="space-y-4" key="core_observations">
             <h3 className="font-semibold text-slate-900">Essential Observations</h3>
-            
+
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <Label>Mood *</Label>
@@ -431,8 +426,12 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
                 </SelectContent>
               </Select>
             </div>
+          </div>
+        );
 
-            <div className="space-y-3">
+      case 'personal_care':
+        return (
+          <div className="space-y-3" key="personal_care">
               <Label>Personal Care Provided? *</Label>
               <div className="flex gap-3">
                 <Button
@@ -480,8 +479,11 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
                 </div>
               )}
             </div>
+        );
 
-            <div className="space-y-3">
+      case 'continence_care':
+        return (
+          <div className="space-y-3" key="continence_care">
               <Label>Continence Care Provided? *</Label>
               <div className="flex gap-3">
                 <Button
@@ -524,8 +526,11 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
                 </div>
               )}
             </div>
+        );
 
-            <div className="space-y-3">
+      case 'catheter_care':
+        return (
+          <div className="space-y-3" key="catheter_care">
               <Label>Any Catheter Care Provided Or Output To Be Reported? *</Label>
               <div className="flex gap-3">
                 <Button
@@ -573,8 +578,11 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
                 </div>
               )}
             </div>
+        );
 
-            <div className="space-y-3">
+      case 'repositioning':
+        return (
+          <div className="space-y-3" key="repositioning">
               <Label>Was the Citizen Repositioned On This Visit? *</Label>
               <div className="flex gap-3">
                 <Button
@@ -622,8 +630,11 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
                 </div>
               )}
             </div>
+        );
 
-            <div className="space-y-3">
+      case 'skincare':
+        return (
+          <div className="space-y-3" key="skincare">
                <Label>Was Any Skincare Provided? *</Label>
               <div className="flex gap-3">
                 <Button
@@ -671,8 +682,11 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
                 </div>
               )}
             </div>
+        );
 
-            <div className="space-y-3">
+      case 'skin_integrity':
+        return (
+          <div className="space-y-3" key="skin_integrity">
               <Label>Are there Any Skin Integrity Concerns? *</Label>
               <div className="flex gap-3">
                 <Button
@@ -720,8 +734,11 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
                 </div>
               )}
             </div>
+        );
 
-            <div className="space-y-3">
+      case 'food_management':
+        return (
+          <div className="space-y-3" key="food_management">
               <Label>Food Offered?</Label>
               <div className="flex gap-3">
                 <Button
@@ -785,8 +802,11 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
                 </div>
               )}
             </div>
+        );
 
-            <div className="space-y-3">
+      case 'drinks_management':
+        return (
+          <div className="space-y-3" key="drinks_management">
               <Label>Drinks Offered?</Label>
               <div className="flex gap-3">
                 <Button
@@ -850,8 +870,11 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
                 </div>
               )}
             </div>
+        );
 
-            <div className="space-y-3">
+      case 'medication_round':
+        return (
+          <div className="space-y-3" key="medication_round">
               <Label>Would You Like To Add A Medication Round For This Visit? *</Label>
               <div className="flex gap-3">
                 <Button
@@ -910,8 +933,11 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
                 </>
               )}
             </div>
+        );
 
-            <div className="space-y-3">
+      case 'medication_concerns':
+        return (
+          <div className="space-y-3" key="medication_concerns">
               <Label>Any Medication Concerns To Be Flagged? *</Label>
               <div className="flex gap-3">
                 <Button
@@ -964,8 +990,11 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
                 </div>
               )}
             </div>
+        );
 
-            <div className="space-y-3">
+      case 'further_concerns':
+        return (
+          <div className="space-y-3" key="further_concerns">
               <Label>Any Further Concerns To Raise? *</Label>
               <div className="flex gap-3">
                 <Button
@@ -1016,8 +1045,11 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
                 </div>
               )}
             </div>
+        );
 
-            <div className="space-y-3">
+      case 'healthcare_visit':
+        return (
+          <div className="space-y-3" key="healthcare_visit">
              <Label>Is A Healthcare Visit Required? *</Label>
              <div className="flex gap-3">
                <Button
@@ -1058,8 +1090,11 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
                </div>
              )}
             </div>
+        );
 
-            <div className="space-y-3">
+      case 'extended_notes':
+        return (
+          <div className="space-y-3" key="extended_notes">
               <Label>Extended Notes For This Visit? *</Label>
               <div className="flex gap-2">
                 <Textarea
@@ -1085,7 +1120,11 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
                 </div>
               </div>
             </div>
+        );
 
+      case 'staff_information':
+        return (
+          <React.Fragment key="staff_information">
             <div className="space-y-3">
               <Label>Grade Of Staff Member Filling Out This Form *</Label>
               <div className="space-y-2">
@@ -1140,7 +1179,7 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   {formData.double_handed_call === 'yes' && (
                     <div>
                       <Label>Staff 2 *</Label>
@@ -1159,8 +1198,60 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
                 </div>
               )}
             </div>
+          </React.Fragment>
+        );
 
-            <div className="space-y-3">
+      default:
+        return null;
+    }
+  };
+
+  if (submittedCareLog) {
+    return (
+      <CareLogViewer
+        careLog={submittedCareLog}
+        open={open}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            setSubmittedCareLog(null);
+            onClose();
+          }
+        }}
+      />
+    );
+  }
+
+  return (
+    <>
+      <DraftRecoveryPrompt open={open && hasDraft} onRestore={restoreDraft} onDiscard={discardDraft} />
+      <Dialog open={open} onOpenChange={onClose}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Care Log - {serviceUser?.full_name}</DialogTitle>
+          <p className="text-sm text-slate-500 mt-1">{shift?.date} • {shift?.start_time} - {shift?.end_time}</p>
+        </DialogHeader>
+
+        <div className="space-y-6">
+          {enabledSections.map(section => {
+            if (section.type === 'custom') {
+              return (
+                <CustomSectionRenderer
+                  key={section.id}
+                  section={section}
+                  values={customFields[section.id] || {}}
+                  onChange={handleCustomFieldChange(section.id)}
+                />
+              );
+            }
+            return (
+              <React.Fragment key={section.id}>
+                {renderBuiltinSection(section.id)}
+              </React.Fragment>
+            );
+          })}
+
+          {/* Timestamp - always shown */}
+          <div className="space-y-3">
               <Label>Time of Log Submission *</Label>
               <Input
                 type="datetime-local"
@@ -1169,7 +1260,6 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
                 className="w-full"
               />
             </div>
-          </div>
 
         </div>
 
@@ -1177,7 +1267,7 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button 
+          <Button
             onClick={handleSubmit}
             disabled={mutation.isPending}
             className="bg-teal-600 hover:bg-teal-700"

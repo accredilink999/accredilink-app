@@ -8,6 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CheckCircle2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useCareLogFormConfig, getEnabledSections } from '@/components/hooks/useCareLogFormConfig';
+import CustomSectionRenderer from './CustomSectionRenderer';
 
 // Columns that can be updated in the care_logs table
 const EDITABLE_COLUMNS = new Set([
@@ -27,11 +29,22 @@ const EDITABLE_COLUMNS = new Set([
   'extended_notes', 'further_concerns', 'further_concerns_details',
   'duration_minutes', 'log_timestamp', 'shift_end_time', 'branch',
   'health_observations', 'notes', 'status',
+  'custom_fields',
 ]);
 
 export default function CareLogEditForm({ careLog, open, onOpenChange, onClose }) {
   const [formData, setFormData] = useState(careLog || {});
+  const [customFields, setCustomFields] = useState(careLog?.custom_fields || {});
   const queryClient = useQueryClient();
+  const { data: formConfigData } = useCareLogFormConfig();
+  const enabledSections = getEnabledSections(formConfigData);
+  const customSections = enabledSections.filter(s => s.type === 'custom');
+  const handleCustomFieldChange = (sectionId) => (fieldId, value) => {
+    setCustomFields(prev => ({
+      ...prev,
+      [sectionId]: { ...(prev[sectionId] || {}), [fieldId]: value }
+    }));
+  };
 
   const updateMutation = useMutation({
     mutationFn: (data) => {
@@ -74,7 +87,11 @@ export default function CareLogEditForm({ careLog, open, onOpenChange, onClose }
   };
 
   const handleSubmit = () => {
-    updateMutation.mutate(formData);
+    const dataToSave = { ...formData };
+    if (Object.keys(customFields).length > 0) {
+      dataToSave.custom_fields = customFields;
+    }
+    updateMutation.mutate(dataToSave);
   };
 
   return (
@@ -330,6 +347,16 @@ export default function CareLogEditForm({ careLog, open, onOpenChange, onClose }
               className="h-20"
             />
           </div>
+
+          {/* Custom Sections */}
+          {customSections.map(section => (
+            <CustomSectionRenderer
+              key={section.id}
+              section={section}
+              values={customFields[section.id] || {}}
+              onChange={handleCustomFieldChange(section.id)}
+            />
+          ))}
 
           {/* Action Buttons */}
           <div className="flex gap-3 justify-end pt-4">

@@ -12,12 +12,14 @@ import ServiceUserForm from '@/components/serviceUsers/ServiceUserForm';
 import ServiceUserDetails from '@/components/serviceUsers/ServiceUserDetails';
 import ClientCardGrid from '@/components/serviceUsers/ClientCardGrid';
 import ClientCardList from '@/components/serviceUsers/ClientCardList';
-import { 
-  Heart, 
-  Plus, 
+import {
+  Heart,
+  Plus,
   Search,
-  AlertCircle
+  AlertCircle,
+  Settings
 } from 'lucide-react';
+import CareLogFormBuilder from '@/components/admin/CareLogFormBuilder';
 
 export default function ClientManagement() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -27,6 +29,7 @@ export default function ClientManagement() {
   const [editingUser, setEditingUser] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedTeam, setSelectedTeam] = useState(null);
+  const [showFormBuilder, setShowFormBuilder] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -136,16 +139,26 @@ export default function ClientManagement() {
         className="[&_h1]:text-slate-900 [&_svg]:text-teal-600 [&_svg]:fill-teal-600"
       >
         {isAdmin && (
-        <Button 
-          onClick={() => {
-            setEditingUser(null);
-            setShowForm(true);
-          }}
-          className="bg-teal-600 hover:bg-teal-700"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Service User
-        </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowFormBuilder(true)}
+              title="Configure Care Log Form"
+            >
+              <Settings className="w-4 h-4 mr-2" />
+              Care Log Form
+            </Button>
+            <Button
+              onClick={() => {
+                setEditingUser(null);
+                setShowForm(true);
+              }}
+              className="bg-teal-600 hover:bg-teal-700"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Service User
+            </Button>
+          </div>
         )}
       </PageHeader>
 
@@ -303,6 +316,13 @@ export default function ClientManagement() {
         onEditDisabled={!isAdmin}
         careLogs={careLogs}
       />
+
+      {isAdmin && (
+        <CareLogFormBuilder
+          open={showFormBuilder}
+          onClose={() => setShowFormBuilder(false)}
+        />
+      )}
     </div>
   );
 }

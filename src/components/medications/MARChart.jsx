@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Pill, Plus, Edit, Trash2, Check, Archive } from 'lucide-react';
 import { format, addDays, startOfWeek } from 'date-fns';
+import { toast } from 'sonner';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import MedicationInfoPopup from './MedicationInfoPopup';
 import ArchivedMARCharts from './ArchivedMARCharts';
@@ -57,6 +58,11 @@ export default function MARChart({ serviceUser, isAdmin }) {
       queryClient.invalidateQueries({ queryKey: ['medications'] });
       setShowAdminDialog(false);
       resetForm();
+      toast.success('Medication added successfully');
+    },
+    onError: (error) => {
+      console.error('Failed to add medication:', error);
+      toast.error('Failed to add medication: ' + (error?.message || 'Unknown error'));
     },
   });
 
@@ -66,6 +72,11 @@ export default function MARChart({ serviceUser, isAdmin }) {
       queryClient.invalidateQueries({ queryKey: ['medications'] });
       setShowAdminDialog(false);
       resetForm();
+      toast.success('Medication updated successfully');
+    },
+    onError: (error) => {
+      console.error('Failed to update medication:', error);
+      toast.error('Failed to update medication: ' + (error?.message || 'Unknown error'));
     },
   });
 
@@ -73,6 +84,11 @@ export default function MARChart({ serviceUser, isAdmin }) {
     mutationFn: (id) => base44.entities.MedicationRecord.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['medications'] });
+      toast.success('Medication deleted');
+    },
+    onError: (error) => {
+      console.error('Failed to delete medication:', error);
+      toast.error('Failed to delete medication: ' + (error?.message || 'Unknown error'));
     },
   });
 
@@ -82,6 +98,11 @@ export default function MARChart({ serviceUser, isAdmin }) {
       queryClient.invalidateQueries({ queryKey: ['medicationAdministrations'] });
       setShowMedDialog(false);
       setSelectedMed(null);
+      toast.success('Administration recorded');
+    },
+    onError: (error) => {
+      console.error('Failed to record administration:', error);
+      toast.error('Failed to record administration: ' + (error?.message || 'Unknown error'));
     },
   });
 
@@ -132,15 +153,15 @@ export default function MARChart({ serviceUser, isAdmin }) {
     if (!adminName.trim()) return;
     recordAdminMutation.mutate({
       medication_record_id: med.id,
+      medication_id: med.id,
       service_user_id: serviceUser.id,
       service_user_name: serviceUser.full_name,
       medication_name: med.medication_name,
-      administered_by: currentUser?.id,
-      administered_by_name: currentUser?.full_name,
+      staff_id: currentUser?.id,
       staff_name: adminName,
       administered_at: date,
       instance: instance,
-      status: 'given'
+      outcome: 'given'
     });
   };
 
@@ -150,9 +171,9 @@ export default function MARChart({ serviceUser, isAdmin }) {
   const getAdminForDay = (medId, date, instance) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     return administrations.find(
-      a => a.medication_record_id === medId && 
-           a.administered_at.split('T')[0] === dateStr && 
-           a.status === 'given' &&
+      a => (a.medication_record_id === medId || a.medication_id === medId) &&
+           a.administered_at?.split('T')[0] === dateStr &&
+           (a.outcome === 'given' || a.outcome === 'administered') &&
            a.instance === instance
     );
   };

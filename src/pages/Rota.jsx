@@ -36,6 +36,10 @@ export default function Rota() {
   const [isCreateAreaOpen, setIsCreateAreaOpen] = useState(false);
   const [showMyShiftsOnly, setShowMyShiftsOnly] = useState(filterParam === 'myshifts');
   const [claimShift, setClaimShift] = useState(null);
+  // Two-phase slide: 'idle' → 'exit' (old slides out) → 'enter-prep' (jump to entry position) → 'enter' (new slides in) → 'idle'
+  const [slideState, setSlideState] = useState('idle');
+  const [slideDir, setSlideDir] = useState('left');
+  const pendingDateRef = useRef(null);
   const queryClient = useQueryClient();
   const autoShiftLoaded = useRef(false);
 
@@ -97,6 +101,39 @@ export default function Rota() {
     return format(date, 'EEEE, d MMMM yyyy');
   }, []);
 
+  // Slide transition state machine
+  useEffect(() => {
+    if (slideState === 'exit') {
+      const t = setTimeout(() => {
+        setCurrentDate(pendingDateRef.current);
+        setSlideState('enter-prep');
+      }, 180);
+      return () => clearTimeout(t);
+    }
+    if (slideState === 'enter-prep') {
+      const raf = requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setSlideState('enter');
+        });
+      });
+      return () => cancelAnimationFrame(raf);
+    }
+    if (slideState === 'enter') {
+      const t = setTimeout(() => {
+        setSlideState('idle');
+      }, 250);
+      return () => clearTimeout(t);
+    }
+  }, [slideState]);
+
+  const triggerNav = useCallback((direction, newDate) => {
+    if (slideState !== 'idle') return;
+    pendingDateRef.current = newDate;
+    setSlideDir(direction);
+    setSlideState('exit');
+    toast(getNavLabel(newDate, view), { duration: 1500 });
+  }, [slideState, view, getNavLabel]);
+
   const handlePrevious = useCallback(() => {
     let newDate;
     if (view === 'month') {
@@ -106,9 +143,8 @@ export default function Rota() {
     } else {
       newDate = addDays(currentDate, -1);
     }
-    setCurrentDate(newDate);
-    toast(getNavLabel(newDate, view), { duration: 1500 });
-  }, [view, currentDate, getNavLabel]);
+    triggerNav('right', newDate);
+  }, [view, currentDate, triggerNav]);
 
   const handleNext = useCallback(() => {
     let newDate;
@@ -119,9 +155,15 @@ export default function Rota() {
     } else {
       newDate = addDays(currentDate, 1);
     }
-    setCurrentDate(newDate);
-    toast(getNavLabel(newDate, view), { duration: 1500 });
-  }, [view, currentDate, getNavLabel]);
+    triggerNav('left', newDate);
+  }, [view, currentDate, triggerNav]);
+
+  const getSlideClass = () => {
+    if (slideState === 'exit') return slideDir === 'left' ? 'rota-exit-left' : 'rota-exit-right';
+    if (slideState === 'enter-prep') return slideDir === 'left' ? 'rota-enter-prep-left' : 'rota-enter-prep-right';
+    if (slideState === 'enter') return 'rota-enter';
+    return '';
+  };
 
   // Swipe detection for touch navigation
   const touchStartRef = useRef(null);
@@ -291,9 +333,10 @@ export default function Rota() {
             {showMyShiftsOnly ? 'My Shifts' : 'All Shifts'}
           </Button>
         </div>
-        <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+        <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} className="overflow-hidden">
+        <div className={`rota-view-wrapper ${getSlideClass()}`}>
         <TabsContent value="month" className="mt-6">
-          <MonthView 
+          <MonthView
             currentDate={currentDate}
             onShiftClick={handleShiftClick}
             onCreateShift={handleCreateShift}
@@ -306,7 +349,7 @@ export default function Rota() {
         </TabsContent>
 
         <TabsContent value="week" className="mt-6">
-          <WeekView 
+          <WeekView
             currentDate={currentDate}
             onShiftClick={handleShiftClick}
             onCreateShift={handleCreateShift}
@@ -329,6 +372,7 @@ export default function Rota() {
             filterByUserId={showMyShiftsOnly ? user?.id : null}
           />
         </TabsContent>
+        </div>
         </div>
       </Tabs>
 

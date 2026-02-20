@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import CareLogEditForm from './CareLogEditForm';
+import CustomFieldsViewer from './CustomFieldsViewer';
+import { useCareLogFormConfig } from '@/components/hooks/useCareLogFormConfig';
 
 export default function CareLogViewer({ careLog, open, onOpenChange, isAdmin = false }) {
   if (!careLog) return null;
@@ -25,6 +27,8 @@ export default function CareLogViewer({ careLog, open, onOpenChange, isAdmin = f
       return users.map(u => ({ id: u.id, name: u.staff_full_name || u.full_name }));
     },
   });
+
+  const { data: formConfigData } = useCareLogFormConfig();
 
   const userIsAdmin = isAdmin || currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
   
@@ -457,6 +461,11 @@ export default function CareLogViewer({ careLog, open, onOpenChange, isAdmin = f
               <p className="text-xs font-semibold text-slate-700 uppercase mb-2">Notes</p>
               <p className="text-sm text-slate-700 leading-relaxed">{careLog.notes}</p>
             </div>
+          )}
+
+          {/* Custom Fields */}
+          {careLog.custom_fields && Object.keys(careLog.custom_fields).length > 0 && (
+            <CustomFieldsViewer customFields={careLog.custom_fields} formConfig={formConfigData} />
           )}
 
           {/* Footer */}
