@@ -33,6 +33,7 @@ import OfflineManager from '@/components/OfflineManager';
 import ActiveShiftAutoOpen from '@/components/ActiveShiftAutoOpen';
 import HeaderIcons from '@/components/HeaderIcons';
 import LockScreen from '@/components/LockScreen';
+import SickBookingDialog from '@/components/leave/SickBookingDialog';
 import { isBiometricEnabled, storeBiometricRefreshToken } from '@/utils/biometric';
 import { supabase } from '@/api/supabaseClient';
 import {
@@ -306,6 +307,7 @@ export default function Layout({ children, currentPageName }) {
 
   // ─── Inactivity Lock Screen (2 hours) ─────────────────────────────
   const [isLocked, setIsLocked] = useState(false);
+  const [sickDialogOpen, setSickDialogOpen] = useState(false);
   const inactivityTimerRef = React.useRef(null);
   const INACTIVITY_MS = 2 * 60 * 60 * 1000; // 2 hours
 
@@ -613,7 +615,7 @@ export default function Layout({ children, currentPageName }) {
                   <Settings className="w-4 h-4 mr-2" />
                   Settings
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate(createPageUrl('LeaveManagement'))} className="cursor-pointer touch-manipulation min-h-[44px]">
+                <DropdownMenuItem onClick={() => setSickDialogOpen(true)} className="cursor-pointer touch-manipulation min-h-[44px]">
                   <CalendarOff className="w-4 h-4 mr-2" />
                   Leave / Sick
                 </DropdownMenuItem>
@@ -724,6 +726,12 @@ export default function Layout({ children, currentPageName }) {
 
                       {user?.id && <ActiveShiftAutoOpen userId={user.id} />}
                       <OfflineManager />
+                      <SickBookingDialog
+                        open={sickDialogOpen}
+                        onOpenChange={setSickDialogOpen}
+                        userId={user?.id}
+                        userName={user?.staff_full_name || user?.full_name}
+                      />
                       </div>
                       );
                       }
