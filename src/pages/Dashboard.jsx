@@ -242,6 +242,7 @@ export default function Dashboard() {
         .from('shifts')
         .select('id, date, start_time, end_time, shift_type, rota_area_id, area_id, shift_name')
         .is('staff_id', null)
+        .eq('status', 'available_cover')
         .gte('date', today)
         .order('date', { ascending: true })
         .limit(50);
@@ -332,7 +333,7 @@ export default function Dashboard() {
         <Card className="p-4 sm:p-5 bg-gradient-to-br from-green-50 to-emerald-50 border-0 shadow-sm">
           <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2 text-sm sm:text-base">
             <Hand className="w-4 h-4 text-green-600 flex-shrink-0" />
-            Shifts Available to Claim
+            Cover Shifts Available
             <Badge variant="secondary" className="bg-green-500 text-white text-xs ml-auto">{availableShifts.length}</Badge>
           </h3>
           <div className="space-y-2">
