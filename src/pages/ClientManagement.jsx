@@ -29,7 +29,7 @@ export default function ClientManagement() {
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
-  const [selectedTeam, setSelectedTeam] = useState(null);
+  const [selectedArea, setSelectedArea] = useState(null);
   const [showFormBuilder, setShowFormBuilder] = useState(false);
 
   const queryClient = useQueryClient();
@@ -66,27 +66,34 @@ export default function ClientManagement() {
     return unsubscribe;
   }, [queryClient]);
 
-  const { data: teams = [] } = useQuery({
-    queryKey: ['careTeams'],
-    queryFn: () => base44.entities.CareTeam.list(),
+  const { data: rotaAreas = [] } = useQuery({
+    queryKey: ['rotaAreas'],
+    queryFn: () => base44.entities.RotaArea.filter({ is_active: true }, 'name'),
   });
 
-  // Get user's assigned teams
-  const userAssignedTeams = teams.filter(team => (team.member_ids || []).includes(user?.id));
+  // Get staff rota permissions for non-admins
+  const { data: staffPermissions = [] } = useQuery({
+    queryKey: ['staffRotaPermissions', user?.id],
+    queryFn: () => base44.entities.RotaPermission.filter({ staff_id: user?.id }),
+    enabled: !!user?.id && !isAdmin,
+  });
+
+  const userAreaIds = staffPermissions.map(p => p.rota_area_id);
+  const userAreas = rotaAreas.filter(a => userAreaIds.includes(a.id));
 
   // Set initial filter for non-admins
   React.useEffect(() => {
-    if (!isAdmin && userAssignedTeams.length > 0 && !selectedTeam) {
-      setSelectedTeam(userAssignedTeams[0].id);
+    if (!isAdmin && userAreas.length > 0 && !selectedArea) {
+      setSelectedArea(userAreas[0].id);
       setStatusFilter('all');
     }
-  }, [isAdmin, userAssignedTeams]);
+  }, [isAdmin, userAreas.length]);
 
   const filteredUsers = serviceUsers.filter(u => {
     const matchesSearch = u.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           u.address?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || u.status === statusFilter;
-    const matchesTeam = selectedTeam ? u.team_id === selectedTeam : true;
+    const matchesTeam = selectedArea ? u.area_id === selectedArea : true;
     return matchesSearch && matchesStatus && matchesTeam;
   });
 
@@ -101,17 +108,6 @@ export default function ClientManagement() {
     on_hold: 'bg-yellow-100 text-yellow-700',
     discharged: 'bg-slate-100 text-slate-700'
   };
-
-  const teamColors = [
-    'bg-blue-500 hover:bg-blue-600',
-    'bg-purple-500 hover:bg-purple-600',
-    'bg-pink-500 hover:bg-pink-600',
-    'bg-indigo-500 hover:bg-indigo-600',
-    'bg-cyan-500 hover:bg-cyan-600',
-    'bg-emerald-500 hover:emerald-600',
-  ];
-
-  const getTeamColor = (index) => teamColors[index % teamColors.length];
 
   const stats = {
     total: serviceUsers.length,
@@ -218,10 +214,10 @@ export default function ClientManagement() {
             {isAdmin && (
               <>
                 <Button
-                  variant={statusFilter === 'all' && !selectedTeam ? 'default' : 'outline'}
+                  variant={statusFilter === 'all' && !selectedArea ? 'default' : 'outline'}
                   onClick={() => {
                     setStatusFilter('all');
-                    setSelectedTeam(null);
+                    setSelectedArea(null);
                   }}
                   size="sm"
                   className="text-xs sm:text-sm bg-slate-600 hover:bg-slate-700 text-white"
@@ -229,48 +225,45 @@ export default function ClientManagement() {
                   All
                 </Button>
                 <Button
-                  variant={statusFilter === 'active' && !selectedTeam ? 'default' : 'outline'}
+                  variant={statusFilter === 'active' && !selectedArea ? 'default' : 'outline'}
                   onClick={() => {
                     setStatusFilter('active');
-                    setSelectedTeam(null);
+                    setSelectedArea(null);
                   }}
                   size="sm"
-                  className={`text-xs sm:text-sm font-semibold ${statusFilter === 'active' && !selectedTeam ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}
+                  className={`text-xs sm:text-sm font-semibold ${statusFilter === 'active' && !selectedArea ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}
                 >
                   Active
                 </Button>
                 <Button
-                  variant={statusFilter === 'on_hold' && !selectedTeam ? 'default' : 'outline'}
+                  variant={statusFilter === 'on_hold' && !selectedArea ? 'default' : 'outline'}
                   onClick={() => {
                     setStatusFilter('on_hold');
-                    setSelectedTeam(null);
+                    setSelectedArea(null);
                   }}
                   size="sm"
-                  className={`text-xs sm:text-sm font-semibold ${statusFilter === 'on_hold' && !selectedTeam ? 'bg-yellow-600 hover:bg-yellow-700 text-white' : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'}`}
+                  className={`text-xs sm:text-sm font-semibold ${statusFilter === 'on_hold' && !selectedArea ? 'bg-yellow-600 hover:bg-yellow-700 text-white' : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'}`}
                 >
                   On Hold
                 </Button>
               </>
             )}
 
-            {/* Team / Area dropdown */}
+            {/* Area dropdown */}
             <Select
-              value={selectedTeam || 'all'}
-              onValueChange={(val) => setSelectedTeam(val === 'all' ? null : val)}
+              value={selectedArea || 'all'}
+              onValueChange={(val) => setSelectedArea(val === 'all' ? null : val)}
             >
-              <SelectTrigger className="w-[180px] h-9 text-xs sm:text-sm border-slate-300">
-                <SelectValue placeholder="All Teams" />
+              <SelectTrigger className="w-[200px] h-9 text-xs sm:text-sm border-slate-300">
+                <SelectValue placeholder="All Areas" />
               </SelectTrigger>
               <SelectContent>
                 {isAdmin && (
-                  <SelectItem value="all">All Teams</SelectItem>
+                  <SelectItem value="all">All Areas</SelectItem>
                 )}
-                {(isAdmin
-                  ? teams.filter(team => !['directors', 'admin team management team', 'management team', 'admin team'].includes(team.name?.toLowerCase()))
-                  : userAssignedTeams
-                ).map((team) => (
-                  <SelectItem key={team.id} value={team.id}>
-                    {team.name}
+                {(isAdmin ? rotaAreas : userAreas).map((area) => (
+                  <SelectItem key={area.id} value={area.id}>
+                    {area.name}
                   </SelectItem>
                 ))}
               </SelectContent>
