@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
@@ -60,9 +60,16 @@ export default function RotaAreaSelector({ selectedAreaId, onAreaChange, isAdmin
   };
 
   // Filter areas based on permissions (admins see all)
-  const accessibleAreas = isAdmin ? rotaAreas : rotaAreas.filter(area => 
+  const accessibleAreas = isAdmin ? rotaAreas : rotaAreas.filter(area =>
     myPermissions.some(p => p.rota_area_id === area.id)
   );
+
+  // Auto-select first area when none is selected
+  useEffect(() => {
+    if (!selectedAreaId && accessibleAreas.length > 0) {
+      onAreaChange(accessibleAreas[0].id);
+    }
+  }, [selectedAreaId, accessibleAreas, onAreaChange]);
 
   if (!isAdmin) {
     return null;
