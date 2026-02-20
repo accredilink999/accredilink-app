@@ -6,9 +6,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { ChevronUp, ChevronDown, Plus, Trash2, Pencil, Save, Loader2, Settings } from 'lucide-react';
+import { ChevronUp, ChevronDown, Plus, Trash2, Pencil, Save, Loader2, Settings, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import CareLogCustomSectionEditor from './CareLogCustomSectionEditor';
+import CareLogFormPreview from './CareLogFormPreview';
 
 const BUILTIN_IDS = new Set(BUILTIN_SECTIONS.map((s) => s.id));
 
@@ -18,6 +19,7 @@ export default function CareLogFormBuilder({ open, onClose }) {
   const [sections, setSections] = useState([]);
   const [customEditorOpen, setCustomEditorOpen] = useState(false);
   const [editingCustomSection, setEditingCustomSection] = useState(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   // Load existing config from system_settings
   const { data: existingSettings } = useQuery({
@@ -176,18 +178,29 @@ export default function CareLogFormBuilder({ open, onClose }) {
               <Settings className="w-5 h-5 text-teal-600" />
               <DialogTitle className="text-slate-900">Care Log Form Builder</DialogTitle>
             </div>
-            <Button
-              onClick={handleSave}
-              disabled={saveMutation.isPending}
-              className="bg-teal-600 hover:bg-teal-700 text-white"
-            >
-              {saveMutation.isPending ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Save className="w-4 h-4 mr-2" />
-              )}
-              Save
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowPreview(true)}
+                className="text-slate-600"
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                Preview
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={saveMutation.isPending}
+                className="bg-teal-600 hover:bg-teal-700 text-white"
+              >
+                {saveMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4 mr-2" />
+                )}
+                Save
+              </Button>
+            </div>
           </DialogHeader>
 
           {/* Section list (scrollable) */}
@@ -298,6 +311,13 @@ export default function CareLogFormBuilder({ open, onClose }) {
         }}
         section={editingCustomSection}
         onSave={handleCustomSectionSave}
+      />
+
+      {/* Form preview dialog */}
+      <CareLogFormPreview
+        open={showPreview}
+        onClose={() => setShowPreview(false)}
+        sections={sortedSections}
       />
     </>
   );
