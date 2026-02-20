@@ -1247,7 +1247,7 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
     <>
       <DraftRecoveryPrompt open={open && hasDraft} onRestore={restoreDraft} onDiscard={discardDraft} />
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>Care Log - {serviceUser?.full_name}</DialogTitle>
           <p className="text-sm text-slate-500 mt-1">{shift?.date} • {shift?.start_time} - {shift?.end_time}</p>

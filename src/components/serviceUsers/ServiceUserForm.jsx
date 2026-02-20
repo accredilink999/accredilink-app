@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -14,20 +15,42 @@ import { toast } from 'sonner';
 import { deployClientCallsToRota } from '@/utils/deployPattern';
 import MARChart from '@/components/medications/MARChart';
 import ClientRotaSetup from '@/components/serviceUsers/ClientRotaSetup';
+import DraftRecoveryPrompt from '@/components/ui/DraftRecoveryPrompt';
+
+// Draft persistence helpers
+const DRAFT_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+function loadDraft(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const { data, savedAt } = JSON.parse(raw);
+    if (Date.now() - savedAt > DRAFT_MAX_AGE) { localStorage.removeItem(key); return null; }
+    return data;
+  } catch { return null; }
+}
+function saveDraftToStorage(key, data) {
+  try { localStorage.setItem(key, JSON.stringify({ data, savedAt: Date.now() })); } catch {}
+}
+function removeDraft(key) {
+  try { localStorage.removeItem(key); } catch {}
+}
 
 export default function ServiceUserForm({ serviceUser, open, onClose }) {
   const queryClient = useQueryClient();
   const isEdit = !!serviceUser;
   const [showRotaSetup, setShowRotaSetup] = useState(false);
   const [newServiceUser, setNewServiceUser] = useState(null);
-  
+  const [hasDraft, setHasDraft] = useState(false);
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+  const formDirtyRef = useRef(false);
+  const prevOpenRef = useRef(false);
+  const draftKey = isEdit ? `draft:service-user:${serviceUser?.id}` : 'draft:service-user:new';
+
   const { data: currentUser } = useQuery({
     queryKey: ['currentUser'],
     queryFn: () => base44.auth.me(),
   });
-  
 
-  
   const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
   
   // Initialize call times from serviceUser with proper IDs
@@ -145,97 +168,163 @@ export default function ServiceUserForm({ serviceUser, open, onClose }) {
   const [additionalRiskCollapsed, setAdditionalRiskCollapsed] = useState(true);
   const [editingRiskIndex, setEditingRiskIndex] = useState(null);
 
+  // Only reset form when dialog transitions from closed → open (not on every serviceUser change)
   useEffect(() => {
-    if (open) {
-      if (serviceUser) {
-        const { call_times, ...rest } = serviceUser;
-        setFormData(rest);
-        setCallTimes(serviceUser.call_times?.map((call, idx) => ({ ...call, id: `existing-${idx}` })) || []);
-        setPersonCentredCalls(parsePersonCentredCalls(serviceUser.person_centred_plan));
-      } else {
-        setFormData({
-           full_name: '',
-           date_of_birth: '',
-           address: '',
-           postcode: '',
-           phone: '',
-           emergency_contact_name: '',
-           emergency_contact_phone: '',
-           emergency_contact_relationship: '',
-           gp_name: '',
-           gp_phone: '',
-           nhs_number: '',
-           care_plan: '',
-           risk_assessments: '',
-           preferences: '',
-           allergies: '',
-           dietary_requirements: '',
-           mobility_level: 'independent',
-           communication_needs: '',
-           key_safe_code: '',
-           status: 'active',
-           notes: '',
-           quick_reference: '',
-           what_matters_to_me: '',
-           brief_history: '',
-           medical_history: '',
-           dna_cpr_in_place: '',
-           assistance_equipment: '',
-           emergency_shutoff_water: '',
-           emergency_shutoff_electricity: '',
-           emergency_shutoff_gas: '',
-           pets_in_property: '',
-           personal_plan_aims: '',
-           risk_management: '',
-           person_centred_plan: '',
-           care_plan_date: new Date().toISOString().split('T')[0],
-           plan_completed_by: '',
-           plan_review_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-         });
-         setCallTimes([]);
-         setPersonCentredCalls([]);
-       }
-       setEditingCallId(null);
-       setNewCall({ time: '', duration: '', type: 'visit', notes: '', tasks: [] });
-       setNewTaskInput('');
-       setEditingPCCallId(null);
-       setNewPersonCentredCall({ call_number: '', section1: '', section2: '', section3: '' });
-      if (serviceUser?.risk_assessment_files) {
-        setRiskAssessmentFiles(serviceUser.risk_assessment_files.map((file, idx) => ({ ...file, id: `existing-${idx}` })));
-      } else {
-        setRiskAssessmentFiles([]);
-      }
-      const defaultRows = riskCategories.map((cat, idx) => ({ col1: cat, col2: '', col3: '' }));
-      if (serviceUser?.risk_assessment_rows) {
-        try {
-          const parsed = JSON.parse(serviceUser.risk_assessment_rows);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            // Merge saved data with defaults, preserving col2 and col3 values
-            const mergedRows = defaultRows.map((defaultRow, idx) => {
-              const savedRow = parsed[idx];
-              return {
-                col1: defaultRow.col1,
-                col2: savedRow?.col2 ?? '',
-                col3: savedRow?.col3 ?? ''
-              };
-            });
-            const additionalRisks = parsed.slice(riskCategories.length).map(row => ({
-              col1: row.col1 ?? '',
-              col2: row.col2 ?? '',
-              col3: row.col3 ?? ''
-            }));
-            setRiskRows([...mergedRows, ...additionalRisks]);
-          } else {
-            setRiskRows(defaultRows);
-          }
-        } catch {
+    const justOpened = open && !prevOpenRef.current;
+    prevOpenRef.current = open;
+    if (!justOpened) return;
+
+    // Check for saved draft
+    const key = isEdit ? `draft:service-user:${serviceUser?.id}` : 'draft:service-user:new';
+    const draft = loadDraft(key);
+    if (draft) {
+      setHasDraft(true);
+    }
+
+    formDirtyRef.current = false;
+
+    if (serviceUser) {
+      const { call_times, ...rest } = serviceUser;
+      setFormData(rest);
+      setCallTimes(serviceUser.call_times?.map((call, idx) => ({ ...call, id: `existing-${idx}` })) || []);
+      setPersonCentredCalls(parsePersonCentredCalls(serviceUser.person_centred_plan));
+    } else {
+      setFormData({
+        full_name: '',
+        date_of_birth: '',
+        address: '',
+        postcode: '',
+        phone: '',
+        emergency_contact_name: '',
+        emergency_contact_phone: '',
+        emergency_contact_relationship: '',
+        gp_name: '',
+        gp_phone: '',
+        nhs_number: '',
+        care_plan: '',
+        risk_assessments: '',
+        preferences: '',
+        allergies: '',
+        dietary_requirements: '',
+        mobility_level: 'independent',
+        communication_needs: '',
+        key_safe_code: '',
+        status: 'active',
+        notes: '',
+        quick_reference: '',
+        what_matters_to_me: '',
+        brief_history: '',
+        medical_history: '',
+        dna_cpr_in_place: '',
+        assistance_equipment: '',
+        emergency_shutoff_water: '',
+        emergency_shutoff_electricity: '',
+        emergency_shutoff_gas: '',
+        pets_in_property: '',
+        personal_plan_aims: '',
+        risk_management: '',
+        person_centred_plan: '',
+        care_plan_date: new Date().toISOString().split('T')[0],
+        plan_completed_by: '',
+        plan_review_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      });
+      setCallTimes([]);
+      setPersonCentredCalls([]);
+    }
+    setEditingCallId(null);
+    setNewCall({ time: '', duration: '', type: 'visit', notes: '', tasks: [] });
+    setNewTaskInput('');
+    setEditingPCCallId(null);
+    setNewPersonCentredCall({ call_number: '', section1: '', section2: '', section3: '' });
+    if (serviceUser?.risk_assessment_files) {
+      setRiskAssessmentFiles(serviceUser.risk_assessment_files.map((file, idx) => ({ ...file, id: `existing-${idx}` })));
+    } else {
+      setRiskAssessmentFiles([]);
+    }
+    const defaultRows = riskCategories.map((cat) => ({ col1: cat, col2: '', col3: '' }));
+    if (serviceUser?.risk_assessment_rows) {
+      try {
+        const parsed = JSON.parse(serviceUser.risk_assessment_rows);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const mergedRows = defaultRows.map((defaultRow, idx) => {
+            const savedRow = parsed[idx];
+            return { col1: defaultRow.col1, col2: savedRow?.col2 ?? '', col3: savedRow?.col3 ?? '' };
+          });
+          const additionalRisks = parsed.slice(riskCategories.length).map(row => ({
+            col1: row.col1 ?? '', col2: row.col2 ?? '', col3: row.col3 ?? ''
+          }));
+          setRiskRows([...mergedRows, ...additionalRisks]);
+        } else {
           setRiskRows(defaultRows);
         }
-      } else {
+      } catch {
         setRiskRows(defaultRows);
       }
+    } else {
+      setRiskRows(defaultRows);
     }
-  }, [open, serviceUser]);
+  }, [open, serviceUser?.id]);
+
+  // Auto-save draft to localStorage (debounced)
+  useEffect(() => {
+    if (!open) return;
+    formDirtyRef.current = true;
+    const timer = setTimeout(() => {
+      saveDraftToStorage(draftKey, { formData, callTimes, personCentredCalls, riskRows, riskAssessmentFiles });
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [formData, callTimes, personCentredCalls, riskRows, riskAssessmentFiles]);
+
+  // Flush draft on page hide / app background
+  useEffect(() => {
+    if (!open) return;
+    const flush = () => {
+      if (formDirtyRef.current) {
+        saveDraftToStorage(draftKey, { formData, callTimes, personCentredCalls, riskRows, riskAssessmentFiles });
+      }
+    };
+    const onVisChange = () => { if (document.hidden) flush(); };
+    document.addEventListener('visibilitychange', onVisChange);
+    window.addEventListener('pagehide', flush);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisChange);
+      window.removeEventListener('pagehide', flush);
+    };
+  }, [open, draftKey, formData, callTimes, personCentredCalls, riskRows, riskAssessmentFiles]);
+
+  // Restore draft handler
+  const handleRestoreDraft = useCallback(() => {
+    const draft = loadDraft(draftKey);
+    if (draft) {
+      if (draft.formData) setFormData(draft.formData);
+      if (draft.callTimes) setCallTimes(draft.callTimes);
+      if (draft.personCentredCalls) setPersonCentredCalls(draft.personCentredCalls);
+      if (draft.riskRows) setRiskRows(draft.riskRows);
+      if (draft.riskAssessmentFiles) setRiskAssessmentFiles(draft.riskAssessmentFiles);
+      toast.success('Draft restored');
+    }
+    setHasDraft(false);
+  }, [draftKey]);
+
+  const handleDiscardDraft = useCallback(() => {
+    removeDraft(draftKey);
+    setHasDraft(false);
+  }, [draftKey]);
+
+  // Safe close — warn if dirty
+  const handleSafeClose = useCallback(() => {
+    if (formDirtyRef.current) {
+      setConfirmCloseOpen(true);
+    } else {
+      onClose();
+    }
+  }, [onClose]);
+
+  const handleConfirmClose = useCallback(() => {
+    setConfirmCloseOpen(false);
+    // Draft is already saved via auto-save
+    onClose();
+  }, [onClose]);
 
   const mutation = useMutation({
     mutationFn: async (data) => {
@@ -250,6 +339,8 @@ export default function ServiceUserForm({ serviceUser, open, onClose }) {
     onSuccess: async (result) => {
       queryClient.invalidateQueries({ queryKey: ['serviceUsers'] });
       toast.success(isEdit ? 'Client updated successfully' : 'Client created successfully');
+      removeDraft(draftKey);
+      formDirtyRef.current = false;
       onClose();
 
       // Auto-deploy call times to rota shifts
@@ -485,8 +576,29 @@ ${formData.care_plan ? `CARE PLAN DETAILS:\n${formData.care_plan}` : ''}`;
   };
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen && !mutation.isPending) onClose(); }}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" onPointerDownOutside={(e) => { if (mutation.isPending) e.preventDefault(); }}>
+    <>
+    <DraftRecoveryPrompt open={open && hasDraft} onRestore={handleRestoreDraft} onDiscard={handleDiscardDraft} />
+    <AlertDialog open={confirmCloseOpen} onOpenChange={setConfirmCloseOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Unsaved changes</AlertDialogTitle>
+          <AlertDialogDescription>
+            Your changes have been saved as a draft. You can restore them next time you open this form.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div className="flex justify-end gap-2 mt-4">
+          <AlertDialogCancel onClick={() => setConfirmCloseOpen(false)}>Continue Editing</AlertDialogCancel>
+          <AlertDialogAction onClick={handleConfirmClose} className="bg-red-600 hover:bg-red-700">Close Anyway</AlertDialogAction>
+        </div>
+      </AlertDialogContent>
+    </AlertDialog>
+    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen && !mutation.isPending) handleSafeClose(); }}>
+      <DialogContent
+        className="max-w-4xl max-h-[90vh] overflow-y-auto"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit Service User' : 'Add New Service User'}</DialogTitle>
         </DialogHeader>
@@ -1279,10 +1391,10 @@ ${formData.care_plan ? `CARE PLAN DETAILS:\n${formData.care_plan}` : ''}`;
         </Tabs>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={handleSafeClose}>
             Cancel
           </Button>
-          <Button 
+          <Button
             onClick={handleSubmit}
             disabled={!formData.full_name || !formData.address || mutation.isPending}
             className="bg-teal-600 hover:bg-teal-700"
@@ -1314,5 +1426,6 @@ ${formData.care_plan ? `CARE PLAN DETAILS:\n${formData.care_plan}` : ''}`;
         />
       )}
     </Dialog>
+    </>
   );
 }

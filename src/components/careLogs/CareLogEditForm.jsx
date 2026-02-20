@@ -98,7 +98,7 @@ export default function CareLogEditForm({ careLog, open, onOpenChange, onClose }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto" onPointerDownOutside={(e) => e.preventDefault()} onInteractOutside={(e) => e.preventDefault()}>
         <DialogHeader className="sticky top-0 bg-white pb-4">
           <DialogTitle className="text-lg">Edit Care Log</DialogTitle>
         </DialogHeader>

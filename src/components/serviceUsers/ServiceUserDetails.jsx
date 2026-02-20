@@ -115,7 +115,9 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
   const [isCallTypeManagerOpen, setIsCallTypeManagerOpen] = useState(false);
   const callFormRef = React.useRef(null);
 
+  // Only sync call times from server when not actively editing (dirty)
   useEffect(() => {
+    if (callTimesDirty) return; // Don't overwrite local edits
     if (serviceUser?.call_times) {
       setCallTimesLocal(serviceUser.call_times);
     } else {
@@ -343,7 +345,11 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className="max-w-4xl max-h-[90vh] overflow-y-auto"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader className="pb-4 border-b">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
