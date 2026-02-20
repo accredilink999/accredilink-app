@@ -68,14 +68,17 @@ export default function PatternManager({ open, onClose }) {
       const staffName = assignedStaff.find(s => s.staff_id === staffId)?.staff_name || 'Unknown';
       toast.info(`Clearing all future shifts for ${staffName}...`);
 
-      // Find all future shifts for this staff member
+      // Find all future shifts for this staff member (include paired_shift_id for partner cleanup)
       const { data: staffShifts, error } = await supabase
         .from('shifts')
-        .select('id')
+        .select('id, paired_shift_id')
         .eq('staff_id', staffId)
         .gte('date', today);
       if (error) throw error;
       if (!staffShifts || staffShifts.length === 0) return { totalCleared: 0, staffName };
+
+      // Collect partner shift IDs to clear their pairing reference
+      const partnerIds = staffShifts.filter(s => s.paired_shift_id).map(s => s.paired_shift_id);
 
       const ids = staffShifts.map(s => s.id);
       // Delete shift_calls in batches
@@ -83,12 +86,19 @@ export default function PatternManager({ open, onClose }) {
         const batch = ids.slice(i, i + 50);
         await supabase.from('shift_calls').delete().in('shift_id', batch);
       }
-      // Revert shifts to blank in batches
+      // Revert shifts to blank in batches (include pairing fields)
       for (let i = 0; i < ids.length; i += 50) {
         const batch = ids.slice(i, i + 50);
         await supabase
           .from('shifts')
-          .update({ staff_id: null, staff_name: null, shift_pattern_id: null })
+          .update({ staff_id: null, staff_name: null, shift_pattern_id: null, paired_shift_id: null, paired_staff_name: null })
+          .in('id', batch);
+      }
+      // Clear pairing on partner shifts
+      for (let i = 0; i < partnerIds.length; i += 50) {
+        const batch = partnerIds.slice(i, i + 50);
+        await supabase.from('shifts')
+          .update({ paired_shift_id: null, paired_staff_name: null })
           .in('id', batch);
       }
       return { totalCleared: ids.length, staffName };
@@ -108,22 +118,27 @@ export default function PatternManager({ open, onClose }) {
 
   const deletePatternMutation = useMutation({
     mutationFn: async (pattern) => {
+      const partnerIds = new Set();
+
       // 1. Find shifts created by this pattern and revert them to blank
       const { data: patternShifts } = await supabase
         .from('shifts')
-        .select('id')
+        .select('id, paired_shift_id')
         .eq('shift_pattern_id', pattern.id);
 
       if (patternShifts && patternShifts.length > 0) {
+        for (const s of patternShifts) {
+          if (s.paired_shift_id) partnerIds.add(s.paired_shift_id);
+        }
         const shiftIds = patternShifts.map(s => s.id);
         // Delete any shift_calls for these shifts
-        for (const shiftId of shiftIds) {
-          await supabase.from('shift_calls').delete().eq('shift_id', shiftId);
+        for (let i = 0; i < shiftIds.length; i += 50) {
+          await supabase.from('shift_calls').delete().in('shift_id', shiftIds.slice(i, i + 50));
         }
         // Revert shifts back to blank (available to claim)
         await supabase
           .from('shifts')
-          .update({ staff_id: null, staff_name: null, shift_pattern_id: null })
+          .update({ staff_id: null, staff_name: null, shift_pattern_id: null, paired_shift_id: null, paired_staff_name: null })
           .eq('shift_pattern_id', pattern.id);
       }
 
@@ -131,26 +146,38 @@ export default function PatternManager({ open, onClose }) {
       if (pattern.staff_id && pattern.rota_area_id) {
         const { data: staffShifts } = await supabase
           .from('shifts')
-          .select('id, shift_pattern_id')
+          .select('id, shift_pattern_id, paired_shift_id')
           .eq('staff_id', pattern.staff_id)
           .eq('rota_area_id', pattern.rota_area_id)
           .is('shift_pattern_id', null)
           .gte('date', new Date().toISOString().split('T')[0]);
 
-        // Only revert future shifts that have no pattern_id (legacy)
         if (staffShifts && staffShifts.length > 0) {
           for (const s of staffShifts) {
-            await supabase.from('shift_calls').delete().eq('shift_id', s.id);
+            if (s.paired_shift_id) partnerIds.add(s.paired_shift_id);
           }
           const legacyIds = staffShifts.map(s => s.id);
+          for (let i = 0; i < legacyIds.length; i += 50) {
+            await supabase.from('shift_calls').delete().in('shift_id', legacyIds.slice(i, i + 50));
+          }
           await supabase
             .from('shifts')
-            .update({ staff_id: null, staff_name: null })
+            .update({ staff_id: null, staff_name: null, paired_shift_id: null, paired_staff_name: null })
             .in('id', legacyIds);
         }
       }
 
-      // 3. Delete the pattern itself
+      // 3. Clear pairing on partner shifts
+      if (partnerIds.size > 0) {
+        const ids = [...partnerIds];
+        for (let i = 0; i < ids.length; i += 50) {
+          await supabase.from('shifts')
+            .update({ paired_shift_id: null, paired_staff_name: null })
+            .in('id', ids.slice(i, i + 50));
+        }
+      }
+
+      // 4. Delete the pattern itself
       await ShiftPatternApi.delete(pattern.id);
     },
     onSuccess: () => {
@@ -168,15 +195,19 @@ export default function PatternManager({ open, onClose }) {
     mutationFn: async (pattern) => {
       toast.info(`Clearing shifts for ${pattern.staff_name}...`);
       let totalCleared = 0;
+      const partnerIds = new Set();
 
       // 1. Find shifts by shift_pattern_id — check shift_name to know original vs created
       const { data: patternShifts } = await supabase
         .from('shifts')
-        .select('id, shift_name')
+        .select('id, shift_name, paired_shift_id')
         .eq('shift_pattern_id', pattern.id)
         .gte('date', new Date().toISOString().split('T')[0]);
 
       if (patternShifts && patternShifts.length > 0) {
+        for (const s of patternShifts) {
+          if (s.paired_shift_id) partnerIds.add(s.paired_shift_id);
+        }
         const toRevert = patternShifts.filter(s => s.shift_name).map(s => s.id);
         const toDelete = patternShifts.filter(s => !s.shift_name).map(s => s.id);
         const allIds = patternShifts.map(s => s.id);
@@ -186,12 +217,12 @@ export default function PatternManager({ open, onClose }) {
           const batch = allIds.slice(i, i + 50);
           await supabase.from('shift_calls').delete().in('shift_id', batch);
         }
-        // Revert original template shifts back to blank
+        // Revert original template shifts back to blank (include pairing fields)
         for (let i = 0; i < toRevert.length; i += 50) {
           const batch = toRevert.slice(i, i + 50);
           await supabase
             .from('shifts')
-            .update({ staff_id: null, staff_name: null, shift_pattern_id: null })
+            .update({ staff_id: null, staff_name: null, shift_pattern_id: null, paired_shift_id: null, paired_staff_name: null })
             .in('id', batch);
         }
         // Delete shifts that were created new by deploy (no shift_name = not a template)
@@ -206,7 +237,7 @@ export default function PatternManager({ open, onClose }) {
       if (pattern.staff_id) {
         let fallbackQuery = supabase
           .from('shifts')
-          .select('id, shift_name')
+          .select('id, shift_name, paired_shift_id')
           .eq('staff_id', pattern.staff_id)
           .gte('date', new Date().toISOString().split('T')[0]);
 
@@ -216,6 +247,9 @@ export default function PatternManager({ open, onClose }) {
 
         const { data: staffShifts } = await fallbackQuery;
         if (staffShifts && staffShifts.length > 0) {
+          for (const s of staffShifts) {
+            if (s.paired_shift_id) partnerIds.add(s.paired_shift_id);
+          }
           const toRevert = staffShifts.filter(s => s.shift_name).map(s => s.id);
           const toDelete = staffShifts.filter(s => !s.shift_name).map(s => s.id);
           const allIds = staffShifts.map(s => s.id);
@@ -228,7 +262,7 @@ export default function PatternManager({ open, onClose }) {
             const batch = toRevert.slice(i, i + 50);
             await supabase
               .from('shifts')
-              .update({ staff_id: null, staff_name: null, shift_pattern_id: null })
+              .update({ staff_id: null, staff_name: null, shift_pattern_id: null, paired_shift_id: null, paired_staff_name: null })
               .in('id', batch);
           }
           for (let i = 0; i < toDelete.length; i += 50) {
@@ -236,6 +270,16 @@ export default function PatternManager({ open, onClose }) {
             await supabase.from('shifts').delete().in('id', batch);
           }
           totalCleared += staffShifts.length;
+        }
+      }
+
+      // 3. Clear pairing on partner shifts
+      if (partnerIds.size > 0) {
+        const ids = [...partnerIds];
+        for (let i = 0; i < ids.length; i += 50) {
+          await supabase.from('shifts')
+            .update({ paired_shift_id: null, paired_staff_name: null })
+            .in('id', ids.slice(i, i + 50));
         }
       }
 

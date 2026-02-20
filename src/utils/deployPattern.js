@@ -257,16 +257,19 @@ export async function deployPatternShifts({
     console.error(`[deploy ${VER}] Call creation error:`, err);
   }
 
-  // ── Step 6: Auto-pair shifts (same date + time + area = pair) ──
+  // ── Step 6: Auto-pair newly filled shifts with existing partner (same date+time+area) ──
+  // Only pairs the shifts we just deployed — does NOT re-pair existing shifts.
   try {
-    const filledDates = [...new Set(toFill.map(s => s.date))].sort();
-    if (filledDates.length > 0) {
+    const filledIds = new Set(toFill.map(s => s.id));
+    if (filledIds.size > 0) {
+      // For each filled shift, look for exactly ONE other assigned shift in the same slot
+      const filledDates = [...new Set(toFill.map(s => s.date))].sort();
       let assigned = [];
       let pOff = 0;
       while (true) {
         const { data, error } = await supabase
           .from('shifts')
-          .select('id, date, start_time, end_time, staff_id, staff_name')
+          .select('id, date, start_time, end_time, staff_id, staff_name, paired_shift_id')
           .not('staff_id', 'is', null)
           .eq('rota_area_id', areaId)
           .gte('date', filledDates[0])
@@ -278,6 +281,7 @@ export async function deployPatternShifts({
         pOff += PAGE;
       }
 
+      // Index all assigned shifts by slot
       const bySlot = {};
       for (const s of assigned) {
         const k = `${s.date}|${s.start_time}|${s.end_time}`;
@@ -287,13 +291,23 @@ export async function deployPatternShifts({
 
       const updates = [];
       for (const shifts of Object.values(bySlot)) {
-        if (shifts.length === 2) {
-          const [a, b] = shifts;
-          updates.push(
-            supabase.from('shifts').update({ paired_shift_id: b.id, paired_staff_name: b.staff_name }).eq('id', a.id),
-            supabase.from('shifts').update({ paired_shift_id: a.id, paired_staff_name: a.staff_name }).eq('id', b.id)
-          );
-        }
+        // Only process slots that contain at least one of the newly filled shifts
+        const newlyFilled = shifts.filter(s => filledIds.has(s.id));
+        if (newlyFilled.length === 0) continue;
+
+        // Only pair when there are exactly 2 shifts in the slot
+        if (shifts.length !== 2) continue;
+
+        const [a, b] = shifts;
+        // Never pair a person with themselves
+        if (a.staff_id === b.staff_id) continue;
+        // Don't re-pair if both sides already have correct pairing
+        if (a.paired_shift_id === b.id && b.paired_shift_id === a.id) continue;
+
+        updates.push(
+          supabase.from('shifts').update({ paired_shift_id: b.id, paired_staff_name: b.staff_name }).eq('id', a.id),
+          supabase.from('shifts').update({ paired_shift_id: a.id, paired_staff_name: a.staff_name }).eq('id', b.id)
+        );
       }
       for (let i = 0; i < updates.length; i += 10) {
         await Promise.all(updates.slice(i, i + 10));
