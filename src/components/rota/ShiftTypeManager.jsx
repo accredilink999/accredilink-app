@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ShiftTypeApi } from '@/api/shiftTypeApi';
+import { supabase } from '@/api/supabaseClient';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -48,9 +49,30 @@ export default function ShiftTypeManager({ open, onClose }) {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, name, start_time, end_time, color }) => ShiftTypeApi.update(id, { name, start_time, end_time, color }),
+    mutationFn: async ({ id, name, start_time, end_time, color, oldName, oldStartTime, oldEndTime }) => {
+      await ShiftTypeApi.update(id, { name, start_time, end_time, color });
+
+      // Propagate changes to all future shifts using this shift type
+      const today = new Date().toISOString().split('T')[0];
+      const updates = {};
+      if (start_time !== oldStartTime) updates.start_time = start_time;
+      if (end_time !== oldEndTime) updates.end_time = end_time;
+      if (name !== oldName) updates.shift_name = name;
+
+      if (Object.keys(updates).length > 0) {
+        const { data, error } = await supabase
+          .from('shifts')
+          .update(updates)
+          .eq('shift_name', oldName)
+          .gte('date', today);
+        if (error) console.error('[ShiftType] Propagate error:', error);
+        const count = data?.length || 0;
+        if (count > 0) toast.info(`Updated ${count} future shift(s) with new times`);
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shiftTypes'] });
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
       toast.success('Shift type updated');
       setEditingId(null);
     },
@@ -113,12 +135,16 @@ export default function ShiftTypeManager({ open, onClose }) {
 
   const handleSaveEdit = () => {
     if (editValue.trim() && editingId) {
-      updateMutation.mutate({ 
-        id: editingId, 
+      const oldType = shiftTypes.find(t => t.id === editingId);
+      updateMutation.mutate({
+        id: editingId,
         name: editValue.trim(),
         start_time: editStartTime,
         end_time: editEndTime,
-        color: editColor
+        color: editColor,
+        oldName: oldType?.name || editValue.trim(),
+        oldStartTime: oldType?.start_time || '',
+        oldEndTime: oldType?.end_time || '',
       });
     }
   };
