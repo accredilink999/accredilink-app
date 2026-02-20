@@ -57,19 +57,29 @@ export default function ClaimShiftModal({ shift, open, onClose, isAdmin = false 
 
   const deleteShiftMutation = useMutation({
     mutationFn: async () => {
+      // Delete associated shift_calls
       const calls = await ShiftCallApi.filter({ shift_id: shift.id });
       for (const call of calls) {
         await ShiftCallApi.delete(call.id);
       }
-      return ShiftApi.delete(shift.id);
+      // Revert to blank available shift instead of deleting
+      return ShiftApi.update(shift.id, {
+        staff_id: null,
+        staff_name: null,
+        paired_shift_id: null,
+        paired_staff_name: null,
+        shift_pattern_id: null,
+        is_base_shift: true,
+        status: 'scheduled',
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
-      toast.success('Shift deleted');
+      toast.success('Shift cleared — now available to claim');
       onClose();
     },
     onError: (err) => {
-      toast.error(err.message || 'Failed to delete shift');
+      toast.error(err.message || 'Failed to clear shift');
     },
   });
 
@@ -165,9 +175,9 @@ export default function ClaimShiftModal({ shift, open, onClose, isAdmin = false 
         <ConfirmDialog
           open={deleteConfirmOpen}
           onOpenChange={setDeleteConfirmOpen}
-          title="Delete Shift?"
-          description="This will permanently delete this available shift. This action cannot be undone."
-          confirmLabel="Delete"
+          title="Clear Shift?"
+          description="This will remove the staff assignment and revert this shift to a blank available slot."
+          confirmLabel="Clear Shift"
           variant="destructive"
           onConfirm={() => deleteShiftMutation.mutate()}
         />

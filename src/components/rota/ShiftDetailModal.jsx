@@ -320,21 +320,36 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
 
   const deleteShiftMutation = useMutation({
     mutationFn: async () => {
-      // Delete associated shift_calls first (CASCADE should handle this, but be explicit)
+      // Delete associated shift_calls
       const calls = await ShiftCallApi.filter({ shift_id: shift.id });
       for (const call of calls) {
         await ShiftCallApi.delete(call.id);
       }
-      return ShiftApi.delete(shift.id);
+      // Clear pairing on partner shift
+      if (shift.paired_shift_id) {
+        await supabase.from('shifts')
+          .update({ paired_shift_id: null, paired_staff_name: null })
+          .eq('id', shift.paired_shift_id);
+      }
+      // Revert to blank available shift instead of deleting
+      return ShiftApi.update(shift.id, {
+        staff_id: null,
+        staff_name: null,
+        paired_shift_id: null,
+        paired_staff_name: null,
+        shift_pattern_id: null,
+        is_base_shift: true,
+        status: 'scheduled',
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       queryClient.invalidateQueries({ queryKey: ['shift-calls'] });
-      toast.success('Shift deleted');
+      toast.success('Shift cleared — now available to claim');
       onClose();
     },
     onError: (err) => {
-      toast.error(err.message || 'Failed to delete shift');
+      toast.error(err.message || 'Failed to clear shift');
     },
   });
 
@@ -1098,7 +1113,7 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
                 className="w-full md:w-auto min-h-[44px] px-4 touch-manipulation"
               >
                 <Trash2 className="w-4 h-4 mr-2" />
-                Delete Shift
+                Clear Shift
               </Button>
             </div>
           )}
@@ -1269,9 +1284,9 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
           <AlertDialog open={deleteShiftConfirm} onOpenChange={setDeleteShiftConfirm}>
           <AlertDialogContent>
           <AlertDialogHeader>
-           <AlertDialogTitle>Delete Shift?</AlertDialogTitle>
+           <AlertDialogTitle>Clear Shift?</AlertDialogTitle>
            <AlertDialogDescription>
-             This will permanently delete this shift and all its associated client calls. This action cannot be undone.
+             This will remove the staff assignment and client calls, reverting this shift to a blank available slot.
            </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex gap-3">
@@ -1284,7 +1299,7 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
              disabled={deleteShiftMutation.isPending}
              className="bg-red-600 hover:bg-red-700"
            >
-             {deleteShiftMutation.isPending ? 'Deleting...' : 'Delete Shift'}
+             {deleteShiftMutation.isPending ? 'Clearing...' : 'Clear Shift'}
            </AlertDialogAction>
           </div>
           </AlertDialogContent>
