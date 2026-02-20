@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import SpeechButton from '@/components/ui/SpeechButton';
+import { shouldShowField } from '@/utils/customFieldConditions';
 
 function renderField(field, value, onChange) {
   const fieldValue = value ?? '';
@@ -153,14 +154,17 @@ export default function CustomSectionRenderer({ section, values, onChange }) {
   return (
     <div className="space-y-4">
       <h3 className="font-semibold text-slate-900">{section.label}</h3>
-      {section.fields.map((field) => (
-        <div key={field.id} className="space-y-3">
-          <Label>
-            {field.label}{field.required ? ' *' : ''}
-          </Label>
-          {renderField(field, values[field.id], onChange)}
-        </div>
-      ))}
+      {section.fields.map((field) => {
+        if (!shouldShowField(field, values)) return null;
+        return (
+          <div key={field.id} className="space-y-3">
+            <Label>
+              {field.label}{field.required ? ' *' : ''}
+            </Label>
+            {renderField(field, values[field.id], onChange)}
+          </div>
+        );
+      })}
     </div>
   );
 }

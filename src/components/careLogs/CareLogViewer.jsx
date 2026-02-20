@@ -8,6 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import CareLogEditForm from './CareLogEditForm';
 import CustomFieldsViewer from './CustomFieldsViewer';
+import BodyMap from './BodyMap';
 import { useCareLogFormConfig } from '@/components/hooks/useCareLogFormConfig';
 
 export default function CareLogViewer({ careLog, open, onOpenChange, isAdmin = false }) {
@@ -390,6 +391,14 @@ export default function CareLogViewer({ careLog, open, onOpenChange, isAdmin = f
             <div className="border-l-4 border-rose-400 bg-rose-50 p-4 rounded">
               <p className="text-xs font-semibold text-rose-900 uppercase mb-2">Skin Integrity Concerns</p>
               <p className="text-sm text-rose-900 leading-relaxed">{careLog.skin_integrity_description}</p>
+            </div>
+          )}
+
+          {/* Body Map */}
+          {careLog.body_map_markers && careLog.body_map_markers.length > 0 && (
+            <div className="border-l-4 border-rose-400 bg-rose-50 p-4 rounded">
+              <p className="text-xs font-semibold text-rose-900 uppercase mb-2">Body Map — Areas of Concern</p>
+              <BodyMap markers={careLog.body_map_markers} readOnly />
             </div>
           )}
 

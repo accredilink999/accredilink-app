@@ -10,6 +10,7 @@ import { CheckCircle2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCareLogFormConfig, getEnabledSections } from '@/components/hooks/useCareLogFormConfig';
 import CustomSectionRenderer from './CustomSectionRenderer';
+import BodyMap from './BodyMap';
 
 // Columns that can be updated in the care_logs table
 const EDITABLE_COLUMNS = new Set([
@@ -30,6 +31,7 @@ const EDITABLE_COLUMNS = new Set([
   'duration_minutes', 'log_timestamp', 'shift_end_time', 'branch',
   'health_observations', 'notes', 'status',
   'custom_fields',
+  'body_map_markers',
 ]);
 
 export default function CareLogEditForm({ careLog, open, onOpenChange, onClose }) {
@@ -256,6 +258,15 @@ export default function CareLogEditForm({ careLog, open, onOpenChange, onClose }
               onChange={(e) => handleChange('skin_integrity_description', e.target.value)}
               placeholder="Describe any skin integrity concerns..."
               className="h-20"
+            />
+          </div>
+
+          {/* Body Map */}
+          <div>
+            <label className="text-sm font-semibold text-slate-700 block mb-2">Body Map</label>
+            <BodyMap
+              markers={formData.body_map_markers || []}
+              onChange={(markers) => handleChange('body_map_markers', markers)}
             />
           </div>
 

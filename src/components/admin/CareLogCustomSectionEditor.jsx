@@ -79,7 +79,18 @@ export default function CareLogCustomSectionEditor({ open, onClose, section, onS
   };
 
   const handleDeleteField = (index) => {
-    setFields((prev) => prev.filter((_, i) => i !== index));
+    const deletedFieldId = fields[index]?.id;
+    setFields((prev) => {
+      const updated = prev.filter((_, i) => i !== index);
+      // Clean up any conditions that reference the deleted field
+      return updated.map(f => {
+        if (f.condition?.fieldId === deletedFieldId) {
+          const { condition, ...rest } = f;
+          return rest;
+        }
+        return f;
+      });
+    });
     if (editingFieldIndex === index) {
       setEditingFieldIndex(null);
       setEditingField(null);
@@ -269,6 +280,155 @@ export default function CareLogCustomSectionEditor({ open, onClose, section, onS
                       </Label>
                     </div>
 
+                    {/* Conditional logic */}
+                    <div className="space-y-2 pt-2 border-t border-teal-200 mt-2">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id={`cond-${index}`}
+                          checked={!!editingField.condition}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setEditingField((prev) => ({
+                                ...prev,
+                                condition: { fieldId: '', operator: 'equals', value: '' },
+                              }));
+                            } else {
+                              setEditingField((prev) => {
+                                const { condition, ...rest } = prev;
+                                return rest;
+                              });
+                            }
+                          }}
+                          className="data-[state=checked]:bg-teal-600 data-[state=checked]:border-teal-600"
+                        />
+                        <Label htmlFor={`cond-${index}`} className="text-slate-700 text-sm cursor-pointer">
+                          Show conditionally
+                        </Label>
+                      </div>
+
+                      {editingField.condition && (
+                        <div className="space-y-2 pl-6">
+                          {/* Target field selector */}
+                          <div className="space-y-1">
+                            <Label className="text-slate-600 text-xs">When field:</Label>
+                            <Select
+                              value={editingField.condition.fieldId || ''}
+                              onValueChange={(val) =>
+                                setEditingField((prev) => ({
+                                  ...prev,
+                                  condition: { ...prev.condition, fieldId: val, value: '' },
+                                }))
+                              }
+                            >
+                              <SelectTrigger className="border-slate-300 h-8 text-sm">
+                                <SelectValue placeholder="Select a field..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {fields
+                                  .filter((f, i) => i !== editingFieldIndex && f.label)
+                                  .map((f) => (
+                                    <SelectItem key={f.id} value={f.id}>
+                                      {f.label}
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {/* Operator selector */}
+                          <div className="space-y-1">
+                            <Label className="text-slate-600 text-xs">Operator:</Label>
+                            <Select
+                              value={editingField.condition.operator}
+                              onValueChange={(val) =>
+                                setEditingField((prev) => ({
+                                  ...prev,
+                                  condition: { ...prev.condition, operator: val },
+                                }))
+                              }
+                            >
+                              <SelectTrigger className="border-slate-300 h-8 text-sm">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="equals">Equals</SelectItem>
+                                <SelectItem value="not_equals">Not Equals</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {/* Value — adapts to target field type */}
+                          <div className="space-y-1">
+                            <Label className="text-slate-600 text-xs">Value:</Label>
+                            {(() => {
+                              const targetField = fields.find((f) => f.id === editingField.condition.fieldId);
+                              if (!targetField) {
+                                return <Input placeholder="Select a field first" disabled className="h-8 text-sm border-slate-300" />;
+                              }
+                              if (targetField.type === 'yes_no') {
+                                return (
+                                  <Select
+                                    value={editingField.condition.value || ''}
+                                    onValueChange={(val) =>
+                                      setEditingField((prev) => ({
+                                        ...prev,
+                                        condition: { ...prev.condition, value: val },
+                                      }))
+                                    }
+                                  >
+                                    <SelectTrigger className="border-slate-300 h-8 text-sm">
+                                      <SelectValue placeholder="Select..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="yes">Yes</SelectItem>
+                                      <SelectItem value="no">No</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                );
+                              }
+                              if (targetField.type === 'select' || targetField.type === 'radio') {
+                                return (
+                                  <Select
+                                    value={editingField.condition.value || ''}
+                                    onValueChange={(val) =>
+                                      setEditingField((prev) => ({
+                                        ...prev,
+                                        condition: { ...prev.condition, value: val },
+                                      }))
+                                    }
+                                  >
+                                    <SelectTrigger className="border-slate-300 h-8 text-sm">
+                                      <SelectValue placeholder="Select..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {(targetField.options || []).map((opt) => (
+                                        <SelectItem key={opt} value={opt}>
+                                          {opt}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                );
+                              }
+                              return (
+                                <Input
+                                  value={editingField.condition.value || ''}
+                                  onChange={(e) =>
+                                    setEditingField((prev) => ({
+                                      ...prev,
+                                      condition: { ...prev.condition, value: e.target.value },
+                                    }))
+                                  }
+                                  placeholder="Enter value..."
+                                  className="border-slate-300 h-8 text-sm"
+                                />
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
                     {/* Options list (select, checkbox_group, radio) */}
                     {TYPES_WITH_OPTIONS.includes(editingField.type) && (
                       <div className="space-y-2">
@@ -340,6 +500,9 @@ export default function CareLogCustomSectionEditor({ open, onClose, section, onS
                     </span>
                     {field.required && (
                       <span className="text-xs text-red-500 font-medium shrink-0">Required</span>
+                    )}
+                    {field.condition && (
+                      <span className="text-xs text-blue-500 font-medium shrink-0">Conditional</span>
                     )}
                     <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button

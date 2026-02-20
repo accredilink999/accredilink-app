@@ -21,6 +21,8 @@ import DraftRecoveryPrompt from '@/components/ui/DraftRecoveryPrompt';
 import { useCareLogFormConfig, getActiveConfig, getEnabledSections } from '@/components/hooks/useCareLogFormConfig';
 import { SECTION_REQUIRED_FIELDS } from '@/constants/careLogFormDefaults';
 import CustomSectionRenderer from './CustomSectionRenderer';
+import BodyMap from './BodyMap';
+import { shouldShowField } from '@/utils/customFieldConditions';
 
 export default function CareLogForm({ shift, serviceUser, open, onClose, callId, scheduledTime }) {
   const queryClient = useQueryClient();
@@ -47,6 +49,7 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
     skincare_description: '',
     skin_integrity_concerns: '',
     skin_integrity_description: '',
+    body_map_markers: [],
     food_offered: '',
     food_accepted: '',
     food_given: '',
@@ -151,6 +154,7 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
     'extended_notes', 'further_concerns', 'further_concerns_details',
     'duration_minutes', 'log_timestamp', 'shift_end_time', 'branch',
     'custom_fields',
+    'body_map_markers',
   ]);
 
   const mutation = useMutation({
@@ -169,6 +173,11 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
         delete cleanData.duration_minutes;
       } else {
         cleanData.duration_minutes = parseInt(cleanData.duration_minutes) || null;
+      }
+
+      // Don't send empty body map markers
+      if (Array.isArray(cleanData.body_map_markers) && cleanData.body_map_markers.length === 0) {
+        delete cleanData.body_map_markers;
       }
 
       // Remove any undefined values that could cause issues
@@ -323,12 +332,15 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
     const missing = Object.entries(requiredFields)
       .filter(([key]) => !formData[key])
       .map(([, label]) => label);
-    // Validate required custom fields
+    // Validate required custom fields (respecting conditional logic)
     for (const section of enabledSections) {
       if (section.type === 'custom' && section.fields) {
+        const sectionValues = customFields[section.id] || {};
         for (const field of section.fields) {
+          // Skip validation if field is hidden by condition
+          if (!shouldShowField(field, sectionValues)) continue;
           if (field.required) {
-            const val = customFields[section.id]?.[field.id];
+            const val = sectionValues[field.id];
             if (!val || (Array.isArray(val) && val.length === 0)) {
               missing.push(field.label);
             }
@@ -698,7 +710,7 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
                 </Button>
                 <Button
                   type="button"
-                  onClick={() => setFormData({...formData, skin_integrity_concerns: 'no', skin_integrity_description: ''})}
+                  onClick={() => setFormData({...formData, skin_integrity_concerns: 'no', skin_integrity_description: '', body_map_markers: []})}
                   className={formData.skin_integrity_concerns === 'no' ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}
                 >
                   No
@@ -706,30 +718,40 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
               </div>
 
               {formData.skin_integrity_concerns === 'yes' && (
-                <div className="mt-3 space-y-2 border-t pt-3">
-                  <Label>Skin Integrity Concerns Details</Label>
-                  <div className="flex gap-2">
-                    <Textarea
-                      value={formData.skin_integrity_description}
-                      onChange={(e) => setFormData({...formData, skin_integrity_description: e.target.value})}
-                      placeholder="Describe any skin integrity concerns..."
-                      rows={4}
-                      className="flex-1"
+                <div className="mt-3 space-y-4 border-t pt-3">
+                  <div className="space-y-2">
+                    <Label>Skin Integrity Concerns Details</Label>
+                    <div className="flex gap-2">
+                      <Textarea
+                        value={formData.skin_integrity_description}
+                        onChange={(e) => setFormData({...formData, skin_integrity_description: e.target.value})}
+                        placeholder="Describe any skin integrity concerns..."
+                        rows={4}
+                        className="flex-1"
+                      />
+                      <div className="flex flex-col gap-2">
+                        <SpeechButton
+                           onResult={(text) => setFormData(prev => ({ ...prev, skin_integrity_description: (prev.skin_integrity_description || '') + ' ' + text }))}
+                           className="h-12 px-3"
+                         />
+                         <Button
+                           type="button"
+                           onClick={() => setFormData({...formData, skin_integrity_description: ''})}
+                           className="h-10 px-3 bg-slate-400 hover:bg-slate-500 text-white"
+                           title="Clear text"
+                         >
+                           <Trash2 className="w-5 h-5" />
+                         </Button>
+                       </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Body Map — Mark Areas of Concern</Label>
+                    <BodyMap
+                      markers={formData.body_map_markers || []}
+                      onChange={(markers) => setFormData(prev => ({...prev, body_map_markers: markers}))}
                     />
-                    <div className="flex flex-col gap-2">
-                      <SpeechButton
-                         onResult={(text) => setFormData(prev => ({ ...prev, skin_integrity_description: (prev.skin_integrity_description || '') + ' ' + text }))}
-                         className="h-12 px-3"
-                       />
-                       <Button
-                         type="button"
-                         onClick={() => setFormData({...formData, skin_integrity_description: ''})}
-                         className="h-10 px-3 bg-slate-400 hover:bg-slate-500 text-white"
-                         title="Clear text"
-                       >
-                         <Trash2 className="w-5 h-5" />
-                       </Button>
-                     </div>
                   </div>
                 </div>
               )}

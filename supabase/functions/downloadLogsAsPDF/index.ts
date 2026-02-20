@@ -1,6 +1,16 @@
 ﻿import { createClient } from 'npm:@supabase/supabase-js@2';
 import { jsPDF } from 'npm:jspdf@2.5.2';
 
+function getBodyRegion(x: number, y: number): string {
+  if (y < 0.15) return 'Head';
+  if (y < 0.25) return x < 0.35 ? 'Right Shoulder' : x > 0.65 ? 'Left Shoulder' : 'Neck/Upper Chest';
+  if (y < 0.35) return x < 0.25 ? 'Right Arm' : x > 0.75 ? 'Left Arm' : 'Upper Torso';
+  if (y < 0.50) return x < 0.25 ? 'Right Arm' : x > 0.75 ? 'Left Arm' : 'Lower Torso';
+  if (y < 0.55) return 'Hip Area';
+  if (y < 0.75) return x < 0.40 ? 'Right Thigh' : x > 0.60 ? 'Left Thigh' : 'Upper Legs';
+  if (y < 0.90) return x < 0.40 ? 'Right Lower Leg' : x > 0.60 ? 'Left Lower Leg' : 'Lower Legs';
+  return x < 0.40 ? 'Right Foot' : x > 0.60 ? 'Left Foot' : 'Feet';
+}
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
@@ -138,6 +148,22 @@ Deno.serve(async (req) => {
         if (log.skin_integrity_concerns) {
           doc.text(`Skin Integrity Concerns: ${log.skin_integrity_concerns}`, margin, yPosition);
           yPosition += 5;
+        }
+        // Body map markers
+        if (log.body_map_markers && Array.isArray(log.body_map_markers) && log.body_map_markers.length > 0) {
+          if (yPosition > pageHeight - 30) { doc.addPage(); yPosition = 20; }
+          doc.setFont('helvetica', 'bold');
+          doc.text('Body Map Markers:', margin, yPosition);
+          yPosition += 5;
+          doc.setFont('helvetica', 'normal');
+          log.body_map_markers.forEach((marker: any, idx: number) => {
+            if (yPosition > pageHeight - 20) { doc.addPage(); yPosition = 20; }
+            const side = marker.side === 'front' ? 'Front' : 'Back';
+            const region = getBodyRegion(marker.x, marker.y);
+            const note = marker.note ? ` - ${marker.note}` : '';
+            doc.text(`  ${idx + 1}. ${side} - ${region}${note}`, margin, yPosition);
+            yPosition += 5;
+          });
         }
         if (log.food_offered) {
           doc.text(`Food Offered: ${log.food_offered}`, margin, yPosition);
