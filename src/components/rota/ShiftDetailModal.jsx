@@ -448,10 +448,21 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
     mutationFn: async () => {
       await ShiftApi.update(shift.id, editData);
 
+      // If staff changed and shift is paired, update or clear pairing on partner
+      const pairedId = currentShift.paired_shift_id;
+      if (pairedId && editData.staff_id !== shift.staff_id) {
+        if (editData.staff_id) {
+          // Staff changed to someone else → update partner's paired_staff_name
+          await ShiftApi.update(pairedId, { paired_staff_name: editData.staff_name });
+        } else {
+          // Staff removed → clear pairing on both sides
+          await ShiftApi.update(pairedId, { paired_shift_id: null, paired_staff_name: null });
+          await ShiftApi.update(shift.id, { paired_shift_id: null, paired_staff_name: null });
+        }
+      }
+
       // Handle sit-in cover call changes
       const existingSitinCall = calls.find(c => c.call_type === 'sitin_cover');
-
-      const pairedId = currentShift.paired_shift_id;
 
       if (sitInCoverRequired === 'yes' && sitInTimeOn && sitInTimeOff) {
         const durationMinutes = timeToMinutes(sitInTimeOff) - timeToMinutes(sitInTimeOn);
