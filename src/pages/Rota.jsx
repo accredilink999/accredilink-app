@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { ShiftApi } from '@/api/rotaApi';
 import { format, startOfMonth, startOfWeek, addDays, isSameDay } from 'date-fns';
 import { usePullToRefresh } from '@/components/hooks/usePullToRefresh';
+import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 
@@ -85,25 +86,68 @@ export default function Rota() {
   const canEdit = isAdmin || currentPermission?.permission_level === 'edit' || currentPermission?.permission_level === 'admin';
   const canAdmin = isAdmin || currentPermission?.permission_level === 'admin';
 
-  const handlePrevious = () => {
-    if (view === 'month') {
-      setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
-    } else if (view === 'week') {
-      setCurrentDate(addDays(currentDate, -7));
-    } else {
-      setCurrentDate(addDays(currentDate, -1));
+  const getNavLabel = useCallback((date, viewType) => {
+    if (viewType === 'month') {
+      return format(date, 'MMMM yyyy');
+    } else if (viewType === 'week') {
+      const ws = startOfWeek(date, { weekStartsOn: 1 });
+      const we = addDays(ws, 6);
+      return `${format(ws, 'd MMM')} - ${format(we, 'd MMM yyyy')}`;
     }
-  };
+    return format(date, 'EEEE, d MMMM yyyy');
+  }, []);
 
-  const handleNext = () => {
+  const handlePrevious = useCallback(() => {
+    let newDate;
     if (view === 'month') {
-      setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+      newDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
     } else if (view === 'week') {
-      setCurrentDate(addDays(currentDate, 7));
+      newDate = addDays(currentDate, -7);
     } else {
-      setCurrentDate(addDays(currentDate, 1));
+      newDate = addDays(currentDate, -1);
     }
-  };
+    setCurrentDate(newDate);
+    toast(getNavLabel(newDate, view), { duration: 1500 });
+  }, [view, currentDate, getNavLabel]);
+
+  const handleNext = useCallback(() => {
+    let newDate;
+    if (view === 'month') {
+      newDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
+    } else if (view === 'week') {
+      newDate = addDays(currentDate, 7);
+    } else {
+      newDate = addDays(currentDate, 1);
+    }
+    setCurrentDate(newDate);
+    toast(getNavLabel(newDate, view), { duration: 1500 });
+  }, [view, currentDate, getNavLabel]);
+
+  // Swipe detection for touch navigation
+  const touchStartRef = useRef(null);
+  const touchStartYRef = useRef(null);
+
+  const onTouchStart = useCallback((e) => {
+    touchStartRef.current = e.touches[0].clientX;
+    touchStartYRef.current = e.touches[0].clientY;
+  }, []);
+
+  const onTouchEnd = useCallback((e) => {
+    if (touchStartRef.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartRef.current;
+    const deltaY = e.changedTouches[0].clientY - touchStartYRef.current;
+    touchStartRef.current = null;
+    touchStartYRef.current = null;
+
+    // Only trigger if horizontal swipe > 60px and more horizontal than vertical
+    if (Math.abs(deltaX) < 60 || Math.abs(deltaX) < Math.abs(deltaY)) return;
+
+    if (deltaX < 0) {
+      handleNext();
+    } else {
+      handlePrevious();
+    }
+  }, [handleNext, handlePrevious]);
 
   const handleToday = () => {
     setCurrentDate(new Date());
@@ -247,6 +291,7 @@ export default function Rota() {
             {showMyShiftsOnly ? 'My Shifts' : 'All Shifts'}
           </Button>
         </div>
+        <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         <TabsContent value="month" className="mt-6">
           <MonthView 
             currentDate={currentDate}
@@ -274,7 +319,7 @@ export default function Rota() {
         </TabsContent>
 
         <TabsContent value="day" className="mt-6">
-          <DayView 
+          <DayView
             currentDate={currentDate}
             onShiftClick={handleShiftClick}
             onCreateShift={handleCreateShift}
@@ -284,6 +329,7 @@ export default function Rota() {
             filterByUserId={showMyShiftsOnly ? user?.id : null}
           />
         </TabsContent>
+        </div>
       </Tabs>
 
       {selectedShift && (
