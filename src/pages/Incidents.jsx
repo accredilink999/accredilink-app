@@ -17,9 +17,9 @@ import PageHeader from '@/components/ui/PageHeader';
 import StatusBadge from '@/components/ui/StatusBadge';
 import Avatar from '@/components/ui/Avatar';
 import EmptyState from '@/components/ui/EmptyState';
-import { 
-  Plus, 
-  Search, 
+import {
+  Plus,
+  Search,
   AlertTriangle,
   Calendar,
   Clock,
@@ -28,6 +28,7 @@ import {
   Eye,
   Filter
 } from 'lucide-react';
+import BodyMap from '@/components/careLogs/BodyMap';
 
 const typeLabels = {
   fall: 'Fall',
@@ -74,7 +75,9 @@ export default function Incidents() {
     family_notified: false,
     gp_notified: false,
     cqc_notifiable: false,
-    follow_up_actions: ''
+    follow_up_actions: '',
+    body_map_markers: [],
+    _show_body_map: false
   };
 
   const { formData, setFormData, hasDraft, restoreDraft, discardDraft, clearDraft } = useFormPersistence(
@@ -139,14 +142,21 @@ export default function Incidents() {
 
   const handleSubmit = () => {
     const serviceUser = serviceUsers.find(s => s.id === formData.service_user_id);
-    
-    createMutation.mutate({
-      ...formData,
+    const { _show_body_map, body_map_markers, ...rest } = formData;
+
+    const submitData = {
+      ...rest,
       service_user_name: serviceUser?.full_name,
       reported_by: user?.id,
       reported_by_name: user?.full_name,
       status: 'open'
-    });
+    };
+
+    if (body_map_markers && body_map_markers.length > 0) {
+      submitData.body_map_markers = body_map_markers;
+    }
+
+    createMutation.mutate(submitData);
   };
 
   const handleStatusChange = (status) => {
@@ -327,6 +337,18 @@ export default function Incidents() {
                 </div>
               )}
 
+              {selectedIncident.body_map_markers && selectedIncident.body_map_markers.length > 0 && (
+                <div>
+                  <Label className="text-slate-500">Body Map</Label>
+                  <div className="mt-2">
+                    <BodyMap
+                      markers={selectedIncident.body_map_markers}
+                      readOnly
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-wrap gap-3">
                 {selectedIncident.medical_attention_required && (
                   <span className="px-3 py-1 bg-red-50 text-red-700 rounded-full text-sm">Medical attention required</span>
@@ -481,6 +503,33 @@ export default function Incidents() {
                   value={formData.witnesses}
                   onChange={(e) => setFormData({...formData, witnesses: e.target.value})}
                 />
+              </div>
+
+              {/* Body Map */}
+              <div className="space-y-3">
+                <Label>Add a body map?</Label>
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    onClick={() => setFormData({...formData, _show_body_map: true})}
+                    className={formData._show_body_map === true ? 'bg-teal-600 hover:bg-teal-700' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}
+                  >
+                    Yes
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => setFormData({...formData, _show_body_map: false, body_map_markers: []})}
+                    className={formData._show_body_map === false ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}
+                  >
+                    No
+                  </Button>
+                </div>
+                {formData._show_body_map && (
+                  <BodyMap
+                    markers={formData.body_map_markers || []}
+                    onChange={(markers) => setFormData({...formData, body_map_markers: markers})}
+                  />
+                )}
               </div>
 
               <div className="space-y-3">
