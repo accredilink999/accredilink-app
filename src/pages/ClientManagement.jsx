@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Avatar from '@/components/ui/Avatar';
 import EmptyState from '@/components/ui/EmptyState';
 import ServiceUserForm from '@/components/serviceUsers/ServiceUserForm';
@@ -213,7 +214,7 @@ export default function ClientManagement() {
               className="pl-10 text-xs sm:text-sm py-2 sm:py-3"
             />
           </div>
-          <div className="flex flex-wrap gap-2 sm:gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {isAdmin && (
               <>
                 <Button
@@ -251,17 +252,29 @@ export default function ClientManagement() {
                 </Button>
               </>
             )}
-            {(isAdmin ? teams.filter(team => !['directors', 'admin team management team', 'management team', 'admin team'].includes(team.name?.toLowerCase())) : userAssignedTeams).map((team, idx) => (
-              <Button
-                key={team.id}
-                variant={selectedTeam === team.id ? 'default' : 'outline'}
-                onClick={() => setSelectedTeam(team.id)}
-                size="sm"
-                className={`text-xs sm:text-sm font-semibold text-white ${selectedTeam === team.id ? getTeamColor(idx) : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
-              >
-                {team.name}
-              </Button>
-            ))}
+
+            {/* Team / Area dropdown */}
+            <Select
+              value={selectedTeam || 'all'}
+              onValueChange={(val) => setSelectedTeam(val === 'all' ? null : val)}
+            >
+              <SelectTrigger className="w-[180px] h-9 text-xs sm:text-sm border-slate-300">
+                <SelectValue placeholder="All Teams" />
+              </SelectTrigger>
+              <SelectContent>
+                {isAdmin && (
+                  <SelectItem value="all">All Teams</SelectItem>
+                )}
+                {(isAdmin
+                  ? teams.filter(team => !['directors', 'admin team management team', 'management team', 'admin team'].includes(team.name?.toLowerCase()))
+                  : userAssignedTeams
+                ).map((team) => (
+                  <SelectItem key={team.id} value={team.id}>
+                    {team.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
