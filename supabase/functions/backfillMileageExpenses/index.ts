@@ -28,27 +28,20 @@ function haversineMiles(lat1: number, lon1: number, lat2: number, lon2: number):
 
 /**
  * Geocode an address string via OpenStreetMap Nominatim.
- * Tries progressively simpler queries (drops leading parts like house names).
+ * Tries full address first, then postcode only.
  */
 async function geocodeAddress(address: string): Promise<{ latitude: number, longitude: number } | null> {
-  if (!address || address.trim().length < 5) return null
+  if (!address || address.trim().length < 3) return null
 
   const clean = address.replace(/,\s*$/, '').trim()
-  const parts = clean.split(/,\s*/)
+  // Try full address first, then just the postcode
   const variants = [clean]
-  for (let i = 1; i < parts.length; i++) {
-    variants.push(parts.slice(i).join(', '))
-  }
   const postcodeMatch = clean.match(/[A-Z]{1,2}\d{1,2}\s*\d[A-Z]{2}/i)
-  if (postcodeMatch) {
-    variants.push(postcodeMatch[0])
-  }
+  if (postcodeMatch) variants.push(postcodeMatch[0])
 
-  for (let vi = 0; vi < variants.length; vi++) {
-    const query = variants[vi]
-    if (query.length < 3) continue
+  for (const query of variants) {
     try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=gb`
       const res = await fetch(url, {
         headers: { 'User-Agent': 'AccredilinkApp/1.0' },
       })
@@ -61,12 +54,9 @@ async function geocodeAddress(address: string): Promise<{ latitude: number, long
         }
       }
     } catch {
-      // continue to next variant
+      // continue
     }
-    // Rate limit: 1 req/sec for Nominatim
-    if (vi < variants.length - 1) {
-      await new Promise(r => setTimeout(r, 1100))
-    }
+    await new Promise(r => setTimeout(r, 1000))
   }
   return null
 }
@@ -215,28 +205,24 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Strategy 4: Geocode service_user_address via Nominatim
+      // Strategy 4: Geocode ALL missing service_user addresses via Nominatim
+      // Also saves coordinates back to service_users table so they persist
       const missing4 = serviceUserIds.filter(id => !locationMap[id])
       if (missing4.length > 0) {
-        // Build address map from shift_calls data
+        // Get ALL addresses for missing IDs from service_users table
+        const { data: suWithAddrs } = await supabaseAdmin
+          .from('service_users')
+          .select('id, address')
+          .in('id', missing4)
+
+        // Also check shift_calls for addresses
         const addressMap: Record<string, string> = {}
+        for (const su of (suWithAddrs || [])) {
+          if (su.id && su.address) addressMap[su.id] = su.address
+        }
         for (const call of eligibleCalls) {
           if (call.service_user_id && call.service_user_address && !addressMap[call.service_user_id]) {
             addressMap[call.service_user_id] = call.service_user_address
-          }
-        }
-
-        // Also try service_users.address for any still missing
-        const idsNeedingAddress = missing4.filter(id => !addressMap[id])
-        if (idsNeedingAddress.length > 0) {
-          const { data: suAddrs } = await supabaseAdmin
-            .from('service_users')
-            .select('id, address')
-            .in('id', idsNeedingAddress)
-          for (const su of (suAddrs || [])) {
-            if (su.id && su.address && !addressMap[su.id]) {
-              addressMap[su.id] = su.address
-            }
           }
         }
 
@@ -249,6 +235,11 @@ Deno.serve(async (req) => {
           if (addr in uniqueAddresses) {
             if (uniqueAddresses[addr]) {
               locationMap[id] = uniqueAddresses[addr]!
+              // Save to service_users for next time
+              await supabaseAdmin.from('service_users').update({
+                latitude: uniqueAddresses[addr]!.latitude,
+                longitude: uniqueAddresses[addr]!.longitude,
+              }).eq('id', id)
             }
             continue
           }
@@ -257,8 +248,12 @@ Deno.serve(async (req) => {
           uniqueAddresses[addr] = coords
           if (coords) {
             locationMap[id] = coords
+            // Save to service_users so next run picks them up from Strategy 3
+            await supabaseAdmin.from('service_users').update({
+              latitude: coords.latitude,
+              longitude: coords.longitude,
+            }).eq('id', id)
           }
-          await new Promise(r => setTimeout(r, 1100))
         }
       }
     }

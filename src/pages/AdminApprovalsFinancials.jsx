@@ -176,14 +176,13 @@ export default function AdminApprovalsFinancials() {
           staffName: staffUser?.staff_full_name || staffUser?.full_name || exp.staff_name || 'Unknown',
           expenses: [],
           totalMiles: 0,
-          totalNonMileageAmount: 0,
+          totalAmount: 0,
         };
       }
       groups[key].expenses.push(exp);
+      groups[key].totalAmount += parseFloat(exp.amount || 0);
       if (exp.expense_type === 'mileage') {
         groups[key].totalMiles += parseFloat(exp.mileage_distance || exp.mileage || 0);
-      } else {
-        groups[key].totalNonMileageAmount += parseFloat(exp.amount || 0);
       }
     });
     return groups;
@@ -210,14 +209,12 @@ export default function AdminApprovalsFinancials() {
       .map(([key, g]) => ({
         ...g,
         key,
-        totalMileageAmount: g.totalMiles * mileageRate,
-        totalAmount: (g.totalMiles * mileageRate) + g.totalNonMileageAmount,
         allApproved: g.expenses.every(e => e.status === 'approved' || e.status === 'paid'),
         allPaid: g.expenses.every(e => e.status === 'paid'),
         hasPending: g.expenses.some(e => e.status === 'pending'),
       }))
       .sort((a, b) => a.staffName.localeCompare(b.staffName));
-  }, [weeklyStaffGroups, effectiveWeek, mileageRate]);
+  }, [weeklyStaffGroups, effectiveWeek]);
 
   const updateLeaveMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.LeaveRequest.update(id, data),
