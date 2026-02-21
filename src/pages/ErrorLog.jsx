@@ -186,14 +186,14 @@ export default function ErrorLog() {
     }
   };
 
-  const copyForClaude = () => {
-    const unresolvedErrors = errors.filter(e => !e.is_resolved);
-    if (unresolvedErrors.length === 0) {
-      toast.error('No unresolved errors to copy');
+  const copyForClaude = (errorsToFormat) => {
+    const toCopy = errorsToFormat || filteredErrors.filter(e => !e.is_resolved);
+    if (toCopy.length === 0) {
+      toast.error('No errors to copy');
       return;
     }
 
-    const formatted = unresolvedErrors.map((err, i) => {
+    const formatted = toCopy.map((err, i) => {
       const lines = [
         `--- Error ${i + 1} ---`,
         `Source: ${err.error_source}`,
@@ -215,10 +215,11 @@ export default function ErrorLog() {
       return lines.join('\n');
     }).join('\n\n');
 
-    const header = `CARE CALL AI - Error Log (${unresolvedErrors.length} unresolved errors)\nExported: ${new Date().toLocaleString()}\n${'='.repeat(50)}\n\n`;
+    const dateLabel = dateFilter || 'all dates';
+    const header = `CARE CALL AI - Error Log (${toCopy.length} errors, ${dateLabel})\nExported: ${new Date().toLocaleString()}\n${'='.repeat(50)}\n\n`;
 
     navigator.clipboard.writeText(header + formatted).then(() => {
-      toast.success(`Copied ${unresolvedErrors.length} errors to clipboard — paste to Claude Code`);
+      toast.success(`Copied ${toCopy.length} errors to clipboard — paste to Claude Code`);
     }).catch(() => {
       const ta = document.createElement('textarea');
       ta.value = header + formatted;
@@ -226,8 +227,19 @@ export default function ErrorLog() {
       ta.select();
       document.execCommand('copy');
       document.body.removeChild(ta);
-      toast.success(`Copied ${unresolvedErrors.length} errors to clipboard`);
+      toast.success(`Copied ${toCopy.length} errors to clipboard`);
     });
+  };
+
+  // One-click: copy just today's unresolved errors
+  const copyTodayForClaude = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const todayErrors = errors.filter(e => !e.is_resolved && e.created_at?.startsWith(today));
+    if (todayErrors.length === 0) {
+      toast.error('No unresolved errors for today');
+      return;
+    }
+    copyForClaude(todayErrors);
   };
 
   const analyzeWithAI = async () => {
@@ -295,9 +307,13 @@ Format with clear headings and bullet points.`,
           )}
           {aiAnalysis?.loading ? 'Analyzing...' : `Analyze with AI (${filteredErrors.filter(e => !e.is_resolved).length})`}
         </Button>
-        <Button onClick={copyForClaude} variant="outline" className="border-purple-200 text-purple-700 hover:bg-purple-50">
+        <Button onClick={copyTodayForClaude} className="bg-orange-500 hover:bg-orange-600 text-white">
           <Copy className="w-4 h-4 mr-2" />
-          Copy for Claude ({unresolvedCount})
+          Copy Today for Claude
+        </Button>
+        <Button onClick={() => copyForClaude()} variant="outline" className="border-purple-200 text-purple-700 hover:bg-purple-50">
+          <Copy className="w-4 h-4 mr-2" />
+          Copy Visible ({filteredErrors.filter(e => !e.is_resolved).length})
         </Button>
         <Button
           variant="outline"
