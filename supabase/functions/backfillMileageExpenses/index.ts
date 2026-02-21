@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
       .select('role, job_title')
       .eq('id', user.id)
       .single()
-    const isAdmin = profile?.role === 'admin' || ['admin', 'manager', 'supervisor'].includes(profile?.job_title)
+    const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin' || ['admin', 'manager', 'supervisor'].includes(profile?.job_title)
     if (!isAdmin) return jsonResponse({ error: 'Admin access required' }, 403)
 
     // Get configured rate
