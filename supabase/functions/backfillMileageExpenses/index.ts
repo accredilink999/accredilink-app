@@ -26,6 +26,51 @@ function haversineMiles(lat1: number, lon1: number, lat2: number, lon2: number):
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
+/**
+ * Geocode an address string via OpenStreetMap Nominatim.
+ * Tries progressively simpler queries (drops leading parts like house names).
+ */
+async function geocodeAddress(address: string): Promise<{ latitude: number, longitude: number } | null> {
+  if (!address || address.trim().length < 5) return null
+
+  const clean = address.replace(/,\s*$/, '').trim()
+  const parts = clean.split(/,\s*/)
+  const variants = [clean]
+  for (let i = 1; i < parts.length; i++) {
+    variants.push(parts.slice(i).join(', '))
+  }
+  const postcodeMatch = clean.match(/[A-Z]{1,2}\d{1,2}\s*\d[A-Z]{2}/i)
+  if (postcodeMatch) {
+    variants.push(postcodeMatch[0])
+  }
+
+  for (let vi = 0; vi < variants.length; vi++) {
+    const query = variants[vi]
+    if (query.length < 3) continue
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`
+      const res = await fetch(url, {
+        headers: { 'User-Agent': 'AccredilinkApp/1.0' },
+      })
+      if (!res.ok) continue
+      const results = await res.json()
+      if (results && results.length > 0) {
+        return {
+          latitude: parseFloat(results[0].lat),
+          longitude: parseFloat(results[0].lon),
+        }
+      }
+    } catch {
+      // continue to next variant
+    }
+    // Rate limit: 1 req/sec for Nominatim
+    if (vi < variants.length - 1) {
+      await new Promise(r => setTimeout(r, 1100))
+    }
+  }
+  return null
+}
+
 function getSundayOfWeek(date: Date): Date {
   const d = new Date(date)
   d.setDate(d.getDate() - d.getDay())
@@ -77,7 +122,7 @@ Deno.serve(async (req) => {
     // We exclude calls where drove_to_call is explicitly false
     const { data: allCalls, error: callsErr } = await supabaseAdmin
       .from('shift_calls')
-      .select('id, shift_id, service_user_id, service_user_name, checkin_latitude, checkin_longitude, checkout_latitude, checkout_longitude, clock_in_time, clock_out_time, drove_to_call, status, created_at')
+      .select('id, shift_id, service_user_id, service_user_name, service_user_address, checkin_latitude, checkin_longitude, checkout_latitude, checkout_longitude, clock_in_time, clock_out_time, drove_to_call, status, created_at')
       .not('shift_id', 'is', null)
       .order('clock_in_time', { ascending: true })
 
@@ -137,6 +182,55 @@ Deno.serve(async (req) => {
           }
         }
       }
+
+      // Final fallback: geocode service_user_address via Nominatim for any still-missing IDs
+      const stillMissing = serviceUserIds.filter(id => !locationMap[id])
+      if (stillMissing.length > 0) {
+        // Build address map from shift_calls data
+        const addressMap: Record<string, string> = {}
+        for (const call of eligibleCalls) {
+          if (call.service_user_id && call.service_user_address && !addressMap[call.service_user_id]) {
+            addressMap[call.service_user_id] = call.service_user_address
+          }
+        }
+
+        // Also try service_users.address for any still missing
+        const idsNeedingAddress = stillMissing.filter(id => !addressMap[id])
+        if (idsNeedingAddress.length > 0) {
+          const { data: suAddrs } = await supabaseAdmin
+            .from('service_users')
+            .select('id, address')
+            .in('id', idsNeedingAddress)
+          for (const su of (suAddrs || [])) {
+            if (su.id && su.address && !addressMap[su.id]) {
+              addressMap[su.id] = su.address
+            }
+          }
+        }
+
+        // Geocode unique addresses (deduplicate to save API calls)
+        const uniqueAddresses: Record<string, { latitude: number, longitude: number } | null> = {}
+        for (const id of stillMissing) {
+          const addr = addressMap[id]
+          if (!addr) continue
+
+          // Check if we already geocoded this exact address
+          if (addr in uniqueAddresses) {
+            if (uniqueAddresses[addr]) {
+              locationMap[id] = uniqueAddresses[addr]!
+            }
+            continue
+          }
+
+          const coords = await geocodeAddress(addr)
+          uniqueAddresses[addr] = coords
+          if (coords) {
+            locationMap[id] = coords
+          }
+          // Rate limit between geocoding calls
+          await new Promise(r => setTimeout(r, 1100))
+        }
+      }
     }
 
     // Get shift details for dates and staff
@@ -168,6 +262,9 @@ Deno.serve(async (req) => {
     for (const p of (profiles || [])) {
       profileMap[p.id] = p
     }
+
+    // Count how many IDs were resolved via geocoding
+    const geocodedCount = Object.keys(locationMap).length
 
     let created = 0
     let skipped = 0
@@ -279,6 +376,7 @@ Deno.serve(async (req) => {
       tooShort,
       totalShifts: Object.keys(byShift).length,
       totalCalls: eligibleCalls.length,
+      geocodedLocations: geocodedCount,
       errors: errors.length > 0 ? errors : undefined
     })
   } catch (error) {
