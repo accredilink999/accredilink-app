@@ -209,22 +209,30 @@ Deno.serve(async (req) => {
     const profileMap: Record<string, any> = {}
     for (const p of (profiles || [])) profileMap[p.id] = p
 
-    // Get existing PER-STAFF PER-DATE mileage expenses
-    const { data: existingExpenses } = await supabaseAdmin
+    // Delete ALL old mileage expenses for this week (cleans up per-shift duplicates)
+    // Then we recreate fresh per-staff per-date expenses below
+    const { data: oldExpenses } = await supabaseAdmin
       .from('expenses')
-      .select('id, staff_id, date')
+      .select('id')
       .eq('expense_type', 'mileage')
       .gte('date', weekStartStr)
       .lte('date', todayStr)
-    const existingExpenseMap: Record<string, string> = {}
-    for (const e of (existingExpenses || [])) {
-      if (e.staff_id && e.date) existingExpenseMap[`${e.staff_id}__${e.date}`] = e.id
+    let deleted = 0
+    if (oldExpenses && oldExpenses.length > 0) {
+      const oldIds = oldExpenses.map(e => e.id)
+      for (let i = 0; i < oldIds.length; i += 100) {
+        await supabaseAdmin
+          .from('expenses')
+          .delete()
+          .in('id', oldIds.slice(i, i + 100))
+      }
+      deleted = oldIds.length
     }
 
     // ========================================
     // STEP 5: Calculate mileage per STAFF per DAY
     // ========================================
-    let created = 0, updated = 0
+    let created = 0
     const errors: string[] = []
     const dailyDetails: any[] = []
 
@@ -292,49 +300,32 @@ Deno.serve(async (req) => {
       const paymentDue = getFollowingThursday(wStart)
       const desc = `Mileage: ${totalMiles} mi @ ${ratePpm}p/mi\n${legs.join('\n')}`
 
-      const existingId = existingExpenseMap[key]
-      if (existingId) {
-        const { error: updateErr } = await supabaseAdmin
-          .from('expenses')
-          .update({
-            amount,
-            description: desc,
-            mileage: totalMiles,
-            mileage_distance: totalMiles,
-            mileage_rate: ratePerMile,
-            staff_name: staffName,
-          })
-          .eq('id', existingId)
-        if (updateErr) errors.push(`Update ${key}: ${updateErr.message}`)
-        else updated++
-      } else {
-        const { error: insertErr } = await supabaseAdmin.from('expenses').insert({
-          staff_id: staffId,
-          staff_name: staffName,
-          expense_type: 'mileage',
-          amount,
-          date: shiftDate,
-          expense_date: shiftDate,
-          description: desc,
-          mileage: totalMiles,
-          mileage_distance: totalMiles,
-          mileage_rate: ratePerMile,
-          week_start_date: wStart.toISOString().split('T')[0],
-          week_end_date: wEnd.toISOString().split('T')[0],
-          payment_due_date: paymentDue.toISOString().split('T')[0],
-          status: 'pending',
-        })
-        if (insertErr) errors.push(`Insert ${key}: ${insertErr.message}`)
-        else created++
-      }
+      const { error: insertErr } = await supabaseAdmin.from('expenses').insert({
+        staff_id: staffId,
+        staff_name: staffName,
+        expense_type: 'mileage',
+        amount,
+        date: shiftDate,
+        expense_date: shiftDate,
+        description: desc,
+        mileage: totalMiles,
+        mileage_distance: totalMiles,
+        mileage_rate: ratePerMile,
+        week_start_date: wStart.toISOString().split('T')[0],
+        week_end_date: wEnd.toISOString().split('T')[0],
+        payment_due_date: paymentDue.toISOString().split('T')[0],
+        status: 'pending',
+      })
+      if (insertErr) errors.push(`Insert ${key}: ${insertErr.message}`)
+      else created++
     }
 
     return jsonResponse({
       success: true,
-      message: `Created ${created}, updated ${updated} mileage expenses. (Per-staff per-day)`,
+      message: `Deleted ${deleted} old, created ${created} new mileage expenses. (Per-staff per-day)`,
       weekRange: `${weekStartStr} to ${todayStr}`,
+      deleted,
       created,
-      updated,
       totalShifts: weekShifts.length,
       totalCalls: allCalls.length,
       eligibleCalls: eligibleCalls.length,
