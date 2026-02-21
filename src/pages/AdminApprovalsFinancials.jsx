@@ -444,8 +444,8 @@ export default function AdminApprovalsFinancials() {
         <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
           <CardContent className="pt-6">
             <div className="text-center">
-              <p className="text-3xl font-bold text-blue-700">{pendingExpenses.length}</p>
-              <p className="text-sm text-blue-600 mt-1">Pending Expenses</p>
+              <p className="text-3xl font-bold text-blue-700">{currentWeekGroups.filter(g => g.hasPending).reduce((sum, g) => sum + g.expenses.filter(e => e.status === 'pending').length, 0)}</p>
+              <p className="text-sm text-blue-600 mt-1">Week Pending</p>
             </div>
           </CardContent>
         </Card>
@@ -453,8 +453,8 @@ export default function AdminApprovalsFinancials() {
         <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200">
           <CardContent className="pt-6">
             <div className="text-center">
-              <p className="text-lg font-bold text-emerald-700">£{totalPendingExpenses.toFixed(2)}</p>
-              <p className="text-sm text-emerald-600 mt-1">Total Pending</p>
+              <p className="text-lg font-bold text-emerald-700">£{weekTotalPending.toFixed(2)}</p>
+              <p className="text-sm text-emerald-600 mt-1">Week Pending</p>
             </div>
           </CardContent>
         </Card>
