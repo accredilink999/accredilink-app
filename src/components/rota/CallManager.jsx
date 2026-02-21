@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import SpeechButton from '@/components/ui/SpeechButton';
-import { Clock, MapPin, CheckCircle, AlertCircle, Play, Square, Plus, Edit, Trash2, FileText, Car, ListChecks, ClipboardList, User } from 'lucide-react';
+import { Clock, MapPin, CheckCircle, AlertCircle, Play, Square, Plus, Edit, Trash2, FileText, Car, ListChecks, ClipboardList, User, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { notifyAdminsOfActivity } from '@/utils/adminNotifications';
 import { toast } from 'sonner';
@@ -165,6 +165,24 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
     staleTime: 5 * 60 * 1000, // cache for 5 minutes
   });
 
+  // Fetch paired shift's calls to show partner progress (without syncing status)
+  const { data: pairedShiftCalls = [] } = useQuery({
+    queryKey: ['paired-shift-calls', shift?.paired_shift_id],
+    queryFn: () => ShiftCallApi.filter({ shift_id: shift.paired_shift_id }, 'scheduled_time', 100),
+    enabled: !!shift?.paired_shift_id,
+  });
+
+  // Helper: get partner's matching call for a given call (matched by service_user_name + scheduled_time + call_date)
+  const getPartnerCall = (call) => {
+    if (!shift?.paired_shift_id || pairedShiftCalls.length === 0) return null;
+    return pairedShiftCalls.find(pc =>
+      pc.scheduled_time === call.scheduled_time &&
+      pc.call_date === call.call_date &&
+      (pc.service_user_id === call.service_user_id ||
+       pc.service_user_name === call.service_user_name)
+    ) || null;
+  };
+
   const VISIT_TYPE_LABELS = {
     food_drink: 'Food & Drink',
     mood: 'Mood',
@@ -230,20 +248,23 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
     onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] });
 
-      // Sync check-in to shared/paired shift calls (same service user, date, time)
-      if (data.service_user_id && data.call_date && data.scheduled_time) {
+      // Notify paired shift partner of check-in (don't sync status — each partner checks in independently)
+      if (shift?.paired_shift_id && data.service_user_id) {
         try {
-          const matchingCalls = await ShiftCallApi.filter({
-            service_user_id: data.service_user_id,
-            call_date: data.call_date,
-            scheduled_time: data.scheduled_time
-          });
-          const otherCalls = matchingCalls.filter(c => c.id !== data.id && c.status === 'pending');
-          for (const otherCall of otherCalls) {
-            await ShiftCallApi.update(otherCall.id, { status: 'in_progress' });
+          const pairedShift = await base44.entities.Shift.read(shift.paired_shift_id);
+          if (pairedShift?.staff_id && pairedShift.staff_id !== shift.staff_id) {
+            base44.functions.invoke('createNotification', {
+              recipient_ids: [pairedShift.staff_id],
+              type: 'care_log',
+              title: `Partner checked in: ${data.service_user_name || 'Client'}`,
+              message: `${shift?.staff_name || 'Your partner'} has checked in to ${data.service_user_name}'s call.`,
+              priority: 'normal',
+              action_url: '/Rota',
+              send_push: true,
+            }).catch(e => console.warn('Partner checkin notification failed:', e));
           }
-        } catch (err) {
-          console.log('Error syncing check-in to shared calls:', err);
+        } catch (e) {
+          console.warn('Could not notify partner of check-in:', e);
         }
       }
 
@@ -291,46 +312,23 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
     onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] });
 
-      // Sync check-out to shared/paired shift calls
-      if (data.service_user_id && data.call_date && data.scheduled_time) {
+      // Notify paired shift partner of check-out (don't sync status — each partner checks out independently)
+      if (shift?.paired_shift_id && data.service_user_id) {
         try {
-          const matchingCalls = await ShiftCallApi.filter({
-            service_user_id: data.service_user_id,
-            call_date: data.call_date,
-            scheduled_time: data.scheduled_time
-          });
-          const otherCalls = matchingCalls.filter(c => c.id !== data.id && c.status !== 'completed');
-          for (const otherCall of otherCalls) {
-            await ShiftCallApi.update(otherCall.id, {
-              clock_out_time: new Date().toISOString(),
-              status: 'completed'
-            });
-            // Send push notification to the partner
-            if (otherCall.shift_id) {
-              try {
-                const otherShift = await base44.entities.Shift.read(otherCall.shift_id);
-                if (otherShift?.staff_id && otherShift.staff_id !== shift?.staff_id) {
-                  const staffName = shift?.staff_name || 'Your shift partner';
-                  base44.functions.invoke('createNotification', {
-                    recipient_ids: [otherShift.staff_id],
-                    type: 'care_log',
-                    title: `Call completed: ${data.service_user_name || 'Client'}`,
-                    message: `${staffName} has completed this call.`,
-                    priority: 'normal',
-                    action_url: '/CareLogs',
-                    send_push: true,
-                  }).catch(e => console.warn('Push to partner failed:', e));
-                }
-              } catch (e) {
-                console.warn('Could not notify partner:', e);
-              }
-            }
+          const pairedShift = await base44.entities.Shift.read(shift.paired_shift_id);
+          if (pairedShift?.staff_id && pairedShift.staff_id !== shift?.staff_id) {
+            base44.functions.invoke('createNotification', {
+              recipient_ids: [pairedShift.staff_id],
+              type: 'care_log',
+              title: `Partner completed: ${data.service_user_name || 'Client'}`,
+              message: `${shift?.staff_name || 'Your partner'} has checked out of ${data.service_user_name}'s call.`,
+              priority: 'normal',
+              action_url: '/Rota',
+              send_push: true,
+            }).catch(e => console.warn('Partner checkout notification failed:', e));
           }
-          if (otherCalls.length > 0) {
-            console.log(`[ClockOut] Auto-completed ${otherCalls.length} shared call(s)`);
-          }
-        } catch (err) {
-          console.log('Error syncing check-out to shared calls:', err);
+        } catch (e) {
+          console.warn('Could not notify partner of check-out:', e);
         }
       }
 
@@ -978,6 +976,26 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                   </div>
                 )}
 
+                {/* Partner status indicator for paired shifts */}
+                {shift?.paired_shift_id && (() => {
+                  const partnerCall = getPartnerCall(call);
+                  const partnerHasLog = careLogs.some(
+                    log => log.shift_id === shift.paired_shift_id && log.service_user_id === call.service_user_id
+                  );
+                  if (!partnerCall) return null;
+                  const parts = [];
+                  if (partnerCall.clock_in_time) parts.push('Checked in');
+                  if (partnerHasLog) parts.push('Log done');
+                  if (partnerCall.clock_out_time) parts.push('Checked out');
+                  if (parts.length === 0) return null;
+                  return (
+                    <div className="text-xs mb-3 flex items-center gap-1 text-purple-600 bg-purple-50 px-2 py-1 rounded">
+                      <Users className="w-3 h-3" />
+                      <span>Partner: {parts.join(' · ')}</span>
+                    </div>
+                  );
+                })()}
+
                 {call.notes && call.call_type !== 'sitin_cover' && (
                   <p className="text-sm text-slate-600 mb-3">{call.notes}</p>
                 )}
@@ -1086,7 +1104,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                         Care Log
                       </Button>
                     )}
-                  {(isMyShift || isAdmin) && call.status !== 'completed' && (
+                  {(isMyShift || isAdmin) && call.status !== 'completed' && !shift?.paired_shift_id && (
                     <Button
                       size="sm"
                       variant="outline"
