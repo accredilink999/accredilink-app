@@ -1227,28 +1227,26 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                       .filter(c => c.drove_to_call === true)
                       .sort((a, b) => new Date(a.clock_in_time) - new Date(b.clock_in_time));
 
-                    // Look up addresses from service_users table for calls missing service_user_address
-                    const needAddress = droveCalls.filter(c => !c.service_user_address && c.service_user_id);
-                    if (needAddress.length > 0) {
-                      const suIds = [...new Set(needAddress.map(c => c.service_user_id))];
+                    // Look up postcodes from service_users table (postcodes are in separate column)
+                    const suIds = [...new Set(droveCalls.map(c => c.service_user_id).filter(Boolean))];
+                    if (suIds.length > 0) {
                       const { data: sus } = await supabase
                         .from('service_users')
-                        .select('id, address')
+                        .select('id, postcode')
                         .in('id', suIds);
-                      const addrMap = {};
+                      const pcMap = {};
                       for (const su of (sus || [])) {
-                        if (su.address) addrMap[su.id] = su.address;
+                        if (su.postcode) pcMap[su.id] = su.postcode.trim();
                       }
                       for (const call of droveCalls) {
-                        if (!call.service_user_address && call.service_user_id && addrMap[call.service_user_id]) {
-                          call.service_user_address = addrMap[call.service_user_id];
+                        if (call.service_user_id && pcMap[call.service_user_id]) {
+                          call.service_user_address = pcMap[call.service_user_id];
                         }
                       }
                     }
 
                     const droveWithAddr = droveCalls.filter(c => c.service_user_address);
                     if (droveWithAddr.length >= 2) {
-                      // Geocode all addresses (cached in memory so only first call per address is slow)
                       const resolved = await resolveCallAddresses(droveWithAddr);
 
                       if (resolved.length >= 2) {

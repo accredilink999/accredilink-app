@@ -26,66 +26,34 @@ function haversineMiles(lat1: number, lon1: number, lat2: number, lon2: number):
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
-// Address → coords cache
-const coordsCache: Record<string, { latitude: number, longitude: number } | null> = {}
+// Postcode → coords cache
+const postcodeCoords: Record<string, { latitude: number, longitude: number }> = {}
 
-// Geocode an address using Nominatim (full address, street-level accuracy)
-async function geocodeAddress(address: string): Promise<{ latitude: number, longitude: number } | null> {
-  if (!address || address.trim().length < 3) return null
-  const key = address.trim().toLowerCase()
-  if (key in coordsCache) return coordsCache[key]
-
-  // Try the full address first, then progressively shorter variants
-  const clean = address.replace(/,\s*$/, '').replace(/\s+/g, ' ').trim()
-  const variants = [clean]
-  // Also try with "UK" appended for better results
-  variants.push(clean + ', UK')
-  // Try from the last comma onwards (e.g. just "Denbigh, UK")
-  const parts = clean.split(/,\s*/)
-  if (parts.length > 1) {
-    for (let i = 1; i < parts.length; i++) {
-      variants.push(parts.slice(i).join(', ') + ', UK')
-    }
-  }
-  // Extract and try postcode if present
-  const postcodeMatch = clean.match(/[A-Z]{1,2}\d{1,2}\s*\d[A-Z]{2}/i)
-  if (postcodeMatch) variants.push(postcodeMatch[0])
-
-  for (const query of variants) {
-    if (query.length < 3) continue
+// Bulk lookup postcodes via postcodes.io (free, reliable, up to 100 per request)
+async function bulkLookupPostcodes(postcodes: string[]): Promise<void> {
+  const toFetch = [...new Set(postcodes.map(p => p.trim().toUpperCase()))].filter(p => p && !(p in postcodeCoords))
+  for (let i = 0; i < toFetch.length; i += 100) {
+    const batch = toFetch.slice(i, i + 100)
     try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=gb`
-      const res = await fetch(url, { headers: { 'User-Agent': 'AccredilinkApp/1.0' } })
+      const res = await fetch('https://api.postcodes.io/postcodes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postcodes: batch }),
+      })
       if (!res.ok) continue
-      const results = await res.json()
-      if (results && results.length > 0) {
-        const coords = { latitude: parseFloat(results[0].lat), longitude: parseFloat(results[0].lon) }
-        coordsCache[key] = coords
-        return coords
-      }
-    } catch { /* continue */ }
-    // Rate limit: 1 request per second for Nominatim
-    await new Promise(r => setTimeout(r, 1100))
-  }
-
-  // Fallback: try postcodes.io if address has a UK postcode
-  if (postcodeMatch) {
-    try {
-      const pc = postcodeMatch[0].replace(/\s+/g, '')
-      const res = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(pc)}`)
-      if (res.ok) {
-        const data = await res.json()
-        if (data.status === 200 && data.result) {
-          const coords = { latitude: data.result.latitude, longitude: data.result.longitude }
-          coordsCache[key] = coords
-          return coords
+      const data = await res.json()
+      if (data.status === 200 && data.result) {
+        for (const r of data.result) {
+          if (r.result && r.result.latitude && r.result.longitude) {
+            postcodeCoords[r.query.toUpperCase()] = {
+              latitude: r.result.latitude,
+              longitude: r.result.longitude,
+            }
+          }
         }
       }
     } catch { /* continue */ }
   }
-
-  coordsCache[key] = null
-  return null
 }
 
 function getSundayOfWeek(date: Date): Date {
@@ -149,28 +117,31 @@ Deno.serve(async (req) => {
     const ratePerMile = ratePpm / 100
 
     // ========================================
-    // STEP 1: Build address map from service_users table
-    // Only ~11 service users, so we geocode these once
+    // STEP 1: Build postcode map from service_users table
+    // Postcodes are in a SEPARATE 'postcode' column, not in the address text
     // ========================================
     const { data: allServiceUsers } = await supabaseAdmin
       .from('service_users')
-      .select('id, full_name, address')
+      .select('id, full_name, address, postcode')
 
-    const suAddressById: Record<string, string> = {}
-    const suAddressByName: Record<string, string> = {}
+    // Map service_user_id → postcode, and name → postcode
+    const postcodeById: Record<string, string> = {}
+    const postcodeByName: Record<string, string> = {}
     for (const su of (allServiceUsers || [])) {
-      if (su.address && su.address.trim()) {
-        suAddressById[su.id] = su.address.trim()
-        if (su.full_name) suAddressByName[su.full_name.toLowerCase().trim()] = su.address.trim()
+      const pc = (su.postcode || '').trim().toUpperCase()
+      if (pc) {
+        postcodeById[su.id] = pc
+        if (su.full_name) postcodeByName[su.full_name.toLowerCase().trim()] = pc
       }
     }
 
-    // Pre-geocode ALL unique service user addresses (only ~11, takes ~15 seconds max)
-    const uniqueAddresses = [...new Set(Object.values(suAddressById))]
-    const geocodeResults: Record<string, string> = {} // address → 'ok' | 'failed'
-    for (const addr of uniqueAddresses) {
-      const coords = await geocodeAddress(addr)
-      geocodeResults[addr] = coords ? 'ok' : 'failed'
+    // Bulk lookup ALL unique postcodes via postcodes.io (instant, no rate limit)
+    const uniquePostcodes = [...new Set(Object.values(postcodeById))]
+    await bulkLookupPostcodes(uniquePostcodes)
+
+    const geocodeResults: Record<string, string> = {}
+    for (const pc of uniquePostcodes) {
+      geocodeResults[pc] = postcodeCoords[pc] ? 'ok' : 'failed'
     }
 
     // ========================================
@@ -191,14 +162,12 @@ Deno.serve(async (req) => {
     // Include all calls EXCEPT those explicitly marked as not driven
     const eligibleCalls = allCalls.filter(c => c.drove_to_call !== false)
 
-    // Resolve address for each call: use service_user_address on call, or look up from service_users
+    // Resolve postcode for each call from service_users table
     for (const call of eligibleCalls) {
-      if (!call.service_user_address || !call.service_user_address.trim()) {
-        if (call.service_user_id && suAddressById[call.service_user_id]) {
-          call.service_user_address = suAddressById[call.service_user_id]
-        } else if (call.service_user_name && suAddressByName[call.service_user_name.toLowerCase().trim()]) {
-          call.service_user_address = suAddressByName[call.service_user_name.toLowerCase().trim()]
-        }
+      if (call.service_user_id && postcodeById[call.service_user_id]) {
+        call._postcode = postcodeById[call.service_user_id]
+      } else if (call.service_user_name && postcodeByName[call.service_user_name.toLowerCase().trim()]) {
+        call._postcode = postcodeByName[call.service_user_name.toLowerCase().trim()]
       }
     }
 
@@ -252,18 +221,17 @@ Deno.serve(async (req) => {
       if (!shift) continue
       if (shift.date && shift.date > todayStr) { skippedFuture++; continue }
 
-      // Resolve each call's coordinates from its address
+      // Resolve each call's coordinates from its postcode
       const resolved = calls
         .map(c => {
-          if (!c.service_user_address) return null
-          const key = c.service_user_address.trim().toLowerCase()
-          const coords = coordsCache[key]
+          const pc = c._postcode
+          if (!pc) return null
+          const coords = postcodeCoords[pc.toUpperCase()]
           if (!coords) return null
           return { ...c, lat: coords.latitude, lng: coords.longitude }
         })
         .filter(Boolean)
         .sort((a: any, b: any) => {
-          // Sort by scheduled_time (or clock_in_time, or created_at)
           const tA = a.scheduled_time || a.clock_in_time || a.created_at
           const tB = b.scheduled_time || b.clock_in_time || b.created_at
           return String(tA).localeCompare(String(tB))
@@ -344,11 +312,11 @@ Deno.serve(async (req) => {
         totalCallsInDb: allCalls.length,
         eligibleCalls: eligibleCalls.length,
         serviceUsersFound: allServiceUsers?.length || 0,
-        serviceUsersWithAddress: Object.keys(suAddressById).length,
-        uniqueAddresses: uniqueAddresses.length,
-        geocodeResults,
-        callsWithAddressAfterLookup: eligibleCalls.filter(c => c.service_user_address).length,
-        callsStillNoAddress: eligibleCalls.filter(c => !c.service_user_address).length,
+        serviceUsersWithPostcode: Object.keys(postcodeById).length,
+        uniquePostcodes: uniquePostcodes.length,
+        postcodeResults: geocodeResults,
+        callsWithPostcode: eligibleCalls.filter(c => c._postcode).length,
+        callsNoPostcode: eligibleCalls.filter(c => !c._postcode).length,
       },
       futureExpensesCleaned: futureExpenses?.length || 0,
       errors: errors.length > 0 ? errors : undefined,
