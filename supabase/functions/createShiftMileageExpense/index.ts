@@ -4,6 +4,18 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+function jsonResponse(body: any, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
+}
+
 function getSundayOfWeek(date: Date): Date {
   const d = new Date(date)
   d.setDate(d.getDate() - d.getDay())
@@ -19,25 +31,21 @@ function getFollowingThursday(weekStart: Date): Date {
 }
 
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders })
+  }
+
   try {
-    if (req.method === 'OPTIONS') {
-      return new Response(null, { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' } })
-    }
     const authHeader = req.headers.get('Authorization') || ''
     const supabase = createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { Authorization: authHeader } } })
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
-    const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser()
-    if (authError || !currentUser) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    const user = currentUser;
-
-    if (!user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) return jsonResponse({ error: 'Unauthorized' }, 401)
 
     const { shiftId, totalMiles } = await req.json();
 
     if (!shiftId || !totalMiles || totalMiles <= 0) {
-      return Response.json({ error: 'Missing or invalid shiftId/totalMiles' }, { status: 400 });
+      return jsonResponse({ error: 'Missing or invalid shiftId/totalMiles' }, 400)
     }
 
     // Prevent duplicate expense for same shift
@@ -49,7 +57,7 @@ Deno.serve(async (req) => {
       .limit(1)
 
     if (existing && existing.length > 0) {
-      return Response.json({ success: false, message: 'Mileage expense already exists for this shift' })
+      return jsonResponse({ success: false, message: 'Mileage expense already exists for this shift' })
     }
 
     // Get the shift date for proper weekly grouping
@@ -106,11 +114,11 @@ Deno.serve(async (req) => {
 
     if (insertError) {
       console.error('Insert error:', insertError);
-      return Response.json({ error: insertError.message }, { status: 500 });
+      return jsonResponse({ error: insertError.message }, 500)
     }
 
-    return Response.json({ success: true, expense });
+    return jsonResponse({ success: true, expense })
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return jsonResponse({ error: error.message }, 500)
   }
 });
