@@ -26,40 +26,46 @@ function haversineMiles(lat1: number, lon1: number, lat2: number, lon2: number):
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
-// Geocode cache: address → coords (persists for the lifetime of the function invocation)
-const geocodeCache: Record<string, { latitude: number, longitude: number } | null> = {}
+// Extract UK postcode from an address string
+function extractPostcode(address: string): string | null {
+  if (!address) return null
+  const match = address.match(/[A-Z]{1,2}\d{1,2}\s*\d[A-Z]{2}/i)
+  return match ? match[0].replace(/\s+/g, ' ').toUpperCase() : null
+}
 
-async function geocodeAddress(address: string): Promise<{ latitude: number, longitude: number } | null> {
-  if (!address || address.trim().length < 3) return null
-  const key = address.trim().toLowerCase()
-  if (key in geocodeCache) return geocodeCache[key]
+// Postcode → coords cache (persists for the lifetime of the function invocation)
+const postcodeCache: Record<string, { latitude: number, longitude: number }> = {}
 
-  const clean = address.replace(/,\s*$/, '').trim()
-  const variants = [clean]
-  const parts = clean.split(/,\s*/)
-  for (let i = 1; i < parts.length; i++) {
-    variants.push(parts.slice(i).join(', '))
-  }
-  const postcodeMatch = clean.match(/[A-Z]{1,2}\d{1,2}\s*\d[A-Z]{2}/i)
-  if (postcodeMatch) variants.push(postcodeMatch[0])
+// Bulk geocode postcodes via postcodes.io (free, no API key, no rate limit, up to 100 per request)
+async function bulkGeocodePostcodes(postcodes: string[]): Promise<number> {
+  let resolved = 0
+  // Deduplicate and skip already cached
+  const toFetch = [...new Set(postcodes)].filter(p => !(p.toUpperCase() in postcodeCache))
 
-  for (const query of variants) {
-    if (query.length < 3) continue
+  for (let i = 0; i < toFetch.length; i += 100) {
+    const batch = toFetch.slice(i, i + 100)
     try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=gb`
-      const res = await fetch(url, { headers: { 'User-Agent': 'AccredilinkApp/1.0' } })
+      const res = await fetch('https://api.postcodes.io/postcodes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postcodes: batch }),
+      })
       if (!res.ok) continue
-      const results = await res.json()
-      if (results && results.length > 0) {
-        const coords = { latitude: parseFloat(results[0].lat), longitude: parseFloat(results[0].lon) }
-        geocodeCache[key] = coords
-        return coords
+      const data = await res.json()
+      if (data.status === 200 && data.result) {
+        for (const r of data.result) {
+          if (r.result && r.result.latitude && r.result.longitude) {
+            postcodeCache[r.query.toUpperCase()] = {
+              latitude: r.result.latitude,
+              longitude: r.result.longitude,
+            }
+            resolved++
+          }
+        }
       }
     } catch { /* continue */ }
-    await new Promise(r => setTimeout(r, 1000))
   }
-  geocodeCache[key] = null
-  return null
+  return resolved
 }
 
 function getSundayOfWeek(date: Date): Date {
@@ -142,48 +148,88 @@ Deno.serve(async (req) => {
       return false
     })
 
-    // Look up addresses from service_users table for calls missing service_user_address
-    const callsMissingAddress = eligibleCalls.filter(c => !c.service_user_address)
-    if (callsMissingAddress.length > 0) {
-      // By service_user_id
-      const missingIds = [...new Set(callsMissingAddress.map(c => c.service_user_id).filter(Boolean))]
-      const addressById: Record<string, string> = {}
-      if (missingIds.length > 0) {
-        for (let i = 0; i < missingIds.length; i += 100) {
-          const { data: sus } = await supabaseAdmin
-            .from('service_users')
-            .select('id, address')
-            .in('id', missingIds.slice(i, i + 100))
-          for (const su of (sus || [])) {
-            if (su.address) addressById[su.id] = su.address
-          }
-        }
+    // --- DIAGNOSTICS ---
+    const diag = {
+      totalCallsInDb: allCalls.length,
+      eligibleCalls: eligibleCalls.length,
+      callsWithAddressOnRecord: 0,
+      callsMissingAddress: 0,
+      addressesFoundFromServiceUsers: 0,
+      callsStillNoAddress: 0,
+      uniquePostcodes: 0,
+      postcodesResolved: 0,
+      sampleAddresses: [] as string[],
+      samplePostcodes: [] as string[],
+    }
+
+    diag.callsWithAddressOnRecord = eligibleCalls.filter(c => c.service_user_address).length
+    diag.callsMissingAddress = eligibleCalls.filter(c => !c.service_user_address).length
+
+    // Look up addresses from service_users table for ALL calls (even those with address, to ensure we have the best data)
+    // First get ALL service_users with addresses
+    const allServiceUserIds = [...new Set(eligibleCalls.map(c => c.service_user_id).filter(Boolean))]
+    const addressById: Record<string, string> = {}
+    for (let i = 0; i < allServiceUserIds.length; i += 100) {
+      const { data: sus } = await supabaseAdmin
+        .from('service_users')
+        .select('id, address')
+        .in('id', allServiceUserIds.slice(i, i + 100))
+      for (const su of (sus || [])) {
+        if (su.address) addressById[su.id] = su.address
       }
-      // By service_user_name (for calls without service_user_id)
-      const namesWithoutId = [...new Set(
-        callsMissingAddress
-          .filter(c => !c.service_user_id && c.service_user_name)
-          .map(c => c.service_user_name)
-      )]
-      const addressByName: Record<string, string> = {}
-      for (const name of namesWithoutId) {
-        const { data: match } = await supabaseAdmin
-          .from('service_users')
-          .select('address')
-          .ilike('full_name', name)
-          .limit(1)
-        if (match?.[0]?.address) addressByName[name.toLowerCase().trim()] = match[0].address
-      }
-      // Populate the address on each call
-      for (const call of eligibleCalls) {
-        if (call.service_user_address) continue
+    }
+
+    // For calls without service_user_id, try matching by name
+    const namesWithoutId = [...new Set(
+      eligibleCalls
+        .filter(c => !c.service_user_id && !c.service_user_address && c.service_user_name)
+        .map(c => c.service_user_name)
+    )]
+    const addressByName: Record<string, string> = {}
+    for (const name of namesWithoutId) {
+      const { data: match } = await supabaseAdmin
+        .from('service_users')
+        .select('address')
+        .ilike('full_name', name)
+        .limit(1)
+      if (match?.[0]?.address) addressByName[name.toLowerCase().trim()] = match[0].address
+    }
+
+    // Populate addresses on calls that are missing them
+    let addressesFilledFromSU = 0
+    for (const call of eligibleCalls) {
+      if (!call.service_user_address) {
         if (call.service_user_id && addressById[call.service_user_id]) {
           call.service_user_address = addressById[call.service_user_id]
+          addressesFilledFromSU++
         } else if (call.service_user_name && addressByName[call.service_user_name.toLowerCase().trim()]) {
           call.service_user_address = addressByName[call.service_user_name.toLowerCase().trim()]
+          addressesFilledFromSU++
         }
       }
     }
+    diag.addressesFoundFromServiceUsers = addressesFilledFromSU
+    diag.callsStillNoAddress = eligibleCalls.filter(c => !c.service_user_address).length
+
+    // Extract postcodes from all addresses
+    const addressPostcodeMap: Record<string, string> = {} // address key → postcode
+    const allPostcodes: string[] = []
+    for (const call of eligibleCalls) {
+      if (!call.service_user_address) continue
+      const pc = extractPostcode(call.service_user_address)
+      if (pc) {
+        addressPostcodeMap[call.service_user_address.trim().toLowerCase()] = pc
+        allPostcodes.push(pc)
+      }
+    }
+    const uniquePostcodes = [...new Set(allPostcodes)]
+    diag.uniquePostcodes = uniquePostcodes.length
+    diag.sampleAddresses = [...new Set(eligibleCalls.map(c => c.service_user_address).filter(Boolean))].slice(0, 5)
+    diag.samplePostcodes = uniquePostcodes.slice(0, 5)
+
+    // Bulk geocode all postcodes via postcodes.io
+    const postcodesResolved = await bulkGeocodePostcodes(uniquePostcodes)
+    diag.postcodesResolved = postcodesResolved
 
     // Group by shift_id
     const byShift: Record<string, any[]> = {}
@@ -201,16 +247,6 @@ Deno.serve(async (req) => {
     const existingExpenseMap: Record<string, string> = {}
     for (const e of (existingExpenses || [])) {
       if (e.shift_id) existingExpenseMap[e.shift_id] = e.id
-    }
-
-    // Pre-geocode all unique addresses
-    const uniqueAddresses = [...new Set(eligibleCalls.map(c => c.service_user_address).filter(Boolean))]
-    let geocoded = 0
-    let geocodeFailed = 0
-    for (const addr of uniqueAddresses) {
-      const coords = await geocodeAddress(addr)
-      if (coords) geocoded++
-      else geocodeFailed++
     }
 
     // Get shift details
@@ -235,7 +271,7 @@ Deno.serve(async (req) => {
     const profileMap: Record<string, any> = {}
     for (const p of (profiles || [])) profileMap[p.id] = p
 
-    let created = 0, updated = 0, noAddress = 0, tooShort = 0
+    let created = 0, updated = 0, noAddress = 0, tooShort = 0, noPostcode = 0
     const errors: string[] = []
 
     for (const [shiftId, calls] of Object.entries(byShift)) {
@@ -243,11 +279,14 @@ Deno.serve(async (req) => {
       if (!shift) continue
       if (shift.date && shift.date > todayStr) continue
 
-      // Resolve each call's coordinates from its address
+      // Resolve each call's coordinates from its address postcode
       const resolved = calls
         .map(c => {
           if (!c.service_user_address) return null
-          const coords = geocodeCache[c.service_user_address.trim().toLowerCase()]
+          const addrKey = c.service_user_address.trim().toLowerCase()
+          const pc = addressPostcodeMap[addrKey]
+          if (!pc) return null
+          const coords = postcodeCache[pc.toUpperCase()]
           if (!coords) return null
           return { ...c, lat: coords.latitude, lng: coords.longitude }
         })
@@ -316,16 +355,14 @@ Deno.serve(async (req) => {
 
     return jsonResponse({
       success: true,
-      message: `Created ${created}, updated ${updated} mileage expenses. ${noAddress} insufficient address data, ${tooShort} too short.`,
+      message: `Created ${created}, updated ${updated} mileage expenses. ${noAddress} insufficient data, ${tooShort} too short.`,
       created,
       updated,
       noAddress,
       tooShort,
       totalShifts: Object.keys(byShift).length,
       totalCalls: eligibleCalls.length,
-      uniqueAddresses: uniqueAddresses.length,
-      geocoded,
-      geocodeFailed,
+      diagnostics: diag,
       futureExpensesCleaned: futureExpenses?.length || 0,
       errors: errors.length > 0 ? errors : undefined,
     })

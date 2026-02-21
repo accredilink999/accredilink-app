@@ -3,7 +3,7 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { ShiftCallApi, ShiftApi } from '@/api/rotaApi';
-import { resolveCallAddresses, geocodeAddress } from '@/lib/gpsCache';
+import { resolveCallAddresses, haversineMiles } from '@/lib/addressMileage';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,17 +29,6 @@ import { format } from 'date-fns';
 import { notifyAdminsOfActivity } from '@/utils/adminNotifications';
 import { toast } from 'sonner';
 
-// Haversine formula: returns distance in miles between two GPS points
-function haversineMiles(lat1, lon1, lat2, lon2) {
-  const R = 3959; // Earth radius in miles
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
 
 // Parse sit-in cover metadata from call notes (JSON)
 function parseSitinMeta(call) {
