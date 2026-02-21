@@ -181,7 +181,9 @@ export default function Layout({ children, currentPageName }) {
 
   const updateLocationMutation = useMutation({
    mutationFn: async (coords) => {
-     return base44.entities.Location.create({
+     // Delete existing + insert fresh → exactly one record per user
+     await supabase.from('locations').delete().eq('staff_id', user.id);
+     const { error } = await supabase.from('locations').insert({
        staff_id: user.id,
        staff_name: user.staff_full_name || user.full_name,
        latitude: coords.latitude,
@@ -189,6 +191,7 @@ export default function Layout({ children, currentPageName }) {
        accuracy: coords.accuracy,
        timestamp: new Date().toISOString()
      });
+     if (error) throw error;
    },
   });
 
@@ -249,31 +252,52 @@ export default function Layout({ children, currentPageName }) {
 
 
   // Auto-start GPS tracking on app load (only if globally enabled)
+  // - Keeps location record when app is backgrounded (so iPhone users stay visible)
+  // - Only deletes on actual page close (beforeunload/pagehide)
+  // - Resumes tracking when app returns to foreground
+  // - Throttles DB writes to once per 30 seconds
   useEffect(() => {
     if (!user?.id || !globalTrackingEnabled) return;
 
-    // Store the auth token so we can use it synchronously in unload handlers
     let currentToken = null;
     supabase.auth.getSession().then(({ data: { session } }) => {
       currentToken = session?.access_token;
     });
 
-    const watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        updateLocationMutation.mutate({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-        });
-      },
-      (error) => console.warn('Geolocation unavailable:', error?.message || error?.code || 'unknown'),
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
-    );
+    let watchId = null;
+    let lastUpdateTime = 0;
+    const THROTTLE_MS = 30000;
 
-    // Remove location when app closes — uses direct Supabase REST DELETE
-    // with keepalive:true so the browser sends it even during page close
+    const startWatch = () => {
+      if (watchId !== null) return;
+      watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const now = Date.now();
+          if (now - lastUpdateTime < THROTTLE_MS) return;
+          lastUpdateTime = now;
+          updateLocationMutation.mutate({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+          });
+        },
+        (error) => console.warn('Geolocation unavailable:', error?.message || error?.code || 'unknown'),
+        { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 }
+      );
+    };
+
+    const stopWatch = () => {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+    };
+
+    startWatch();
+
+    // Only delete location on actual page close (not background)
     const removeLocation = () => {
-      navigator.geolocation.clearWatch(watchId);
+      stopWatch();
       if (!currentToken) return;
       try {
         const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
@@ -289,8 +313,13 @@ export default function Layout({ children, currentPageName }) {
       } catch (e) { /* ignore errors on unload */ }
     };
 
+    // Pause/resume tracking on visibility change — keep location record
     const handleVisibilityChange = () => {
-      if (document.hidden) removeLocation();
+      if (document.hidden) {
+        stopWatch();
+      } else {
+        startWatch();
+      }
     };
 
     window.addEventListener('beforeunload', removeLocation);
@@ -298,7 +327,7 @@ export default function Layout({ children, currentPageName }) {
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      navigator.geolocation.clearWatch(watchId);
+      stopWatch();
       window.removeEventListener('beforeunload', removeLocation);
       window.removeEventListener('pagehide', removeLocation);
       document.removeEventListener('visibilitychange', handleVisibilityChange);

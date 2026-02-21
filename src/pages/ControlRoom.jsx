@@ -320,10 +320,12 @@ export default function ControlRoom() {
   // ── Staff map markers (live GPS + last known fallback) ──────────
   const staffMarkers = React.useMemo(() => {
     const markers = [];
-    const liveMap = new Map();
+    const twoMinAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+
+    const gpsMap = new Map();
     for (const loc of staffLocations) {
       if (loc.latitude && loc.longitude) {
-        liveMap.set(loc.staff_id, loc);
+        gpsMap.set(loc.staff_id, loc);
       }
     }
     const shiftToStaff = new Map();
@@ -344,17 +346,19 @@ export default function ControlRoom() {
     for (const staffId of staffOnShiftIds) {
       const shift = todayShifts.find(s => s.staff_id === staffId && s.status !== 'cancelled');
       if (!shift) continue;
-      const live = liveMap.get(staffId);
+      const gps = gpsMap.get(staffId);
       const lastKnown = lastKnownMap.get(staffId);
-      if (live) {
+      if (gps) {
+        // Has a GPS record — "live" only if updated within last 2 minutes
+        const isRecent = gps.timestamp && gps.timestamp > twoMinAgo;
         markers.push({
           staffId,
-          staffName: live.staff_name || shift.staff_name || 'Unknown',
-          lat: Number(live.latitude),
-          lng: Number(live.longitude),
-          isLive: true,
-          accuracy: live.accuracy,
-          timestamp: live.timestamp,
+          staffName: gps.staff_name || shift.staff_name || 'Unknown',
+          lat: Number(gps.latitude),
+          lng: Number(gps.longitude),
+          isLive: isRecent,
+          accuracy: gps.accuracy,
+          timestamp: gps.timestamp,
         });
       } else if (lastKnown) {
         markers.push({

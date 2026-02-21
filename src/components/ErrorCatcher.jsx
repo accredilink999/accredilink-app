@@ -71,7 +71,7 @@ export default function ErrorCatcher() {
         msg.includes('Loading chunk') ||
         msg.includes('validateDOMNesting') ||
         msg.includes('Each child in a list') ||
-        msg.includes('getAllStaff network error') ||
+        msg.includes('network error') ||
         msg.includes('falling back to profiles') ||
         msg.includes('Geolocation error') ||
         msg.includes('Failed to start the audio device') ||
