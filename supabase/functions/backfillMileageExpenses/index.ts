@@ -145,12 +145,12 @@ Deno.serve(async (req) => {
     }
 
     // ========================================
-    // STEP 2: Get ALL shift_calls on past shifts
-    // No drove_to_call or clock_in_time filter — include everything
+    // STEP 2: Get shift_calls that were ACTUALLY WORKED
+    // Exclude blank pattern-generated calls (status 'pending', no clock_in)
     // ========================================
     const { data: allCalls, error: callsErr } = await supabaseAdmin
       .from('shift_calls')
-      .select('id, shift_id, service_user_id, service_user_name, service_user_address, clock_in_time, drove_to_call, created_at, scheduled_time')
+      .select('id, shift_id, service_user_id, service_user_name, service_user_address, clock_in_time, drove_to_call, created_at, scheduled_time, status')
       .not('shift_id', 'is', null)
       .order('scheduled_time', { ascending: true })
 
@@ -159,8 +159,18 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: true, message: 'No shift_calls found', created: 0 })
     }
 
-    // Include all calls EXCEPT those explicitly marked as not driven
-    const eligibleCalls = allCalls.filter(c => c.drove_to_call !== false)
+    // Only include calls that were actually attended:
+    // - drove_to_call explicitly true, OR
+    // - has clock_in_time (staff checked in), OR
+    // - status is 'completed' or 'in_progress' (call was worked)
+    // Exclude: drove_to_call === false (staff said they didn't drive)
+    const eligibleCalls = allCalls.filter(c => {
+      if (c.drove_to_call === false) return false
+      if (c.drove_to_call === true) return true
+      if (c.clock_in_time) return true
+      if (c.status === 'completed' || c.status === 'in_progress') return true
+      return false
+    })
 
     // Resolve postcode for each call from service_users table
     for (const call of eligibleCalls) {
