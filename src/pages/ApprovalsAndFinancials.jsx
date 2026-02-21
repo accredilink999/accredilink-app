@@ -134,7 +134,14 @@ export default function ApprovalsAndFinancials() {
       return d >= currentWeekStart && d <= currentWeekEnd;
     });
   const currentWeekMiles = currentWeekMileage.reduce((sum, e) => sum + parseFloat(e.mileage_distance || e.mileage || 0), 0);
-  const currentWeekAmount = currentWeekMiles * mileageRate;
+  const currentWeekAmount = currentWeekMileage.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+
+  // All current week expenses (not just mileage)
+  const currentWeekExpenses = expenseRecords.filter(e => {
+    const d = new Date(e.date || e.expense_date || e.created_date);
+    return d >= currentWeekStart && d <= currentWeekEnd;
+  });
+  const currentWeekTotal = currentWeekExpenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
 
   const { data: payrollRecords = [] } = useQuery({
     queryKey: ['myPayroll', user?.id],
@@ -245,7 +252,7 @@ export default function ApprovalsAndFinancials() {
         subtitle="Track your leave requests, expenses, and payroll information"
       />
 
-      <Tabs defaultValue="leave" className="w-full">
+      <Tabs defaultValue="expenses" className="w-full">
         <TabsList className="bg-gradient-to-r from-purple-100 to-pink-100 p-2 w-full flex flex-wrap justify-start sm:flex-nowrap gap-1">
           <TabsTrigger value="leave" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white text-sm sm:text-base whitespace-nowrap px-3 py-2">Leave Requests</TabsTrigger>
           <TabsTrigger value="expenses" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white text-sm sm:text-base whitespace-nowrap px-3 py-2">Expenses</TabsTrigger>
@@ -547,68 +554,6 @@ export default function ApprovalsAndFinancials() {
 
         {/* Expenses Tab */}
         <TabsContent value="expenses" className="space-y-4">
-          {!showExpenseForm && (
-            <Button 
-              onClick={() => setShowExpenseForm(true)}
-              className="bg-emerald-600 hover:bg-emerald-700"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Submit Expense
-            </Button>
-          )}
-
-          {showExpenseForm && (
-            <Card className="p-6 bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200">
-              <form onSubmit={handleSubmitExpense} className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-slate-700 block mb-1">Description *</label>
-                  <Input
-                    placeholder="e.g., Travel costs, client meeting supplies"
-                    value={expenseForm.description}
-                    onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-slate-700 block mb-1">Amount (£) *</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={expenseForm.amount}
-                    onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-slate-700 block mb-1">Notes</label>
-                  <Textarea
-                    placeholder="Add any additional details about this expense"
-                    value={expenseForm.notes}
-                    onChange={(e) => setExpenseForm({ ...expenseForm, notes: e.target.value })}
-                    className="h-20"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Button 
-                    type="submit" 
-                    disabled={submitExpenseMutation.isPending}
-                    className="bg-emerald-600 hover:bg-emerald-700"
-                  >
-                    {submitExpenseMutation.isPending ? 'Submitting...' : 'Submit Expense'}
-                  </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline"
-                    onClick={() => setShowExpenseForm(false)}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </Card>
-          )}
-
           {/* Current week mileage accrual */}
           <Card className="bg-gradient-to-br from-teal-50 to-emerald-50 border-teal-200">
             <CardContent className="pt-5 pb-4">
@@ -643,60 +588,80 @@ export default function ApprovalsAndFinancials() {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Daily breakdown for current week */}
+          <Card className="p-4">
+            <h3 className="font-semibold text-slate-900 mb-3">Daily Breakdown</h3>
+            {currentWeekExpenses.length === 0 ? (
+              <p className="text-sm text-slate-500">No expenses this week yet</p>
+            ) : (
+              <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-0 text-sm">
+                <span className="text-xs font-semibold text-slate-400 uppercase pb-1">Day</span>
+                <span className="text-xs font-semibold text-slate-400 uppercase text-right pb-1">Miles</span>
+                <span className="text-xs font-semibold text-slate-400 uppercase text-right pb-1">Amount</span>
+                <span className="text-xs font-semibold text-slate-400 uppercase text-right pb-1">Running</span>
+                {(() => {
+                  const today = new Date();
+                  let runningAmount = 0;
+                  const days = [];
+                  for (let i = 0; i < 7; i++) {
+                    const day = new Date(currentWeekStart);
+                    day.setDate(day.getDate() + i);
+                    const dayStr = format(day, 'yyyy-MM-dd');
+                    const dayExps = currentWeekExpenses.filter(e => {
+                      const ed = new Date(e.date || e.expense_date || e.created_date);
+                      return format(ed, 'yyyy-MM-dd') === dayStr;
+                    });
+                    const dayMiles = dayExps.reduce((s, e) => s + parseFloat(e.mileage_distance || e.mileage || 0), 0);
+                    const dayAmount = dayExps.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+                    runningAmount += dayAmount;
+                    const isToday = format(today, 'yyyy-MM-dd') === dayStr;
+                    const isFuture = day > today;
+                    days.push({ day, dayStr, dayMiles, dayAmount, hasData: dayExps.length > 0, runningAmount, isToday, isFuture });
+                  }
+                  return days.map(d => (
+                    <React.Fragment key={d.dayStr}>
+                      <span className={`py-1.5 border-b border-slate-50 flex items-center gap-1 ${d.isToday ? 'font-semibold text-teal-700' : d.isFuture ? 'text-slate-300' : d.hasData ? 'text-slate-700' : 'text-slate-400'}`}>
+                        {format(d.day, 'EEE dd MMM')}
+                        {d.isToday && <Badge className="bg-teal-100 text-teal-700 text-[10px] py-0 px-1">Today</Badge>}
+                      </span>
+                      <span className={`py-1.5 border-b border-slate-50 text-right ${d.isToday ? 'font-semibold text-teal-700' : d.hasData ? 'text-slate-700' : 'text-slate-300'}`}>
+                        {d.dayMiles > 0 ? `${d.dayMiles.toFixed(1)} mi` : '—'}
+                      </span>
+                      <span className={`py-1.5 border-b border-slate-50 text-right font-medium ${d.isToday ? 'font-semibold text-teal-700' : d.hasData ? 'text-slate-900' : 'text-slate-300'}`}>
+                        {d.dayAmount > 0 ? `£${d.dayAmount.toFixed(2)}` : '—'}
+                      </span>
+                      <span className={`py-1.5 border-b border-slate-50 text-right text-xs ${d.hasData ? 'text-slate-500' : 'text-slate-300'}`}>
+                        {d.runningAmount > 0 && !d.isFuture ? `£${d.runningAmount.toFixed(2)}` : '—'}
+                      </span>
+                    </React.Fragment>
+                  ));
+                })()}
+                <span className="font-semibold text-slate-900 pt-2 border-t border-slate-200">Week Total</span>
+                <span className="font-semibold text-slate-900 pt-2 text-right border-t border-slate-200">{currentWeekMiles.toFixed(1)} mi</span>
+                <span className="font-bold text-slate-900 pt-2 text-right border-t border-slate-200">£{currentWeekTotal.toFixed(2)}</span>
+                <span className="pt-2 border-t border-slate-200"></span>
+              </div>
+            )}
+          </Card>
+
+          {/* Summary stats */}
+          <div className="grid grid-cols-2 gap-4">
             <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
-              <CardContent className="pt-6">
+              <CardContent className="pt-5 pb-4">
                 <div className="text-center">
-                  <p className="text-sm text-slate-600 mb-1">Pending</p>
-                  <p className="text-3xl font-bold text-blue-600">{pendingExpenses.length}</p>
+                  <p className="text-sm text-slate-600 mb-1">This Week</p>
+                  <p className="text-2xl font-bold text-blue-600">£{currentWeekTotal.toFixed(2)}</p>
                 </div>
               </CardContent>
             </Card>
             <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200">
-              <CardContent className="pt-6">
+              <CardContent className="pt-5 pb-4">
                 <div className="text-center">
                   <p className="text-sm text-slate-600 mb-1">Total Approved</p>
-                  <p className="text-3xl font-bold text-emerald-600">£{totalApprovedExpenses.toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-emerald-600">£{totalApprovedExpenses.toFixed(2)}</p>
                 </div>
               </CardContent>
             </Card>
-            <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200">
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <p className="text-sm text-slate-600 mb-1">Total Submitted</p>
-                  <p className="text-3xl font-bold text-purple-600">£{expenseRecords.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0).toFixed(2)}</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="space-y-3">
-            {expenseRecords.length === 0 ? (
-              <Card className="p-8 text-center bg-slate-50">
-                <p className="text-slate-500">No expenses submitted</p>
-              </Card>
-            ) : (
-              expenseRecords.map(expense => (
-                <Card key={expense.id} className={`p-4 border-l-4 ${expense.status === 'approved' ? 'border-l-green-500 bg-green-50' : 'border-l-yellow-500 bg-yellow-50'}`}>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-slate-900">{expense.description}</h3>
-                        <Badge className={statusColors[expense.status]}>
-                          {expense.status}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-slate-600 mb-2">£{parseFloat(expense.amount).toFixed(2)}</p>
-                      {expense.expense_type === 'mileage' && (
-                        <p className="text-xs text-slate-600 mb-1">{expense.mileage_distance} miles @ £{expense.mileage_rate}/mile</p>
-                      )}
-                      <p className="text-xs text-slate-500">{formatDistanceToNow(new Date(expense.created_date), { addSuffix: true })}</p>
-                    </div>
-                    <DollarSign className="w-8 h-8 text-green-500 opacity-20" />
-                  </div>
-                </Card>
-              ))
-            )}
           </div>
         </TabsContent>
 

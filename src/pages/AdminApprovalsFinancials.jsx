@@ -73,7 +73,7 @@ const statusIcons = {
 
 export default function AdminApprovalsFinancials() {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState('leave');
+  const [activeTab, setActiveTab] = useState('expenses');
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
@@ -855,64 +855,62 @@ export default function AdminApprovalsFinancials() {
                             </div>
                           </div>
 
-                          {/* Expand/collapse toggle */}
-                          <button
-                            className="flex items-center gap-1 text-xs text-teal-600 mt-2 hover:text-teal-700"
-                            onClick={() => setExpandedCards(prev => ({ ...prev, [group.key]: !prev[group.key] }))}
-                          >
-                            {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                            {isExpanded ? 'Hide' : 'Show'} daily breakdown
-                          </button>
-
-                          {/* Daily breakdown — all 7 days Sun-Sat, grouped by day */}
-                          {isExpanded && (
-                            <div className="mt-3 border-t border-slate-100 pt-3">
-                              {(() => {
-                                // Build all 7 days of the week
-                                const days = [];
-                                for (let i = 0; i < 7; i++) {
-                                  const day = new Date(group.weekStart);
-                                  day.setDate(day.getDate() + i);
-                                  const dayStr = format(day, 'yyyy-MM-dd');
-                                  // Sum all expenses for this day
-                                  const dayExps = group.expenses.filter(e => {
-                                    const ed = new Date(e.date || e.expense_date || e.created_date);
-                                    return format(ed, 'yyyy-MM-dd') === dayStr;
-                                  });
-                                  const dayMiles = dayExps.reduce((s, e) => s + parseFloat(e.mileage_distance || e.mileage || 0), 0);
-                                  const dayAmount = dayExps.reduce((s, e) => {
-                                    if (e.expense_type === 'mileage') return s + parseFloat(e.mileage_distance || e.mileage || 0) * mileageRate;
-                                    return s + (parseFloat(e.amount) || 0);
-                                  }, 0);
-                                  days.push({ day, dayStr, dayMiles, dayAmount, hasData: dayExps.length > 0 });
-                                }
-                                return (
-                                  <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 gap-y-0 text-sm">
-                                    <span className="text-xs font-semibold text-slate-400 uppercase pb-1">Day</span>
-                                    <span className="text-xs font-semibold text-slate-400 uppercase text-right pb-1">Miles</span>
-                                    <span className="text-xs font-semibold text-slate-400 uppercase text-right pb-1">Amount</span>
-                                    {days.map(d => (
-                                      <React.Fragment key={d.dayStr}>
-                                        <span className={`py-1.5 border-b border-slate-50 ${d.hasData ? 'text-slate-700' : 'text-slate-300'}`}>
-                                          {format(d.day, 'EEE dd MMM')}
-                                        </span>
-                                        <span className={`py-1.5 border-b border-slate-50 text-right ${d.hasData ? 'text-slate-700' : 'text-slate-300'}`}>
-                                          {d.dayMiles > 0 ? `${d.dayMiles.toFixed(1)} mi` : '—'}
-                                        </span>
-                                        <span className={`py-1.5 border-b border-slate-50 text-right font-medium ${d.hasData ? 'text-slate-900' : 'text-slate-300'}`}>
-                                          {d.dayAmount > 0 ? `£${d.dayAmount.toFixed(2)}` : '—'}
-                                        </span>
-                                      </React.Fragment>
-                                    ))}
-                                    {/* Totals row */}
-                                    <span className="font-semibold text-slate-900 pt-2 border-t border-slate-200">Total</span>
-                                    <span className="font-semibold text-slate-900 pt-2 text-right border-t border-slate-200">{group.totalMiles.toFixed(1)} mi</span>
-                                    <span className="font-bold text-slate-900 pt-2 text-right border-t border-slate-200">£{group.totalAmount.toFixed(2)}</span>
-                                  </div>
-                                );
-                              })()}
-                            </div>
-                          )}
+                          {/* Daily breakdown — all 7 days Sun-Sat */}
+                          <div className="mt-3 border-t border-slate-100 pt-3">
+                            {(() => {
+                              const today = new Date();
+                              const days = [];
+                              let runningMiles = 0;
+                              let runningAmount = 0;
+                              for (let i = 0; i < 7; i++) {
+                                const day = new Date(group.weekStart);
+                                day.setDate(day.getDate() + i);
+                                const dayStr = format(day, 'yyyy-MM-dd');
+                                const dayExps = group.expenses.filter(e => {
+                                  const ed = new Date(e.date || e.expense_date || e.created_date);
+                                  return format(ed, 'yyyy-MM-dd') === dayStr;
+                                });
+                                const dayMiles = dayExps.reduce((s, e) => s + parseFloat(e.mileage_distance || e.mileage || 0), 0);
+                                const dayAmount = dayExps.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+                                runningMiles += dayMiles;
+                                runningAmount += dayAmount;
+                                const isToday = format(today, 'yyyy-MM-dd') === dayStr;
+                                const isFuture = day > today;
+                                days.push({ day, dayStr, dayMiles, dayAmount, hasData: dayExps.length > 0, runningMiles, runningAmount, isToday, isFuture, expCount: dayExps.length });
+                              }
+                              return (
+                                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-0 text-sm">
+                                  <span className="text-xs font-semibold text-slate-400 uppercase pb-1">Day</span>
+                                  <span className="text-xs font-semibold text-slate-400 uppercase text-right pb-1">Miles</span>
+                                  <span className="text-xs font-semibold text-slate-400 uppercase text-right pb-1">Amount</span>
+                                  <span className="text-xs font-semibold text-slate-400 uppercase text-right pb-1">Running</span>
+                                  {days.map(d => (
+                                    <React.Fragment key={d.dayStr}>
+                                      <span className={`py-1.5 border-b border-slate-50 flex items-center gap-1 ${d.isToday ? 'font-semibold text-teal-700' : d.isFuture ? 'text-slate-300' : d.hasData ? 'text-slate-700' : 'text-slate-400'}`}>
+                                        {format(d.day, 'EEE dd MMM')}
+                                        {d.isToday && <Badge className="bg-teal-100 text-teal-700 text-[10px] py-0 px-1">Today</Badge>}
+                                        {d.expCount > 1 && <span className="text-[10px] text-slate-400">({d.expCount})</span>}
+                                      </span>
+                                      <span className={`py-1.5 border-b border-slate-50 text-right ${d.isToday ? 'font-semibold text-teal-700' : d.hasData ? 'text-slate-700' : 'text-slate-300'}`}>
+                                        {d.dayMiles > 0 ? `${d.dayMiles.toFixed(1)} mi` : '—'}
+                                      </span>
+                                      <span className={`py-1.5 border-b border-slate-50 text-right font-medium ${d.isToday ? 'font-semibold text-teal-700' : d.hasData ? 'text-slate-900' : 'text-slate-300'}`}>
+                                        {d.dayAmount > 0 ? `£${d.dayAmount.toFixed(2)}` : '—'}
+                                      </span>
+                                      <span className={`py-1.5 border-b border-slate-50 text-right text-xs ${d.hasData ? 'text-slate-500' : 'text-slate-300'}`}>
+                                        {d.runningAmount > 0 && !d.isFuture ? `£${d.runningAmount.toFixed(2)}` : '—'}
+                                      </span>
+                                    </React.Fragment>
+                                  ))}
+                                  {/* Weekly total row */}
+                                  <span className="font-semibold text-slate-900 pt-2 border-t border-slate-200">Week Total</span>
+                                  <span className="font-semibold text-slate-900 pt-2 text-right border-t border-slate-200">{group.totalMiles.toFixed(1)} mi</span>
+                                  <span className="font-bold text-slate-900 pt-2 text-right border-t border-slate-200">£{group.totalAmount.toFixed(2)}</span>
+                                  <span className="pt-2 border-t border-slate-200"></span>
+                                </div>
+                              );
+                            })()}
+                          </div>
 
                           {/* Action buttons */}
                           {pendingIds.length > 0 && (
