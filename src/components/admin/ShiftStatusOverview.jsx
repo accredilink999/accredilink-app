@@ -23,10 +23,7 @@ export default function ShiftStatusOverview() {
 
   const { data: shiftsToday = [] } = useQuery({
     queryKey: ['shiftsToday', selectedDate],
-    queryFn: async () => {
-      const allShifts = await ShiftApi.list('-created_date', 500);
-      return allShifts.filter(s => s.date === selectedDate);
-    },
+    queryFn: () => ShiftApi.filter({ date: selectedDate }),
     staleTime: 0,
   });
 

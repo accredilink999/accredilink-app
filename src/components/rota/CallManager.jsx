@@ -1298,6 +1298,66 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                     });
                     queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] });
 
+                    // 6. Update daily mileage expense in real-time
+                    try {
+                      const totalMiles = allDroveCalls.reduce((sum, c) => sum + (Number(c.call_mileage) || 0), 0) + legRounded;
+                      const totalMilesRounded = Math.round(totalMiles * 100) / 100;
+
+                      const { data: rateSetting } = await supabase
+                        .from('system_settings')
+                        .select('setting_value')
+                        .eq('setting_key', 'mileage_rate_ppm')
+                        .single();
+                      const ratePpm = rateSetting?.setting_value ? parseInt(rateSetting.setting_value, 10) : 45;
+                      const ratePerMile = ratePpm / 100;
+                      const amount = Math.round(totalMilesRounded * ratePerMile * 100) / 100;
+
+                      if (totalMilesRounded > 0) {
+                        const staffName = shift?.staff_name || 'Unknown';
+                        const today = new Date();
+                        const dayOfWeek = today.getDay();
+                        const weekStart = new Date(today);
+                        weekStart.setDate(weekStart.getDate() - dayOfWeek);
+                        const weekEnd = new Date(weekStart);
+                        weekEnd.setDate(weekEnd.getDate() + 6);
+                        const paymentDue = new Date(weekStart);
+                        paymentDue.setDate(paymentDue.getDate() + 11);
+
+                        const { data: existing } = await supabase
+                          .from('expenses')
+                          .select('id')
+                          .eq('staff_id', staffId)
+                          .eq('date', todayStr)
+                          .eq('expense_type', 'mileage')
+                          .maybeSingle();
+
+                        const expenseData = {
+                          staff_id: staffId,
+                          staff_name: staffName,
+                          expense_type: 'mileage',
+                          amount,
+                          date: todayStr,
+                          expense_date: todayStr,
+                          description: `Mileage: ${totalMilesRounded} mi @ ${ratePpm}p/mi`,
+                          mileage: totalMilesRounded,
+                          mileage_distance: totalMilesRounded,
+                          mileage_rate: ratePerMile,
+                          week_start_date: weekStart.toISOString().split('T')[0],
+                          week_end_date: weekEnd.toISOString().split('T')[0],
+                          payment_due_date: paymentDue.toISOString().split('T')[0],
+                          status: 'pending',
+                        };
+
+                        if (existing?.id) {
+                          await supabase.from('expenses').update(expenseData).eq('id', existing.id);
+                        } else {
+                          await supabase.from('expenses').insert(expenseData);
+                        }
+                      }
+                    } catch (expErr) {
+                      console.error('Error updating daily expense:', expErr);
+                    }
+
                   } catch (err) {
                     console.error('Error saving drive data:', err);
                   }
