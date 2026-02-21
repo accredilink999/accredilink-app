@@ -54,7 +54,17 @@ Deno.serve(async (req) => {
     const weekEndStr = lastSaturday.toISOString().split('T')[0]
     const paymentDue = getFollowingThursday(lastSunday)
 
-    // Get all individual mileage expenses for the week
+    // Read configured mileage rate from system_settings
+    const { data: rateSetting } = await supabaseAdmin
+      .from('system_settings')
+      .select('setting_value')
+      .eq('setting_key', 'mileage_rate_ppm')
+      .limit(1)
+      .single()
+    const ratePpm = rateSetting?.setting_value ? parseInt(rateSetting.setting_value, 10) : 45
+    const ratePerMile = ratePpm / 100
+
+    // Get all individual mileage expenses for the week (check both date columns)
     const { data: weekExpenses, error: fetchError } = await supabaseAdmin
       .from('expenses')
       .select('*')
@@ -76,7 +86,7 @@ Deno.serve(async (req) => {
 
     for (const [staffId, expenses] of Object.entries(byStaff)) {
       const totalMiles = expenses.reduce((sum: number, e: any) => sum + (e.mileage_distance || e.mileage || 0), 0)
-      const totalAmount = Math.round(totalMiles * 0.45 * 100) / 100
+      const totalAmount = Math.round(totalMiles * ratePerMile * 100) / 100
 
       if (totalAmount <= 0) continue
 
@@ -102,9 +112,11 @@ Deno.serve(async (req) => {
             expense_type: 'weekly_mileage',
             amount: totalAmount,
             date: weekEndStr,
-            description: `Weekly Mileage: ${weekStartStr} to ${weekEndStr} (${totalMiles.toFixed(1)} miles)`,
+            expense_date: weekEndStr,
+            description: `Weekly Mileage: ${weekStartStr} to ${weekEndStr} (${totalMiles.toFixed(1)} miles @ ${ratePpm}p/mile)`,
+            mileage: totalMiles,
             mileage_distance: totalMiles,
-            mileage_rate: 0.45,
+            mileage_rate: ratePerMile,
             week_start_date: weekStartStr,
             week_end_date: weekEndStr,
             payment_due_date: paymentDue.toISOString().split('T')[0],

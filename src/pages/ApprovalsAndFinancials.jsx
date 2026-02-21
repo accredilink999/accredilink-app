@@ -16,9 +16,9 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { CheckCircle2, Clock, XCircle, DollarSign, Plus, Calendar } from 'lucide-react';
+import { CheckCircle2, Clock, XCircle, DollarSign, Plus, Calendar, Car, PoundSterling, TrendingUp } from 'lucide-react';
 import LeaveCalendarPopup from '@/components/leave/LeaveCalendarPopup';
-import { formatDistanceToNow, format, parseISO, isWithinInterval } from 'date-fns';
+import { formatDistanceToNow, format, parseISO, isWithinInterval, startOfWeek, endOfWeek } from 'date-fns';
 import { toast } from 'sonner';
 
 export default function ApprovalsAndFinancials() {
@@ -115,6 +115,26 @@ export default function ApprovalsAndFinancials() {
     queryFn: () => base44.entities.Expense.filter({ staff_id: user?.id }, '-created_date', 50),
     enabled: !!user?.id,
   });
+
+  // Mileage rate from SystemSettings
+  const { data: rateSettings = [] } = useQuery({
+    queryKey: ['mileageRateSetting'],
+    queryFn: () => base44.entities.SystemSettings.filter({ setting_key: 'mileage_rate_ppm' }),
+  });
+  const mileageRatePpm = rateSettings[0]?.setting_value ? parseInt(rateSettings[0].setting_value, 10) : 45;
+  const mileageRate = mileageRatePpm / 100;
+
+  // Current week mileage accrual
+  const currentWeekStart = startOfWeek(new Date(), { weekStartsOn: 0 });
+  const currentWeekEnd = endOfWeek(new Date(), { weekStartsOn: 0 });
+  const currentWeekMileage = expenseRecords
+    .filter(e => {
+      if (e.expense_type !== 'mileage') return false;
+      const d = new Date(e.date || e.expense_date || e.created_date);
+      return d >= currentWeekStart && d <= currentWeekEnd;
+    });
+  const currentWeekMiles = currentWeekMileage.reduce((sum, e) => sum + parseFloat(e.mileage_distance || e.mileage || 0), 0);
+  const currentWeekAmount = currentWeekMiles * mileageRate;
 
   const { data: payrollRecords = [] } = useQuery({
     queryKey: ['myPayroll', user?.id],
@@ -588,6 +608,40 @@ export default function ApprovalsAndFinancials() {
               </form>
             </Card>
           )}
+
+          {/* Current week mileage accrual */}
+          <Card className="bg-gradient-to-br from-teal-50 to-emerald-50 border-teal-200">
+            <CardContent className="pt-5 pb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <TrendingUp className="w-5 h-5 text-teal-600" />
+                <h3 className="font-semibold text-teal-800">This Week's Mileage</h3>
+                <span className="text-xs text-teal-600 bg-teal-100 px-2 py-0.5 rounded-full">
+                  {format(currentWeekStart, 'dd MMM')} – {format(currentWeekEnd, 'dd MMM')}
+                </span>
+              </div>
+              {currentWeekMiles > 0 ? (
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="text-center p-2 bg-white/60 rounded-lg">
+                    <Car className="w-4 h-4 text-teal-600 mx-auto" />
+                    <p className="text-xl font-bold text-slate-900">{currentWeekMiles.toFixed(1)}</p>
+                    <p className="text-xs text-slate-500">Miles</p>
+                  </div>
+                  <div className="text-center p-2 bg-white/60 rounded-lg">
+                    <PoundSterling className="w-4 h-4 text-teal-600 mx-auto" />
+                    <p className="text-xl font-bold text-slate-900">£{currentWeekAmount.toFixed(2)}</p>
+                    <p className="text-xs text-slate-500">Accruing</p>
+                  </div>
+                  <div className="text-center p-2 bg-white/60 rounded-lg">
+                    <Clock className="w-4 h-4 text-teal-600 mx-auto" />
+                    <p className="text-sm font-bold text-slate-900">{mileageRatePpm}p/mi</p>
+                    <p className="text-xs text-slate-500">Rate</p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-teal-600">No mileage logged this week yet</p>
+              )}
+            </CardContent>
+          </Card>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">

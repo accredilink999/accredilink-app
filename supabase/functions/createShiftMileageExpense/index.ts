@@ -66,7 +66,16 @@ Deno.serve(async (req) => {
     weekEnd.setDate(weekEnd.getDate() + 6)
     const paymentDue = getFollowingThursday(weekStart)
 
-    const amount = Math.round(totalMiles * 0.45 * 100) / 100
+    // Read configured mileage rate from system_settings (pence per mile)
+    const { data: rateSetting } = await supabaseAdmin
+      .from('system_settings')
+      .select('setting_value')
+      .eq('setting_key', 'mileage_rate_ppm')
+      .limit(1)
+      .single()
+    const ratePpm = rateSetting?.setting_value ? parseInt(rateSetting.setting_value, 10) : 45
+    const ratePerMile = ratePpm / 100 // convert pence to pounds
+    const amount = Math.round(totalMiles * ratePerMile * 100) / 100
 
     // Get staff name from profile
     const { data: profile } = await supabaseAdmin
@@ -77,21 +86,28 @@ Deno.serve(async (req) => {
 
     const staffName = profile?.staff_full_name || profile?.full_name || user.email
 
-    const expense = await (async () => { const { data, error } = await supabaseAdmin.from('expenses').insert({
+    const { data: expense, error: insertError } = await supabaseAdmin.from('expenses').insert({
       staff_id: user.id,
       staff_name: staffName,
       shift_id: shiftId,
       expense_type: 'mileage',
       amount,
       date: expenseDate,
-      description: `Auto mileage: ${totalMiles} miles @ £0.45/mile`,
+      expense_date: expenseDate,
+      description: `Auto mileage: ${totalMiles} miles @ ${ratePpm}p/mile`,
+      mileage: totalMiles,
       mileage_distance: totalMiles,
-      mileage_rate: 0.45,
+      mileage_rate: ratePerMile,
       week_start_date: weekStart.toISOString().split('T')[0],
       week_end_date: weekEnd.toISOString().split('T')[0],
       payment_due_date: paymentDue.toISOString().split('T')[0],
       status: 'pending'
-    }).select().single(); if (error) throw error; return data })();
+    }).select().single();
+
+    if (insertError) {
+      console.error('Insert error:', insertError);
+      return Response.json({ error: insertError.message }, { status: 500 });
+    }
 
     return Response.json({ success: true, expense });
   } catch (error) {

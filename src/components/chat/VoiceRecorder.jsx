@@ -1,6 +1,17 @@
 import React, { useState, useRef } from 'react';
-import { Mic, Square } from 'lucide-react';
+import { Mic, Square, Loader2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+
+// Pick a MIME type that works on this device
+function getAudioMime() {
+  if (typeof MediaRecorder === 'undefined') return { mime: '', ext: 'webm' };
+  // Prefer mp4/aac (works everywhere including iOS)
+  if (MediaRecorder.isTypeSupported('audio/mp4')) return { mime: 'audio/mp4', ext: 'mp4' };
+  if (MediaRecorder.isTypeSupported('audio/aac')) return { mime: 'audio/aac', ext: 'aac' };
+  if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) return { mime: 'audio/webm;codecs=opus', ext: 'webm' };
+  if (MediaRecorder.isTypeSupported('audio/webm')) return { mime: 'audio/webm', ext: 'webm' };
+  return { mime: '', ext: 'webm' }; // let browser pick default
+}
 
 export default function VoiceRecorder({ onVoiceMessageSend, disabled }) {
   const [isRecording, setIsRecording] = useState(false);
@@ -9,6 +20,7 @@ export default function VoiceRecorder({ onVoiceMessageSend, disabled }) {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const durationIntervalRef = useRef(null);
+  const audioMimeRef = useRef(getAudioMime());
 
   const playBeep = (frequency = 880, duration = 0.1) => {
     try {
@@ -41,7 +53,9 @@ export default function VoiceRecorder({ onVoiceMessageSend, disabled }) {
       audioChunksRef.current = [];
       setRecordingDuration(0);
 
-      const mediaRecorder = new MediaRecorder(stream);
+      const { mime, ext } = audioMimeRef.current;
+      const recorderOptions = mime ? { mimeType: mime } : {};
+      const mediaRecorder = new MediaRecorder(stream, recorderOptions);
       mediaRecorderRef.current = mediaRecorder;
 
       durationIntervalRef.current = setInterval(() => {
@@ -54,13 +68,14 @@ export default function VoiceRecorder({ onVoiceMessageSend, disabled }) {
 
       mediaRecorder.onstop = async () => {
         clearInterval(durationIntervalRef.current);
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const actualMime = mediaRecorder.mimeType || mime || 'audio/webm';
+        const audioBlob = new Blob(audioChunksRef.current, { type: actualMime });
         stream.getTracks().forEach(track => track.stop());
 
         if (audioBlob.size > 0) {
           setIsSending(true);
           try {
-            const audioFile = new File([audioBlob], `voice-${Date.now()}.webm`, { type: 'audio/webm' });
+            const audioFile = new File([audioBlob], `voice-${Date.now()}.${ext}`, { type: actualMime });
             const { file_url } = await base44.integrations.Core.UploadFile({ file: audioFile });
             await onVoiceMessageSend({
               content: '🎤 Voice Note',
@@ -116,6 +131,14 @@ export default function VoiceRecorder({ onVoiceMessageSend, disabled }) {
     );
   }
 
+  if (isSending) {
+    return (
+      <div className="p-2.5 flex-shrink-0">
+        <Loader2 className="w-6 h-6 text-[#00a884] animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <button
       type="button"
@@ -123,7 +146,7 @@ export default function VoiceRecorder({ onVoiceMessageSend, disabled }) {
       onMouseUp={stopRecording}
       onTouchStart={startRecording}
       onTouchEnd={stopRecording}
-      disabled={disabled || isSending}
+      disabled={disabled}
       className="p-2.5 hover:bg-slate-200 rounded-full transition-colors flex-shrink-0"
       title="Hold to record voice note, release to send"
     >

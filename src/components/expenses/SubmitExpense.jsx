@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,13 +11,21 @@ import { Upload } from 'lucide-react';
 
 export default function SubmitExpense({ userId, userName }) {
   const queryClient = useQueryClient();
+
+  // Load admin-configured mileage rate
+  const { data: rateSettings = [] } = useQuery({
+    queryKey: ['mileageRateSetting'],
+    queryFn: () => base44.entities.SystemSettings.filter({ setting_key: 'mileage_rate_ppm' }),
+  });
+  const defaultRatePpm = rateSettings[0]?.setting_value ? parseInt(rateSettings[0].setting_value, 10) : 45;
+  const defaultRate = (defaultRatePpm / 100).toFixed(2);
+
   const [formData, setFormData] = useState({
     expense_type: 'mileage',
     amount: '',
     date: new Date().toISOString().split('T')[0],
     description: '',
     mileage_distance: '',
-    mileage_rate: '0.45'
   });
 
   const [receiptFile, setReceiptFile] = useState(null);
@@ -30,13 +38,14 @@ export default function SubmitExpense({ userId, userName }) {
     mutationFn: (data) => base44.entities.Expense.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['allExpenses'] });
+      queryClient.invalidateQueries({ queryKey: ['mileage-expenses'] });
       setFormData({
         expense_type: 'mileage',
         amount: '',
         date: new Date().toISOString().split('T')[0],
         description: '',
         mileage_distance: '',
-        mileage_rate: '0.45'
       });
       setReceiptFile(null);
     },
@@ -44,16 +53,17 @@ export default function SubmitExpense({ userId, userName }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     let receiptUrl = null;
     if (receiptFile) {
       const result = await uploadReceiptMutation.mutateAsync(receiptFile);
       receiptUrl = result.file_url;
     }
 
+    const rate = parseFloat(defaultRate);
     let finalAmount = parseFloat(formData.amount);
     if (formData.expense_type === 'mileage' && formData.mileage_distance) {
-      finalAmount = parseFloat(formData.mileage_distance) * parseFloat(formData.mileage_rate);
+      finalAmount = parseFloat(formData.mileage_distance) * rate;
     }
 
     createExpenseMutation.mutate({
@@ -64,11 +74,16 @@ export default function SubmitExpense({ userId, userName }) {
       date: formData.date,
       description: formData.description,
       mileage_distance: formData.mileage_distance ? parseFloat(formData.mileage_distance) : undefined,
-      mileage_rate: formData.mileage_rate ? parseFloat(formData.mileage_rate) : undefined,
+      mileage_rate: rate,
       receipt_url: receiptUrl,
       status: 'pending'
     });
   };
+
+  // Auto-calculate mileage total for display
+  const mileageTotal = formData.expense_type === 'mileage' && formData.mileage_distance
+    ? (parseFloat(formData.mileage_distance) * parseFloat(defaultRate)).toFixed(2)
+    : null;
 
   return (
     <Card>
@@ -108,28 +123,35 @@ export default function SubmitExpense({ userId, userName }) {
           </div>
 
           {formData.expense_type === 'mileage' ? (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Distance (miles)</Label>
-                <Input
-                  type="number"
-                  step="0.1"
-                  value={formData.mileage_distance}
-                  onChange={(e) => setFormData({...formData, mileage_distance: e.target.value})}
-                  required
-                />
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Distance (miles)</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={formData.mileage_distance}
+                    onChange={(e) => setFormData({...formData, mileage_distance: e.target.value})}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Rate per mile</Label>
+                  <div className="flex items-center h-10 px-3 rounded-md border border-slate-200 bg-slate-50 text-sm text-slate-700">
+                    {defaultRatePpm}p/mile (£{defaultRate})
+                  </div>
+                  <p className="text-xs text-slate-400">Set by admin</p>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Rate per mile</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.mileage_rate}
-                  onChange={(e) => setFormData({...formData, mileage_rate: e.target.value})}
-                  required
-                />
-              </div>
-            </div>
+              {mileageTotal && (
+                <div className="bg-teal-50 border border-teal-200 rounded-lg px-4 py-3">
+                  <p className="text-sm text-teal-700">
+                    Total claim: <span className="font-bold text-lg">£{mileageTotal}</span>
+                    <span className="text-teal-500 ml-2">({formData.mileage_distance} miles × {defaultRatePpm}p/mile)</span>
+                  </p>
+                </div>
+              )}
+            </>
           ) : (
             <div className="space-y-2">
               <Label>Amount (£)</Label>

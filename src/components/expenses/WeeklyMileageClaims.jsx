@@ -5,8 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Check, X, Calendar, Car, PoundSterling, Clock } from 'lucide-react';
-import { format, parseISO, startOfWeek, endOfWeek, isAfter } from 'date-fns';
+import { Check, X, Calendar, Car, PoundSterling, Clock, TrendingUp } from 'lucide-react';
+import { format, parseISO, startOfWeek, endOfWeek, isAfter, isSameWeek } from 'date-fns';
 
 function getFollowingThursday(weekStartDate) {
   const d = new Date(weekStartDate);
@@ -45,6 +45,14 @@ export default function WeeklyMileageClaims({ userId, isAdmin }) {
     enabled: !!userId,
   });
 
+  // Load admin-configured mileage rate
+  const { data: rateSettings = [] } = useQuery({
+    queryKey: ['mileageRateSetting'],
+    queryFn: () => base44.entities.SystemSettings.filter({ setting_key: 'mileage_rate_ppm' }),
+  });
+  const mileageRatePpm = rateSettings[0]?.setting_value ? parseInt(rateSettings[0].setting_value, 10) : 45;
+  const mileageRate = mileageRatePpm / 100;
+
   // Group daily expenses by week (Sun-Sat) and by staff
   const weeklyGroups = {};
   expenses.forEach(exp => {
@@ -67,9 +75,19 @@ export default function WeeklyMileageClaims({ userId, isAdmin }) {
       };
     }
     weeklyGroups[key].expenses.push(exp);
-    weeklyGroups[key].totalMiles += (exp.mileage_distance || exp.mileage || 0);
-    weeklyGroups[key].totalAmount += (exp.amount || 0);
+    weeklyGroups[key].totalMiles += parseFloat(exp.mileage_distance || exp.mileage || 0);
+    weeklyGroups[key].totalAmount += parseFloat(exp.mileage_distance || exp.mileage || 0) * mileageRate;
   });
+
+  // Current week accrual for staff view
+  const now = new Date();
+  const currentWeekStart = startOfWeek(now, { weekStartsOn: 0 });
+  const currentWeekEnd = endOfWeek(now, { weekStartsOn: 0 });
+  const currentWeekKey = Object.keys(weeklyGroups).find(k =>
+    weeklyGroups[k].weekStartStr === format(currentWeekStart, 'yyyy-MM-dd') &&
+    (!isAdmin || weeklyGroups[k].staffId === userId)
+  );
+  const currentWeekGroup = currentWeekKey ? weeklyGroups[currentWeekKey] : null;
 
   // Map weekly summaries by staff + week for status lookup
   const summaryMap = {};
@@ -126,6 +144,42 @@ export default function WeeklyMileageClaims({ userId, isAdmin }) {
 
   return (
     <div className="space-y-4">
+      {/* Current week accrual card */}
+      {!isAdmin && (
+        <Card className="bg-gradient-to-br from-teal-50 to-emerald-50 border-teal-200 overflow-hidden">
+          <CardContent className="pt-5 pb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp className="w-5 h-5 text-teal-600" />
+              <h3 className="font-semibold text-teal-800">This Week</h3>
+              <span className="text-xs text-teal-600 bg-teal-100 px-2 py-0.5 rounded-full">
+                {format(currentWeekStart, 'dd MMM')} – {format(currentWeekEnd, 'dd MMM')}
+              </span>
+            </div>
+            {currentWeekGroup ? (
+              <div className="grid grid-cols-3 gap-3">
+                <div className="text-center p-2 bg-white/60 rounded-lg">
+                  <Car className="w-4 h-4 text-teal-600 mx-auto" />
+                  <p className="text-xl font-bold text-slate-900">{currentWeekGroup.totalMiles.toFixed(1)}</p>
+                  <p className="text-xs text-slate-500">Miles</p>
+                </div>
+                <div className="text-center p-2 bg-white/60 rounded-lg">
+                  <PoundSterling className="w-4 h-4 text-teal-600 mx-auto" />
+                  <p className="text-xl font-bold text-slate-900">£{currentWeekGroup.totalAmount.toFixed(2)}</p>
+                  <p className="text-xs text-slate-500">Accruing</p>
+                </div>
+                <div className="text-center p-2 bg-white/60 rounded-lg">
+                  <Clock className="w-4 h-4 text-teal-600 mx-auto" />
+                  <p className="text-sm font-bold text-slate-900">{mileageRatePpm}p/mi</p>
+                  <p className="text-xs text-slate-500">Rate</p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-teal-600">No mileage logged this week yet</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {isAdmin && (
         <div className="flex gap-3 items-center flex-wrap">
           <Button
@@ -213,7 +267,7 @@ export default function WeeklyMileageClaims({ userId, isAdmin }) {
                         {format(new Date(exp.date || exp.expense_date || exp.created_at), 'EEE dd MMM')}
                       </span>
                       <span className="text-slate-900 font-medium">
-                        {(exp.mileage_distance || exp.mileage || 0).toFixed(1)} mi / {'\u00A3'}{(exp.amount || 0).toFixed(2)}
+                        {parseFloat(exp.mileage_distance || exp.mileage || 0).toFixed(1)} mi / {'\u00A3'}{(parseFloat(exp.mileage_distance || exp.mileage || 0) * mileageRate).toFixed(2)}
                       </span>
                     </div>
                   ))}

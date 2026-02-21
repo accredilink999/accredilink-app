@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import PageHeader from '@/components/ui/PageHeader';
@@ -7,22 +7,32 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Avatar from '@/components/ui/Avatar';
 import EmptyState from '@/components/ui/EmptyState';
 import LeaveCalendarPopup from '@/components/leave/LeaveCalendarPopup';
-import { 
-  CheckCircle2, 
-  XCircle, 
-  Clock, 
+import {
+  CheckCircle2,
+  XCircle,
+  Clock,
   DollarSign,
   ArrowRightLeft,
   CalendarOff,
   AlertCircle,
   Calendar,
   Trash2,
-  ClipboardCheck
+  ClipboardCheck,
+  Car,
+  PoundSterling,
+  ChevronDown,
+  ChevronUp,
+  ChevronLeft,
+  ChevronRight,
+  List
 } from 'lucide-react';
-import { format, differenceInDays } from 'date-fns';
+import { format, differenceInDays, startOfWeek, endOfWeek, addWeeks, subWeeks, isSameWeek, isAfter } from 'date-fns';
+import { toast } from 'sonner';
 
 const leaveTypeLabels = {
   annual_leave: 'Annual Leave',
@@ -63,6 +73,10 @@ export default function AdminApprovalsFinancials() {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
+  const [selectedWeek, setSelectedWeek] = useState(null); // null = auto-detect
+  const [expenseView, setExpenseView] = useState('all'); // 'weekly' | 'all'
+  const [expandedCards, setExpandedCards] = useState({});
+  const [customRate, setCustomRate] = useState('');
 
   const { data: leaveRequests = [] } = useQuery({
     queryKey: ['allLeaveRequests'],
@@ -76,7 +90,7 @@ export default function AdminApprovalsFinancials() {
 
   const { data: expenses = [] } = useQuery({
     queryKey: ['allExpenses'],
-    queryFn: () => base44.entities.Expense.list('-created_date', 100),
+    queryFn: () => base44.entities.Expense.list('-created_date', 500),
   });
 
   const { data: user } = useQuery({
@@ -88,6 +102,95 @@ export default function AdminApprovalsFinancials() {
     queryKey: ['staffMembers'],
     queryFn: () => base44.entities.User.list('-created_date', 500),
   });
+
+  // Mileage rate from SystemSettings
+  const { data: rateSettings = [] } = useQuery({
+    queryKey: ['mileageRateSetting'],
+    queryFn: () => base44.entities.SystemSettings.filter({ setting_key: 'mileage_rate_ppm' }),
+  });
+  const mileageRatePpm = rateSettings[0]?.setting_value ? parseInt(rateSettings[0].setting_value, 10) : 45;
+  const mileageRate = mileageRatePpm / 100; // £ per mile
+
+  const saveRateMutation = useMutation({
+    mutationFn: async (ppm) => {
+      const existing = rateSettings[0];
+      if (existing) {
+        return base44.entities.SystemSettings.update(existing.id, { setting_value: String(ppm) });
+      }
+      return base44.entities.SystemSettings.create({
+        setting_key: 'mileage_rate_ppm',
+        setting_value: String(ppm),
+        description: 'Mileage rate in pence per mile',
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mileageRateSetting'] });
+      toast.success('Mileage rate updated');
+      setShowRateConfig(false);
+    },
+  });
+
+  // Group expenses by staff + week (Sun-Sat)
+  const weeklyStaffGroups = useMemo(() => {
+    const groups = {};
+    expenses.forEach(exp => {
+      if (exp.expense_type === 'weekly_mileage') return; // skip summary records
+      const expDate = new Date(exp.date || exp.expense_date || exp.created_date || exp.created_at);
+      if (isNaN(expDate.getTime())) return;
+      const weekStart = startOfWeek(expDate, { weekStartsOn: 0 });
+      const staffId = exp.staff_id || 'unknown';
+      const key = `${format(weekStart, 'yyyy-MM-dd')}_${staffId}`;
+      if (!groups[key]) {
+        const staffUser = staffMembers.find(s => s.id === staffId);
+        groups[key] = {
+          weekStart,
+          weekEnd: endOfWeek(expDate, { weekStartsOn: 0 }),
+          staffId,
+          staffName: staffUser?.staff_full_name || staffUser?.full_name || exp.staff_name || 'Unknown',
+          expenses: [],
+          totalMiles: 0,
+          totalNonMileageAmount: 0,
+        };
+      }
+      groups[key].expenses.push(exp);
+      if (exp.expense_type === 'mileage') {
+        groups[key].totalMiles += parseFloat(exp.mileage_distance || exp.mileage || 0);
+      } else {
+        groups[key].totalNonMileageAmount += parseFloat(exp.amount || 0);
+      }
+    });
+    return groups;
+  }, [expenses, staffMembers]);
+
+  // Auto-select the most recent week with expenses (or current week if none)
+  useEffect(() => {
+    if (selectedWeek !== null) return; // already set by user
+    const allWeekStarts = Object.values(weeklyStaffGroups).map(g => g.weekStart);
+    if (allWeekStarts.length > 0) {
+      const mostRecent = allWeekStarts.sort((a, b) => b - a)[0];
+      setSelectedWeek(mostRecent);
+    } else {
+      setSelectedWeek(startOfWeek(new Date(), { weekStartsOn: 0 }));
+    }
+  }, [weeklyStaffGroups, selectedWeek]);
+
+  const effectiveWeek = selectedWeek || startOfWeek(new Date(), { weekStartsOn: 0 });
+
+  // Filter groups for the selected week
+  const currentWeekGroups = useMemo(() => {
+    return Object.entries(weeklyStaffGroups)
+      .filter(([, g]) => isSameWeek(g.weekStart, effectiveWeek, { weekStartsOn: 0 }))
+      .map(([key, g]) => ({
+        ...g,
+        key,
+        totalMileageAmount: g.totalMiles * mileageRate,
+        totalAmount: (g.totalMiles * mileageRate) + g.totalNonMileageAmount,
+        allApproved: g.expenses.every(e => e.status === 'approved' || e.status === 'paid'),
+        allPaid: g.expenses.every(e => e.status === 'paid'),
+        hasPending: g.expenses.some(e => e.status === 'pending'),
+      }))
+      .sort((a, b) => a.staffName.localeCompare(b.staffName));
+  }, [weeklyStaffGroups, effectiveWeek, mileageRate]);
 
   const updateLeaveMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.LeaveRequest.update(id, data),
@@ -178,13 +281,70 @@ export default function AdminApprovalsFinancials() {
     });
   };
 
+  // Batch approve all expenses for a staff member's week
+  const batchApproveMutation = useMutation({
+    mutationFn: async (expenseIds) => {
+      await Promise.all(expenseIds.map(id =>
+        base44.entities.Expense.update(id, {
+          status: 'approved',
+          reviewed_by: user?.id,
+          reviewed_by_name: user?.full_name,
+        })
+      ));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['allExpenses'] });
+      toast.success('Week approved');
+    },
+  });
+
+  const batchRejectMutation = useMutation({
+    mutationFn: async (expenseIds) => {
+      await Promise.all(expenseIds.map(id =>
+        base44.entities.Expense.update(id, {
+          status: 'rejected',
+          reviewed_by: user?.id,
+          reviewed_by_name: user?.full_name,
+        })
+      ));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['allExpenses'] });
+      toast.success('Week rejected');
+    },
+  });
+
+  const batchMarkPaidMutation = useMutation({
+    mutationFn: async (expenseIds) => {
+      await Promise.all(expenseIds.map(id =>
+        base44.entities.Expense.update(id, { status: 'paid' })
+      ));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['allExpenses'] });
+      toast.success('Marked as paid');
+    },
+  });
+
   const pendingLeave = leaveRequests.filter(r => r.status === 'pending');
   const pendingSwaps = shiftSwaps.filter(r => r.status === 'pending');
-  const pendingExpenses = expenses.filter(e => e.status === 'pending');
-  const approvedExpenses = expenses.filter(e => e.status === 'approved');
+  const pendingExpenses = expenses.filter(e => e.status === 'pending' && e.expense_type !== 'weekly_mileage');
+  const approvedExpenses = expenses.filter(e => e.status === 'approved' && e.expense_type !== 'weekly_mileage');
 
-  const totalApprovedExpenses = approvedExpenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
-  const totalPendingExpenses = pendingExpenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+  // Recalculate totals using current mileage rate for mileage expenses
+  const calcExpenseAmount = (e) => {
+    if (e.expense_type === 'mileage') {
+      return parseFloat(e.mileage_distance || e.mileage || 0) * mileageRate;
+    }
+    return parseFloat(e.amount) || 0;
+  };
+  const totalApprovedExpenses = approvedExpenses.reduce((sum, e) => sum + calcExpenseAmount(e), 0);
+  const totalPendingExpenses = pendingExpenses.reduce((sum, e) => sum + calcExpenseAmount(e), 0);
+
+  // Week-level totals
+  const weekTotalPending = currentWeekGroups.filter(g => g.hasPending).reduce((sum, g) => sum + g.totalAmount, 0);
+  const weekTotalApproved = currentWeekGroups.filter(g => g.allApproved && !g.allPaid).reduce((sum, g) => sum + g.totalAmount, 0);
+  const weekTotalMiles = currentWeekGroups.reduce((sum, g) => sum + g.totalMiles, 0);
 
   return (
     <div className="space-y-6">
@@ -433,104 +593,345 @@ export default function AdminApprovalsFinancials() {
 
         {/* Expenses Tab */}
         <TabsContent value="expenses" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-blue-700">£{totalPendingExpenses.toFixed(2)}</p>
-                  <p className="text-sm text-blue-600 mt-1">Pending Amount</p>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200">
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-emerald-700">£{totalApprovedExpenses.toFixed(2)}</p>
-                  <p className="text-sm text-emerald-600 mt-1">Approved Total</p>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200">
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-purple-700">{pendingExpenses.length}</p>
-                  <p className="text-sm text-purple-600 mt-1">Awaiting Review</p>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Mileage Rate Config — always visible */}
+          <Card className="p-4 bg-gradient-to-br from-teal-50 to-cyan-50 border-teal-200">
+            <div className="flex items-center gap-2 mb-3">
+              <Car className="w-5 h-5 text-teal-600" />
+              <p className="text-sm font-semibold text-slate-700">Mileage Rate: <span className="text-teal-700 text-base">{mileageRatePpm}p/mile</span></p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {[25, 30, 35, 40, 45].map(rate => (
+                <Button
+                  key={rate}
+                  size="sm"
+                  variant={mileageRatePpm === rate ? 'default' : 'outline'}
+                  className={mileageRatePpm === rate ? 'bg-teal-600' : ''}
+                  onClick={() => saveRateMutation.mutate(rate)}
+                  disabled={saveRateMutation.isPending}
+                >
+                  {rate}p
+                </Button>
+              ))}
+              <div className="flex items-center gap-1">
+                <Input
+                  type="number"
+                  placeholder="Custom"
+                  className="w-20 h-9"
+                  value={customRate}
+                  onChange={(e) => setCustomRate(e.target.value)}
+                />
+                <span className="text-sm text-slate-500">p</span>
+                <Button
+                  size="sm"
+                  disabled={!customRate || saveRateMutation.isPending}
+                  onClick={() => { if (customRate) saveRateMutation.mutate(parseInt(customRate, 10)); }}
+                  className="bg-teal-600 hover:bg-teal-700"
+                >
+                  Set
+                </Button>
+              </div>
+            </div>
+          </Card>
+
+          <div className="flex items-center gap-1">
+            <Button size="sm" variant={expenseView === 'weekly' ? 'default' : 'outline'} className={expenseView === 'weekly' ? 'bg-teal-600 hover:bg-teal-700' : ''} onClick={() => setExpenseView('weekly')}>
+              Weekly Summary
+            </Button>
+            <Button size="sm" variant={expenseView === 'all' ? 'default' : 'outline'} className={expenseView === 'all' ? 'bg-teal-600 hover:bg-teal-700' : ''} onClick={() => setExpenseView('all')}>
+              <List className="w-3.5 h-3.5 mr-1" /> All
+            </Button>
           </div>
 
-          {expenses.length === 0 ? (
-            <EmptyState
-              icon={DollarSign}
-              title="No expenses submitted"
-              description="All expenses have been processed"
-            />
-          ) : (
-            <div className="space-y-3">
-              {expenses.map((expense, idx) => {
-                const colors = [
-                  'from-orange-50 to-amber-50 border-orange-100',
-                  'from-rose-50 to-pink-50 border-rose-100',
-                  'from-sky-50 to-blue-50 border-sky-100',
-                ];
-                const colorClass = colors[idx % colors.length];
+          {expenseView === 'weekly' ? (
+            <>
+              {/* Week navigator */}
+              <div className="flex items-center justify-between">
+                <Button size="sm" variant="outline" onClick={() => setSelectedWeek(subWeeks(effectiveWeek, 1))}>
+                  <ChevronLeft className="w-4 h-4 mr-1" /> Previous
+                </Button>
+                <h3 className="text-sm font-semibold text-slate-700">
+                  {format(effectiveWeek, 'dd MMM')} – {format(endOfWeek(effectiveWeek, { weekStartsOn: 0 }), 'dd MMM yyyy')}
+                  {isSameWeek(effectiveWeek, new Date(), { weekStartsOn: 0 }) && (
+                    <Badge className="ml-2 bg-teal-100 text-teal-700">Current Week</Badge>
+                  )}
+                </h3>
+                <Button size="sm" variant="outline" onClick={() => setSelectedWeek(addWeeks(effectiveWeek, 1))}>
+                  Next <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </div>
 
-                return (
-                  <Card key={expense.id} className={`p-4 bg-gradient-to-r ${colorClass}`}>
-                    <div className="flex flex-col md:flex-row items-start justify-between gap-4">
-                      <div className="flex items-start gap-3 flex-1">
-                        {(() => {
-                          const staffUser = staffMembers.find(s => s.id === expense.staff_id);
-                          const displayName = staffUser?.staff_full_name || staffUser?.full_name || expense.staff_name;
-                          return (
-                            <>
-                              <Avatar name={displayName} size="sm" />
-                              <div>
-                                <h3 className="font-semibold text-slate-900">{expense.description}</h3>
-                                <p className="text-sm text-slate-600 mt-1">{displayName}</p>
-                                <p className="text-lg font-bold text-slate-900 mt-2">£{parseFloat(expense.amount).toFixed(2)}</p>
-                                <p className="text-xs text-slate-500 mt-1">Submitted: {format(new Date(expense.created_date), 'dd MMM yyyy')}</p>
-                              </div>
-                            </>
-                          );
-                        })()}
-                      </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <Badge className={statusColors[expense.status]}>
-                          <span className="flex items-center gap-1">
-                            {statusIcons[expense.status]}
-                            {expense.status}
-                          </span>
-                        </Badge>
-                        {expense.status === 'pending' && (
-                          <div className="flex gap-2">
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => handleRejectExpense(expense)}
-                              disabled={updateExpenseMutation.isPending}
-                            >
-                              <XCircle className="w-4 h-4 mr-1 text-red-500" />
-                              Reject
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              onClick={() => handleApproveExpense(expense)}
-                              disabled={updateExpenseMutation.isPending}
-                              className="bg-emerald-600 hover:bg-emerald-700"
-                            >
-                              <CheckCircle2 className="w-4 h-4 mr-1" />
-                              Approve
-                            </Button>
-                          </div>
-                        )}
-                      </div>
+              {/* Week stats */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card className="bg-gradient-to-br from-slate-50 to-slate-100 border-slate-200">
+                  <CardContent className="pt-5 pb-4">
+                    <div className="text-center">
+                      <Car className="w-5 h-5 text-slate-500 mx-auto mb-1" />
+                      <p className="text-2xl font-bold text-slate-700">{weekTotalMiles.toFixed(1)}</p>
+                      <p className="text-xs text-slate-500">Total Miles</p>
                     </div>
-                  </Card>
-                );
-              })}
-            </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+                  <CardContent className="pt-5 pb-4">
+                    <div className="text-center">
+                      <PoundSterling className="w-5 h-5 text-blue-500 mx-auto mb-1" />
+                      <p className="text-2xl font-bold text-blue-700">£{weekTotalPending.toFixed(2)}</p>
+                      <p className="text-xs text-blue-500">Pending</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200">
+                  <CardContent className="pt-5 pb-4">
+                    <div className="text-center">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-500 mx-auto mb-1" />
+                      <p className="text-2xl font-bold text-emerald-700">£{weekTotalApproved.toFixed(2)}</p>
+                      <p className="text-xs text-emerald-500">Approved</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200">
+                  <CardContent className="pt-5 pb-4">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-purple-700">{currentWeekGroups.length}</p>
+                      <p className="text-xs text-purple-500">Staff Members</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Per-staff weekly cards */}
+              {currentWeekGroups.length === 0 ? (
+                <EmptyState
+                  icon={DollarSign}
+                  title="No expenses this week"
+                  description="No expense claims have been submitted for this week"
+                />
+              ) : (
+                <div className="space-y-3">
+                  {currentWeekGroups.map((group) => {
+                    const isExpanded = expandedCards[group.key];
+                    const status = group.allPaid ? 'paid' : group.allApproved ? 'approved' : group.hasPending ? 'pending' : 'approved';
+                    const pendingIds = group.expenses.filter(e => e.status === 'pending').map(e => e.id);
+                    const approvedIds = group.expenses.filter(e => e.status === 'approved').map(e => e.id);
+
+                    return (
+                      <Card key={group.key} className="overflow-hidden">
+                        <div className="p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <Avatar name={group.staffName} size="sm" />
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-semibold text-slate-900 truncate">{group.staffName}</h4>
+                                <p className="text-xs text-slate-500">{group.expenses.length} expense{group.expenses.length !== 1 ? 's' : ''}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <div className="text-right">
+                                {group.totalMiles > 0 && (
+                                  <p className="text-xs text-slate-500">{group.totalMiles.toFixed(1)} miles</p>
+                                )}
+                                <p className="text-lg font-bold text-slate-900">£{group.totalAmount.toFixed(2)}</p>
+                              </div>
+                              <Badge className={statusColors[status]}>
+                                <span className="flex items-center gap-1">
+                                  {statusIcons[status] || statusIcons.approved}
+                                  {status}
+                                </span>
+                              </Badge>
+                            </div>
+                          </div>
+
+                          {/* Expand/collapse toggle */}
+                          <button
+                            className="flex items-center gap-1 text-xs text-teal-600 mt-2 hover:text-teal-700"
+                            onClick={() => setExpandedCards(prev => ({ ...prev, [group.key]: !prev[group.key] }))}
+                          >
+                            {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                            {isExpanded ? 'Hide' : 'Show'} breakdown
+                          </button>
+
+                          {/* Daily breakdown */}
+                          {isExpanded && (
+                            <div className="mt-3 space-y-1 border-t border-slate-100 pt-3">
+                              {group.expenses
+                                .sort((a, b) => new Date(a.date || a.expense_date || a.created_date) - new Date(b.date || b.expense_date || b.created_date))
+                                .map(exp => (
+                                  <div key={exp.id} className="flex justify-between items-center text-sm py-1.5 border-b border-slate-50 last:border-0">
+                                    <div className="flex-1 min-w-0">
+                                      <span className="text-slate-600">
+                                        {format(new Date(exp.date || exp.expense_date || exp.created_date), 'EEE dd MMM')}
+                                      </span>
+                                      <span className="text-slate-400 ml-2 capitalize">{(exp.expense_type || '').replace(/_/g, ' ')}</span>
+                                      {exp.description && <span className="text-slate-400 ml-1">— {exp.description}</span>}
+                                    </div>
+                                    <div className="text-right flex-shrink-0 ml-3">
+                                      {exp.expense_type === 'mileage' ? (
+                                        <span className="text-slate-900 font-medium">
+                                          {parseFloat(exp.mileage_distance || exp.mileage || 0).toFixed(1)} mi / £{(parseFloat(exp.mileage_distance || exp.mileage || 0) * mileageRate).toFixed(2)}
+                                        </span>
+                                      ) : (
+                                        <span className="text-slate-900 font-medium">£{parseFloat(exp.amount || 0).toFixed(2)}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                            </div>
+                          )}
+
+                          {/* Action buttons */}
+                          {pendingIds.length > 0 && (
+                            <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
+                              <Button
+                                size="sm"
+                                onClick={() => batchApproveMutation.mutate(pendingIds)}
+                                disabled={batchApproveMutation.isPending}
+                                className="bg-emerald-600 hover:bg-emerald-700 flex-1"
+                              >
+                                <CheckCircle2 className="w-4 h-4 mr-1" />
+                                Approve Week
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => batchRejectMutation.mutate(pendingIds)}
+                                disabled={batchRejectMutation.isPending}
+                                className="flex-1"
+                              >
+                                <XCircle className="w-4 h-4 mr-1 text-red-500" />
+                                Reject
+                              </Button>
+                            </div>
+                          )}
+                          {status === 'approved' && approvedIds.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-slate-100">
+                              <Button
+                                size="sm"
+                                onClick={() => batchMarkPaidMutation.mutate(approvedIds)}
+                                disabled={batchMarkPaidMutation.isPending}
+                                className="w-full bg-blue-600 hover:bg-blue-700"
+                              >
+                                <PoundSterling className="w-4 h-4 mr-1" />
+                                Mark as Paid
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          ) : (
+            /* All expenses flat list (original view) */
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+                  <CardContent className="pt-6">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-blue-700">£{totalPendingExpenses.toFixed(2)}</p>
+                      <p className="text-sm text-blue-600 mt-1">Pending Amount</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200">
+                  <CardContent className="pt-6">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-emerald-700">£{totalApprovedExpenses.toFixed(2)}</p>
+                      <p className="text-sm text-emerald-600 mt-1">Approved Total</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200">
+                  <CardContent className="pt-6">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-purple-700">{pendingExpenses.length}</p>
+                      <p className="text-sm text-purple-600 mt-1">Awaiting Review</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {expenses.filter(e => e.expense_type !== 'weekly_mileage').length === 0 ? (
+                <EmptyState
+                  icon={DollarSign}
+                  title="No expenses submitted yet"
+                  description="Mileage expenses are automatically created when staff check out of their last call after answering 'Yes' to 'Did you drive?'"
+                />
+              ) : (
+                <div className="space-y-3">
+                  {expenses.filter(e => e.expense_type !== 'weekly_mileage').map((expense, idx) => {
+                    const colors = [
+                      'from-orange-50 to-amber-50 border-orange-100',
+                      'from-rose-50 to-pink-50 border-rose-100',
+                      'from-sky-50 to-blue-50 border-sky-100',
+                    ];
+                    const colorClass = colors[idx % colors.length];
+
+                    return (
+                      <Card key={expense.id} className={`p-4 bg-gradient-to-r ${colorClass}`}>
+                        <div className="flex flex-col md:flex-row items-start justify-between gap-4">
+                          <div className="flex items-start gap-3 flex-1">
+                            {(() => {
+                              const staffUser = staffMembers.find(s => s.id === expense.staff_id);
+                              const displayName = staffUser?.staff_full_name || staffUser?.full_name || expense.staff_name;
+                              return (
+                                <>
+                                  <Avatar name={displayName} size="sm" />
+                                  <div>
+                                    <h3 className="font-semibold text-slate-900">{expense.description}</h3>
+                                    <p className="text-sm text-slate-600 mt-1">{displayName}</p>
+                                    <p className="text-lg font-bold text-slate-900 mt-2">
+                                      £{expense.expense_type === 'mileage'
+                                        ? (parseFloat(expense.mileage_distance || expense.mileage || 0) * mileageRate).toFixed(2)
+                                        : (parseFloat(expense.amount) || 0).toFixed(2)}
+                                    </p>
+                                    {expense.expense_type === 'mileage' && (
+                                      <p className="text-xs text-slate-500">{parseFloat(expense.mileage_distance || expense.mileage || 0).toFixed(1)} miles @ {mileageRatePpm}p/mile</p>
+                                    )}
+                                    <p className="text-xs text-slate-500 mt-1">Submitted: {format(new Date(expense.created_date || expense.created_at || expense.date || expense.expense_date), 'dd MMM yyyy')}</p>
+                                  </div>
+                                </>
+                              );
+                            })()}
+                          </div>
+                          <div className="flex flex-col items-end gap-2">
+                            <Badge className={statusColors[expense.status]}>
+                              <span className="flex items-center gap-1">
+                                {statusIcons[expense.status]}
+                                {expense.status}
+                              </span>
+                            </Badge>
+                            {expense.status === 'pending' && (
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleRejectExpense(expense)}
+                                  disabled={updateExpenseMutation.isPending}
+                                >
+                                  <XCircle className="w-4 h-4 mr-1 text-red-500" />
+                                  Reject
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleApproveExpense(expense)}
+                                  disabled={updateExpenseMutation.isPending}
+                                  className="bg-emerald-600 hover:bg-emerald-700"
+                                >
+                                  <CheckCircle2 className="w-4 h-4 mr-1" />
+                                  Approve
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
         </TabsContent>
       </Tabs>

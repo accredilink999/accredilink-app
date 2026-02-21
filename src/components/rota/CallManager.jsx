@@ -392,6 +392,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
           }
         } catch (err) {
           console.error('Error calculating mileage:', err);
+          toast.error('Mileage expense could not be saved. Please contact admin.');
         }
       }
 

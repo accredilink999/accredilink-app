@@ -89,6 +89,17 @@
   }
 }
 
+/* Chat upload progress animation */
+@keyframes upload-progress {
+  0% { width: 5%; }
+  50% { width: 70%; }
+  80% { width: 85%; }
+  100% { width: 95%; }
+}
+.animate-upload-progress {
+  animation: upload-progress 8s ease-out forwards;
+}
+
 /* Rota slide transitions — two-phase: exit then enter */
 .rota-view-wrapper {
   will-change: transform, opacity;

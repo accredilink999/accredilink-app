@@ -1,11 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Play, Pause, AlertCircle } from 'lucide-react';
 
 export default function VoiceNotePlayer({ url, isOwn }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1);
+  const [error, setError] = useState(false);
   const audioRef = useRef(null);
 
   useEffect(() => {
@@ -16,29 +17,39 @@ export default function VoiceNotePlayer({ url, isOwn }) {
     const updateDuration = () => setDuration(audio.duration);
     const handleEnded = () => setIsPlaying(false);
 
+    const handleError = () => setError(true);
+
     audio.addEventListener('timeupdate', updateTime);
     audio.addEventListener('loadedmetadata', updateDuration);
     audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('error', handleError);
 
     return () => {
       audio.removeEventListener('timeupdate', updateTime);
       audio.removeEventListener('loadedmetadata', updateDuration);
       audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('error', handleError);
     };
   }, []);
 
-  const togglePlay = () => {
+  const togglePlay = (e) => {
+    e.stopPropagation();
     if (audioRef.current) {
       if (isPlaying) {
         audioRef.current.pause();
+        setIsPlaying(false);
       } else {
-        audioRef.current.play();
+        audioRef.current.play().then(() => {
+          setIsPlaying(true);
+        }).catch(() => {
+          setError(true);
+        });
       }
-      setIsPlaying(!isPlaying);
     }
   };
 
-  const cycleSpeed = () => {
+  const cycleSpeed = (e) => {
+    e.stopPropagation();
     const rates = [1, 1.5, 2];
     const nextIdx = (rates.indexOf(playbackRate) + 1) % rates.length;
     const newRate = rates[nextIdx];
@@ -58,9 +69,30 @@ export default function VoiceNotePlayer({ url, isOwn }) {
   // Generate static waveform bars
   const bars = useRef(Array.from({ length: 28 }, () => 4 + Math.random() * 16)).current;
 
+  // Block all pointer/touch events from reaching the message bubble
+  const stopBubble = useCallback((e) => e.stopPropagation(), []);
+
+  if (error) {
+    return (
+      <div
+        className="flex items-center gap-2 min-w-[200px] max-w-[280px] text-xs text-slate-500"
+        onClick={stopBubble} onTouchStart={stopBubble} onTouchEnd={stopBubble}
+      >
+        <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+        <span>Unable to play voice note</span>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex items-center gap-2 min-w-[200px] max-w-[280px]">
-      <audio ref={audioRef} src={url} />
+    <div
+      className="flex items-center gap-2 min-w-[200px] max-w-[280px]"
+      onClick={stopBubble}
+      onTouchStart={stopBubble}
+      onTouchEnd={stopBubble}
+      onTouchMove={stopBubble}
+    >
+      <audio ref={audioRef} src={url} preload="metadata" />
 
       <button
         onClick={togglePlay}
@@ -78,6 +110,7 @@ export default function VoiceNotePlayer({ url, isOwn }) {
         <div
           className="flex items-end gap-[1.5px] h-5 cursor-pointer"
           onClick={(e) => {
+            e.stopPropagation();
             if (audioRef.current && duration) {
               const rect = e.currentTarget.getBoundingClientRect();
               const percent = (e.clientX - rect.left) / rect.width;
@@ -104,7 +137,7 @@ export default function VoiceNotePlayer({ url, isOwn }) {
 
         {/* Time + speed */}
         <div className="flex items-center justify-between">
-          <span className={`text-[11px] ${isOwn ? 'text-[#667781]' : 'text-[#667781]'}`}>
+          <span className="text-[11px] text-[#667781]">
             {formatTime(isPlaying ? currentTime : duration)}
           </span>
           <button
