@@ -288,6 +288,56 @@ Deno.serve(async (req) => {
       profileMap[p.id] = p
     }
 
+    // Build name-based fallback for calls without service_user_id
+    // Maps service_user_name → coordinates from locationMap or service_users table
+    const nameLocationMap: Record<string, { latitude: number, longitude: number }> = {}
+
+    // First: populate from existing locationMap using call data to link names to IDs
+    for (const call of allCalls) {
+      if (call.service_user_name && call.service_user_id && locationMap[call.service_user_id]) {
+        const key = call.service_user_name.toLowerCase().trim()
+        if (!nameLocationMap[key]) {
+          nameLocationMap[key] = locationMap[call.service_user_id]
+        }
+      }
+    }
+
+    // Second: look up any remaining names from service_users table
+    const callsWithoutSuId = eligibleCalls.filter(c => !c.service_user_id && c.service_user_name)
+    const unmatchedNames = [...new Set(callsWithoutSuId
+      .map(c => c.service_user_name)
+      .filter(n => n && !nameLocationMap[n.toLowerCase().trim()])
+    )]
+    if (unmatchedNames.length > 0) {
+      // Query service_users by name for each unmatched name
+      for (const name of unmatchedNames) {
+        const { data: match } = await supabaseAdmin
+          .from('service_users')
+          .select('id, address, latitude, longitude')
+          .ilike('full_name', name)
+          .limit(1)
+        if (match?.[0]) {
+          const su = match[0]
+          let coords: { latitude: number, longitude: number } | null = null
+          if (su.latitude && su.longitude) {
+            coords = { latitude: Number(su.latitude), longitude: Number(su.longitude) }
+          } else if (su.address) {
+            coords = await geocodeAddress(su.address)
+            if (coords) {
+              // Save back to service_users
+              await supabaseAdmin.from('service_users').update({
+                latitude: coords.latitude,
+                longitude: coords.longitude,
+              }).eq('id', su.id)
+            }
+          }
+          if (coords) {
+            nameLocationMap[name.toLowerCase().trim()] = coords
+          }
+        }
+      }
+    }
+
     // Count how many IDs were resolved via geocoding
     const geocodedCount = Object.keys(locationMap).length
 
@@ -301,18 +351,27 @@ Deno.serve(async (req) => {
       const shift = shiftMap[shiftId]
       if (!shift) continue
 
-      // Resolve GPS: checkin coords → median historical GPS → locations → service_users → Nominatim
+      // Resolve GPS: checkin coords → locationMap by ID → nameLocationMap by name
       const resolved = calls
         .map(c => {
           let lat = c.checkin_latitude ? Number(c.checkin_latitude) : null
           let lng = c.checkin_longitude ? Number(c.checkin_longitude) : null
 
-          // Fallback to locationMap (median GPS / locations / service_users / geocoded address)
-          if (!lat || !lng) {
+          // Fallback to locationMap by service_user_id
+          if ((!lat || !lng) && c.service_user_id) {
             const cached = locationMap[c.service_user_id]
             if (cached) {
               lat = Number(cached.latitude)
               lng = Number(cached.longitude)
+            }
+          }
+
+          // Fallback to nameLocationMap by service_user_name (for calls without service_user_id)
+          if ((!lat || !lng) && c.service_user_name) {
+            const byName = nameLocationMap[c.service_user_name.toLowerCase().trim()]
+            if (byName) {
+              lat = Number(byName.latitude)
+              lng = Number(byName.longitude)
             }
           }
 
