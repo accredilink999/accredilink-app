@@ -1,71 +1,77 @@
 /**
  * addressMileage.js — Calculate miles between service user addresses
  *
- * Uses postcodes.io (free UK postcode API) to get coordinates from postcodes,
- * then haversine formula to calculate distance in miles.
+ * Uses Nominatim (OpenStreetMap) for full-address geocoding, then
+ * postcodes.io as fallback for addresses with UK postcodes.
  * No GPS from user devices — purely address-based.
  */
 
-// Cache: postcode → { latitude, longitude }
-const postcodeCache = new Map();
+// Cache: address key → { latitude, longitude } | null
+const addressCache = new Map();
 
 // Extract UK postcode from an address string
 function extractPostcode(address) {
   if (!address) return null;
   const match = address.match(/[A-Z]{1,2}\d{1,2}\s*\d[A-Z]{2}/i);
-  return match ? match[0].replace(/\s+/g, ' ').toUpperCase() : null;
+  return match ? match[0].toUpperCase() : null;
 }
 
-// Look up a single postcode via postcodes.io
-async function lookupPostcode(postcode) {
-  const key = postcode.toUpperCase().replace(/\s+/g, '');
-  if (postcodeCache.has(key)) return postcodeCache.get(key);
+// Geocode a single address — tries Nominatim first, postcodes.io fallback
+async function geocodeAddress(address) {
+  if (!address || address.trim().length < 3) return null;
+  const key = address.trim().toLowerCase();
+  if (addressCache.has(key)) return addressCache.get(key);
 
-  try {
-    const res = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(key)}`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data.status === 200 && data.result) {
-      const coords = { latitude: data.result.latitude, longitude: data.result.longitude };
-      postcodeCache.set(key, coords);
-      return coords;
+  const clean = address.replace(/,\s*$/, '').replace(/\s+/g, ' ').trim();
+  const variants = [clean, clean + ', UK'];
+  const parts = clean.split(/,\s*/);
+  if (parts.length > 1) {
+    for (let i = 1; i < parts.length; i++) {
+      variants.push(parts.slice(i).join(', ') + ', UK');
     }
-  } catch (e) {
-    console.warn('Postcode lookup failed:', postcode, e);
   }
-  return null;
-}
+  const postcodeMatch = clean.match(/[A-Z]{1,2}\d{1,2}\s*\d[A-Z]{2}/i);
+  if (postcodeMatch) variants.push(postcodeMatch[0]);
 
-// Bulk lookup postcodes via postcodes.io (up to 100 per request)
-async function bulkLookupPostcodes(postcodes) {
-  const toFetch = [...new Set(postcodes)]
-    .map(p => p.toUpperCase().replace(/\s+/g, ''))
-    .filter(p => !postcodeCache.has(p));
-
-  for (let i = 0; i < toFetch.length; i += 100) {
-    const batch = toFetch.slice(i, i + 100);
+  // Try Nominatim
+  for (const query of variants) {
+    if (query.length < 3) continue;
     try {
-      const res = await fetch('https://api.postcodes.io/postcodes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ postcodes: batch }),
-      });
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=gb`;
+      const res = await fetch(url, { headers: { 'User-Agent': 'AccredilinkApp/1.0' } });
       if (!res.ok) continue;
-      const data = await res.json();
-      if (data.status === 200 && data.result) {
-        for (const r of data.result) {
-          if (r.result && r.result.latitude && r.result.longitude) {
-            postcodeCache.set(r.query.toUpperCase().replace(/\s+/g, ''), {
-              latitude: r.result.latitude,
-              longitude: r.result.longitude,
-            });
-          }
+      const results = await res.json();
+      if (results && results.length > 0) {
+        const coords = { latitude: parseFloat(results[0].lat), longitude: parseFloat(results[0].lon) };
+        addressCache.set(key, coords);
+        return coords;
+      }
+    } catch (e) {
+      console.warn('Nominatim failed for:', query, e);
+    }
+    await new Promise(r => setTimeout(r, 1100));
+  }
+
+  // Fallback: postcodes.io if address has a UK postcode
+  if (postcodeMatch) {
+    try {
+      const pc = postcodeMatch[0].replace(/\s+/g, '');
+      const res = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(pc)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status === 200 && data.result) {
+          const coords = { latitude: data.result.latitude, longitude: data.result.longitude };
+          addressCache.set(key, coords);
+          return coords;
         }
       }
     } catch (e) {
-      console.warn('Bulk postcode lookup failed:', e);
+      console.warn('postcodes.io failed:', e);
     }
   }
+
+  addressCache.set(key, null);
+  return null;
 }
 
 // Haversine distance in miles
@@ -81,34 +87,20 @@ export function haversineMiles(lat1, lon1, lat2, lon2) {
 
 /**
  * Resolve coordinates for an array of calls using their service_user_address.
- * Extracts postcodes from addresses, looks them up via postcodes.io.
- * Returns array of { ...call, resolvedLat, resolvedLng } (only calls with resolved coords).
+ * Geocodes each unique address (cached), returns calls with resolvedLat/resolvedLng.
  */
 export async function resolveCallAddresses(calls) {
-  // Extract postcodes from all addresses
-  const postcodeMap = {}; // address key → postcode
-  const postcodes = [];
-  for (const call of calls) {
-    if (!call.service_user_address) continue;
-    const pc = extractPostcode(call.service_user_address);
-    if (pc) {
-      postcodeMap[call.service_user_address.trim().toLowerCase()] = pc;
-      postcodes.push(pc);
-    }
+  // Geocode unique addresses first (only ~11 service users, so fast)
+  const uniqueAddresses = [...new Set(calls.map(c => c.service_user_address).filter(Boolean))];
+  for (const addr of uniqueAddresses) {
+    await geocodeAddress(addr);
   }
 
-  // Bulk lookup all postcodes
-  if (postcodes.length > 0) {
-    await bulkLookupPostcodes(postcodes);
-  }
-
-  // Resolve each call
+  // Resolve each call from cache
   const results = [];
   for (const call of calls) {
     if (!call.service_user_address) continue;
-    const pc = postcodeMap[call.service_user_address.trim().toLowerCase()];
-    if (!pc) continue;
-    const coords = postcodeCache.get(pc.toUpperCase().replace(/\s+/g, ''));
+    const coords = addressCache.get(call.service_user_address.trim().toLowerCase());
     if (coords) {
       results.push({ ...call, resolvedLat: coords.latitude, resolvedLng: coords.longitude });
     }

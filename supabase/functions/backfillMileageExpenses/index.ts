@@ -26,46 +26,66 @@ function haversineMiles(lat1: number, lon1: number, lat2: number, lon2: number):
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
-// Extract UK postcode from an address string
-function extractPostcode(address: string): string | null {
-  if (!address) return null
-  const match = address.match(/[A-Z]{1,2}\d{1,2}\s*\d[A-Z]{2}/i)
-  return match ? match[0].replace(/\s+/g, ' ').toUpperCase() : null
-}
+// Address → coords cache
+const coordsCache: Record<string, { latitude: number, longitude: number } | null> = {}
 
-// Postcode → coords cache (persists for the lifetime of the function invocation)
-const postcodeCache: Record<string, { latitude: number, longitude: number }> = {}
+// Geocode an address using Nominatim (full address, street-level accuracy)
+async function geocodeAddress(address: string): Promise<{ latitude: number, longitude: number } | null> {
+  if (!address || address.trim().length < 3) return null
+  const key = address.trim().toLowerCase()
+  if (key in coordsCache) return coordsCache[key]
 
-// Bulk geocode postcodes via postcodes.io (free, no API key, no rate limit, up to 100 per request)
-async function bulkGeocodePostcodes(postcodes: string[]): Promise<number> {
-  let resolved = 0
-  // Deduplicate and skip already cached
-  const toFetch = [...new Set(postcodes)].filter(p => !(p.toUpperCase() in postcodeCache))
+  // Try the full address first, then progressively shorter variants
+  const clean = address.replace(/,\s*$/, '').replace(/\s+/g, ' ').trim()
+  const variants = [clean]
+  // Also try with "UK" appended for better results
+  variants.push(clean + ', UK')
+  // Try from the last comma onwards (e.g. just "Denbigh, UK")
+  const parts = clean.split(/,\s*/)
+  if (parts.length > 1) {
+    for (let i = 1; i < parts.length; i++) {
+      variants.push(parts.slice(i).join(', ') + ', UK')
+    }
+  }
+  // Extract and try postcode if present
+  const postcodeMatch = clean.match(/[A-Z]{1,2}\d{1,2}\s*\d[A-Z]{2}/i)
+  if (postcodeMatch) variants.push(postcodeMatch[0])
 
-  for (let i = 0; i < toFetch.length; i += 100) {
-    const batch = toFetch.slice(i, i + 100)
+  for (const query of variants) {
+    if (query.length < 3) continue
     try {
-      const res = await fetch('https://api.postcodes.io/postcodes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ postcodes: batch }),
-      })
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=gb`
+      const res = await fetch(url, { headers: { 'User-Agent': 'AccredilinkApp/1.0' } })
       if (!res.ok) continue
-      const data = await res.json()
-      if (data.status === 200 && data.result) {
-        for (const r of data.result) {
-          if (r.result && r.result.latitude && r.result.longitude) {
-            postcodeCache[r.query.toUpperCase()] = {
-              latitude: r.result.latitude,
-              longitude: r.result.longitude,
-            }
-            resolved++
-          }
+      const results = await res.json()
+      if (results && results.length > 0) {
+        const coords = { latitude: parseFloat(results[0].lat), longitude: parseFloat(results[0].lon) }
+        coordsCache[key] = coords
+        return coords
+      }
+    } catch { /* continue */ }
+    // Rate limit: 1 request per second for Nominatim
+    await new Promise(r => setTimeout(r, 1100))
+  }
+
+  // Fallback: try postcodes.io if address has a UK postcode
+  if (postcodeMatch) {
+    try {
+      const pc = postcodeMatch[0].replace(/\s+/g, '')
+      const res = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(pc)}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.status === 200 && data.result) {
+          const coords = { latitude: data.result.latitude, longitude: data.result.longitude }
+          coordsCache[key] = coords
+          return coords
         }
       }
     } catch { /* continue */ }
   }
-  return resolved
+
+  coordsCache[key] = null
+  return null
 }
 
 function getSundayOfWeek(date: Date): Date {
@@ -128,125 +148,67 @@ Deno.serve(async (req) => {
     const ratePpm = rateSetting?.setting_value ? parseInt(rateSetting.setting_value, 10) : 45
     const ratePerMile = ratePpm / 100
 
-    // Get ALL shift_calls
+    // ========================================
+    // STEP 1: Build address map from service_users table
+    // Only ~11 service users, so we geocode these once
+    // ========================================
+    const { data: allServiceUsers } = await supabaseAdmin
+      .from('service_users')
+      .select('id, full_name, address')
+
+    const suAddressById: Record<string, string> = {}
+    const suAddressByName: Record<string, string> = {}
+    for (const su of (allServiceUsers || [])) {
+      if (su.address && su.address.trim()) {
+        suAddressById[su.id] = su.address.trim()
+        if (su.full_name) suAddressByName[su.full_name.toLowerCase().trim()] = su.address.trim()
+      }
+    }
+
+    // Pre-geocode ALL unique service user addresses (only ~11, takes ~15 seconds max)
+    const uniqueAddresses = [...new Set(Object.values(suAddressById))]
+    const geocodeResults: Record<string, string> = {} // address → 'ok' | 'failed'
+    for (const addr of uniqueAddresses) {
+      const coords = await geocodeAddress(addr)
+      geocodeResults[addr] = coords ? 'ok' : 'failed'
+    }
+
+    // ========================================
+    // STEP 2: Get ALL shift_calls on past shifts
+    // No drove_to_call or clock_in_time filter — include everything
+    // ========================================
     const { data: allCalls, error: callsErr } = await supabaseAdmin
       .from('shift_calls')
-      .select('id, shift_id, service_user_id, service_user_name, service_user_address, clock_in_time, drove_to_call, created_at')
+      .select('id, shift_id, service_user_id, service_user_name, service_user_address, clock_in_time, drove_to_call, created_at, scheduled_time')
       .not('shift_id', 'is', null)
-      .order('clock_in_time', { ascending: true })
+      .order('scheduled_time', { ascending: true })
 
     if (callsErr) throw callsErr
     if (!allCalls || allCalls.length === 0) {
       return jsonResponse({ success: true, message: 'No shift_calls found', created: 0 })
     }
 
-    // Only include calls that actually happened
-    const eligibleCalls = allCalls.filter(c => {
-      if (c.drove_to_call === false) return false
-      if (c.drove_to_call === true) return true
-      if (c.clock_in_time) return true
-      return false
-    })
+    // Include all calls EXCEPT those explicitly marked as not driven
+    const eligibleCalls = allCalls.filter(c => c.drove_to_call !== false)
 
-    // --- DIAGNOSTICS ---
-    const diag = {
-      totalCallsInDb: allCalls.length,
-      eligibleCalls: eligibleCalls.length,
-      callsWithAddressOnRecord: 0,
-      callsMissingAddress: 0,
-      addressesFoundFromServiceUsers: 0,
-      callsStillNoAddress: 0,
-      uniquePostcodes: 0,
-      postcodesResolved: 0,
-      sampleAddresses: [] as string[],
-      samplePostcodes: [] as string[],
-    }
-
-    diag.callsWithAddressOnRecord = eligibleCalls.filter(c => c.service_user_address).length
-    diag.callsMissingAddress = eligibleCalls.filter(c => !c.service_user_address).length
-
-    // Look up addresses from service_users table for ALL calls (even those with address, to ensure we have the best data)
-    // First get ALL service_users with addresses
-    const allServiceUserIds = [...new Set(eligibleCalls.map(c => c.service_user_id).filter(Boolean))]
-    const addressById: Record<string, string> = {}
-    for (let i = 0; i < allServiceUserIds.length; i += 100) {
-      const { data: sus } = await supabaseAdmin
-        .from('service_users')
-        .select('id, address')
-        .in('id', allServiceUserIds.slice(i, i + 100))
-      for (const su of (sus || [])) {
-        if (su.address) addressById[su.id] = su.address
-      }
-    }
-
-    // For calls without service_user_id, try matching by name
-    const namesWithoutId = [...new Set(
-      eligibleCalls
-        .filter(c => !c.service_user_id && !c.service_user_address && c.service_user_name)
-        .map(c => c.service_user_name)
-    )]
-    const addressByName: Record<string, string> = {}
-    for (const name of namesWithoutId) {
-      const { data: match } = await supabaseAdmin
-        .from('service_users')
-        .select('address')
-        .ilike('full_name', name)
-        .limit(1)
-      if (match?.[0]?.address) addressByName[name.toLowerCase().trim()] = match[0].address
-    }
-
-    // Populate addresses on calls that are missing them
-    let addressesFilledFromSU = 0
+    // Resolve address for each call: use service_user_address on call, or look up from service_users
     for (const call of eligibleCalls) {
-      if (!call.service_user_address) {
-        if (call.service_user_id && addressById[call.service_user_id]) {
-          call.service_user_address = addressById[call.service_user_id]
-          addressesFilledFromSU++
-        } else if (call.service_user_name && addressByName[call.service_user_name.toLowerCase().trim()]) {
-          call.service_user_address = addressByName[call.service_user_name.toLowerCase().trim()]
-          addressesFilledFromSU++
+      if (!call.service_user_address || !call.service_user_address.trim()) {
+        if (call.service_user_id && suAddressById[call.service_user_id]) {
+          call.service_user_address = suAddressById[call.service_user_id]
+        } else if (call.service_user_name && suAddressByName[call.service_user_name.toLowerCase().trim()]) {
+          call.service_user_address = suAddressByName[call.service_user_name.toLowerCase().trim()]
         }
       }
     }
-    diag.addressesFoundFromServiceUsers = addressesFilledFromSU
-    diag.callsStillNoAddress = eligibleCalls.filter(c => !c.service_user_address).length
 
-    // Extract postcodes from all addresses
-    const addressPostcodeMap: Record<string, string> = {} // address key → postcode
-    const allPostcodes: string[] = []
-    for (const call of eligibleCalls) {
-      if (!call.service_user_address) continue
-      const pc = extractPostcode(call.service_user_address)
-      if (pc) {
-        addressPostcodeMap[call.service_user_address.trim().toLowerCase()] = pc
-        allPostcodes.push(pc)
-      }
-    }
-    const uniquePostcodes = [...new Set(allPostcodes)]
-    diag.uniquePostcodes = uniquePostcodes.length
-    diag.sampleAddresses = [...new Set(eligibleCalls.map(c => c.service_user_address).filter(Boolean))].slice(0, 5)
-    diag.samplePostcodes = uniquePostcodes.slice(0, 5)
-
-    // Bulk geocode all postcodes via postcodes.io
-    const postcodesResolved = await bulkGeocodePostcodes(uniquePostcodes)
-    diag.postcodesResolved = postcodesResolved
-
-    // Group by shift_id
+    // ========================================
+    // STEP 3: Group by shift, resolve coords, calculate miles
+    // ========================================
     const byShift: Record<string, any[]> = {}
     for (const call of eligibleCalls) {
       if (!byShift[call.shift_id]) byShift[call.shift_id] = []
       byShift[call.shift_id].push(call)
-    }
-
-    // Get existing mileage expenses
-    const { data: existingExpenses } = await supabaseAdmin
-      .from('expenses')
-      .select('id, shift_id')
-      .eq('expense_type', 'mileage')
-      .not('shift_id', 'is', null)
-    const existingExpenseMap: Record<string, string> = {}
-    for (const e of (existingExpenses || [])) {
-      if (e.shift_id) existingExpenseMap[e.shift_id] = e.id
     }
 
     // Get shift details
@@ -262,6 +224,17 @@ Deno.serve(async (req) => {
     const shiftMap: Record<string, any> = {}
     for (const s of allShifts) shiftMap[s.id] = s
 
+    // Get existing mileage expenses
+    const { data: existingExpenses } = await supabaseAdmin
+      .from('expenses')
+      .select('id, shift_id')
+      .eq('expense_type', 'mileage')
+      .not('shift_id', 'is', null)
+    const existingExpenseMap: Record<string, string> = {}
+    for (const e of (existingExpenses || [])) {
+      if (e.shift_id) existingExpenseMap[e.shift_id] = e.id
+    }
+
     // Get staff names
     const staffIds = [...new Set(allShifts.map(s => s.staff_id).filter(Boolean))]
     const { data: profiles } = await supabaseAdmin
@@ -271,27 +244,30 @@ Deno.serve(async (req) => {
     const profileMap: Record<string, any> = {}
     for (const p of (profiles || [])) profileMap[p.id] = p
 
-    let created = 0, updated = 0, noAddress = 0, tooShort = 0, noPostcode = 0
+    let created = 0, updated = 0, noAddress = 0, tooShort = 0, skippedFuture = 0
     const errors: string[] = []
 
     for (const [shiftId, calls] of Object.entries(byShift)) {
       const shift = shiftMap[shiftId]
       if (!shift) continue
-      if (shift.date && shift.date > todayStr) continue
+      if (shift.date && shift.date > todayStr) { skippedFuture++; continue }
 
-      // Resolve each call's coordinates from its address postcode
+      // Resolve each call's coordinates from its address
       const resolved = calls
         .map(c => {
           if (!c.service_user_address) return null
-          const addrKey = c.service_user_address.trim().toLowerCase()
-          const pc = addressPostcodeMap[addrKey]
-          if (!pc) return null
-          const coords = postcodeCache[pc.toUpperCase()]
+          const key = c.service_user_address.trim().toLowerCase()
+          const coords = coordsCache[key]
           if (!coords) return null
           return { ...c, lat: coords.latitude, lng: coords.longitude }
         })
         .filter(Boolean)
-        .sort((a: any, b: any) => new Date(a.clock_in_time || a.created_at).getTime() - new Date(b.clock_in_time || b.created_at).getTime())
+        .sort((a: any, b: any) => {
+          // Sort by scheduled_time (or clock_in_time, or created_at)
+          const tA = a.scheduled_time || a.clock_in_time || a.created_at
+          const tB = b.scheduled_time || b.clock_in_time || b.created_at
+          return String(tA).localeCompare(String(tB))
+        })
 
       if (resolved.length < 2) {
         noAddress++
@@ -301,7 +277,8 @@ Deno.serve(async (req) => {
       // Calculate total miles between consecutive calls
       let totalMiles = 0
       for (let i = 0; i < resolved.length - 1; i++) {
-        totalMiles += haversineMiles(resolved[i]!.lat, resolved[i]!.lng, resolved[i + 1]!.lat, resolved[i + 1]!.lng)
+        const dist = haversineMiles(resolved[i]!.lat, resolved[i]!.lng, resolved[i + 1]!.lat, resolved[i + 1]!.lng)
+        totalMiles += dist
       }
 
       if (totalMiles <= 0.1) { tooShort++; continue }
@@ -355,14 +332,24 @@ Deno.serve(async (req) => {
 
     return jsonResponse({
       success: true,
-      message: `Created ${created}, updated ${updated} mileage expenses. ${noAddress} insufficient data, ${tooShort} too short.`,
+      message: `Created ${created}, updated ${updated} mileage expenses. ${noAddress} insufficient data, ${tooShort} too short, ${skippedFuture} future.`,
       created,
       updated,
       noAddress,
       tooShort,
-      totalShifts: Object.keys(byShift).length,
+      skippedFuture,
+      totalShifts: shiftIds.length,
       totalCalls: eligibleCalls.length,
-      diagnostics: diag,
+      diagnostics: {
+        totalCallsInDb: allCalls.length,
+        eligibleCalls: eligibleCalls.length,
+        serviceUsersFound: allServiceUsers?.length || 0,
+        serviceUsersWithAddress: Object.keys(suAddressById).length,
+        uniqueAddresses: uniqueAddresses.length,
+        geocodeResults,
+        callsWithAddressAfterLookup: eligibleCalls.filter(c => c.service_user_address).length,
+        callsStillNoAddress: eligibleCalls.filter(c => !c.service_user_address).length,
+      },
       futureExpensesCleaned: futureExpenses?.length || 0,
       errors: errors.length > 0 ? errors : undefined,
     })
