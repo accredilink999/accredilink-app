@@ -828,37 +828,53 @@ export default function AdminApprovalsFinancials() {
                             {isExpanded ? 'Hide' : 'Show'} daily breakdown
                           </button>
 
-                          {/* Daily breakdown */}
+                          {/* Daily breakdown — all 7 days Sun-Sat, grouped by day */}
                           {isExpanded && (
                             <div className="mt-3 border-t border-slate-100 pt-3">
-                              <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 gap-y-1 text-sm">
-                                <span className="text-xs font-semibold text-slate-400 uppercase">Day</span>
-                                <span className="text-xs font-semibold text-slate-400 uppercase text-right">Miles</span>
-                                <span className="text-xs font-semibold text-slate-400 uppercase text-right">Amount</span>
-                                {group.expenses
-                                  .sort((a, b) => new Date(a.date || a.expense_date || a.created_date) - new Date(b.date || b.expense_date || b.created_date))
-                                  .map(exp => {
-                                    const miles = parseFloat(exp.mileage_distance || exp.mileage || 0);
-                                    const amt = exp.expense_type === 'mileage' ? miles * mileageRate : parseFloat(exp.amount || 0);
-                                    return (
-                                      <React.Fragment key={exp.id}>
-                                        <span className="text-slate-600 py-1 border-b border-slate-50">
-                                          {format(new Date(exp.date || exp.expense_date || exp.created_date), 'EEE dd MMM')}
+                              {(() => {
+                                // Build all 7 days of the week
+                                const days = [];
+                                for (let i = 0; i < 7; i++) {
+                                  const day = new Date(group.weekStart);
+                                  day.setDate(day.getDate() + i);
+                                  const dayStr = format(day, 'yyyy-MM-dd');
+                                  // Sum all expenses for this day
+                                  const dayExps = group.expenses.filter(e => {
+                                    const ed = new Date(e.date || e.expense_date || e.created_date);
+                                    return format(ed, 'yyyy-MM-dd') === dayStr;
+                                  });
+                                  const dayMiles = dayExps.reduce((s, e) => s + parseFloat(e.mileage_distance || e.mileage || 0), 0);
+                                  const dayAmount = dayExps.reduce((s, e) => {
+                                    if (e.expense_type === 'mileage') return s + parseFloat(e.mileage_distance || e.mileage || 0) * mileageRate;
+                                    return s + (parseFloat(e.amount) || 0);
+                                  }, 0);
+                                  days.push({ day, dayStr, dayMiles, dayAmount, hasData: dayExps.length > 0 });
+                                }
+                                return (
+                                  <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 gap-y-0 text-sm">
+                                    <span className="text-xs font-semibold text-slate-400 uppercase pb-1">Day</span>
+                                    <span className="text-xs font-semibold text-slate-400 uppercase text-right pb-1">Miles</span>
+                                    <span className="text-xs font-semibold text-slate-400 uppercase text-right pb-1">Amount</span>
+                                    {days.map(d => (
+                                      <React.Fragment key={d.dayStr}>
+                                        <span className={`py-1.5 border-b border-slate-50 ${d.hasData ? 'text-slate-700' : 'text-slate-300'}`}>
+                                          {format(d.day, 'EEE dd MMM')}
                                         </span>
-                                        <span className="text-slate-700 py-1 border-b border-slate-50 text-right">
-                                          {exp.expense_type === 'mileage' ? `${miles.toFixed(1)} mi` : '—'}
+                                        <span className={`py-1.5 border-b border-slate-50 text-right ${d.hasData ? 'text-slate-700' : 'text-slate-300'}`}>
+                                          {d.dayMiles > 0 ? `${d.dayMiles.toFixed(1)} mi` : '—'}
                                         </span>
-                                        <span className="text-slate-900 font-medium py-1 border-b border-slate-50 text-right">
-                                          £{amt.toFixed(2)}
+                                        <span className={`py-1.5 border-b border-slate-50 text-right font-medium ${d.hasData ? 'text-slate-900' : 'text-slate-300'}`}>
+                                          {d.dayAmount > 0 ? `£${d.dayAmount.toFixed(2)}` : '—'}
                                         </span>
                                       </React.Fragment>
-                                    );
-                                  })}
-                                {/* Totals row */}
-                                <span className="font-semibold text-slate-900 pt-2">Total</span>
-                                <span className="font-semibold text-slate-900 pt-2 text-right">{group.totalMiles.toFixed(1)} mi</span>
-                                <span className="font-bold text-slate-900 pt-2 text-right">£{group.totalAmount.toFixed(2)}</span>
-                              </div>
+                                    ))}
+                                    {/* Totals row */}
+                                    <span className="font-semibold text-slate-900 pt-2 border-t border-slate-200">Total</span>
+                                    <span className="font-semibold text-slate-900 pt-2 text-right border-t border-slate-200">{group.totalMiles.toFixed(1)} mi</span>
+                                    <span className="font-bold text-slate-900 pt-2 text-right border-t border-slate-200">£{group.totalAmount.toFixed(2)}</span>
+                                  </div>
+                                );
+                              })()}
                             </div>
                           )}
 
