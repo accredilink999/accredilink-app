@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { invokeFunction } from '@/api/functions';
 import PageHeader from '@/components/ui/PageHeader';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { Card, CardContent } from "@/components/ui/card";
@@ -29,7 +30,10 @@ import {
   ChevronUp,
   ChevronLeft,
   ChevronRight,
-  List
+  List,
+  Download,
+  Users,
+  Loader2
 } from 'lucide-react';
 import { format, differenceInDays, startOfWeek, endOfWeek, addWeeks, subWeeks, isSameWeek, isAfter } from 'date-fns';
 import { toast } from 'sonner';
@@ -77,6 +81,8 @@ export default function AdminApprovalsFinancials() {
   const [expenseView, setExpenseView] = useState('all'); // 'weekly' | 'all'
   const [expandedCards, setExpandedCards] = useState({});
   const [customRate, setCustomRate] = useState('');
+  const [backfillLoading, setBackfillLoading] = useState(false);
+  const [staffFilter, setStaffFilter] = useState('all');
 
   const { data: leaveRequests = [] } = useQuery({
     queryKey: ['allLeaveRequests'],
@@ -126,14 +132,13 @@ export default function AdminApprovalsFinancials() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mileageRateSetting'] });
       toast.success('Mileage rate updated');
-      setShowRateConfig(false);
     },
   });
 
   // Group expenses by staff + week (Sun-Sat)
   const weeklyStaffGroups = useMemo(() => {
     const groups = {};
-    expenses.forEach(exp => {
+    filteredExpenses.forEach(exp => {
       if (exp.expense_type === 'weekly_mileage') return; // skip summary records
       const expDate = new Date(exp.date || exp.expense_date || exp.created_date || exp.created_at);
       if (isNaN(expDate.getTime())) return;
@@ -160,7 +165,7 @@ export default function AdminApprovalsFinancials() {
       }
     });
     return groups;
-  }, [expenses, staffMembers]);
+  }, [filteredExpenses, staffMembers]);
 
   // Auto-select the most recent week with expenses (or current week if none)
   useEffect(() => {
@@ -326,10 +331,46 @@ export default function AdminApprovalsFinancials() {
     },
   });
 
+  // Backfill mileage from shift_calls
+  const handleBackfill = async () => {
+    setBackfillLoading(true);
+    try {
+      const result = await invokeFunction('backfillMileageExpenses');
+      toast.success(result.message || `Created ${result.created} mileage expenses`);
+      queryClient.invalidateQueries({ queryKey: ['allExpenses'] });
+    } catch (err) {
+      toast.error(err.message || 'Backfill failed');
+    } finally {
+      setBackfillLoading(false);
+    }
+  };
+
+  // Get unique staff members who have expenses
+  const staffWithExpenses = useMemo(() => {
+    const staffMap = {};
+    expenses.forEach(exp => {
+      if (!exp.staff_id || exp.expense_type === 'weekly_mileage') return;
+      if (!staffMap[exp.staff_id]) {
+        const staffUser = staffMembers.find(s => s.id === exp.staff_id);
+        staffMap[exp.staff_id] = {
+          id: exp.staff_id,
+          name: staffUser?.staff_full_name || staffUser?.full_name || exp.staff_name || 'Unknown',
+        };
+      }
+    });
+    return Object.values(staffMap).sort((a, b) => a.name.localeCompare(b.name));
+  }, [expenses, staffMembers]);
+
+  // Filter expenses by selected staff
+  const filteredExpenses = useMemo(() => {
+    if (staffFilter === 'all') return expenses;
+    return expenses.filter(e => e.staff_id === staffFilter);
+  }, [expenses, staffFilter]);
+
   const pendingLeave = leaveRequests.filter(r => r.status === 'pending');
   const pendingSwaps = shiftSwaps.filter(r => r.status === 'pending');
-  const pendingExpenses = expenses.filter(e => e.status === 'pending' && e.expense_type !== 'weekly_mileage');
-  const approvedExpenses = expenses.filter(e => e.status === 'approved' && e.expense_type !== 'weekly_mileage');
+  const pendingExpenses = filteredExpenses.filter(e => e.status === 'pending' && e.expense_type !== 'weekly_mileage');
+  const approvedExpenses = filteredExpenses.filter(e => e.status === 'approved' && e.expense_type !== 'weekly_mileage');
 
   // Recalculate totals using current mileage rate for mileage expenses
   const calcExpenseAmount = (e) => {
@@ -633,6 +674,34 @@ export default function AdminApprovalsFinancials() {
             </div>
           </Card>
 
+          {/* Import & Staff Filter */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              onClick={handleBackfill}
+              disabled={backfillLoading}
+              className="bg-indigo-600 hover:bg-indigo-700"
+            >
+              {backfillLoading ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Download className="w-4 h-4 mr-1" />}
+              {backfillLoading ? 'Importing...' : 'Import Existing Mileage'}
+            </Button>
+
+            <div className="flex items-center gap-1 ml-auto">
+              <Users className="w-4 h-4 text-slate-400" />
+              <Select value={staffFilter} onValueChange={setStaffFilter}>
+                <SelectTrigger className="w-[180px] h-9">
+                  <SelectValue placeholder="All Staff" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Staff</SelectItem>
+                  {staffWithExpenses.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <div className="flex items-center gap-1">
             <Button size="sm" variant={expenseView === 'weekly' ? 'default' : 'outline'} className={expenseView === 'weekly' ? 'bg-teal-600 hover:bg-teal-700' : ''} onClick={() => setExpenseView('weekly')}>
               Weekly Summary
@@ -852,7 +921,7 @@ export default function AdminApprovalsFinancials() {
                 </Card>
               </div>
 
-              {expenses.filter(e => e.expense_type !== 'weekly_mileage').length === 0 ? (
+              {filteredExpenses.filter(e => e.expense_type !== 'weekly_mileage').length === 0 ? (
                 <EmptyState
                   icon={DollarSign}
                   title="No expenses submitted yet"
@@ -860,7 +929,7 @@ export default function AdminApprovalsFinancials() {
                 />
               ) : (
                 <div className="space-y-3">
-                  {expenses.filter(e => e.expense_type !== 'weekly_mileage').map((expense, idx) => {
+                  {filteredExpenses.filter(e => e.expense_type !== 'weekly_mileage').map((expense, idx) => {
                     const colors = [
                       'from-orange-50 to-amber-50 border-orange-100',
                       'from-rose-50 to-pink-50 border-rose-100',
