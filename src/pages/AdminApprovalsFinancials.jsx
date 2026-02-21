@@ -81,6 +81,7 @@ export default function AdminApprovalsFinancials() {
   const [expenseView, setExpenseView] = useState('weekly'); // 'weekly' | 'all'
   const [expandedCards, setExpandedCards] = useState({});
   const [customRate, setCustomRate] = useState('');
+  const [monthlyDay, setMonthlyDay] = useState('');
   const [backfillLoading, setBackfillLoading] = useState(false);
   const [staffFilter, setStaffFilter] = useState('all');
 
@@ -134,6 +135,57 @@ export default function AdminApprovalsFinancials() {
       toast.success('Mileage rate updated');
     },
   });
+
+  // Pay schedule from SystemSettings — JSON: { type: 'weekly'|'monthly', day: number }
+  // weekly: day = day of week (0=Sun..6=Sat), default 4 (Thursday)
+  // monthly: day = day of month (1-28)
+  const { data: payScheduleSettings = [] } = useQuery({
+    queryKey: ['payScheduleSetting'],
+    queryFn: () => base44.entities.SystemSettings.filter({ setting_key: 'expense_pay_schedule' }),
+  });
+  const paySchedule = useMemo(() => {
+    try {
+      return payScheduleSettings[0]?.setting_value ? JSON.parse(payScheduleSettings[0].setting_value) : { type: 'weekly', day: 4 };
+    } catch { return { type: 'weekly', day: 4 }; }
+  }, [payScheduleSettings]);
+
+  const savePayScheduleMutation = useMutation({
+    mutationFn: async (schedule) => {
+      const val = JSON.stringify(schedule);
+      const existing = payScheduleSettings[0];
+      if (existing) {
+        return base44.entities.SystemSettings.update(existing.id, { setting_value: val });
+      }
+      return base44.entities.SystemSettings.create({
+        setting_key: 'expense_pay_schedule',
+        setting_value: val,
+        description: 'Expense payment schedule (weekly/monthly)',
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payScheduleSetting'] });
+      toast.success('Payment schedule updated');
+    },
+  });
+
+  // Calculate next pay date based on schedule
+  const getNextPayDateStr = () => {
+    const now = new Date();
+    if (paySchedule.type === 'monthly') {
+      const dayOfMonth = paySchedule.day || 1;
+      let payDate = new Date(now.getFullYear(), now.getMonth(), dayOfMonth);
+      if (payDate <= now) payDate = new Date(now.getFullYear(), now.getMonth() + 1, dayOfMonth);
+      return format(payDate, "EEEE do MMMM");
+    }
+    // weekly — default Thursday (day 4)
+    const targetDay = paySchedule.day ?? 4;
+    const current = now.getDay();
+    let daysUntil = (targetDay - current + 7) % 7;
+    if (daysUntil === 0) daysUntil = 7; // next week, not today
+    const payDate = new Date(now);
+    payDate.setDate(payDate.getDate() + daysUntil);
+    return format(payDate, "EEEE do MMMM");
+  };
 
   // Filter expenses by selected staff
   const filteredExpenses = useMemo(() => {
@@ -292,6 +344,20 @@ export default function AdminApprovalsFinancials() {
         reviewed_by_name: user?.full_name
       }
     });
+    // Notify staff
+    if (expense.staff_id) {
+      const payDateStr = getNextPayDateStr();
+      const amt = parseFloat(expense.amount || 0).toFixed(2);
+      base44.functions.invoke('createNotification', {
+        recipient_ids: [expense.staff_id],
+        type: 'expense_approved',
+        title: 'Expenses Approved',
+        message: `Your expenses (£${amt}) have been approved and will be paid into your account on ${payDateStr}.`,
+        priority: 'normal',
+        action_url: '/ApprovalsAndFinancials',
+        send_push: true,
+      }).catch(e => console.warn('Expense approval notification failed:', e));
+    }
   };
 
   const handleRejectExpense = (expense) => {
@@ -307,7 +373,7 @@ export default function AdminApprovalsFinancials() {
 
   // Batch approve all expenses for a staff member's week
   const batchApproveMutation = useMutation({
-    mutationFn: async (expenseIds) => {
+    mutationFn: async ({ expenseIds, staffId, staffName, totalAmount }) => {
       await Promise.all(expenseIds.map(id =>
         base44.entities.Expense.update(id, {
           status: 'approved',
@@ -315,15 +381,29 @@ export default function AdminApprovalsFinancials() {
           reviewed_by_name: user?.full_name,
         })
       ));
+      return { staffId, staffName, totalAmount };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['allExpenses'] });
       toast.success('Week approved');
+      if (result?.staffId) {
+        const payDateStr = getNextPayDateStr();
+        const amt = parseFloat(result.totalAmount || 0).toFixed(2);
+        base44.functions.invoke('createNotification', {
+          recipient_ids: [result.staffId],
+          type: 'expense_approved',
+          title: 'Expenses Approved',
+          message: `Your weekly expenses (£${amt}) have been approved and will be paid into your account on ${payDateStr}.`,
+          priority: 'normal',
+          action_url: '/ApprovalsAndFinancials',
+          send_push: true,
+        }).catch(e => console.warn('Batch approval notification failed:', e));
+      }
     },
   });
 
   const batchRejectMutation = useMutation({
-    mutationFn: async (expenseIds) => {
+    mutationFn: async ({ expenseIds }) => {
       await Promise.all(expenseIds.map(id =>
         base44.entities.Expense.update(id, {
           status: 'rejected',
@@ -339,14 +419,27 @@ export default function AdminApprovalsFinancials() {
   });
 
   const batchMarkPaidMutation = useMutation({
-    mutationFn: async (expenseIds) => {
+    mutationFn: async ({ expenseIds, staffId, staffName, totalAmount }) => {
       await Promise.all(expenseIds.map(id =>
         base44.entities.Expense.update(id, { status: 'paid' })
       ));
+      return { staffId, staffName, totalAmount };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['allExpenses'] });
       toast.success('Marked as paid');
+      if (result?.staffId) {
+        const amt = parseFloat(result.totalAmount || 0).toFixed(2);
+        base44.functions.invoke('createNotification', {
+          recipient_ids: [result.staffId],
+          type: 'expense_paid',
+          title: 'Expenses Paid',
+          message: `£${amt} mileage expenses have been paid into your account.`,
+          priority: 'normal',
+          action_url: '/ApprovalsAndFinancials',
+          send_push: true,
+        }).catch(e => console.warn('Batch paid notification failed:', e));
+      }
     },
   });
 
@@ -674,7 +767,7 @@ export default function AdminApprovalsFinancials() {
 
         {/* Expenses Tab */}
         <TabsContent value="expenses" className="space-y-4">
-          {/* Mileage Rate Config — always visible */}
+          {/* Expense Settings — mileage rate + pay schedule */}
           <Card className="p-4 bg-gradient-to-br from-teal-50 to-cyan-50 border-teal-200">
             <div className="flex items-center gap-2 mb-3">
               <Car className="w-5 h-5 text-teal-600" />
@@ -710,6 +803,73 @@ export default function AdminApprovalsFinancials() {
                 >
                   Set
                 </Button>
+              </div>
+            </div>
+
+            {/* Pay Schedule */}
+            <div className="mt-4 pt-3 border-t border-teal-200/50">
+              <div className="flex items-center gap-2 mb-2">
+                <PoundSterling className="w-4 h-4 text-teal-600" />
+                <p className="text-sm font-semibold text-slate-700">Payment Day: <span className="text-teal-700">{getNextPayDateStr()}</span></p>
+              </div>
+              <div className="flex flex-wrap gap-2 items-center">
+                <Select
+                  value={paySchedule.type}
+                  onValueChange={(val) => savePayScheduleMutation.mutate({ type: val, day: val === 'weekly' ? 4 : 1 })}
+                >
+                  <SelectTrigger className="w-[130px] h-9 bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {paySchedule.type === 'weekly' && (
+                  <Select
+                    value={String(paySchedule.day ?? 4)}
+                    onValueChange={(val) => savePayScheduleMutation.mutate({ type: 'weekly', day: parseInt(val, 10) })}
+                  >
+                    <SelectTrigger className="w-[140px] h-9 bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((name, i) => (
+                        <SelectItem key={i} value={String(i)}>{name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {paySchedule.type === 'monthly' && (
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={28}
+                      placeholder={String(paySchedule.day || 1)}
+                      className="w-16 h-9 bg-white"
+                      value={monthlyDay}
+                      onChange={(e) => setMonthlyDay(e.target.value)}
+                    />
+                    <span className="text-xs text-slate-500">of each month</span>
+                    <Button
+                      size="sm"
+                      disabled={!monthlyDay || savePayScheduleMutation.isPending}
+                      onClick={() => {
+                        const d = Math.min(28, Math.max(1, parseInt(monthlyDay, 10) || 1));
+                        savePayScheduleMutation.mutate({ type: 'monthly', day: d });
+                        setMonthlyDay('');
+                      }}
+                      className="bg-teal-600 hover:bg-teal-700"
+                    >
+                      Set
+                    </Button>
+                  </div>
+                )}
+
+                {savePayScheduleMutation.isPending && <Loader2 className="w-4 h-4 animate-spin text-teal-600" />}
               </div>
             </div>
           </Card>
@@ -941,7 +1101,7 @@ export default function AdminApprovalsFinancials() {
                             <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
                               <Button
                                 size="sm"
-                                onClick={() => batchApproveMutation.mutate(pendingIds)}
+                                onClick={() => batchApproveMutation.mutate({ expenseIds: pendingIds, staffId: group.staffId, staffName: group.staffName, totalAmount: group.totalAmount })}
                                 disabled={batchApproveMutation.isPending}
                                 className="bg-emerald-600 hover:bg-emerald-700 flex-1"
                               >
@@ -951,7 +1111,7 @@ export default function AdminApprovalsFinancials() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => batchRejectMutation.mutate(pendingIds)}
+                                onClick={() => batchRejectMutation.mutate({ expenseIds: pendingIds })}
                                 disabled={batchRejectMutation.isPending}
                                 className="flex-1"
                               >
@@ -964,7 +1124,7 @@ export default function AdminApprovalsFinancials() {
                             <div className="mt-3 pt-3 border-t border-slate-100">
                               <Button
                                 size="sm"
-                                onClick={() => batchMarkPaidMutation.mutate(approvedIds)}
+                                onClick={() => batchMarkPaidMutation.mutate({ expenseIds: approvedIds, staffId: group.staffId, staffName: group.staffName, totalAmount: group.totalAmount })}
                                 disabled={batchMarkPaidMutation.isPending}
                                 className="w-full bg-blue-600 hover:bg-blue-700"
                               >
