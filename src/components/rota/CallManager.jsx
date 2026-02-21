@@ -899,6 +899,9 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
              const canClockIn = (isMyShift || isAdmin) && !call.clock_in_time && (call.status === 'pending' || call.status === 'in_progress') && !isOnHold;
              const canClockOut = (isMyShift || isAdmin) && call.clock_in_time && !call.clock_out_time && call.status === 'in_progress' && !isOnHold;
              const hasCarLog = careLogs.some(log => log.id === call.care_log_id || (log.shift_call_id === call.id));
+             const partnerHasLog = shift?.paired_shift_id && careLogs.some(
+               log => log.shift_id === shift.paired_shift_id && log.service_user_id === call.service_user_id
+             );
 
 
              const getCardBackground = () => {
@@ -1080,7 +1083,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                          const incomplete = getIncompleteTasks(call);
                          if (incomplete.length > 0) {
                            setTaskWarningCall(call);
-                         } else if (hasCarLog) {
+                         } else if (hasCarLog || partnerHasLog) {
                            clockOutMutation.mutate(call);
                          } else {
                            setClockOutConfirmCall(call);
@@ -1093,7 +1096,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                        Check Out
                      </Button>
                    )}
-                  {(isMyShift || isAdmin) && !hasCarLog && !isOnHold && call.status !== 'completed' && (
+                  {(isMyShift || isAdmin) && !hasCarLog && !partnerHasLog && !isOnHold && call.status !== 'completed' && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -1104,6 +1107,12 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                         Care Log
                       </Button>
                     )}
+                  {!hasCarLog && partnerHasLog && call.status !== 'completed' && (
+                    <div className="col-span-2 text-xs text-purple-700 bg-purple-50 px-3 py-2 rounded flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 flex-shrink-0" />
+                      Partner Has Filled In The Log For This Call
+                    </div>
+                  )}
                   {(isMyShift || isAdmin) && call.status !== 'completed' && !shift?.paired_shift_id && (
                     <Button
                       size="sm"
@@ -1114,7 +1123,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                       Not My Call
                     </Button>
                   )}
-                  {(isMyShift || isAdmin) && !hasCarLog && call.status !== 'completed' && (
+                  {(isMyShift || isAdmin) && !hasCarLog && !partnerHasLog && call.status !== 'completed' && (
                     <Button
                       size="sm"
                       variant="outline"
