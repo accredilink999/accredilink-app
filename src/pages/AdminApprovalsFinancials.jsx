@@ -355,12 +355,41 @@ export default function AdminApprovalsFinancials() {
     setBackfillLoading(true);
     try {
       const result = await invokeFunction('backfillMileageExpenses');
-      toast.success(result.message || `Created ${result.created} mileage expenses`);
+      const msg = result.message || `Created ${result.created} mileage expenses`;
+      console.log('[Backfill result]', JSON.stringify(result, null, 2));
+      if (result.errors?.length) {
+        toast.error(`${msg}\nErrors: ${result.errors.join(', ')}`);
+      } else {
+        toast.success(msg);
+      }
       queryClient.invalidateQueries({ queryKey: ['allExpenses'] });
     } catch (err) {
       toast.error(err.message || 'Backfill failed');
     } finally {
       setBackfillLoading(false);
+    }
+  };
+
+  // Debug mileage for a specific staff member
+  const handleDebugMileage = async (name) => {
+    try {
+      const result = await invokeFunction('debugMileage', { staffName: name });
+      console.log('[Debug Mileage]', JSON.stringify(result, null, 2));
+      if (result.summary) {
+        const s = result.summary;
+        toast.info(
+          `${name}: ${s.totalShifts} shifts, ${s.totalCalls} calls\n` +
+          `Drove: ${s.callsDroveTrue} yes / ${s.callsDroveFalse} no / ${s.callsDroveNull} null\n` +
+          `GPS: ${s.callsWithGPS}/${s.totalCalls} calls\n` +
+          `Service users with coords: ${s.serviceUsersWithCoords}/${s.serviceUsersWithAddress}\n` +
+          `Existing expenses: ${s.existingMileageExpenses}`,
+          { duration: 15000 }
+        );
+      } else {
+        toast.info(JSON.stringify(result), { duration: 10000 });
+      }
+    } catch (err) {
+      toast.error(`Debug failed: ${err.message}`);
     }
   };
 
@@ -681,6 +710,16 @@ export default function AdminApprovalsFinancials() {
             >
               {backfillLoading ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Download className="w-4 h-4 mr-1" />}
               {backfillLoading ? 'Importing...' : 'Import Existing Mileage'}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                const name = prompt('Staff name to debug:');
+                if (name) handleDebugMileage(name);
+              }}
+            >
+              Debug Staff
             </Button>
 
             <div className="flex items-center gap-1 ml-auto">
