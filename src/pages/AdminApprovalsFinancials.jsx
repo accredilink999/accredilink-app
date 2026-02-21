@@ -78,7 +78,7 @@ export default function AdminApprovalsFinancials() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
   const [selectedWeek, setSelectedWeek] = useState(null); // null = auto-detect
-  const [expenseView, setExpenseView] = useState('all'); // 'weekly' | 'all'
+  const [expenseView, setExpenseView] = useState('weekly'); // 'weekly' | 'all'
   const [expandedCards, setExpandedCards] = useState({});
   const [customRate, setCustomRate] = useState('');
   const [backfillLoading, setBackfillLoading] = useState(false);
@@ -718,55 +718,64 @@ export default function AdminApprovalsFinancials() {
                 <Button size="sm" variant="outline" onClick={() => setSelectedWeek(subWeeks(effectiveWeek, 1))}>
                   <ChevronLeft className="w-4 h-4 mr-1" /> Previous
                 </Button>
-                <h3 className="text-sm font-semibold text-slate-700">
-                  {format(effectiveWeek, 'dd MMM')} – {format(endOfWeek(effectiveWeek, { weekStartsOn: 0 }), 'dd MMM yyyy')}
+                <div className="text-center">
+                  <h3 className="text-sm font-semibold text-slate-700">
+                    Sun {format(effectiveWeek, 'dd MMM')} – Sat {format(endOfWeek(effectiveWeek, { weekStartsOn: 0 }), 'dd MMM yyyy')}
+                  </h3>
                   {isSameWeek(effectiveWeek, new Date(), { weekStartsOn: 0 }) && (
-                    <Badge className="ml-2 bg-teal-100 text-teal-700">Current Week</Badge>
+                    <Badge className="mt-1 bg-teal-100 text-teal-700">Week to Date</Badge>
                   )}
-                </h3>
+                </div>
                 <Button size="sm" variant="outline" onClick={() => setSelectedWeek(addWeeks(effectiveWeek, 1))}>
                   Next <ChevronRight className="w-4 h-4 ml-1" />
                 </Button>
               </div>
 
               {/* Week stats */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card className="bg-gradient-to-br from-slate-50 to-slate-100 border-slate-200">
-                  <CardContent className="pt-5 pb-4">
-                    <div className="text-center">
-                      <Car className="w-5 h-5 text-slate-500 mx-auto mb-1" />
-                      <p className="text-2xl font-bold text-slate-700">{weekTotalMiles.toFixed(1)}</p>
-                      <p className="text-xs text-slate-500">Total Miles</p>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
-                  <CardContent className="pt-5 pb-4">
-                    <div className="text-center">
-                      <PoundSterling className="w-5 h-5 text-blue-500 mx-auto mb-1" />
-                      <p className="text-2xl font-bold text-blue-700">£{weekTotalPending.toFixed(2)}</p>
-                      <p className="text-xs text-blue-500">Pending</p>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200">
-                  <CardContent className="pt-5 pb-4">
-                    <div className="text-center">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-500 mx-auto mb-1" />
-                      <p className="text-2xl font-bold text-emerald-700">£{weekTotalApproved.toFixed(2)}</p>
-                      <p className="text-xs text-emerald-500">Approved</p>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200">
-                  <CardContent className="pt-5 pb-4">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-purple-700">{currentWeekGroups.length}</p>
-                      <p className="text-xs text-purple-500">Staff Members</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+              {(() => {
+                const isCurrentWeek = isSameWeek(effectiveWeek, new Date(), { weekStartsOn: 0 });
+                const weekTotalAmount = currentWeekGroups.reduce((sum, g) => sum + g.totalAmount, 0);
+                return (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <Card className="bg-gradient-to-br from-slate-50 to-slate-100 border-slate-200">
+                      <CardContent className="pt-5 pb-4">
+                        <div className="text-center">
+                          <Car className="w-5 h-5 text-slate-500 mx-auto mb-1" />
+                          <p className="text-2xl font-bold text-slate-700">{weekTotalMiles.toFixed(1)}</p>
+                          <p className="text-xs text-slate-500">{isCurrentWeek ? 'Miles So Far' : 'Total Miles'}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="bg-gradient-to-br from-teal-50 to-cyan-50 border-teal-200">
+                      <CardContent className="pt-5 pb-4">
+                        <div className="text-center">
+                          <PoundSterling className="w-5 h-5 text-teal-500 mx-auto mb-1" />
+                          <p className="text-2xl font-bold text-teal-700">£{weekTotalAmount.toFixed(2)}</p>
+                          <p className="text-xs text-teal-500">{isCurrentWeek ? 'Week to Date Total' : 'Week Total'}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+                      <CardContent className="pt-5 pb-4">
+                        <div className="text-center">
+                          <Clock className="w-5 h-5 text-blue-500 mx-auto mb-1" />
+                          <p className="text-2xl font-bold text-blue-700">£{weekTotalPending.toFixed(2)}</p>
+                          <p className="text-xs text-blue-500">Pending Approval</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200">
+                      <CardContent className="pt-5 pb-4">
+                        <div className="text-center">
+                          <Users className="w-5 h-5 text-purple-500 mx-auto mb-1" />
+                          <p className="text-2xl font-bold text-purple-700">{currentWeekGroups.length}</p>
+                          <p className="text-xs text-purple-500">Staff Members</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                );
+              })()}
 
               {/* Per-staff weekly cards */}
               {currentWeekGroups.length === 0 ? (
@@ -816,34 +825,40 @@ export default function AdminApprovalsFinancials() {
                             onClick={() => setExpandedCards(prev => ({ ...prev, [group.key]: !prev[group.key] }))}
                           >
                             {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                            {isExpanded ? 'Hide' : 'Show'} breakdown
+                            {isExpanded ? 'Hide' : 'Show'} daily breakdown
                           </button>
 
                           {/* Daily breakdown */}
                           {isExpanded && (
-                            <div className="mt-3 space-y-1 border-t border-slate-100 pt-3">
-                              {group.expenses
-                                .sort((a, b) => new Date(a.date || a.expense_date || a.created_date) - new Date(b.date || b.expense_date || b.created_date))
-                                .map(exp => (
-                                  <div key={exp.id} className="flex justify-between items-center text-sm py-1.5 border-b border-slate-50 last:border-0">
-                                    <div className="flex-1 min-w-0">
-                                      <span className="text-slate-600">
-                                        {format(new Date(exp.date || exp.expense_date || exp.created_date), 'EEE dd MMM')}
-                                      </span>
-                                      <span className="text-slate-400 ml-2 capitalize">{(exp.expense_type || '').replace(/_/g, ' ')}</span>
-                                      {exp.description && <span className="text-slate-400 ml-1">— {exp.description}</span>}
-                                    </div>
-                                    <div className="text-right flex-shrink-0 ml-3">
-                                      {exp.expense_type === 'mileage' ? (
-                                        <span className="text-slate-900 font-medium">
-                                          {parseFloat(exp.mileage_distance || exp.mileage || 0).toFixed(1)} mi / £{(parseFloat(exp.mileage_distance || exp.mileage || 0) * mileageRate).toFixed(2)}
+                            <div className="mt-3 border-t border-slate-100 pt-3">
+                              <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 gap-y-1 text-sm">
+                                <span className="text-xs font-semibold text-slate-400 uppercase">Day</span>
+                                <span className="text-xs font-semibold text-slate-400 uppercase text-right">Miles</span>
+                                <span className="text-xs font-semibold text-slate-400 uppercase text-right">Amount</span>
+                                {group.expenses
+                                  .sort((a, b) => new Date(a.date || a.expense_date || a.created_date) - new Date(b.date || b.expense_date || b.created_date))
+                                  .map(exp => {
+                                    const miles = parseFloat(exp.mileage_distance || exp.mileage || 0);
+                                    const amt = exp.expense_type === 'mileage' ? miles * mileageRate : parseFloat(exp.amount || 0);
+                                    return (
+                                      <React.Fragment key={exp.id}>
+                                        <span className="text-slate-600 py-1 border-b border-slate-50">
+                                          {format(new Date(exp.date || exp.expense_date || exp.created_date), 'EEE dd MMM')}
                                         </span>
-                                      ) : (
-                                        <span className="text-slate-900 font-medium">£{parseFloat(exp.amount || 0).toFixed(2)}</span>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
+                                        <span className="text-slate-700 py-1 border-b border-slate-50 text-right">
+                                          {exp.expense_type === 'mileage' ? `${miles.toFixed(1)} mi` : '—'}
+                                        </span>
+                                        <span className="text-slate-900 font-medium py-1 border-b border-slate-50 text-right">
+                                          £{amt.toFixed(2)}
+                                        </span>
+                                      </React.Fragment>
+                                    );
+                                  })}
+                                {/* Totals row */}
+                                <span className="font-semibold text-slate-900 pt-2">Total</span>
+                                <span className="font-semibold text-slate-900 pt-2 text-right">{group.totalMiles.toFixed(1)} mi</span>
+                                <span className="font-bold text-slate-900 pt-2 text-right">£{group.totalAmount.toFixed(2)}</span>
+                              </div>
                             </div>
                           )}
 
