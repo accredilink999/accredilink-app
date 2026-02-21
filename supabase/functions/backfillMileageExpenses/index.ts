@@ -4,6 +4,18 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+function jsonResponse(body: any, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
+}
+
 function haversineMiles(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 3959
   const dLat = (lat2 - lat1) * Math.PI / 180
@@ -29,17 +41,17 @@ function getFollowingThursday(weekStart: Date): Date {
 }
 
 Deno.serve(async (req) => {
-  try {
-    if (req.method === 'OPTIONS') {
-      return new Response(null, { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' } })
-    }
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders })
+  }
 
+  try {
     const authHeader = req.headers.get('Authorization') || ''
     const supabase = createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { Authorization: authHeader } } })
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
 
     const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    if (authError || !user) return jsonResponse({ error: 'Unauthorized' }, 401)
 
     // Verify admin
     const { data: profile } = await supabaseAdmin
@@ -48,7 +60,7 @@ Deno.serve(async (req) => {
       .eq('id', user.id)
       .single()
     const isAdmin = profile?.role === 'admin' || ['admin', 'manager', 'supervisor'].includes(profile?.job_title)
-    if (!isAdmin) return Response.json({ error: 'Admin access required' }, { status: 403 })
+    if (!isAdmin) return jsonResponse({ error: 'Admin access required' }, 403)
 
     // Get configured rate
     const { data: rateSetting } = await supabaseAdmin
@@ -69,7 +81,7 @@ Deno.serve(async (req) => {
 
     if (callsErr) throw callsErr
     if (!droveCalls || droveCalls.length === 0) {
-      return Response.json({ success: true, message: 'No drove_to_call records found', created: 0 })
+      return jsonResponse({ success: true, message: 'No drove_to_call records found', created: 0 })
     }
 
     // Group by shift_id
@@ -205,7 +217,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    return Response.json({
+    return jsonResponse({
       success: true,
       message: `Created ${created} mileage expenses, skipped ${skipped} (already exist)`,
       created,
@@ -214,6 +226,6 @@ Deno.serve(async (req) => {
       errors: errors.length > 0 ? errors : undefined
     })
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 })
+    return jsonResponse({ error: error.message }, 500)
   }
 })
