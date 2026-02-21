@@ -21,23 +21,8 @@ if (typeof window !== 'undefined') {
     _deferredPrompt = e;
     _notify();
 
-    // Auto-trigger the native install dialog on first visit
-    if (!_autoPrompted && !sessionStorage.getItem('pwa_auto_prompted')) {
-      _autoPrompted = true;
-      sessionStorage.setItem('pwa_auto_prompted', 'true');
-      // Small delay to let the app render first
-      setTimeout(() => {
-        if (_deferredPrompt) {
-          _deferredPrompt.prompt();
-          _deferredPrompt.userChoice.then(({ outcome }) => {
-            if (outcome === 'accepted') {
-              _deferredPrompt = null;
-              _notify();
-            }
-          });
-        }
-      }, 1000);
-    }
+    // Note: auto-prompting removed — browsers require a user gesture
+    // to call prompt(). The PWAInstallButton component handles this.
   });
 
   window.addEventListener('appinstalled', () => {

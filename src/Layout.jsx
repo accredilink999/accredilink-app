@@ -266,7 +266,7 @@ export default function Layout({ children, currentPageName }) {
           accuracy: position.coords.accuracy,
         });
       },
-      (error) => console.error('Geolocation error:', error),
+      (error) => console.warn('Geolocation unavailable:', error?.message || error?.code || 'unknown'),
       { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
     );
 

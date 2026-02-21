@@ -38,8 +38,18 @@ export default function ErrorCatcher() {
     // 2. Unhandled promise rejections
     const onUnhandledRejection = (event) => {
       const reason = event.reason;
+      const msg = reason?.message || String(reason);
+      // Skip known harmless rejections
+      if (
+        msg.includes('Failed to fetch') ||
+        msg.includes('Failed to start the audio device') ||
+        msg.includes('Keyboard') ||
+        msg.includes('not implemented on web') ||
+        msg.includes('BeforeInstallPromptEvent') ||
+        msg.includes('Load failed')
+      ) return;
       logError({
-        message: reason?.message || String(reason),
+        message: msg,
         stack: reason?.stack || '',
         source: 'unhandledrejection',
       });
@@ -60,7 +70,15 @@ export default function ErrorCatcher() {
         msg.includes('ResizeObserver') ||
         msg.includes('Loading chunk') ||
         msg.includes('validateDOMNesting') ||
-        msg.includes('Each child in a list')
+        msg.includes('Each child in a list') ||
+        msg.includes('getAllStaff network error') ||
+        msg.includes('falling back to profiles') ||
+        msg.includes('Geolocation error') ||
+        msg.includes('Failed to start the audio device') ||
+        msg.includes('DialogContent') ||
+        msg.includes('DialogTitle') ||
+        msg.includes('VisuallyHidden') ||
+        msg.includes('Load failed')
       ) return;
 
       logError({
