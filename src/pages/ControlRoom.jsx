@@ -121,9 +121,11 @@ export default function ControlRoom() {
   });
 
   // ── STAFF LIVE GPS (separate from client/calls code) ────────────
+  // Only show staff who are currently clocked in (not completed/cancelled)
   const staffOnShiftIds = React.useMemo(() => {
     return [...new Set(todayShifts
-      .filter(s => s.staff_id && s.status !== 'cancelled')
+      .filter(s => s.staff_id && s.status !== 'cancelled' && s.status !== 'completed')
+      .filter(s => s.status === 'in_progress' || s.clock_in_time)
       .map(s => s.staff_id)
     )];
   }, [todayShifts]);
