@@ -35,6 +35,7 @@ export default function ChatWindow({ conversation, currentUserId, currentUserNam
   const [editingMessage, setEditingMessage] = useState(null);
   const [readByMessage, setReadByMessage] = useState(null);
   const [uploadingGroupPhoto, setUploadingGroupPhoto] = useState(false);
+  const [expandedImageUrl, setExpandedImageUrl] = useState(null);
   const groupPhotoInputRef = useRef(null);
 
   const messagesEndRef = useRef(null);
@@ -718,6 +719,7 @@ export default function ChatWindow({ conversation, currentUserId, currentUserNam
               }}
               onForward={() => {}}
               onViewReadBy={(msg) => setReadByMessage(msg)}
+              onImageExpand={(url) => setExpandedImageUrl(url)}
             />
           );
         })}
@@ -1016,6 +1018,27 @@ export default function ChatWindow({ conversation, currentUserId, currentUserNam
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ── Image Lightbox ── */}
+      {expandedImageUrl && (
+        <div
+          className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center"
+          onClick={() => setExpandedImageUrl(null)}
+        >
+          <button
+            className="absolute top-4 right-4 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors z-10"
+            onClick={() => setExpandedImageUrl(null)}
+          >
+            <X className="w-6 h-6" />
+          </button>
+          <img
+            src={expandedImageUrl}
+            alt="Expanded"
+            className="max-w-[95vw] max-h-[90vh] object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }

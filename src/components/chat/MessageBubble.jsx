@@ -39,6 +39,7 @@ const MessageBubble = React.memo(({
   onReply,
   onForward,
   onViewReadBy,
+  onImageExpand,
   currentUserId,
   conversationParticipants,
   participantNames,
@@ -227,7 +228,7 @@ const MessageBubble = React.memo(({
                   src={message.attachment_url}
                   alt="attachment"
                   className="rounded-md max-w-full max-h-64 object-cover cursor-pointer"
-                  onClick={() => window.open(message.attachment_url, '_blank')}
+                  onClick={(e) => { e.stopPropagation(); onImageExpand?.(message.attachment_url); }}
                 />
               ) : message.attachment_type === 'audio' ? (
                 <VoiceNotePlayer url={message.attachment_url} isOwn={isOwn} />
