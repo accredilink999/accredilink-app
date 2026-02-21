@@ -29,7 +29,6 @@ function haversineMiles(lat1: number, lon1: number, lat2: number, lon2: number):
 // Postcode → coords cache
 const postcodeCoords: Record<string, { latitude: number, longitude: number }> = {}
 
-// Bulk lookup postcodes via postcodes.io (free, reliable, up to 100 per request)
 async function bulkLookupPostcodes(postcodes: string[]): Promise<void> {
   const toFetch = [...new Set(postcodes.map(p => p.trim().toUpperCase()))].filter(p => p && !(p in postcodeCoords))
   for (let i = 0; i < toFetch.length; i += 100) {
@@ -92,19 +91,10 @@ Deno.serve(async (req) => {
     const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin' || ['admin', 'manager', 'supervisor'].includes(profile?.job_title)
     if (!isAdmin) return jsonResponse({ error: 'Admin access required' }, 403)
 
-    const todayStr = new Date().toISOString().split('T')[0]
-
-    // Clean up future-dated mileage expenses
-    const { data: futureExpenses } = await supabaseAdmin
-      .from('expenses')
-      .select('id')
-      .eq('expense_type', 'mileage')
-      .gt('date', todayStr)
-    if (futureExpenses && futureExpenses.length > 0) {
-      for (let i = 0; i < futureExpenses.length; i += 100) {
-        await supabaseAdmin.from('expenses').delete().in('id', futureExpenses.slice(i, i + 100).map(e => e.id))
-      }
-    }
+    const today = new Date()
+    const todayStr = today.toISOString().split('T')[0]
+    const weekStart = getSundayOfWeek(today)
+    const weekStartStr = weekStart.toISOString().split('T')[0]
 
     // Get configured mileage rate
     const { data: rateSetting } = await supabaseAdmin
@@ -117,14 +107,12 @@ Deno.serve(async (req) => {
     const ratePerMile = ratePpm / 100
 
     // ========================================
-    // STEP 1: Build postcode map from service_users table
-    // Postcodes are in a SEPARATE 'postcode' column, not in the address text
+    // STEP 1: Get service user postcodes
     // ========================================
     const { data: allServiceUsers } = await supabaseAdmin
       .from('service_users')
-      .select('id, full_name, address, postcode')
+      .select('id, full_name, postcode')
 
-    // Map service_user_id → postcode, and name → postcode
     const postcodeById: Record<string, string> = {}
     const postcodeByName: Record<string, string> = {}
     for (const su of (allServiceUsers || [])) {
@@ -135,44 +123,51 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Bulk lookup ALL unique postcodes via postcodes.io (instant, no rate limit)
     const uniquePostcodes = [...new Set(Object.values(postcodeById))]
     await bulkLookupPostcodes(uniquePostcodes)
 
-    const geocodeResults: Record<string, string> = {}
+    const postcodeResults: Record<string, string> = {}
     for (const pc of uniquePostcodes) {
-      geocodeResults[pc] = postcodeCoords[pc] ? 'ok' : 'failed'
+      postcodeResults[pc] = postcodeCoords[pc] ? 'ok' : 'failed'
     }
 
     // ========================================
-    // STEP 2: Get shift_calls that were ACTUALLY WORKED
-    // Exclude blank pattern-generated calls (status 'pending', no clock_in)
+    // STEP 2: Get THIS WEEK's shifts (Sunday to today)
     // ========================================
-    const { data: allCalls, error: callsErr } = await supabaseAdmin
-      .from('shift_calls')
-      .select('id, shift_id, service_user_id, service_user_name, service_user_address, clock_in_time, drove_to_call, created_at, scheduled_time, status')
-      .not('shift_id', 'is', null)
-      .order('scheduled_time', { ascending: true })
+    const { data: weekShifts, error: shiftsErr } = await supabaseAdmin
+      .from('shifts')
+      .select('id, date, staff_id, staff_name')
+      .gte('date', weekStartStr)
+      .lte('date', todayStr)
+      .limit(500)
 
-    if (callsErr) throw callsErr
-    if (!allCalls || allCalls.length === 0) {
-      return jsonResponse({ success: true, message: 'No shift_calls found', created: 0 })
+    if (shiftsErr) throw shiftsErr
+    if (!weekShifts || weekShifts.length === 0) {
+      return jsonResponse({ success: true, message: 'No shifts found for this week', created: 0, weekRange: `${weekStartStr} to ${todayStr}` })
     }
 
-    // Only include calls that were actually attended:
-    // - drove_to_call explicitly true, OR
-    // - has clock_in_time (staff checked in), OR
-    // - status is 'completed' or 'in_progress' (call was worked)
-    // Exclude: drove_to_call === false (staff said they didn't drive)
-    const eligibleCalls = allCalls.filter(c => {
-      if (c.drove_to_call === false) return false
-      if (c.drove_to_call === true) return true
-      if (c.clock_in_time) return true
-      if (c.status === 'completed' || c.status === 'in_progress') return true
-      return false
-    })
+    const shiftMap: Record<string, any> = {}
+    for (const s of weekShifts) shiftMap[s.id] = s
+    const shiftIds = weekShifts.map(s => s.id)
 
-    // Resolve postcode for each call from service_users table
+    // ========================================
+    // STEP 3: Get shift_calls for this week's shifts only
+    // ========================================
+    let allCalls: any[] = []
+    for (let i = 0; i < shiftIds.length; i += 100) {
+      const { data: batch } = await supabaseAdmin
+        .from('shift_calls')
+        .select('id, shift_id, service_user_id, service_user_name, scheduled_time, clock_in_time, drove_to_call')
+        .in('shift_id', shiftIds.slice(i, i + 100))
+        .order('scheduled_time', { ascending: true })
+        .limit(1000)
+      if (batch) allCalls = allCalls.concat(batch)
+    }
+
+    // All calls included — only exclude those where staff said "No I didn't drive"
+    const eligibleCalls = allCalls.filter(c => c.drove_to_call !== false)
+
+    // Attach postcode to each call from service_users
     for (const call of eligibleCalls) {
       if (call.service_user_id && postcodeById[call.service_user_id]) {
         call._postcode = postcodeById[call.service_user_id]
@@ -181,41 +176,30 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ========================================
-    // STEP 3: Group by shift, resolve coords, calculate miles
-    // ========================================
+    // Group by shift
     const byShift: Record<string, any[]> = {}
     for (const call of eligibleCalls) {
       if (!byShift[call.shift_id]) byShift[call.shift_id] = []
       byShift[call.shift_id].push(call)
     }
 
-    // Get shift details
-    const shiftIds = Object.keys(byShift)
-    let allShifts: any[] = []
+    // Get existing mileage expenses for this week's shifts
+    let existingExpenses: any[] = []
     for (let i = 0; i < shiftIds.length; i += 100) {
-      const { data: shifts } = await supabaseAdmin
-        .from('shifts')
-        .select('id, date, staff_id, staff_name')
-        .in('id', shiftIds.slice(i, i + 100))
-      if (shifts) allShifts = allShifts.concat(shifts)
+      const { data: eBatch } = await supabaseAdmin
+        .from('expenses')
+        .select('id, shift_id')
+        .eq('expense_type', 'mileage')
+        .in('shift_id', shiftIds.slice(i, i + 100))
+      if (eBatch) existingExpenses = existingExpenses.concat(eBatch)
     }
-    const shiftMap: Record<string, any> = {}
-    for (const s of allShifts) shiftMap[s.id] = s
-
-    // Get existing mileage expenses
-    const { data: existingExpenses } = await supabaseAdmin
-      .from('expenses')
-      .select('id, shift_id')
-      .eq('expense_type', 'mileage')
-      .not('shift_id', 'is', null)
     const existingExpenseMap: Record<string, string> = {}
-    for (const e of (existingExpenses || [])) {
+    for (const e of existingExpenses) {
       if (e.shift_id) existingExpenseMap[e.shift_id] = e.id
     }
 
     // Get staff names
-    const staffIds = [...new Set(allShifts.map(s => s.staff_id).filter(Boolean))]
+    const staffIds = [...new Set(weekShifts.map(s => s.staff_id).filter(Boolean))]
     const { data: profiles } = await supabaseAdmin
       .from('profiles')
       .select('id, staff_full_name, full_name')
@@ -223,40 +207,46 @@ Deno.serve(async (req) => {
     const profileMap: Record<string, any> = {}
     for (const p of (profiles || [])) profileMap[p.id] = p
 
-    let created = 0, updated = 0, noAddress = 0, tooShort = 0, skippedFuture = 0
+    // ========================================
+    // STEP 4: Calculate mileage per shift
+    // ========================================
+    let created = 0, updated = 0, noPostcode = 0, tooShort = 0, onlyOneCall = 0
     const errors: string[] = []
+    const shiftDetails: any[] = []
 
     for (const [shiftId, calls] of Object.entries(byShift)) {
       const shift = shiftMap[shiftId]
       if (!shift) continue
-      if (shift.date && shift.date > todayStr) { skippedFuture++; continue }
 
-      // Resolve each call's coordinates from its postcode
+      // Resolve coordinates from postcodes
       const resolved = calls
         .map(c => {
           const pc = c._postcode
           if (!pc) return null
           const coords = postcodeCoords[pc.toUpperCase()]
           if (!coords) return null
-          return { ...c, lat: coords.latitude, lng: coords.longitude }
+          return { ...c, lat: coords.latitude, lng: coords.longitude, postcode: pc }
         })
         .filter(Boolean)
         .sort((a: any, b: any) => {
-          const tA = a.scheduled_time || a.clock_in_time || a.created_at
-          const tB = b.scheduled_time || b.clock_in_time || b.created_at
+          const tA = a.scheduled_time || a.clock_in_time || ''
+          const tB = b.scheduled_time || b.clock_in_time || ''
           return String(tA).localeCompare(String(tB))
         })
 
       if (resolved.length < 2) {
-        noAddress++
+        if (resolved.length === 1) onlyOneCall++
+        else noPostcode++
         continue
       }
 
       // Calculate total miles between consecutive calls
       let totalMiles = 0
+      const legs: string[] = []
       for (let i = 0; i < resolved.length - 1; i++) {
         const dist = haversineMiles(resolved[i]!.lat, resolved[i]!.lng, resolved[i + 1]!.lat, resolved[i + 1]!.lng)
         totalMiles += dist
+        legs.push(`${resolved[i]!.postcode} → ${resolved[i + 1]!.postcode}: ${dist.toFixed(2)}mi`)
       }
 
       if (totalMiles <= 0.1) { tooShort++; continue }
@@ -265,11 +255,21 @@ Deno.serve(async (req) => {
       const amount = Math.round(totalMiles * ratePerMile * 100) / 100
       const expenseDate = shift.date || todayStr
       const shiftDate = new Date(expenseDate)
-      const weekStart = getSundayOfWeek(shiftDate)
-      const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 6)
-      const paymentDue = getFollowingThursday(weekStart)
+      const wStart = getSundayOfWeek(shiftDate)
+      const wEnd = new Date(wStart); wEnd.setDate(wEnd.getDate() + 6)
+      const paymentDue = getFollowingThursday(wStart)
       const staffProfile = profileMap[shift.staff_id]
       const staffName = staffProfile?.staff_full_name || staffProfile?.full_name || shift.staff_name || 'Unknown'
+
+      shiftDetails.push({
+        shiftId,
+        date: shift.date,
+        staff: staffName,
+        calls: resolved.length,
+        miles: totalMiles,
+        amount,
+        legs,
+      })
 
       const existingId = existingExpenseMap[shiftId]
       if (existingId) {
@@ -298,8 +298,8 @@ Deno.serve(async (req) => {
           mileage: totalMiles,
           mileage_distance: totalMiles,
           mileage_rate: ratePerMile,
-          week_start_date: weekStart.toISOString().split('T')[0],
-          week_end_date: weekEnd.toISOString().split('T')[0],
+          week_start_date: wStart.toISOString().split('T')[0],
+          week_end_date: wEnd.toISOString().split('T')[0],
           payment_due_date: paymentDue.toISOString().split('T')[0],
           status: 'pending'
         })
@@ -310,25 +310,19 @@ Deno.serve(async (req) => {
 
     return jsonResponse({
       success: true,
-      message: `Created ${created}, updated ${updated} mileage expenses. ${noAddress} insufficient data, ${tooShort} too short, ${skippedFuture} future.`,
+      message: `Created ${created}, updated ${updated} mileage expenses.`,
+      weekRange: `${weekStartStr} to ${todayStr}`,
       created,
       updated,
-      noAddress,
+      noPostcode,
+      onlyOneCall,
       tooShort,
-      skippedFuture,
-      totalShifts: shiftIds.length,
-      totalCalls: eligibleCalls.length,
-      diagnostics: {
-        totalCallsInDb: allCalls.length,
-        eligibleCalls: eligibleCalls.length,
-        serviceUsersFound: allServiceUsers?.length || 0,
-        serviceUsersWithPostcode: Object.keys(postcodeById).length,
-        uniquePostcodes: uniquePostcodes.length,
-        postcodeResults: geocodeResults,
-        callsWithPostcode: eligibleCalls.filter(c => c._postcode).length,
-        callsNoPostcode: eligibleCalls.filter(c => !c._postcode).length,
-      },
-      futureExpensesCleaned: futureExpenses?.length || 0,
+      totalShiftsThisWeek: weekShifts.length,
+      totalCallsThisWeek: allCalls.length,
+      eligibleCalls: eligibleCalls.length,
+      callsWithPostcode: eligibleCalls.filter(c => c._postcode).length,
+      postcodeResults,
+      shiftDetails,
       errors: errors.length > 0 ? errors : undefined,
     })
   } catch (error) {
