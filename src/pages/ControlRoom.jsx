@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -26,12 +26,26 @@ import ShiftStatusOverview from '@/components/admin/ShiftStatusOverview';
 import ShiftReminderSettings from '@/components/admin/ShiftReminderSettings';
 import { Trash2 } from 'lucide-react';
 
+// Helper: flies the map to a target location when props change
+function FlyToLocation({ lat, lng, zoom, onComplete }) {
+  const map = useMap();
+  useEffect(() => {
+    if (lat && lng) {
+      map.flyTo([lat, lng], zoom || 16, { duration: 1 });
+      const timer = setTimeout(() => onComplete?.(), 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [lat, lng, zoom, map, onComplete]);
+  return null;
+}
+
 export default function ControlRoom() {
   const queryClient = useQueryClient();
   const [mapMaximized, setMapMaximized] = useState(false);
   const [activeTab, setActiveTab] = useState('tracking');
   const [showLogoUploader, setShowLogoUploader] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [flyToTarget, setFlyToTarget] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [editingAnnouncement, setEditingAnnouncement] = useState(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -271,49 +285,68 @@ export default function ControlRoom() {
   }, [todayCalls, clientLocations, todayShifts]);
 
   // Active staff: staff with shifts today who have activity in last hour
+  // Deduplicated by staff_id — multiple shifts for the same person are merged
   const activeStaffList = React.useMemo(() => {
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const byStaff = new Map();
 
-    return todayShifts
-      .filter(s => s.staff_id && s.status !== 'cancelled')
-      .map(shift => {
-        const shiftCalls = todayCalls.filter(c => c.shift_id === shift.id);
-        const realCalls = shiftCalls.filter(c => c.call_type !== 'sitin_cover');
-        const totalCalls = realCalls.length;
-        const completedCalls = realCalls.filter(c => c.status === 'completed').length;
-        // Only count as in_progress if staff has actually clocked in
-        const hasInProgress = realCalls.some(c => c.status === 'in_progress' && c.clock_in_time);
+    for (const shift of todayShifts) {
+      if (!shift.staff_id || shift.status === 'cancelled') continue;
 
-        // Check for recent activity
-        const hasRecentActivity = shift.clock_in_time ||
-          shiftCalls.some(c =>
-            (c.clock_in_time && c.clock_in_time > oneHourAgo) ||
-            (c.clock_out_time && c.clock_out_time > oneHourAgo)
-          );
+      const shiftCalls = todayCalls.filter(c => c.shift_id === shift.id);
+      const realCalls = shiftCalls.filter(c => c.call_type !== 'sitin_cover');
+      const totalCalls = realCalls.length;
+      const completedCalls = realCalls.filter(c => c.status === 'completed').length;
+      const hasInProgress = realCalls.some(c => c.status === 'in_progress' && c.clock_in_time);
 
-        let statusLabel = 'Scheduled';
-        let statusColor = 'text-slate-500';
-        if (shift.status === 'completed') {
-          statusLabel = 'Completed';
-          statusColor = 'text-green-600';
-        } else if (hasInProgress) {
-          statusLabel = 'On Call';
-          statusColor = 'text-amber-600';
-        } else if (shift.status === 'in_progress' || shift.clock_in_time) {
-          statusLabel = 'On Shift';
-          statusColor = 'text-blue-600';
+      const hasRecentActivity = shift.clock_in_time ||
+        shiftCalls.some(c =>
+          (c.clock_in_time && c.clock_in_time > oneHourAgo) ||
+          (c.clock_out_time && c.clock_out_time > oneHourAgo)
+        );
+
+      const shouldShow = shift.status !== 'completed' && (hasRecentActivity || shift.status === 'in_progress' || shift.clock_in_time);
+      if (!shouldShow) continue;
+
+      let statusLabel = 'Scheduled';
+      let statusColor = 'text-slate-500';
+      if (shift.status === 'completed') {
+        statusLabel = 'Completed';
+        statusColor = 'text-green-600';
+      } else if (hasInProgress) {
+        statusLabel = 'On Call';
+        statusColor = 'text-amber-600';
+      } else if (shift.status === 'in_progress' || shift.clock_in_time) {
+        statusLabel = 'On Shift';
+        statusColor = 'text-blue-600';
+      }
+
+      if (byStaff.has(shift.staff_id)) {
+        const existing = byStaff.get(shift.staff_id);
+        existing.totalCalls += totalCalls;
+        existing.completedCalls += completedCalls;
+        // Keep the more active status
+        const priority = { 'On Call': 3, 'On Shift': 2, 'Scheduled': 1 };
+        if ((priority[statusLabel] || 0) > (priority[existing.statusLabel] || 0)) {
+          existing.statusLabel = statusLabel;
+          existing.statusColor = statusColor;
         }
-
-        return {
+        // Widen the time range
+        if (shift.start_time < existing.start_time) existing.start_time = shift.start_time;
+        if (shift.end_time > existing.end_time) existing.end_time = shift.end_time;
+      } else {
+        byStaff.set(shift.staff_id, {
           ...shift,
           totalCalls,
           completedCalls,
           statusLabel,
           statusColor,
           hasRecentActivity,
-        };
-      })
-      .filter(s => s.status !== 'completed' && (s.hasRecentActivity || s.status === 'in_progress' || s.clock_in_time))
+        });
+      }
+    }
+
+    return Array.from(byStaff.values())
       .sort((a, b) => (a.staff_name || '').localeCompare(b.staff_name || ''));
   }, [todayShifts, todayCalls]);
 
@@ -523,6 +556,7 @@ export default function ControlRoom() {
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap contributors' />
             {renderClientMarkers()}
             {renderStaffMarkers()}
+            {flyToTarget && <FlyToLocation lat={flyToTarget.lat} lng={flyToTarget.lng} zoom={16} onComplete={() => setFlyToTarget(null)} />}
           </MapContainer>
         </div>
       </div>
@@ -597,6 +631,7 @@ export default function ControlRoom() {
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap contributors' />
             {renderClientMarkers()}
             {renderStaffMarkers()}
+            {flyToTarget && <FlyToLocation lat={flyToTarget.lat} lng={flyToTarget.lng} zoom={16} onComplete={() => setFlyToTarget(null)} />}
           </MapContainer>
           {clientMarkers.length === 0 && staffMarkers.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center bg-white/80">
@@ -647,18 +682,36 @@ export default function ControlRoom() {
             <p className="text-sm text-slate-500">No active staff in the last hour</p>
           ) : (
             <div className="space-y-2 max-h-64 overflow-y-auto">
-              {activeStaffList.map(shift => (
-                <div key={shift.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-900 truncate">{shift.staff_name}</p>
-                    <p className="text-xs text-slate-500">{shift.shift_name} &middot; {shift.start_time}–{shift.end_time}</p>
+              {activeStaffList.map(shift => {
+                const gpsMarker = staffMarkers.find(m => m.staffId === shift.staff_id);
+                return (
+                  <div
+                    key={shift.staff_id}
+                    className={`flex items-center justify-between p-3 bg-slate-50 rounded-lg transition-colors ${gpsMarker ? 'cursor-pointer hover:bg-blue-50' : ''}`}
+                    onClick={() => {
+                      if (!gpsMarker) return;
+                      setFlyToTarget({ lat: gpsMarker.lat, lng: gpsMarker.lng });
+                      setMapMaximized(true);
+                    }}
+                  >
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+                        gpsMarker?.isLive ? 'bg-blue-500 animate-pulse' :
+                        gpsMarker ? 'bg-gray-400' :
+                        'bg-transparent border border-dashed border-slate-300'
+                      }`} title={gpsMarker?.isLive ? 'Live GPS' : gpsMarker ? 'Last known' : 'No GPS'} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate">{shift.staff_name}</p>
+                        <p className="text-xs text-slate-500">{shift.shift_name} &middot; {shift.start_time}–{shift.end_time}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <span className="text-xs text-slate-600">{shift.completedCalls}/{shift.totalCalls} calls</span>
+                      <span className={`text-xs font-medium ${shift.statusColor}`}>{shift.statusLabel}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    <span className="text-xs text-slate-600">{shift.completedCalls}/{shift.totalCalls} calls</span>
-                    <span className={`text-xs font-medium ${shift.statusColor}`}>{shift.statusLabel}</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Card>
