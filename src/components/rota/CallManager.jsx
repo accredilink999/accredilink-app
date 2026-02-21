@@ -3,7 +3,7 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { ShiftCallApi, ShiftApi } from '@/api/rotaApi';
-import { getServiceUserLocations, resolveCallCoordinates } from '@/lib/gpsCache';
+import { resolveCallAddresses, geocodeAddress } from '@/lib/gpsCache';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -146,24 +146,6 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
     enabled: hasSitinCalls,
   });
 
-  // Fetch cached GPS locations for service users (fallback when staff GPS fails)
-  // Build address fallback map so clients with zero GPS history get geocoded via Nominatim
-  const serviceUserIds = [...new Set(callsToDisplay.map(c => c.service_user_id).filter(Boolean))];
-  const addressFallbacks = React.useMemo(() => {
-    const map = new Map();
-    for (const c of callsToDisplay) {
-      if (c.service_user_id && c.service_user_address) {
-        map.set(c.service_user_id, c.service_user_address);
-      }
-    }
-    return map;
-  }, [callsToDisplay]);
-  const { data: gpsLocationCache = new Map() } = useQuery({
-    queryKey: ['gpsLocationCache', ...serviceUserIds],
-    queryFn: () => getServiceUserLocations(serviceUserIds, addressFallbacks),
-    enabled: serviceUserIds.length > 0,
-    staleTime: 5 * 60 * 1000, // cache for 5 minutes
-  });
 
   // Fetch paired shift's calls to show partner progress (without syncing status)
   const { data: pairedShiftCalls = [] } = useQuery({
@@ -409,19 +391,8 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
     return (call.tasks || []).filter(t => !t.completed);
   };
 
-  // Calculate miles driven from previous check-in to this check-in
-  // Uses cached historical GPS when live coordinates are unavailable
-  const getMilesFromPrevious = (call, index) => {
-    if (!call.drove_to_call) return null;
-    const droveCalls = callsToDisplay.filter(c => c.drove_to_call);
-    const resolved = resolveCallCoordinates(droveCalls, gpsLocationCache);
-    const myIdx = resolved.findIndex(c => c.id === call.id);
-    if (myIdx < 0) return null; // no coordinates available even with fallback
-    if (myIdx === 0) return 0; // first driven call = 0 miles (starting point)
-    const prev = resolved[myIdx - 1];
-    const curr = resolved[myIdx];
-    return haversineMiles(prev.resolvedLat, prev.resolvedLng, curr.resolvedLat, curr.resolvedLng);
-  };
+  // Miles display: just show "Drove" — actual mileage total is on the expense record
+  // (individual call-to-call distance requires async geocoding which can't run in render)
 
   const updateStatusMutation = useMutation({
     mutationFn: ({ callId, status }) =>
@@ -966,15 +937,10 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                 {call.drove_to_call != null && (
                   <div className="text-xs mb-3 flex items-center gap-1">
                     <Car className="w-3 h-3" />
-                    {call.drove_to_call ? (() => {
-                      const miles = getMilesFromPrevious(call, index);
-                      return (
-                        <span className="text-green-600">
-                          Drove to call — {miles !== null ? `${miles.toFixed(1)} miles` : '0 miles'}
-                        </span>
-                      );
-                    })() : (
-                      <span className="text-slate-400">Did not drive — 0 miles</span>
+                    {call.drove_to_call ? (
+                      <span className="text-green-600">Drove to call</span>
+                    ) : (
+                      <span className="text-slate-400">Did not drive</span>
                     )}
                   </div>
                 )}
@@ -1262,35 +1228,19 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                     });
                     queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] });
 
-                    // Calculate mileage from all drove_to_call check-ins so far
+                    // Calculate mileage from addresses of all drove_to_call check-ins
                     const allShiftCalls = await ShiftCallApi.filter(
                       { shift_id: shift?.id },
                       'created_at',
                       100
                     );
-                    const droveCalls = allShiftCalls.filter(c => c.drove_to_call === true);
+                    const droveCalls = allShiftCalls
+                      .filter(c => c.drove_to_call === true && c.service_user_address)
+                      .sort((a, b) => new Date(a.clock_in_time) - new Date(b.clock_in_time));
 
                     if (droveCalls.length >= 2) {
-                      const idsNeedingCache = droveCalls
-                        .filter(c => !c.checkin_latitude || !c.checkin_longitude)
-                        .map(c => c.service_user_id)
-                        .filter(Boolean);
-                      let locationCache = gpsLocationCache;
-                      if (idsNeedingCache.length > 0) {
-                        const addrFallbacks = new Map();
-                        for (const c of allShiftCalls) {
-                          if (c.service_user_id && c.service_user_address) {
-                            addrFallbacks.set(c.service_user_id, c.service_user_address);
-                          }
-                        }
-                        locationCache = await getServiceUserLocations([
-                          ...serviceUserIds,
-                          ...idsNeedingCache,
-                        ], addrFallbacks);
-                      }
-
-                      const resolved = resolveCallCoordinates(droveCalls, locationCache)
-                        .sort((a, b) => new Date(a.clock_in_time) - new Date(b.clock_in_time));
+                      // Geocode all addresses (cached in memory so only first call per address is slow)
+                      const resolved = await resolveCallAddresses(droveCalls);
 
                       if (resolved.length >= 2) {
                         let totalMiles = 0;
