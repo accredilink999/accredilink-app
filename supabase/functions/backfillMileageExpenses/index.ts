@@ -97,6 +97,22 @@ Deno.serve(async (req) => {
     const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin' || ['admin', 'manager', 'supervisor'].includes(profile?.job_title)
     if (!isAdmin) return jsonResponse({ error: 'Admin access required' }, 403)
 
+    // Clean up: delete any mileage expenses for future dates (incorrectly created by previous runs)
+    const todayCleanup = new Date().toISOString().split('T')[0]
+    const { data: futureExpenses } = await supabaseAdmin
+      .from('expenses')
+      .select('id, date')
+      .eq('expense_type', 'mileage')
+      .gt('date', todayCleanup)
+    if (futureExpenses && futureExpenses.length > 0) {
+      const futureIds = futureExpenses.map(e => e.id)
+      for (let i = 0; i < futureIds.length; i += 100) {
+        const batch = futureIds.slice(i, i + 100)
+        await supabaseAdmin.from('expenses').delete().in('id', batch)
+      }
+      console.log(`Cleaned up ${futureExpenses.length} future-dated mileage expenses`)
+    }
+
     // Get configured rate
     const { data: rateSetting } = await supabaseAdmin
       .from('system_settings')
@@ -121,10 +137,17 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: true, message: 'No shift_calls found', created: 0 })
     }
 
-    // Filter: include drove_to_call = true or null (not false)
-    const eligibleCalls = allCalls.filter(c =>
-      c.drove_to_call === true || c.drove_to_call === null || c.drove_to_call === undefined
-    )
+    // Filter: only calls that have actually happened (checked in OR drove_to_call answered)
+    // Exclude calls where drove_to_call is explicitly false
+    // Exclude future/unactioned calls (no clock_in_time and drove_to_call still null)
+    const todayStr = new Date().toISOString().split('T')[0]
+    const eligibleCalls = allCalls.filter(c => {
+      if (c.drove_to_call === false) return false // explicitly didn't drive
+      if (c.drove_to_call === true) return true // confirmed drove
+      // For null drove_to_call (legacy): only include if they actually checked in
+      if (c.clock_in_time) return true
+      return false // skip unactioned calls (future scheduled)
+    })
 
     // Group by shift_id
     const byShift: Record<string, any[]> = {}
@@ -350,6 +373,8 @@ Deno.serve(async (req) => {
     for (const [shiftId, calls] of Object.entries(byShift)) {
       const shift = shiftMap[shiftId]
       if (!shift) continue
+      // Skip future shifts — only process shifts that have already occurred
+      if (shift.date && shift.date > todayStr) continue
 
       // Resolve GPS: checkin coords → locationMap by ID → nameLocationMap by name
       const resolved = calls
