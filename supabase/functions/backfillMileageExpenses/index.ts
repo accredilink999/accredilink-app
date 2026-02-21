@@ -122,12 +122,11 @@ Deno.serve(async (req) => {
     const ratePpm = rateSetting?.setting_value ? parseInt(rateSetting.setting_value, 10) : 45
     const ratePerMile = ratePpm / 100
 
-    // Get all shift_calls with an address that have actually been actioned
+    // Get ALL shift_calls
     const { data: allCalls, error: callsErr } = await supabaseAdmin
       .from('shift_calls')
-      .select('id, shift_id, service_user_name, service_user_address, clock_in_time, drove_to_call, created_at')
+      .select('id, shift_id, service_user_id, service_user_name, service_user_address, clock_in_time, drove_to_call, created_at')
       .not('shift_id', 'is', null)
-      .not('service_user_address', 'is', null)
       .order('clock_in_time', { ascending: true })
 
     if (callsErr) throw callsErr
@@ -142,6 +141,49 @@ Deno.serve(async (req) => {
       if (c.clock_in_time) return true
       return false
     })
+
+    // Look up addresses from service_users table for calls missing service_user_address
+    const callsMissingAddress = eligibleCalls.filter(c => !c.service_user_address)
+    if (callsMissingAddress.length > 0) {
+      // By service_user_id
+      const missingIds = [...new Set(callsMissingAddress.map(c => c.service_user_id).filter(Boolean))]
+      const addressById: Record<string, string> = {}
+      if (missingIds.length > 0) {
+        for (let i = 0; i < missingIds.length; i += 100) {
+          const { data: sus } = await supabaseAdmin
+            .from('service_users')
+            .select('id, address')
+            .in('id', missingIds.slice(i, i + 100))
+          for (const su of (sus || [])) {
+            if (su.address) addressById[su.id] = su.address
+          }
+        }
+      }
+      // By service_user_name (for calls without service_user_id)
+      const namesWithoutId = [...new Set(
+        callsMissingAddress
+          .filter(c => !c.service_user_id && c.service_user_name)
+          .map(c => c.service_user_name)
+      )]
+      const addressByName: Record<string, string> = {}
+      for (const name of namesWithoutId) {
+        const { data: match } = await supabaseAdmin
+          .from('service_users')
+          .select('address')
+          .ilike('full_name', name)
+          .limit(1)
+        if (match?.[0]?.address) addressByName[name.toLowerCase().trim()] = match[0].address
+      }
+      // Populate the address on each call
+      for (const call of eligibleCalls) {
+        if (call.service_user_address) continue
+        if (call.service_user_id && addressById[call.service_user_id]) {
+          call.service_user_address = addressById[call.service_user_id]
+        } else if (call.service_user_name && addressByName[call.service_user_name.toLowerCase().trim()]) {
+          call.service_user_address = addressByName[call.service_user_name.toLowerCase().trim()]
+        }
+      }
+    }
 
     // Group by shift_id
     const byShift: Record<string, any[]> = {}
@@ -161,7 +203,7 @@ Deno.serve(async (req) => {
       if (e.shift_id) existingExpenseMap[e.shift_id] = e.id
     }
 
-    // Pre-geocode all unique addresses (this is the only resolution strategy needed)
+    // Pre-geocode all unique addresses
     const uniqueAddresses = [...new Set(eligibleCalls.map(c => c.service_user_address).filter(Boolean))]
     let geocoded = 0
     let geocodeFailed = 0

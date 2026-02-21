@@ -1235,12 +1235,32 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                       100
                     );
                     const droveCalls = allShiftCalls
-                      .filter(c => c.drove_to_call === true && c.service_user_address)
+                      .filter(c => c.drove_to_call === true)
                       .sort((a, b) => new Date(a.clock_in_time) - new Date(b.clock_in_time));
 
-                    if (droveCalls.length >= 2) {
+                    // Look up addresses from service_users table for calls missing service_user_address
+                    const needAddress = droveCalls.filter(c => !c.service_user_address && c.service_user_id);
+                    if (needAddress.length > 0) {
+                      const suIds = [...new Set(needAddress.map(c => c.service_user_id))];
+                      const { data: sus } = await supabase
+                        .from('service_users')
+                        .select('id, address')
+                        .in('id', suIds);
+                      const addrMap = {};
+                      for (const su of (sus || [])) {
+                        if (su.address) addrMap[su.id] = su.address;
+                      }
+                      for (const call of droveCalls) {
+                        if (!call.service_user_address && call.service_user_id && addrMap[call.service_user_id]) {
+                          call.service_user_address = addrMap[call.service_user_id];
+                        }
+                      }
+                    }
+
+                    const droveWithAddr = droveCalls.filter(c => c.service_user_address);
+                    if (droveWithAddr.length >= 2) {
                       // Geocode all addresses (cached in memory so only first call per address is slow)
-                      const resolved = await resolveCallAddresses(droveCalls);
+                      const resolved = await resolveCallAddresses(droveWithAddr);
 
                       if (resolved.length >= 2) {
                         let totalMiles = 0;
