@@ -80,6 +80,7 @@ export default function AdminApprovalsFinancials() {
   const [selectedWeek, setSelectedWeek] = useState(null); // null = auto-detect
   const [expenseView, setExpenseView] = useState('weekly'); // 'weekly' | 'all'
   const [expandedCards, setExpandedCards] = useState({});
+  const [expandedDays, setExpandedDays] = useState({});
   const [customRate, setCustomRate] = useState('');
   const [monthlyDay, setMonthlyDay] = useState('');
   const [backfillLoading, setBackfillLoading] = useState(false);
@@ -1060,7 +1061,7 @@ export default function AdminApprovalsFinancials() {
                                 runningAmount += dayAmount;
                                 const isToday = format(today, 'yyyy-MM-dd') === dayStr;
                                 const isFuture = day > today;
-                                days.push({ day, dayStr, dayMiles, dayAmount, hasData: dayExps.length > 0, runningMiles, runningAmount, isToday, isFuture, expCount: dayExps.length });
+                                days.push({ day, dayStr, dayMiles, dayAmount, hasData: dayExps.length > 0, runningMiles, runningAmount, isToday, isFuture, expCount: dayExps.length, expenses: dayExps });
                               }
                               return (
                                 <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-0 text-sm">
@@ -1068,9 +1069,16 @@ export default function AdminApprovalsFinancials() {
                                   <span className="text-xs font-semibold text-slate-400 uppercase text-right pb-1">Miles</span>
                                   <span className="text-xs font-semibold text-slate-400 uppercase text-right pb-1">Amount</span>
                                   <span className="text-xs font-semibold text-slate-400 uppercase text-right pb-1">Running</span>
-                                  {days.map(d => (
+                                  {days.map(d => {
+                                    const dayKey = `${group.key}_${d.dayStr}`;
+                                    const isDayExpanded = expandedDays[dayKey];
+                                    return (
                                     <React.Fragment key={d.dayStr}>
-                                      <span className={`py-1.5 border-b border-slate-50 flex items-center gap-1 ${d.isToday ? 'font-semibold text-teal-700' : d.isFuture ? 'text-slate-300' : d.hasData ? 'text-slate-700' : 'text-slate-400'}`}>
+                                      <span
+                                        className={`py-1.5 border-b border-slate-50 flex items-center gap-1 cursor-pointer ${d.isToday ? 'font-semibold text-teal-700' : d.isFuture ? 'text-slate-300' : d.hasData ? 'text-slate-700' : 'text-slate-400'}`}
+                                        onClick={() => d.hasData && setExpandedDays(prev => ({ ...prev, [dayKey]: !prev[dayKey] }))}
+                                      >
+                                        {d.hasData && (isDayExpanded ? <ChevronUp className="w-3 h-3 flex-shrink-0" /> : <ChevronDown className="w-3 h-3 flex-shrink-0" />)}
                                         {format(d.day, 'EEE dd MMM')}
                                         {d.isToday && <Badge className="bg-teal-100 text-teal-700 text-[10px] py-0 px-1">Today</Badge>}
                                         {d.expCount > 1 && <span className="text-[10px] text-slate-400">({d.expCount})</span>}
@@ -1084,8 +1092,16 @@ export default function AdminApprovalsFinancials() {
                                       <span className={`py-1.5 border-b border-slate-50 text-right text-xs ${d.hasData ? 'text-slate-500' : 'text-slate-300'}`}>
                                         {d.runningAmount > 0 && !d.isFuture ? `£${d.runningAmount.toFixed(2)}` : '—'}
                                       </span>
+                                      {isDayExpanded && d.expenses.map((exp, idx) => (
+                                        <React.Fragment key={exp.id || idx}>
+                                          <div className="col-span-4 bg-slate-50 px-3 py-2 text-xs text-slate-600 border-b border-slate-100 whitespace-pre-wrap">
+                                            {exp.description || 'No detail'}
+                                          </div>
+                                        </React.Fragment>
+                                      ))}
                                     </React.Fragment>
-                                  ))}
+                                    );
+                                  })}
                                   {/* Weekly total row */}
                                   <span className="font-semibold text-slate-900 pt-2 border-t border-slate-200">Week Total</span>
                                   <span className="font-semibold text-slate-900 pt-2 text-right border-t border-slate-200">{group.totalMiles.toFixed(1)} mi</span>

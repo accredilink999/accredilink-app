@@ -246,7 +246,9 @@ Deno.serve(async (req) => {
       for (let i = 0; i < resolved.length - 1; i++) {
         const dist = haversineMiles(resolved[i]!.lat, resolved[i]!.lng, resolved[i + 1]!.lat, resolved[i + 1]!.lng)
         totalMiles += dist
-        legs.push(`${resolved[i]!.postcode} → ${resolved[i + 1]!.postcode}: ${dist.toFixed(2)}mi`)
+        const fromName = resolved[i]!.service_user_name || resolved[i]!.postcode
+        const toName = resolved[i + 1]!.service_user_name || resolved[i + 1]!.postcode
+        legs.push(`${fromName} → ${toName}: ${dist.toFixed(2)}mi`)
         // Store individual leg mileage on the destination call
         const legRounded = Math.round(dist * 100) / 100
         if (legRounded > 0) {
@@ -285,7 +287,7 @@ Deno.serve(async (req) => {
           .from('expenses')
           .update({
             amount,
-            description: `Auto mileage: ${totalMiles} miles @ ${ratePpm}p/mile`,
+            description: `Auto mileage: ${totalMiles} miles @ ${ratePpm}p/mile\n${legs.join('\n')}`,
             mileage: totalMiles,
             mileage_distance: totalMiles,
             mileage_rate: ratePerMile,
@@ -302,7 +304,7 @@ Deno.serve(async (req) => {
           amount,
           date: expenseDate,
           expense_date: expenseDate,
-          description: `Auto mileage: ${totalMiles} miles @ ${ratePpm}p/mile`,
+          description: `Auto mileage: ${totalMiles} miles @ ${ratePpm}p/mile\n${legs.join('\n')}`,
           mileage: totalMiles,
           mileage_distance: totalMiles,
           mileage_rate: ratePerMile,
