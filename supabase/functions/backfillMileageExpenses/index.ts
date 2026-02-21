@@ -122,7 +122,7 @@ Deno.serve(async (req) => {
     // We exclude calls where drove_to_call is explicitly false
     const { data: allCalls, error: callsErr } = await supabaseAdmin
       .from('shift_calls')
-      .select('id, shift_id, service_user_id, service_user_name, service_user_address, checkin_latitude, checkin_longitude, checkout_latitude, checkout_longitude, clock_in_time, clock_out_time, drove_to_call, status, created_at')
+      .select('id, shift_id, service_user_id, service_user_name, service_user_address, checkin_latitude, checkin_longitude, clock_in_time, clock_out_time, drove_to_call, status, created_at')
       .not('shift_id', 'is', null)
       .order('clock_in_time', { ascending: true })
 
@@ -282,19 +282,13 @@ Deno.serve(async (req) => {
       const shift = shiftMap[shiftId]
       if (!shift) continue
 
-      // Resolve GPS: checkin coords → checkout coords → locations table → service_users table
+      // Resolve GPS: checkin coords → locations table → service_users table → Nominatim
       const resolved = calls
         .map(c => {
           let lat = c.checkin_latitude ? Number(c.checkin_latitude) : null
           let lng = c.checkin_longitude ? Number(c.checkin_longitude) : null
 
-          // Fallback to checkout coordinates
-          if (!lat || !lng) {
-            lat = c.checkout_latitude ? Number(c.checkout_latitude) : null
-            lng = c.checkout_longitude ? Number(c.checkout_longitude) : null
-          }
-
-          // Fallback to locations/service_users table
+          // Fallback to locations/service_users table / geocoded address
           if (!lat || !lng) {
             const cached = locationMap[c.service_user_id]
             if (cached) {
