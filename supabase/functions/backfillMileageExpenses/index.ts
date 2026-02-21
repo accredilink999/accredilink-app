@@ -72,22 +72,28 @@ Deno.serve(async (req) => {
     const ratePpm = rateSetting?.setting_value ? parseInt(rateSetting.setting_value, 10) : 45
     const ratePerMile = ratePpm / 100
 
-    // Get all shift_calls where drove_to_call = true
-    const { data: droveCalls, error: callsErr } = await supabaseAdmin
+    // Get ALL shift_calls that have a shift_id (not just drove_to_call = true)
+    // We include calls where drove_to_call is true OR null (legacy calls before feature existed)
+    // We exclude calls where drove_to_call is explicitly false
+    const { data: allCalls, error: callsErr } = await supabaseAdmin
       .from('shift_calls')
-      .select('id, shift_id, service_user_id, service_user_name, checkin_latitude, checkin_longitude, clock_in_time, created_at')
-      .eq('drove_to_call', true)
+      .select('id, shift_id, service_user_id, service_user_name, checkin_latitude, checkin_longitude, checkout_latitude, checkout_longitude, clock_in_time, clock_out_time, drove_to_call, status, created_at')
+      .not('shift_id', 'is', null)
       .order('clock_in_time', { ascending: true })
 
     if (callsErr) throw callsErr
-    if (!droveCalls || droveCalls.length === 0) {
-      return jsonResponse({ success: true, message: 'No drove_to_call records found', created: 0 })
+    if (!allCalls || allCalls.length === 0) {
+      return jsonResponse({ success: true, message: 'No shift_calls found', created: 0 })
     }
+
+    // Filter: include drove_to_call = true or null (not false)
+    const eligibleCalls = allCalls.filter(c =>
+      c.drove_to_call === true || c.drove_to_call === null || c.drove_to_call === undefined
+    )
 
     // Group by shift_id
     const byShift: Record<string, any[]> = {}
-    for (const call of droveCalls) {
-      if (!call.shift_id) continue
+    for (const call of eligibleCalls) {
       if (!byShift[call.shift_id]) byShift[call.shift_id] = []
       byShift[call.shift_id].push(call)
     }
@@ -101,8 +107,8 @@ Deno.serve(async (req) => {
 
     const existingShiftIds = new Set((existingExpenses || []).map(e => e.shift_id))
 
-    // Get service_user locations for fallback GPS
-    const serviceUserIds = [...new Set(droveCalls.map(c => c.service_user_id).filter(Boolean))]
+    // Build GPS fallback from locations table
+    const serviceUserIds = [...new Set(eligibleCalls.map(c => c.service_user_id).filter(Boolean))]
     let locationMap: Record<string, { latitude: number, longitude: number }> = {}
     if (serviceUserIds.length > 0) {
       const { data: locations } = await supabaseAdmin
@@ -116,22 +122,43 @@ Deno.serve(async (req) => {
           locationMap[loc.service_user_id] = { latitude: loc.latitude, longitude: loc.longitude }
         }
       }
+
+      // Also try service_users table for any missing locations (stored latitude/longitude)
+      const missingIds = serviceUserIds.filter(id => !locationMap[id])
+      if (missingIds.length > 0) {
+        const { data: serviceUsers } = await supabaseAdmin
+          .from('service_users')
+          .select('id, latitude, longitude')
+          .in('id', missingIds)
+
+        for (const su of (serviceUsers || [])) {
+          if (su.id && su.latitude && su.longitude && !locationMap[su.id]) {
+            locationMap[su.id] = { latitude: Number(su.latitude), longitude: Number(su.longitude) }
+          }
+        }
+      }
     }
 
     // Get shift details for dates and staff
     const shiftIds = Object.keys(byShift)
-    const { data: shifts } = await supabaseAdmin
-      .from('shifts')
-      .select('id, date, staff_id, staff_name')
-      .in('id', shiftIds)
+    // Supabase .in() has a limit, batch if needed
+    let allShifts: any[] = []
+    for (let i = 0; i < shiftIds.length; i += 100) {
+      const batch = shiftIds.slice(i, i + 100)
+      const { data: shifts } = await supabaseAdmin
+        .from('shifts')
+        .select('id, date, staff_id, staff_name')
+        .in('id', batch)
+      if (shifts) allShifts = allShifts.concat(shifts)
+    }
 
     const shiftMap: Record<string, any> = {}
-    for (const s of (shifts || [])) {
+    for (const s of allShifts) {
       shiftMap[s.id] = s
     }
 
     // Get staff names from profiles
-    const staffIds = [...new Set((shifts || []).map(s => s.staff_id).filter(Boolean))]
+    const staffIds = [...new Set(allShifts.map(s => s.staff_id).filter(Boolean))]
     const { data: profiles } = await supabaseAdmin
       .from('profiles')
       .select('id, staff_full_name, full_name')
@@ -144,6 +171,8 @@ Deno.serve(async (req) => {
 
     let created = 0
     let skipped = 0
+    let noGps = 0
+    let tooShort = 0
     const errors: string[] = []
 
     for (const [shiftId, calls] of Object.entries(byShift)) {
@@ -156,17 +185,38 @@ Deno.serve(async (req) => {
       const shift = shiftMap[shiftId]
       if (!shift) continue
 
-      // Resolve GPS: use checkin_latitude/longitude, fallback to service_user location
+      // Resolve GPS: checkin coords → checkout coords → locations table → service_users table
       const resolved = calls
         .map(c => {
-          const lat = c.checkin_latitude || locationMap[c.service_user_id]?.latitude
-          const lng = c.checkin_longitude || locationMap[c.service_user_id]?.longitude
-          return lat && lng ? { ...c, lat: Number(lat), lng: Number(lng) } : null
+          let lat = c.checkin_latitude ? Number(c.checkin_latitude) : null
+          let lng = c.checkin_longitude ? Number(c.checkin_longitude) : null
+
+          // Fallback to checkout coordinates
+          if (!lat || !lng) {
+            lat = c.checkout_latitude ? Number(c.checkout_latitude) : null
+            lng = c.checkout_longitude ? Number(c.checkout_longitude) : null
+          }
+
+          // Fallback to locations/service_users table
+          if (!lat || !lng) {
+            const cached = locationMap[c.service_user_id]
+            if (cached) {
+              lat = Number(cached.latitude)
+              lng = Number(cached.longitude)
+            }
+          }
+
+          return lat && lng && !isNaN(lat) && !isNaN(lng)
+            ? { ...c, lat, lng }
+            : null
         })
         .filter(Boolean)
         .sort((a: any, b: any) => new Date(a.clock_in_time || a.created_at).getTime() - new Date(b.clock_in_time || b.created_at).getTime())
 
-      if (resolved.length < 2) continue
+      if (resolved.length < 2) {
+        noGps++
+        continue
+      }
 
       // Calculate total miles
       let totalMiles = 0
@@ -177,7 +227,10 @@ Deno.serve(async (req) => {
         )
       }
 
-      if (totalMiles <= 0.1) continue
+      if (totalMiles <= 0.1) {
+        tooShort++
+        continue
+      }
 
       totalMiles = Math.round(totalMiles * 100) / 100
       const amount = Math.round(totalMiles * ratePerMile * 100) / 100
@@ -219,10 +272,13 @@ Deno.serve(async (req) => {
 
     return jsonResponse({
       success: true,
-      message: `Created ${created} mileage expenses, skipped ${skipped} (already exist)`,
+      message: `Created ${created} mileage expenses, skipped ${skipped} existing, ${noGps} insufficient GPS, ${tooShort} too short`,
       created,
       skipped,
+      noGps,
+      tooShort,
       totalShifts: Object.keys(byShift).length,
+      totalCalls: eligibleCalls.length,
       errors: errors.length > 0 ? errors : undefined
     })
   } catch (error) {
