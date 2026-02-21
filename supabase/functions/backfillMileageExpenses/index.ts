@@ -136,7 +136,7 @@ Deno.serve(async (req) => {
     // ========================================
     const { data: weekShifts, error: shiftsErr } = await supabaseAdmin
       .from('shifts')
-      .select('id, date, staff_id, staff_name')
+      .select('id, date, staff_id, staff_name, paired_shift_id')
       .gte('date', weekStartStr)
       .lte('date', todayStr)
       .limit(500)
@@ -148,6 +148,8 @@ Deno.serve(async (req) => {
 
     const shiftMap: Record<string, any> = {}
     for (const s of weekShifts) shiftMap[s.id] = s
+
+    // For paired shifts, each partner gets their OWN expense (they both drove)
     const shiftIds = weekShifts.map(s => s.id)
 
     // ========================================
@@ -168,11 +170,19 @@ Deno.serve(async (req) => {
     const eligibleCalls = allCalls.filter(c => c.drove_to_call !== false)
 
     // Attach postcode to each call from service_users
+    const unmatchedCalls: any[] = []
     for (const call of eligibleCalls) {
       if (call.service_user_id && postcodeById[call.service_user_id]) {
         call._postcode = postcodeById[call.service_user_id]
       } else if (call.service_user_name && postcodeByName[call.service_user_name.toLowerCase().trim()]) {
         call._postcode = postcodeByName[call.service_user_name.toLowerCase().trim()]
+      } else if (call.service_user_name) {
+        unmatchedCalls.push({
+          name: call.service_user_name,
+          service_user_id: call.service_user_id || null,
+          shift_id: call.shift_id,
+          scheduled_time: call.scheduled_time,
+        })
       }
     }
 
@@ -275,7 +285,10 @@ Deno.serve(async (req) => {
         shiftId,
         date: shift.date,
         staff: staffName,
-        calls: resolved.length,
+        staffId: shift.staff_id,
+        pairedWith: shift.paired_shift_id || null,
+        totalCalls: calls.length,
+        resolvedCalls: resolved.length,
         miles: totalMiles,
         amount,
         legs,
@@ -333,6 +346,7 @@ Deno.serve(async (req) => {
       callsWithPostcode: eligibleCalls.filter(c => c._postcode).length,
       postcodeResults,
       shiftDetails,
+      unmatchedCalls: unmatchedCalls.length > 0 ? unmatchedCalls : undefined,
       errors: errors.length > 0 ? errors : undefined,
     })
   } catch (error) {
