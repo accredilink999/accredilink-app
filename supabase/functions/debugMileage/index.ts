@@ -29,9 +29,104 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) return jsonResponse({ error: 'Unauthorized' }, 401)
 
-    const { staffName } = await req.json()
+    const body = await req.json()
+    const { staffName, clientName } = body
 
-    // Find shifts for this staff member in the last 7 days
+    // --- CLIENT/SERVICE USER DEBUG MODE ---
+    if (clientName) {
+      // Find service user in service_users table
+      const { data: serviceUsers } = await supabaseAdmin
+        .from('service_users')
+        .select('id, full_name, address, latitude, longitude, status')
+        .ilike('full_name', `%${clientName}%`)
+        .limit(5)
+
+      // Find ALL shift_calls for this client name (recent)
+      const { data: clientCalls } = await supabaseAdmin
+        .from('shift_calls')
+        .select('id, shift_id, service_user_id, service_user_name, service_user_address, checkin_latitude, checkin_longitude, drove_to_call, clock_in_time, clock_out_time, status, call_date, scheduled_time')
+        .ilike('service_user_name', `%${clientName}%`)
+        .order('call_date', { ascending: false })
+        .limit(50)
+
+      // Get the shifts these calls belong to (to see staff names)
+      const callShiftIds = [...new Set((clientCalls || []).map(c => c.shift_id).filter(Boolean))]
+      let callShifts: any[] = []
+      if (callShiftIds.length > 0) {
+        const { data: shifts } = await supabaseAdmin
+          .from('shifts')
+          .select('id, staff_name, staff_id, date')
+          .in('id', callShiftIds)
+        callShifts = shifts || []
+      }
+      const shiftMap: Record<string, any> = {}
+      for (const s of callShifts) shiftMap[s.id] = s
+
+      // Check historical GPS data for this client's service_user_id
+      const suIds = [...new Set((serviceUsers || []).map(s => s.id))]
+      let historicalGPS: any[] = []
+      if (suIds.length > 0) {
+        const { data: gps } = await supabaseAdmin
+          .from('shift_calls')
+          .select('service_user_id, checkin_latitude, checkin_longitude')
+          .in('service_user_id', suIds)
+          .not('checkin_latitude', 'is', null)
+          .not('checkin_longitude', 'is', null)
+          .limit(50)
+        historicalGPS = gps || []
+      }
+
+      // Check locations table
+      let locationEntries: any[] = []
+      if (suIds.length > 0) {
+        const { data: locs } = await supabaseAdmin
+          .from('locations')
+          .select('service_user_id, latitude, longitude')
+          .in('service_user_id', suIds)
+          .limit(10)
+        locationEntries = locs || []
+      }
+
+      // Name matching check: does the shift_call service_user_name EXACTLY match service_users.full_name?
+      const callNames = [...new Set((clientCalls || []).map(c => c.service_user_name).filter(Boolean))]
+      const suNames = (serviceUsers || []).map(s => s.full_name)
+      const nameMatches: Record<string, boolean> = {}
+      for (const cn of callNames) {
+        nameMatches[cn] = suNames.some(sn => sn?.toLowerCase().trim() === cn?.toLowerCase().trim())
+      }
+
+      return jsonResponse({
+        searchTerm: clientName,
+        serviceUsers: serviceUsers || [],
+        callNames,
+        nameMatchesToServiceUsers: nameMatches,
+        recentCalls: (clientCalls || []).map(c => ({
+          ...c,
+          staffName: shiftMap[c.shift_id]?.staff_name || 'unknown',
+          shiftDate: shiftMap[c.shift_id]?.date || null,
+          hasGPS: !!(c.checkin_latitude && c.checkin_longitude),
+          hasServiceUserId: !!c.service_user_id,
+        })),
+        historicalGPSCount: historicalGPS.length,
+        locationTableEntries: locationEntries.length,
+        summary: {
+          serviceUsersFound: (serviceUsers || []).length,
+          hasAddress: (serviceUsers || []).some(s => s.address),
+          hasCoordinates: (serviceUsers || []).some(s => s.latitude && s.longitude),
+          totalCalls: (clientCalls || []).length,
+          callsWithGPS: (clientCalls || []).filter(c => c.checkin_latitude && c.checkin_longitude).length,
+          callsWithServiceUserId: (clientCalls || []).filter(c => c.service_user_id).length,
+          callsDroveTrue: (clientCalls || []).filter(c => c.drove_to_call === true).length,
+          callsDroveFalse: (clientCalls || []).filter(c => c.drove_to_call === false).length,
+          callsDroveNull: (clientCalls || []).filter(c => c.drove_to_call === null).length,
+          historicalGPSPoints: historicalGPS.length,
+          locationTableEntries: locationEntries.length,
+          allNamesMATCH: Object.values(nameMatches).every(v => v),
+        }
+      })
+    }
+
+    // --- STAFF DEBUG MODE (original) ---
     const { data: shifts } = await supabaseAdmin
       .from('shifts')
       .select('id, staff_name, staff_id, date')
@@ -41,7 +136,6 @@ Deno.serve(async (req) => {
       .limit(10)
 
     if (!shifts || shifts.length === 0) {
-      // Try profiles table
       const { data: profiles } = await supabaseAdmin
         .from('profiles')
         .select('id, staff_full_name, full_name')
@@ -55,7 +149,6 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Get shift_calls for these shifts
     const shiftIds = shifts.map(s => s.id)
     const { data: calls } = await supabaseAdmin
       .from('shift_calls')
@@ -63,14 +156,12 @@ Deno.serve(async (req) => {
       .in('shift_id', shiftIds)
       .order('clock_in_time', { ascending: true })
 
-    // Check existing expenses
     const { data: expenses } = await supabaseAdmin
       .from('expenses')
       .select('id, shift_id, staff_name, amount, mileage, mileage_distance, date, expense_type')
       .in('shift_id', shiftIds)
       .eq('expense_type', 'mileage')
 
-    // Check service user locations
     const suIds = [...new Set((calls || []).map(c => c.service_user_id).filter(Boolean))]
     const { data: serviceUsers } = await supabaseAdmin
       .from('service_users')

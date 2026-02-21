@@ -370,12 +370,26 @@ export default function AdminApprovalsFinancials() {
     }
   };
 
-  // Debug mileage for a specific staff member
-  const handleDebugMileage = async (name) => {
+  // Debug mileage for a specific staff member or client
+  const handleDebugMileage = async (name, mode = 'staff') => {
     try {
-      const result = await invokeFunction('debugMileage', { staffName: name });
-      console.log('[Debug Mileage]', JSON.stringify(result, null, 2));
-      if (result.summary) {
+      const payload = mode === 'client' ? { clientName: name } : { staffName: name };
+      const result = await invokeFunction('debugMileage', payload);
+      console.log(`[Debug Mileage - ${mode}]`, JSON.stringify(result, null, 2));
+      if (mode === 'client' && result.summary) {
+        const s = result.summary;
+        toast.info(
+          `Client "${name}":\n` +
+          `Found in service_users: ${s.serviceUsersFound > 0 ? 'YES' : 'NO'}\n` +
+          `Has address: ${s.hasAddress ? 'YES' : 'NO'} | Has coords: ${s.hasCoordinates ? 'YES' : 'NO'}\n` +
+          `Total calls: ${s.totalCalls} | With GPS: ${s.callsWithGPS}\n` +
+          `With service_user_id: ${s.callsWithServiceUserId}/${s.totalCalls}\n` +
+          `Drove: ${s.callsDroveTrue} yes / ${s.callsDroveFalse} no / ${s.callsDroveNull} null\n` +
+          `Historical GPS points: ${s.historicalGPSPoints}\n` +
+          `Name matches: ${s.allNamesMATCH ? 'ALL MATCH' : 'MISMATCH — check console'}`,
+          { duration: 20000 }
+        );
+      } else if (result.summary) {
         const s = result.summary;
         toast.info(
           `${name}: ${s.totalShifts} shifts, ${s.totalCalls} calls\n` +
@@ -716,10 +730,20 @@ export default function AdminApprovalsFinancials() {
               variant="outline"
               onClick={() => {
                 const name = prompt('Staff name to debug:');
-                if (name) handleDebugMileage(name);
+                if (name) handleDebugMileage(name, 'staff');
               }}
             >
               Debug Staff
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                const name = prompt('Client/service user name to debug:');
+                if (name) handleDebugMileage(name, 'client');
+              }}
+            >
+              Debug Client
             </Button>
 
             <div className="flex items-center gap-1 ml-auto">
