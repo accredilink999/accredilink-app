@@ -1214,6 +1214,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                 if (driveToCallConfirm?.id) {
                   const coords = driveToCallConfirm.currentLocation;
                   try {
+                    // 1. Mark this call as drove
                     await ShiftCallApi.update(driveToCallConfirm.id, {
                       drove_to_call: true,
                       checkin_latitude: coords ? coords.latitude : null,
@@ -1221,63 +1222,82 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                     });
                     queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] });
 
-                    // Calculate mileage from addresses of all drove_to_call check-ins
-                    const allShiftCalls = await ShiftCallApi.filter(
-                      { shift_id: shift?.id },
-                      'created_at',
-                      100
-                    );
-                    const droveCalls = allShiftCalls
-                      .filter(c => c.drove_to_call === true)
-                      .sort((a, b) => new Date(a.clock_in_time) - new Date(b.clock_in_time));
-
-                    // Look up postcodes from service_users table (postcodes are in separate column)
-                    const suIds = [...new Set(droveCalls.map(c => c.service_user_id).filter(Boolean))];
-                    if (suIds.length > 0) {
-                      const { data: sus } = await supabase
+                    // 2. Get this call's postcode
+                    const thisCallSuId = driveToCallConfirm.service_user_id;
+                    let thisPostcode = null;
+                    if (thisCallSuId) {
+                      const { data: suData } = await supabase
                         .from('service_users')
-                        .select('id, postcode')
-                        .in('id', suIds);
-                      const pcMap = {};
-                      for (const su of (sus || [])) {
-                        if (su.postcode) pcMap[su.id] = su.postcode.trim();
-                      }
-                      for (const call of droveCalls) {
-                        if (call.service_user_id && pcMap[call.service_user_id]) {
-                          call.service_user_address = pcMap[call.service_user_id];
-                        }
-                      }
+                        .select('postcode')
+                        .eq('id', thisCallSuId)
+                        .single();
+                      thisPostcode = suData?.postcode?.trim()?.toUpperCase() || null;
                     }
 
-                    const droveWithAddr = droveCalls.filter(c => c.service_user_address);
-                    if (droveWithAddr.length >= 2) {
-                      const resolved = await resolveCallAddresses(droveWithAddr);
+                    // 3. Find THIS USER's previous "I drove" call TODAY across ALL their shifts
+                    const todayStr = format(new Date(), 'yyyy-MM-dd');
+                    const staffId = shift?.staff_id || userId;
+                    // Get all shifts for this staff member today
+                    const { data: todayShifts } = await supabase
+                      .from('shifts')
+                      .select('id')
+                      .eq('staff_id', staffId)
+                      .eq('date', todayStr);
+                    const todayShiftIds = (todayShifts || []).map(s => s.id);
 
-                      if (resolved.length >= 2) {
-                        let totalMiles = 0;
-                        // Calculate per-leg distance and store on each call
-                        for (let i = 0; i < resolved.length - 1; i++) {
-                          const legMiles = haversineMiles(
-                            resolved[i].resolvedLat, resolved[i].resolvedLng,
-                            resolved[i + 1].resolvedLat, resolved[i + 1].resolvedLng
+                    let allDroveCalls = [];
+                    for (const sid of todayShiftIds) {
+                      const calls = await ShiftCallApi.filter({ shift_id: sid }, 'clock_in_time', 200);
+                      allDroveCalls = allDroveCalls.concat(
+                        calls.filter(c => c.drove_to_call === true && c.id !== driveToCallConfirm.id)
+                      );
+                    }
+                    allDroveCalls.sort((a, b) =>
+                      new Date(a.clock_in_time || a.scheduled_time || 0) - new Date(b.clock_in_time || b.scheduled_time || 0)
+                    );
+
+                    // 4. Calculate distance from previous drove point to this one
+                    const prevDrove = allDroveCalls.length > 0 ? allDroveCalls[allDroveCalls.length - 1] : null;
+                    let legMiles = 0;
+
+                    if (prevDrove && thisPostcode) {
+                      // Get previous call's postcode
+                      let prevPostcode = null;
+                      if (prevDrove.service_user_id) {
+                        const { data: prevSu } = await supabase
+                          .from('service_users')
+                          .select('postcode')
+                          .eq('id', prevDrove.service_user_id)
+                          .single();
+                        prevPostcode = prevSu?.postcode?.trim()?.toUpperCase() || null;
+                      }
+
+                      if (prevPostcode && thisPostcode) {
+                        // Resolve both postcodes to coords
+                        await resolveCallAddresses([
+                          { service_user_address: prevPostcode },
+                          { service_user_address: thisPostcode },
+                        ]);
+                        const resolved = await resolveCallAddresses([
+                          { ...prevDrove, service_user_address: prevPostcode },
+                          { ...driveToCallConfirm, service_user_address: thisPostcode },
+                        ]);
+                        if (resolved.length === 2) {
+                          legMiles = haversineMiles(
+                            resolved[0].resolvedLat, resolved[0].resolvedLng,
+                            resolved[1].resolvedLat, resolved[1].resolvedLng
                           );
-                          totalMiles += legMiles;
-                          // Store individual mileage on the destination call
-                          const legRounded = Math.round(legMiles * 100) / 100;
-                          if (legRounded > 0) {
-                            await ShiftCallApi.update(resolved[i + 1].id, {
-                              call_mileage: legRounded,
-                            });
-                          }
-                        }
-                        if (totalMiles > 0.1) {
-                          await base44.functions.invoke('createShiftMileageExpense', {
-                            shiftId: shift?.id,
-                            totalMiles: Math.round(totalMiles * 100) / 100
-                          });
                         }
                       }
                     }
+
+                    // 5. Store per-call mileage
+                    const legRounded = Math.round(legMiles * 100) / 100;
+                    await ShiftCallApi.update(driveToCallConfirm.id, {
+                      call_mileage: legRounded,
+                    });
+                    queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] });
+
                   } catch (err) {
                     console.error('Error saving drive data:', err);
                   }
