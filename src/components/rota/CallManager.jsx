@@ -334,68 +334,6 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
         }
       }
 
-      // Check if this is the last regular call to be completed (exclude sitin_cover)
-      const regularCalls = freshCalls.filter(c => c.call_type !== 'sitin_cover');
-      const completedCount = regularCalls.filter(c => c.status === 'completed').length;
-      const isLastCall = completedCount >= regularCalls.length - 1;
-
-      if (isLastCall && data.call_type !== 'sitin_cover') {
-        // Calculate mileage from all shift_calls where drove_to_call=true
-        // Uses cached GPS locations as fallback when staff GPS is unavailable
-        try {
-          const allShiftCalls = await ShiftCallApi.filter(
-            { shift_id: shift?.id },
-            'created_at',
-            100
-          );
-
-          const droveCalls = allShiftCalls.filter(c => c.drove_to_call === true);
-
-          // Fetch cached locations for any calls missing GPS
-          const idsNeedingCache = droveCalls
-            .filter(c => !c.checkin_latitude || !c.checkin_longitude)
-            .map(c => c.service_user_id)
-            .filter(Boolean);
-          let locationCache = gpsLocationCache;
-          if (idsNeedingCache.length > 0) {
-            // Re-fetch with address fallbacks so Nominatim can geocode clients with no GPS history
-            const addrFallbacks = new Map();
-            for (const c of allShiftCalls) {
-              if (c.service_user_id && c.service_user_address) {
-                addrFallbacks.set(c.service_user_id, c.service_user_address);
-              }
-            }
-            locationCache = await getServiceUserLocations([
-              ...serviceUserIds,
-              ...idsNeedingCache,
-            ], addrFallbacks);
-          }
-
-          const resolved = resolveCallCoordinates(droveCalls, locationCache)
-            .sort((a, b) => new Date(a.clock_in_time) - new Date(b.clock_in_time));
-
-          if (resolved.length >= 2) {
-            let totalMiles = 0;
-            for (let i = 0; i < resolved.length - 1; i++) {
-              totalMiles += haversineMiles(
-                resolved[i].resolvedLat, resolved[i].resolvedLng,
-                resolved[i + 1].resolvedLat, resolved[i + 1].resolvedLng
-              );
-            }
-
-            if (totalMiles > 0.1) {
-              await base44.functions.invoke('createShiftMileageExpense', {
-                shiftId: shift?.id,
-                totalMiles: Math.round(totalMiles * 100) / 100
-              });
-            }
-          }
-        } catch (err) {
-          console.error('Error calculating mileage:', err);
-          toast.error('Mileage expense could not be saved. Please contact admin.');
-        }
-      }
-
       // Notify admins of call check-out
       const coStaffName = shift?.staff_name || 'Staff';
       const coClientName = data.service_user_name || 'a client';
@@ -1296,6 +1234,53 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                       checkin_longitude: coords ? coords.longitude : null,
                     });
                     queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] });
+
+                    // Calculate mileage from all drove_to_call check-ins so far
+                    const allShiftCalls = await ShiftCallApi.filter(
+                      { shift_id: shift?.id },
+                      'created_at',
+                      100
+                    );
+                    const droveCalls = allShiftCalls.filter(c => c.drove_to_call === true);
+
+                    if (droveCalls.length >= 2) {
+                      const idsNeedingCache = droveCalls
+                        .filter(c => !c.checkin_latitude || !c.checkin_longitude)
+                        .map(c => c.service_user_id)
+                        .filter(Boolean);
+                      let locationCache = gpsLocationCache;
+                      if (idsNeedingCache.length > 0) {
+                        const addrFallbacks = new Map();
+                        for (const c of allShiftCalls) {
+                          if (c.service_user_id && c.service_user_address) {
+                            addrFallbacks.set(c.service_user_id, c.service_user_address);
+                          }
+                        }
+                        locationCache = await getServiceUserLocations([
+                          ...serviceUserIds,
+                          ...idsNeedingCache,
+                        ], addrFallbacks);
+                      }
+
+                      const resolved = resolveCallCoordinates(droveCalls, locationCache)
+                        .sort((a, b) => new Date(a.clock_in_time) - new Date(b.clock_in_time));
+
+                      if (resolved.length >= 2) {
+                        let totalMiles = 0;
+                        for (let i = 0; i < resolved.length - 1; i++) {
+                          totalMiles += haversineMiles(
+                            resolved[i].resolvedLat, resolved[i].resolvedLng,
+                            resolved[i + 1].resolvedLat, resolved[i + 1].resolvedLng
+                          );
+                        }
+                        if (totalMiles > 0.1) {
+                          await base44.functions.invoke('createShiftMileageExpense', {
+                            shiftId: shift?.id,
+                            totalMiles: Math.round(totalMiles * 100) / 100
+                          });
+                        }
+                      }
+                    }
                   } catch (err) {
                     console.error('Error saving drive data:', err);
                   }

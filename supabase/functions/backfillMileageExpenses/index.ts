@@ -143,38 +143,70 @@ Deno.serve(async (req) => {
       byShift[call.shift_id].push(call)
     }
 
-    // Get existing expense shift_ids to skip duplicates
+    // Get existing mileage expenses to update or skip
     const { data: existingExpenses } = await supabaseAdmin
       .from('expenses')
-      .select('shift_id')
+      .select('id, shift_id')
       .eq('expense_type', 'mileage')
       .not('shift_id', 'is', null)
 
-    const existingShiftIds = new Set((existingExpenses || []).map(e => e.shift_id))
+    const existingExpenseMap: Record<string, string> = {}
+    for (const e of (existingExpenses || [])) {
+      if (e.shift_id) existingExpenseMap[e.shift_id] = e.id
+    }
 
-    // Build GPS fallback from locations table
+    // Build GPS fallback for service users — multiple strategies
     const serviceUserIds = [...new Set(eligibleCalls.map(c => c.service_user_id).filter(Boolean))]
     let locationMap: Record<string, { latitude: number, longitude: number }> = {}
     if (serviceUserIds.length > 0) {
-      const { data: locations } = await supabaseAdmin
-        .from('locations')
-        .select('service_user_id, latitude, longitude')
-        .in('service_user_id', serviceUserIds)
-        .order('created_at', { ascending: false })
-
-      for (const loc of (locations || [])) {
-        if (loc.service_user_id && loc.latitude && loc.longitude && !locationMap[loc.service_user_id]) {
-          locationMap[loc.service_user_id] = { latitude: loc.latitude, longitude: loc.longitude }
+      // Strategy 1: Median of ALL historical checkin GPS for each service user
+      // (same approach as client-side gpsCache.js — robust to outliers)
+      const gpsGrouped: Record<string, { lats: number[], lngs: number[] }> = {}
+      for (const call of allCalls) {
+        if (call.service_user_id && call.checkin_latitude && call.checkin_longitude) {
+          const lat = Number(call.checkin_latitude)
+          const lng = Number(call.checkin_longitude)
+          if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+            if (!gpsGrouped[call.service_user_id]) gpsGrouped[call.service_user_id] = { lats: [], lngs: [] }
+            gpsGrouped[call.service_user_id].lats.push(lat)
+            gpsGrouped[call.service_user_id].lngs.push(lng)
+          }
+        }
+      }
+      for (const [id, coords] of Object.entries(gpsGrouped)) {
+        const sortedLats = [...coords.lats].sort((a, b) => a - b)
+        const sortedLngs = [...coords.lngs].sort((a, b) => a - b)
+        const midLat = Math.floor(sortedLats.length / 2)
+        const midLng = Math.floor(sortedLngs.length / 2)
+        locationMap[id] = {
+          latitude: sortedLats.length % 2 === 0 ? (sortedLats[midLat - 1] + sortedLats[midLat]) / 2 : sortedLats[midLat],
+          longitude: sortedLngs.length % 2 === 0 ? (sortedLngs[midLng - 1] + sortedLngs[midLng]) / 2 : sortedLngs[midLng],
         }
       }
 
-      // Also try service_users table for any missing locations (stored latitude/longitude)
-      const missingIds = serviceUserIds.filter(id => !locationMap[id])
-      if (missingIds.length > 0) {
+      // Strategy 2: locations table
+      const missing2 = serviceUserIds.filter(id => !locationMap[id])
+      if (missing2.length > 0) {
+        const { data: locations } = await supabaseAdmin
+          .from('locations')
+          .select('service_user_id, latitude, longitude')
+          .in('service_user_id', missing2)
+          .order('created_at', { ascending: false })
+
+        for (const loc of (locations || [])) {
+          if (loc.service_user_id && loc.latitude && loc.longitude && !locationMap[loc.service_user_id]) {
+            locationMap[loc.service_user_id] = { latitude: loc.latitude, longitude: loc.longitude }
+          }
+        }
+      }
+
+      // Strategy 3: service_users table lat/lng
+      const missing3 = serviceUserIds.filter(id => !locationMap[id])
+      if (missing3.length > 0) {
         const { data: serviceUsers } = await supabaseAdmin
           .from('service_users')
           .select('id, latitude, longitude')
-          .in('id', missingIds)
+          .in('id', missing3)
 
         for (const su of (serviceUsers || [])) {
           if (su.id && su.latitude && su.longitude && !locationMap[su.id]) {
@@ -183,9 +215,9 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Final fallback: geocode service_user_address via Nominatim for any still-missing IDs
-      const stillMissing = serviceUserIds.filter(id => !locationMap[id])
-      if (stillMissing.length > 0) {
+      // Strategy 4: Geocode service_user_address via Nominatim
+      const missing4 = serviceUserIds.filter(id => !locationMap[id])
+      if (missing4.length > 0) {
         // Build address map from shift_calls data
         const addressMap: Record<string, string> = {}
         for (const call of eligibleCalls) {
@@ -195,7 +227,7 @@ Deno.serve(async (req) => {
         }
 
         // Also try service_users.address for any still missing
-        const idsNeedingAddress = stillMissing.filter(id => !addressMap[id])
+        const idsNeedingAddress = missing4.filter(id => !addressMap[id])
         if (idsNeedingAddress.length > 0) {
           const { data: suAddrs } = await supabaseAdmin
             .from('service_users')
@@ -210,11 +242,10 @@ Deno.serve(async (req) => {
 
         // Geocode unique addresses (deduplicate to save API calls)
         const uniqueAddresses: Record<string, { latitude: number, longitude: number } | null> = {}
-        for (const id of stillMissing) {
+        for (const id of missing4) {
           const addr = addressMap[id]
           if (!addr) continue
 
-          // Check if we already geocoded this exact address
           if (addr in uniqueAddresses) {
             if (uniqueAddresses[addr]) {
               locationMap[id] = uniqueAddresses[addr]!
@@ -227,7 +258,6 @@ Deno.serve(async (req) => {
           if (coords) {
             locationMap[id] = coords
           }
-          // Rate limit between geocoding calls
           await new Promise(r => setTimeout(r, 1100))
         }
       }
@@ -267,28 +297,22 @@ Deno.serve(async (req) => {
     const geocodedCount = Object.keys(locationMap).length
 
     let created = 0
-    let skipped = 0
+    let updated = 0
     let noGps = 0
     let tooShort = 0
     const errors: string[] = []
 
     for (const [shiftId, calls] of Object.entries(byShift)) {
-      // Skip if expense already exists
-      if (existingShiftIds.has(shiftId)) {
-        skipped++
-        continue
-      }
-
       const shift = shiftMap[shiftId]
       if (!shift) continue
 
-      // Resolve GPS: checkin coords → locations table → service_users table → Nominatim
+      // Resolve GPS: checkin coords → median historical GPS → locations → service_users → Nominatim
       const resolved = calls
         .map(c => {
           let lat = c.checkin_latitude ? Number(c.checkin_latitude) : null
           let lng = c.checkin_longitude ? Number(c.checkin_longitude) : null
 
-          // Fallback to locations/service_users table / geocoded address
+          // Fallback to locationMap (median GPS / locations / service_users / geocoded address)
           if (!lat || !lng) {
             const cached = locationMap[c.service_user_id]
             if (cached) {
@@ -336,41 +360,63 @@ Deno.serve(async (req) => {
       const staffProfile = profileMap[shift.staff_id]
       const staffName = staffProfile?.staff_full_name || staffProfile?.full_name || shift.staff_name || 'Unknown'
 
-      const { error: insertErr } = await supabaseAdmin.from('expenses').insert({
-        staff_id: shift.staff_id,
-        staff_name: staffName,
-        shift_id: shiftId,
-        expense_type: 'mileage',
-        amount,
-        date: expenseDate,
-        expense_date: expenseDate,
-        description: `Auto mileage: ${totalMiles} miles @ ${ratePpm}p/mile`,
-        mileage: totalMiles,
-        mileage_distance: totalMiles,
-        mileage_rate: ratePerMile,
-        week_start_date: weekStart.toISOString().split('T')[0],
-        week_end_date: weekEnd.toISOString().split('T')[0],
-        payment_due_date: paymentDue.toISOString().split('T')[0],
-        status: 'pending'
-      })
+      const existingId = existingExpenseMap[shiftId]
+      if (existingId) {
+        // Update existing expense with recalculated mileage
+        const { error: updateErr } = await supabaseAdmin
+          .from('expenses')
+          .update({
+            amount,
+            description: `Auto mileage: ${totalMiles} miles @ ${ratePpm}p/mile`,
+            mileage: totalMiles,
+            mileage_distance: totalMiles,
+            mileage_rate: ratePerMile,
+          })
+          .eq('id', existingId)
 
-      if (insertErr) {
-        errors.push(`Shift ${shiftId}: ${insertErr.message}`)
+        if (updateErr) {
+          errors.push(`Shift ${shiftId} update: ${updateErr.message}`)
+        } else {
+          updated++
+        }
       } else {
-        created++
+        // Create new expense
+        const { error: insertErr } = await supabaseAdmin.from('expenses').insert({
+          staff_id: shift.staff_id,
+          staff_name: staffName,
+          shift_id: shiftId,
+          expense_type: 'mileage',
+          amount,
+          date: expenseDate,
+          expense_date: expenseDate,
+          description: `Auto mileage: ${totalMiles} miles @ ${ratePpm}p/mile`,
+          mileage: totalMiles,
+          mileage_distance: totalMiles,
+          mileage_rate: ratePerMile,
+          week_start_date: weekStart.toISOString().split('T')[0],
+          week_end_date: weekEnd.toISOString().split('T')[0],
+          payment_due_date: paymentDue.toISOString().split('T')[0],
+          status: 'pending'
+        })
+
+        if (insertErr) {
+          errors.push(`Shift ${shiftId}: ${insertErr.message}`)
+        } else {
+          created++
+        }
       }
     }
 
     return jsonResponse({
       success: true,
-      message: `Created ${created} mileage expenses, skipped ${skipped} existing, ${noGps} insufficient GPS, ${tooShort} too short`,
+      message: `Created ${created}, updated ${updated} mileage expenses. ${noGps} insufficient GPS, ${tooShort} too short`,
       created,
-      skipped,
+      updated,
       noGps,
       tooShort,
       totalShifts: Object.keys(byShift).length,
       totalCalls: eligibleCalls.length,
-      geocodedLocations: geocodedCount,
+      resolvedLocations: geocodedCount,
       errors: errors.length > 0 ? errors : undefined
     })
   } catch (error) {

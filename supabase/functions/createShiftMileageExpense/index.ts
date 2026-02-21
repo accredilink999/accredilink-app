@@ -48,17 +48,13 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'Missing or invalid shiftId/totalMiles' }, 400)
     }
 
-    // Prevent duplicate expense for same shift
+    // Check if expense already exists for this shift — update if so, create if not
     const { data: existing } = await supabaseAdmin
       .from('expenses')
       .select('id')
       .eq('shift_id', shiftId)
       .eq('expense_type', 'mileage')
       .limit(1)
-
-    if (existing && existing.length > 0) {
-      return jsonResponse({ success: false, message: 'Mileage expense already exists for this shift' })
-    }
 
     // Get the shift date for proper weekly grouping
     const { data: shift } = await supabaseAdmin
@@ -94,6 +90,29 @@ Deno.serve(async (req) => {
 
     const staffName = profile?.staff_full_name || profile?.full_name || user.email
 
+    if (existing && existing.length > 0) {
+      // Update existing expense with new running total
+      const { data: expense, error: updateError } = await supabaseAdmin
+        .from('expenses')
+        .update({
+          amount,
+          description: `Auto mileage: ${totalMiles} miles @ ${ratePpm}p/mile`,
+          mileage: totalMiles,
+          mileage_distance: totalMiles,
+          mileage_rate: ratePerMile,
+        })
+        .eq('id', existing[0].id)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('Update error:', updateError);
+        return jsonResponse({ error: updateError.message }, 500)
+      }
+      return jsonResponse({ success: true, updated: true, expense })
+    }
+
+    // Create new expense
     const { data: expense, error: insertError } = await supabaseAdmin.from('expenses').insert({
       staff_id: user.id,
       staff_name: staffName,
