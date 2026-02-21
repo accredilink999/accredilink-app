@@ -135,6 +135,28 @@ export default function AdminApprovalsFinancials() {
     },
   });
 
+  // Filter expenses by selected staff
+  const filteredExpenses = useMemo(() => {
+    if (staffFilter === 'all') return expenses;
+    return expenses.filter(e => e.staff_id === staffFilter);
+  }, [expenses, staffFilter]);
+
+  // Get unique staff members who have expenses
+  const staffWithExpenses = useMemo(() => {
+    const staffMap = {};
+    expenses.forEach(exp => {
+      if (!exp.staff_id || exp.expense_type === 'weekly_mileage') return;
+      if (!staffMap[exp.staff_id]) {
+        const staffUser = staffMembers.find(s => s.id === exp.staff_id);
+        staffMap[exp.staff_id] = {
+          id: exp.staff_id,
+          name: staffUser?.staff_full_name || staffUser?.full_name || exp.staff_name || 'Unknown',
+        };
+      }
+    });
+    return Object.values(staffMap).sort((a, b) => a.name.localeCompare(b.name));
+  }, [expenses, staffMembers]);
+
   // Group expenses by staff + week (Sun-Sat)
   const weeklyStaffGroups = useMemo(() => {
     const groups = {};
@@ -344,28 +366,6 @@ export default function AdminApprovalsFinancials() {
       setBackfillLoading(false);
     }
   };
-
-  // Get unique staff members who have expenses
-  const staffWithExpenses = useMemo(() => {
-    const staffMap = {};
-    expenses.forEach(exp => {
-      if (!exp.staff_id || exp.expense_type === 'weekly_mileage') return;
-      if (!staffMap[exp.staff_id]) {
-        const staffUser = staffMembers.find(s => s.id === exp.staff_id);
-        staffMap[exp.staff_id] = {
-          id: exp.staff_id,
-          name: staffUser?.staff_full_name || staffUser?.full_name || exp.staff_name || 'Unknown',
-        };
-      }
-    });
-    return Object.values(staffMap).sort((a, b) => a.name.localeCompare(b.name));
-  }, [expenses, staffMembers]);
-
-  // Filter expenses by selected staff
-  const filteredExpenses = useMemo(() => {
-    if (staffFilter === 'all') return expenses;
-    return expenses.filter(e => e.staff_id === staffFilter);
-  }, [expenses, staffFilter]);
 
   const pendingLeave = leaveRequests.filter(r => r.status === 'pending');
   const pendingSwaps = shiftSwaps.filter(r => r.status === 'pending');
