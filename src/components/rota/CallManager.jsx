@@ -859,8 +859,11 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
              const canClockIn = (isMyShift || isAdmin) && !call.clock_in_time && (call.status === 'pending' || call.status === 'in_progress') && !isOnHold;
              const canClockOut = (isMyShift || isAdmin) && call.clock_in_time && !call.clock_out_time && call.status === 'in_progress' && !isOnHold;
              const hasCarLog = careLogs.some(log => log.id === call.care_log_id || (log.shift_call_id === call.id));
-             const partnerHasLog = shift?.paired_shift_id && careLogs.some(
-               log => log.shift_id === shift.paired_shift_id && log.service_user_id === call.service_user_id
+             const matchedPartnerCall = shift?.paired_shift_id ? getPartnerCall(call) : null;
+             const partnerHasLog = shift?.paired_shift_id && matchedPartnerCall && careLogs.some(
+               log => log.shift_id === shift.paired_shift_id &&
+                 log.service_user_id === call.service_user_id &&
+                 (log.shift_call_id === matchedPartnerCall.id || (!log.shift_call_id && log.visit_time === call.scheduled_time))
              );
 
 
@@ -941,15 +944,11 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
 
                 {/* Partner status indicator for paired shifts */}
                 {shift?.paired_shift_id && (() => {
-                  const partnerCall = getPartnerCall(call);
-                  const partnerHasLog = careLogs.some(
-                    log => log.shift_id === shift.paired_shift_id && log.service_user_id === call.service_user_id
-                  );
-                  if (!partnerCall) return null;
+                  if (!matchedPartnerCall) return null;
                   const parts = [];
-                  if (partnerCall.clock_in_time) parts.push('Checked in');
+                  if (matchedPartnerCall.clock_in_time) parts.push('Checked in');
                   if (partnerHasLog) parts.push('Log done');
-                  if (partnerCall.clock_out_time) parts.push('Checked out');
+                  if (matchedPartnerCall.clock_out_time) parts.push('Checked out');
                   if (parts.length === 0) return null;
                   return (
                     <div className="text-xs mb-3 flex items-center gap-1 text-purple-600 bg-purple-50 px-2 py-1 rounded">
