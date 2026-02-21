@@ -240,13 +240,21 @@ Deno.serve(async (req) => {
         continue
       }
 
-      // Calculate total miles between consecutive calls
+      // Calculate total miles between consecutive calls and store per-call mileage
       let totalMiles = 0
       const legs: string[] = []
       for (let i = 0; i < resolved.length - 1; i++) {
         const dist = haversineMiles(resolved[i]!.lat, resolved[i]!.lng, resolved[i + 1]!.lat, resolved[i + 1]!.lng)
         totalMiles += dist
         legs.push(`${resolved[i]!.postcode} → ${resolved[i + 1]!.postcode}: ${dist.toFixed(2)}mi`)
+        // Store individual leg mileage on the destination call
+        const legRounded = Math.round(dist * 100) / 100
+        if (legRounded > 0) {
+          await supabaseAdmin
+            .from('shift_calls')
+            .update({ call_mileage: legRounded })
+            .eq('id', resolved[i + 1]!.id)
+        }
       }
 
       if (totalMiles <= 0.1) { tooShort++; continue }

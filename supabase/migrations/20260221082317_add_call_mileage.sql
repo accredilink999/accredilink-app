@@ -1,0 +1,1 @@
+ALTER TABLE shift_calls ADD COLUMN IF NOT EXISTS call_mileage NUMERIC;

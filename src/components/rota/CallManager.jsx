@@ -927,7 +927,12 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                   <div className="text-xs mb-3 flex items-center gap-1">
                     <Car className="w-3 h-3" />
                     {call.drove_to_call ? (
-                      <span className="text-green-600">Drove to call</span>
+                      <>
+                        <span className="text-green-600">Drove to call</span>
+                        {call.call_mileage > 0 && (
+                          <span className="text-teal-600 font-medium ml-1">({call.call_mileage} mi)</span>
+                        )}
+                      </>
                     ) : (
                       <span className="text-slate-400">Did not drive</span>
                     )}
@@ -1251,11 +1256,20 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
 
                       if (resolved.length >= 2) {
                         let totalMiles = 0;
+                        // Calculate per-leg distance and store on each call
                         for (let i = 0; i < resolved.length - 1; i++) {
-                          totalMiles += haversineMiles(
+                          const legMiles = haversineMiles(
                             resolved[i].resolvedLat, resolved[i].resolvedLng,
                             resolved[i + 1].resolvedLat, resolved[i + 1].resolvedLng
                           );
+                          totalMiles += legMiles;
+                          // Store individual mileage on the destination call
+                          const legRounded = Math.round(legMiles * 100) / 100;
+                          if (legRounded > 0) {
+                            await ShiftCallApi.update(resolved[i + 1].id, {
+                              call_mileage: legRounded,
+                            });
+                          }
                         }
                         if (totalMiles > 0.1) {
                           await base44.functions.invoke('createShiftMileageExpense', {
