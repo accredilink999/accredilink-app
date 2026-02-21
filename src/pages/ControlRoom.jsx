@@ -106,12 +106,68 @@ export default function ControlRoom() {
     staleTime: 5 * 60 * 1000,
   });
 
+  // ── STAFF LIVE GPS (separate from client/calls code) ────────────
+  const staffOnShiftIds = React.useMemo(() => {
+    return [...new Set(todayShifts
+      .filter(s => s.staff_id && s.status !== 'cancelled')
+      .map(s => s.staff_id)
+    )];
+  }, [todayShifts]);
+
+  const { data: staffLocations = [] } = useQuery({
+    queryKey: ['staffLiveLocations', staffOnShiftIds.join(',')],
+    queryFn: async () => {
+      if (staffOnShiftIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('locations')
+        .select('staff_id, staff_name, latitude, longitude, accuracy, timestamp')
+        .in('staff_id', staffOnShiftIds);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: staffOnShiftIds.length > 0,
+    refetchInterval: 15000,
+  });
+
+  const { data: lastKnownGPS = [] } = useQuery({
+    queryKey: ['staffLastKnownGPS', staffOnShiftIds.join(','), todayStr],
+    queryFn: async () => {
+      if (staffOnShiftIds.length === 0) return [];
+      const shiftIds = todayShifts
+        .filter(s => staffOnShiftIds.includes(s.staff_id) && s.status !== 'cancelled')
+        .map(s => s.id);
+      if (shiftIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('shift_calls')
+        .select('shift_id, checkin_latitude, checkin_longitude, clock_in_time')
+        .in('shift_id', shiftIds)
+        .not('checkin_latitude', 'is', null)
+        .not('checkin_longitude', 'is', null)
+        .order('clock_in_time', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: staffOnShiftIds.length > 0,
+    staleTime: 60000,
+  });
+
   // Subscribe to shift_calls for real-time updates
   useEffect(() => {
     const unsubscribe = ShiftCallApi.subscribe(() => {
       queryClient.invalidateQueries({ queryKey: ['todayCalls'] });
     });
     return unsubscribe;
+  }, [queryClient]);
+
+  // Subscribe to locations table for live staff GPS updates
+  useEffect(() => {
+    const channel = supabase
+      .channel('staff-locations')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'locations' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['staffLiveLocations'] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [queryClient]);
 
   // Subscribe to shift updates
@@ -261,13 +317,70 @@ export default function ControlRoom() {
       .sort((a, b) => (a.staff_name || '').localeCompare(b.staff_name || ''));
   }, [todayShifts, todayCalls]);
 
-  // Map center from client markers
-  const hasMarkers = clientMarkers.length > 0;
+  // ── Staff map markers (live GPS + last known fallback) ──────────
+  const staffMarkers = React.useMemo(() => {
+    const markers = [];
+    const liveMap = new Map();
+    for (const loc of staffLocations) {
+      if (loc.latitude && loc.longitude) {
+        liveMap.set(loc.staff_id, loc);
+      }
+    }
+    const shiftToStaff = new Map();
+    for (const s of todayShifts) {
+      if (s.staff_id) shiftToStaff.set(s.id, s.staff_id);
+    }
+    const lastKnownMap = new Map();
+    for (const call of lastKnownGPS) {
+      const sid = shiftToStaff.get(call.shift_id);
+      if (sid && !lastKnownMap.has(sid)) {
+        lastKnownMap.set(sid, {
+          latitude: call.checkin_latitude,
+          longitude: call.checkin_longitude,
+          timestamp: call.clock_in_time,
+        });
+      }
+    }
+    for (const staffId of staffOnShiftIds) {
+      const shift = todayShifts.find(s => s.staff_id === staffId && s.status !== 'cancelled');
+      if (!shift) continue;
+      const live = liveMap.get(staffId);
+      const lastKnown = lastKnownMap.get(staffId);
+      if (live) {
+        markers.push({
+          staffId,
+          staffName: live.staff_name || shift.staff_name || 'Unknown',
+          lat: Number(live.latitude),
+          lng: Number(live.longitude),
+          isLive: true,
+          accuracy: live.accuracy,
+          timestamp: live.timestamp,
+        });
+      } else if (lastKnown) {
+        markers.push({
+          staffId,
+          staffName: shift.staff_name || 'Unknown',
+          lat: Number(lastKnown.latitude),
+          lng: Number(lastKnown.longitude),
+          isLive: false,
+          timestamp: lastKnown.timestamp,
+        });
+      }
+    }
+    return markers;
+  }, [staffOnShiftIds, staffLocations, lastKnownGPS, todayShifts]);
+
+  // Map center from all markers (clients + staff)
+  const allMapPoints = [
+    ...clientMarkers.map(m => ({ lat: m.lat, lng: m.lng })),
+    ...staffMarkers.map(m => ({ lat: m.lat, lng: m.lng })),
+  ];
+  const hasMarkers = allMapPoints.length > 0;
   const centerLat = hasMarkers
-    ? clientMarkers.reduce((sum, m) => sum + m.lat, 0) / clientMarkers.length
+    ? allMapPoints.reduce((sum, m) => sum + m.lat, 0) / allMapPoints.length
     : 52.82;
   const centerLng = hasMarkers
-    ? clientMarkers.reduce((sum, m) => sum + m.lng, 0) / clientMarkers.length
+    ? allMapPoints.reduce((sum, m) => sum + m.lng, 0) / allMapPoints.length
     : -3.40;
 
   // Lollipop icon with client name label
@@ -287,6 +400,62 @@ export default function ControlRoom() {
       popupAnchor: [0, -50],
     });
   };
+
+  // Staff GPS marker icon (blue = live, grey = last known)
+  const createStaffIcon = (name, isLive) => {
+    const color = isLive ? '#3B82F6' : '#9CA3AF';
+    const pulse = isLive ? 'animation:staffPulse 2s infinite;' : '';
+    const labelText = name.length > 15 ? name.substring(0, 14) + '...' : name;
+    const liveDot = isLive
+      ? '<div style="width:7px;height:7px;background:#22C55E;border-radius:50%;position:absolute;top:-1px;right:-1px;border:1.5px solid white;"></div>'
+      : '';
+    return L.divIcon({
+      className: 'staff-gps-marker',
+      html: `<div style="position:relative;display:flex;flex-direction:column;align-items:center;">
+        <div style="font-size:9px;font-weight:600;color:white;background:${color};padding:1px 5px;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,0.25);white-space:nowrap;margin-bottom:2px;max-width:100px;overflow:hidden;text-overflow:ellipsis;">${labelText}</div>
+        <div style="position:relative;width:22px;height:22px;background:${color};border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;${pulse}">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+          ${liveDot}
+        </div>
+      </div>
+      <style>@keyframes staffPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.8;transform:scale(1.1)}}</style>`,
+      iconSize: [80, 42],
+      iconAnchor: [40, 42],
+      popupAnchor: [0, -42],
+    });
+  };
+
+  const renderStaffMarkers = () => (
+    <>
+      {staffMarkers.map(s => (
+        <Marker
+          key={`staff-${s.staffId}`}
+          position={[s.lat, s.lng]}
+          icon={createStaffIcon(s.staffName, s.isLive)}
+        >
+          <Popup>
+            <div className="text-sm p-2 w-48">
+              <p className="font-bold text-slate-900">{s.staffName}</p>
+              <div className="flex items-center gap-1.5 mt-1">
+                <div className={`w-2 h-2 rounded-full ${s.isLive ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                <span className="text-xs text-slate-500">
+                  {s.isLive ? 'Live GPS' : 'Last known location'}
+                </span>
+              </div>
+              {s.timestamp && (
+                <p className="text-xs text-slate-400 mt-1">
+                  Updated: {format(new Date(s.timestamp), 'HH:mm')}
+                </p>
+              )}
+              {s.accuracy && (
+                <p className="text-xs text-slate-400">Accuracy: ±{Math.round(s.accuracy)}m</p>
+              )}
+            </div>
+          </Popup>
+        </Marker>
+      ))}
+    </>
+  );
 
   // Render client markers for map
   const renderClientMarkers = () => (
@@ -349,6 +518,7 @@ export default function ControlRoom() {
           <MapContainer center={[centerLat, centerLng]} zoom={13} style={{ height: '100%', width: '100%' }} ref={mapRef}>
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap contributors' />
             {renderClientMarkers()}
+            {renderStaffMarkers()}
           </MapContainer>
         </div>
       </div>
@@ -422,10 +592,11 @@ export default function ControlRoom() {
           <MapContainer center={[centerLat, centerLng]} zoom={13} style={{ height: '100%', width: '100%' }} ref={mapRef}>
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap contributors' />
             {renderClientMarkers()}
+            {renderStaffMarkers()}
           </MapContainer>
-          {clientMarkers.length === 0 && (
+          {clientMarkers.length === 0 && staffMarkers.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center bg-white/80">
-              <p className="text-slate-500 text-xs">No client calls scheduled today — markers will appear when shifts have calls</p>
+              <p className="text-slate-500 text-xs">No markers to show — client and staff markers will appear when shifts are active</p>
             </div>
           )}
           <button
@@ -449,8 +620,16 @@ export default function ControlRoom() {
             <div className="w-3 h-3 rounded-full bg-green-500"></div>
             Completed / Pending
           </div>
+          <div className="flex items-center gap-1.5 text-xs text-slate-600">
+            <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+            Staff (Live)
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-slate-600">
+            <div className="w-3 h-3 rounded-full bg-gray-400"></div>
+            Staff (Last Known)
+          </div>
           <div className="text-xs text-slate-400">
-            {clientMarkers.length} client{clientMarkers.length !== 1 ? 's' : ''} on map
+            {clientMarkers.length} client{clientMarkers.length !== 1 ? 's' : ''} · {staffMarkers.length} staff on map
           </div>
         </div>
 
