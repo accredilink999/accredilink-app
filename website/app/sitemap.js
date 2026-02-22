@@ -39,6 +39,21 @@ export default function sitemap() {
     priority: 0.7,
   }));
 
+  // SEO service+location pages (high priority for local ranking)
+  const seoPages = [
+    // Primary authority page
+    { url: `${baseUrl}/areas/denbighshire/emergency-home-care`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.9 },
+    // Town authority pages
+    { url: `${baseUrl}/areas/denbigh/home-care`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.9 },
+    { url: `${baseUrl}/areas/llangollen/home-care`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.9 },
+    // Service+town pages - Denbigh
+    { url: `${baseUrl}/areas/denbigh/dementia-care`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.85 },
+    { url: `${baseUrl}/areas/denbigh/overnight-care`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.85 },
+    // Service+town pages - Llangollen
+    { url: `${baseUrl}/areas/llangollen/dementia-care`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.85 },
+    { url: `${baseUrl}/areas/llangollen/overnight-care`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.85 },
+  ];
+
   // Blog posts
   const blogSlugs = [
     'how-to-arrange-domiciliary-care-in-wales',
@@ -47,6 +62,7 @@ export default function sitemap() {
     'what-is-respite-care',
     'hospital-discharge-care-wales',
     'dementia-care-at-home-tips',
+    'home-care-denbighshire-guide',
   ];
   const blogPages = blogSlugs.map(slug => ({
     url: `${baseUrl}/blog/${slug}`,
@@ -55,5 +71,5 @@ export default function sitemap() {
     priority: 0.6,
   }));
 
-  return [...staticPages, ...servicePages, ...locationPages, ...blogPages];
+  return [...staticPages, ...servicePages, ...locationPages, ...seoPages, ...blogPages];
 }

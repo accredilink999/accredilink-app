@@ -34,7 +34,7 @@ export default function DayView({ currentDate, onShiftClick, onCreateShift, isAd
 
   const { data: shiftTypes = [] } = useQuery({
     queryKey: ['shiftTypes'],
-    queryFn: () => ShiftTypeApi.list(),
+    queryFn: () => ShiftTypeApi.filter({ is_active: true }),
   });
 
   const { data: calls = [] } = useQuery({

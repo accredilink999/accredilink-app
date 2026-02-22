@@ -393,6 +393,8 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
       queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] });
       if (status === 'missed') {
         toast.success('Marked as Not Home');
+      } else if (status === 'completed') {
+        toast.success('Call marked as complete');
       }
     },
     onError: (err, { callId }) => {
@@ -1055,7 +1057,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                        Check Out
                      </Button>
                    )}
-                  {(isMyShift || isAdmin) && !hasCarLog && !partnerHasLog && !isOnHold && call.status !== 'completed' && (
+                  {(isMyShift || isAdmin) && !hasCarLog && !partnerHasLog && !isOnHold && call.status !== 'completed' && call.status !== 'missed' && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -1072,7 +1074,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                       Partner Has Filled In The Log For This Call
                     </div>
                   )}
-                  {(isMyShift || isAdmin) && call.status !== 'completed' && !shift?.paired_shift_id && (
+                  {(isMyShift || isAdmin) && call.status !== 'completed' && call.status !== 'missed' && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -1082,7 +1084,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                       Not My Call
                     </Button>
                   )}
-                  {(isMyShift || isAdmin) && !hasCarLog && !partnerHasLog && call.status !== 'completed' && (
+                  {(isMyShift || isAdmin) && call.status !== 'completed' && call.status !== 'missed' && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -1090,6 +1092,17 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                       className="w-full min-h-[44px] px-4 touch-manipulation"
                     >
                       Not Home
+                    </Button>
+                  )}
+                  {(isMyShift || isAdmin) && call.status === 'pending' && !call.clock_in_time && !isOnHold && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => updateStatusMutation.mutate({ callId: call.id, status: 'completed' })}
+                      className="w-full min-h-[44px] px-4 touch-manipulation border-green-300 text-green-700 hover:bg-green-50"
+                    >
+                      <CheckCircle className="w-3 h-3 mr-1" />
+                      Mark Complete
                     </Button>
                   )}
                   {isAdmin && (
@@ -1104,6 +1117,20 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                     </Button>
                   )}
                 </div>
+
+                {/* Status indicator text for completed/missed calls */}
+                {call.status === 'missed' && (
+                  <p className="text-xs text-red-600 font-medium mt-2 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    Not at home — no care log required
+                  </p>
+                )}
+                {call.status === 'completed' && !call.clock_out_time && (
+                  <p className="text-xs text-green-600 font-medium mt-2 flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3" />
+                    Marked as complete
+                  </p>
+                )}
               </Card>
             );
           })}

@@ -156,9 +156,31 @@ export default function ShiftTypeManager({ open, onClose }) {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => ShiftTypeApi.update(id, { is_active: false }),
+    mutationFn: async (id) => {
+      // Get the shift type name before deactivating
+      const { data: shiftType } = await supabase
+        .from('shift_types')
+        .select('name')
+        .eq('id', id)
+        .single();
+
+      // Soft-delete the shift type
+      await ShiftTypeApi.update(id, { is_active: false });
+
+      // Remove future unassigned shifts with this name (blank template shifts)
+      if (shiftType?.name) {
+        const today = new Date().toISOString().split('T')[0];
+        await supabase
+          .from('shifts')
+          .delete()
+          .eq('shift_name', shiftType.name)
+          .is('staff_id', null)
+          .gte('date', today);
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shiftTypes'] });
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
       toast.success('Shift type deleted');
     },
     onError: (error) => {

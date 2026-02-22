@@ -48,7 +48,7 @@ export default function WeekView({ currentDate, onShiftClick, onCreateShift, isA
 
   const { data: shiftTypes = [] } = useQuery({
     queryKey: ['shiftTypes'],
-    queryFn: () => ShiftTypeApi.list(),
+    queryFn: () => ShiftTypeApi.filter({ is_active: true }),
   });
 
   const { data: allCalls = [] } = useQuery({

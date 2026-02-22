@@ -110,7 +110,7 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
 
   const { data: shiftTypes = [] } = useQuery({
     queryKey: ['shiftTypes'],
-    queryFn: () => ShiftTypeApi.list(),
+    queryFn: () => ShiftTypeApi.filter({ is_active: true }),
   });
 
   // When editing, sync shift times from current shift type definitions
