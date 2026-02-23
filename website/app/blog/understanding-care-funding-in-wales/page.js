@@ -4,11 +4,24 @@ import Image from 'next/image';
 export const metadata = {
   title: 'Understanding Care Funding in Wales: What You Need to Know | Accredilink',
   description: 'A clear guide to care funding in Wales, including local authority funding, financial assessments, direct payments, NHS Continuing Healthcare, Attendance Allowance, and the Welsh cap on care charges.',
+  alternates: {
+    canonical: 'https://accredilinkcare.co.uk/blog/understanding-care-funding-in-wales',
+  },
 };
 
 export default function UnderstandingCareFundingInWales() {
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "Article",
+        headline: "Understanding Care Funding in Wales: What You Need to Know",
+        description: "A clear guide to care funding in Wales, including local authority funding, financial assessments, direct payments, NHS Continuing Healthcare, Attendance Allowance, and the Welsh cap on care charges.",
+        author: { "@type": "Organization", "@id": "https://accredilinkcare.co.uk/#organization", name: "Accredilink Community Response Taskforce" },
+        publisher: { "@type": "Organization", "@id": "https://accredilinkcare.co.uk/#organization" },
+        url: "https://accredilinkcare.co.uk/blog/understanding-care-funding-in-wales",
+        mainEntityOfPage: "https://accredilinkcare.co.uk/blog/understanding-care-funding-in-wales",
+      }) }} />
       <section className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#B91C1C] via-white to-[#166534]" />
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 relative">

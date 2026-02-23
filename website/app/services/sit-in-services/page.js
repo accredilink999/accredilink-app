@@ -3,12 +3,16 @@ import ServicePageLayout from '@/components/ServicePageLayout';
 export const metadata = {
   title: 'Sit-in Services',
   description: 'Sit-in care services in Denbighshire, Conwy and Wrexham. Professional companionship and supervision so family carers can take a break with peace of mind.',
+  alternates: {
+    canonical: 'https://accredilinkcare.co.uk/services/sit-in-services',
+  },
 };
 
 export default function SitInServices() {
   return (
     <ServicePageLayout
       title="Sit-in Services"
+      slug="sit-in-services"
       description="Our sit-in service provides a trusted, friendly carer to stay with your loved one while you step out. Whether you need to attend an appointment, do the shopping, or simply have time to yourself — we provide professional, person-centred companionship and supervision so you can leave with complete peace of mind."
       icon={
         <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">

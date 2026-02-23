@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
 import { ShiftCallApi } from '@/api/rotaApi';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -35,9 +36,16 @@ export default function AddClientCallsModal({ shift, open, onClose }) {
     enabled: !!open && !!shift?.id,
   });
 
+  const shiftAreaId = shift?.rota_area_id || shift?.area_id;
   const { data: callTypesData = [] } = useQuery({
-    queryKey: ['callTypes'],
-    queryFn: () => base44.entities.CallType.filter({ is_active: true }, 'sort_order'),
+    queryKey: ['callTypes', shiftAreaId],
+    queryFn: async () => {
+      let q = supabase.from('call_types').select('*').eq('is_active', true);
+      if (shiftAreaId) q = q.or(`area_id.eq.${shiftAreaId},area_id.is.null`);
+      const { data, error } = await q.order('sort_order');
+      if (error) throw error;
+      return data || [];
+    },
     enabled: !!open,
   });
 

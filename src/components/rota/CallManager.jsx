@@ -53,6 +53,8 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
   const [newTaskText, setNewTaskText] = useState({});
   const [sitinLogCallId, setSitinLogCallId] = useState(null);
   const [sitinLogForm, setSitinLogForm] = useState({ visit_type: 'food_drink', notes: '', service_user_id: '' });
+  const [deleteConfirmCallId, setDeleteConfirmCallId] = useState(null);
+  const [holdExpiredConfirm, setHoldExpiredConfirm] = useState(null);
 
   const [freshCalls, setFreshCalls] = useState(calls);
 
@@ -391,8 +393,10 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
     },
     onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] });
-      if (status === 'missed') {
-        toast.success('Marked as Not Home');
+      if (status === 'not_at_home') {
+        toast.success('Marked as Not at Home');
+      } else if (status === 'missed') {
+        toast.success('Marked as Missed');
       } else if (status === 'completed') {
         toast.success('Call marked as complete');
       }
@@ -403,6 +407,43 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
       queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] });
       console.error('Update status error:', err);
       toast.error(err.message || 'Failed to update call status');
+    },
+  });
+
+  // Decrement temporary hold counter for on-hold service users
+  const decrementHoldMutation = useMutation({
+    mutationFn: async ({ serviceUserId, serviceUserName, currentRemaining }) => {
+      const newRemaining = currentRemaining - 1;
+      if (newRemaining <= 0) {
+        // Hold expired: revert to active
+        await base44.entities.ServiceUser.update(serviceUserId, {
+          status: 'active',
+          hold_type: 'permanent',
+          hold_remaining_calls: null
+        });
+        return { expired: true, serviceUserName };
+      } else {
+        // Decrement the counter
+        await base44.entities.ServiceUser.update(serviceUserId, {
+          hold_remaining_calls: newRemaining
+        });
+        // Warn on last held call
+        if (newRemaining === 1) {
+          toast.warning(`Last held call for ${serviceUserName} - hold will expire after the next call`);
+        }
+        return { expired: false, remaining: newRemaining, serviceUserName };
+      }
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['serviceUsers'] });
+      if (result.expired) {
+        toast.success(`Hold period ended for ${result.serviceUserName} - status reverted to Active`);
+        setHoldExpiredConfirm(result.serviceUserName);
+      }
+    },
+    onError: (err) => {
+      console.error('Failed to decrement hold:', err);
+      toast.error('Failed to update hold status');
     },
   });
 
@@ -571,6 +612,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
     switch (status) {
       case 'completed': return 'bg-green-100 text-green-800';
       case 'in_progress': return 'bg-blue-100 text-blue-800';
+      case 'not_at_home': return 'bg-amber-100 text-amber-800';
       case 'missed': return 'bg-red-100 text-red-800';
       case 'rescheduled': return 'bg-yellow-100 text-yellow-800';
       default: return 'bg-slate-100 text-slate-800';
@@ -581,6 +623,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
     switch (status) {
       case 'completed': return <CheckCircle className="w-4 h-4" />;
       case 'in_progress': return <Play className="w-4 h-4" />;
+      case 'not_at_home': return <MapPin className="w-4 h-4" />;
       case 'missed': return <AlertCircle className="w-4 h-4" />;
       default: return <Clock className="w-4 h-4" />;
     }
@@ -872,6 +915,8 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
              const getCardBackground = () => {
                if (isOnHold) return 'bg-gray-100 opacity-50';
                if (call.status === 'completed') return 'bg-green-50';
+               if (call.status === 'not_at_home') return 'bg-amber-50';
+               if (call.status === 'missed') return 'bg-red-50';
 
                const callTime = new Date(`${call.date}T${call.scheduled_time}`);
                const now = new Date();
@@ -907,12 +952,16 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                   </div>
                   <div className="flex items-center gap-2">
                     {isOnHold && (
-                      <Badge className="bg-gray-400 text-white">On Hold</Badge>
+                      <Badge className="bg-amber-500 text-white">
+                        {serviceUser?.hold_type === 'temporary' && serviceUser?.hold_remaining_calls > 0
+                          ? `On Hold (${serviceUser.hold_remaining_calls} call${serviceUser.hold_remaining_calls !== 1 ? 's' : ''} remaining)`
+                          : 'On Hold'}
+                      </Badge>
                     )}
                     <Badge className={getStatusColor(call.status)}>
                       <span className="flex items-center gap-1">
                         {getStatusIcon(call.status)}
-                        {call.status}
+                        {call.status === 'not_at_home' ? 'not at home' : call.status}
                       </span>
                     </Badge>
                   </div>
@@ -1057,7 +1106,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                        Check Out
                      </Button>
                    )}
-                  {(isMyShift || isAdmin) && !hasCarLog && !partnerHasLog && !isOnHold && call.status !== 'completed' && call.status !== 'missed' && (
+                  {(isMyShift || isAdmin) && !hasCarLog && !partnerHasLog && !isOnHold && call.status !== 'completed' && call.status !== 'missed' && call.status !== 'not_at_home' && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -1074,7 +1123,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                       Partner Has Filled In The Log For This Call
                     </div>
                   )}
-                  {(isMyShift || isAdmin) && call.status !== 'completed' && call.status !== 'missed' && (
+                  {(isMyShift || isAdmin) && call.status !== 'completed' && call.status !== 'missed' && call.status !== 'not_at_home' && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -1084,14 +1133,24 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                       Not My Call
                     </Button>
                   )}
-                  {(isMyShift || isAdmin) && call.status !== 'completed' && call.status !== 'missed' && (
+                  {(isMyShift || isAdmin) && call.status !== 'completed' && call.status !== 'missed' && call.status !== 'not_at_home' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => updateStatusMutation.mutate({ callId: call.id, status: 'not_at_home' })}
+                      className="w-full min-h-[44px] px-4 touch-manipulation border-amber-300 text-amber-700 hover:bg-amber-50"
+                    >
+                      Not at Home
+                    </Button>
+                  )}
+                  {(isMyShift || isAdmin) && call.status !== 'completed' && call.status !== 'missed' && call.status !== 'not_at_home' && (
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => updateStatusMutation.mutate({ callId: call.id, status: 'missed' })}
-                      className="w-full min-h-[44px] px-4 touch-manipulation"
+                      className="w-full min-h-[44px] px-4 touch-manipulation border-red-300 text-red-700 hover:bg-red-50"
                     >
-                      Not Home
+                      Missed
                     </Button>
                   )}
                   {(isMyShift || isAdmin) && call.status === 'pending' && !call.clock_in_time && !isOnHold && (
@@ -1105,11 +1164,28 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                       Mark Complete
                     </Button>
                   )}
+                  {/* Decrement hold for on-hold temporary users */}
+                  {isOnHold && serviceUser?.hold_type === 'temporary' && serviceUser?.hold_remaining_calls > 0 && (isMyShift || isAdmin) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => decrementHoldMutation.mutate({
+                        serviceUserId: serviceUser.id,
+                        serviceUserName: call.service_user_name,
+                        currentRemaining: serviceUser.hold_remaining_calls
+                      })}
+                      disabled={decrementHoldMutation.isPending}
+                      className="w-full min-h-[44px] px-4 touch-manipulation border-amber-300 text-amber-700 hover:bg-amber-50 col-span-2"
+                    >
+                      <CheckCircle className="w-3 h-3 mr-1" />
+                      Skip Call (Decrement Hold)
+                    </Button>
+                  )}
                   {isAdmin && (
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => deleteCallMutation.mutate(call.id)}
+                      onClick={() => setDeleteConfirmCallId(call.id)}
                       disabled={deleteCallMutation.isPending}
                       className="w-full min-h-[44px] px-4 touch-manipulation"
                     >
@@ -1118,11 +1194,17 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                   )}
                 </div>
 
-                {/* Status indicator text for completed/missed calls */}
+                {/* Status indicator text for completed/missed/not_at_home calls */}
+                {call.status === 'not_at_home' && (
+                  <p className="text-xs text-amber-600 font-medium mt-2 flex items-center gap-1">
+                    <MapPin className="w-3 h-3" />
+                    Not at home — no care log required
+                  </p>
+                )}
                 {call.status === 'missed' && (
                   <p className="text-xs text-red-600 font-medium mt-2 flex items-center gap-1">
                     <AlertCircle className="w-3 h-3" />
-                    Not at home — no care log required
+                    Missed call
                   </p>
                 )}
                 {call.status === 'completed' && !call.clock_out_time && (
@@ -1163,6 +1245,30 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
           scheduledTime={careLogCall.scheduled_time}
         />
       )}
+
+      {/* Delete call confirmation dialog */}
+      <AlertDialog open={!!deleteConfirmCallId} onOpenChange={(open) => !open && setDeleteConfirmCallId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete This Call?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this call? This action cannot be undone. Any linked care logs will be unlinked.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-3">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                deleteCallMutation.mutate(deleteConfirmCallId);
+                setDeleteConfirmCallId(null);
+              }}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Yes, Delete
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!clockOutConfirmCall} onOpenChange={(open) => !open && setClockOutConfirmCall(null)}>
         <AlertDialogContent>
@@ -1394,6 +1500,23 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
               className="bg-green-600 hover:bg-green-700"
             >
               Yes, I Drove
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Hold expired confirmation dialog */}
+      <AlertDialog open={!!holdExpiredConfirm} onOpenChange={(open) => !open && setHoldExpiredConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Temporary Hold Ended</AlertDialogTitle>
+            <AlertDialogDescription>
+              The temporary hold for <strong>{holdExpiredConfirm}</strong> has ended. Their status has been set back to <strong>Active</strong>. Calls for this client will resume as normal.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex justify-end gap-2">
+            <AlertDialogAction onClick={() => setHoldExpiredConfirm(null)} className="bg-teal-600 hover:bg-teal-700">
+              OK, Got It
             </AlertDialogAction>
           </div>
         </AlertDialogContent>

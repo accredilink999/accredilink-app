@@ -1,5 +1,6 @@
 import React from 'react';
 import { Card } from "@/components/ui/card";
+import { FileText, Download } from 'lucide-react';
 import ReadOnlyMARCard from "@/components/medications/ReadOnlyMARCard";
 
 export default function CarePlanViewer({ serviceUser }) {
@@ -198,6 +199,32 @@ export default function CarePlanViewer({ serviceUser }) {
     }
   };
 
+  const renderRiskAssessmentFiles = () => {
+    const files = serviceUser.risk_assessment_files;
+    if (!files || !Array.isArray(files) || files.length === 0) return null;
+
+    return (
+      <Card className="p-3 sm:p-4">
+        <h4 className="font-semibold mb-3 text-teal-600 text-sm sm:text-base">Risk Assessment Attachments</h4>
+        <div className="space-y-2">
+          {files.map((file, idx) => (
+            <a
+              key={file.id || idx}
+              href={file.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 p-2 rounded-lg border border-slate-200 hover:border-teal-300 hover:bg-teal-50 transition-colors"
+            >
+              <FileText className="w-5 h-5 text-teal-600 flex-shrink-0" />
+              <span className="text-sm text-slate-700 truncate flex-1">{file.name || `Attachment ${idx + 1}`}</span>
+              <Download className="w-4 h-4 text-slate-400" />
+            </a>
+          ))}
+        </div>
+      </Card>
+    );
+  };
+
   const renderEmergencyShutoffs = () => {
     if (!serviceUser.emergency_shutoff_water && !serviceUser.emergency_shutoff_electricity && !serviceUser.emergency_shutoff_gas) {
       return null;
@@ -246,6 +273,7 @@ export default function CarePlanViewer({ serviceUser }) {
       {renderEmergencyShutoffs()}
       {renderSection('Pets In Property', serviceUser.pets_in_property)}
       {renderRiskAssessments()}
+      {renderRiskAssessmentFiles()}
       {renderSection('Additional Risk Notes', serviceUser.risk_assessments)}
       {renderPersonCentredCalls()}
       {(serviceUser.care_plan_date || serviceUser.plan_completed_by || serviceUser.plan_review_date) && (

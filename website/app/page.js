@@ -2,6 +2,19 @@ import Link from 'next/link';
 import Image from 'next/image';
 import AnimateOnScroll from '@/components/AnimateOnScroll';
 
+const websiteSchema = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "@id": "https://accredilinkcare.co.uk/#website",
+  name: "Accredilink Community Response Taskforce",
+  url: "https://accredilinkcare.co.uk",
+  potentialAction: {
+    "@type": "SearchAction",
+    target: "https://accredilinkcare.co.uk/?q={search_term_string}",
+    "query-input": "required name=search_term_string",
+  },
+};
+
 const services = [
   {
     title: 'Domiciliary Care',
@@ -137,6 +150,7 @@ const strengths = [
 export default function Home() {
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }} />
       {/* Hero */}
       <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         {/* Welsh-inspired accent bars */}
@@ -368,8 +382,46 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CTA */}
+      {/* Latest Guides & Resources */}
       <section className="py-16 sm:py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <AnimateOnScroll animation="fade-in-up">
+            <div className="text-center max-w-2xl mx-auto mb-10">
+              <p className="text-sm font-semibold text-welsh-red uppercase tracking-wider mb-3">Resources</p>
+              <h2 className="text-3xl sm:text-4xl font-bold text-slate-900">Helpful Guides</h2>
+              <p className="mt-4 text-lg text-slate-600">Free advice and information to help you navigate care options in North Wales.</p>
+            </div>
+          </AnimateOnScroll>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              { href: '/blog/how-to-arrange-domiciliary-care-in-wales', title: 'How to Arrange Domiciliary Care in Wales', desc: 'Complete guide to setting up home care — assessments, funding, and choosing a provider.' },
+              { href: '/blog/understanding-care-funding-in-wales', title: 'Understanding Care Funding in Wales', desc: 'Local authority funding, direct payments, Attendance Allowance and NHS CHC explained.' },
+              { href: '/blog/what-is-respite-care', title: 'What Is Respite Care?', desc: 'How respite care works, who it\'s for, and how to arrange it in Denbighshire.' },
+              { href: '/areas/denbighshire/respite-care-at-home', title: 'Respite Care at Home in Denbighshire', desc: 'In-home respite services across Denbighshire — flexible support for family carers.' },
+              { href: '/areas/denbighshire/hospital-discharge-care', title: 'Hospital Discharge Care', desc: 'Safe transition home from hospital with professional domiciliary care support.' },
+              { href: '/blog/home-care-denbighshire-guide', title: 'Home Care in Denbighshire Guide', desc: 'Everything you need to know about arranging home care locally.' },
+            ].map((item, i) => (
+              <AnimateOnScroll key={item.href} animation="fade-in-up" delay={i * 100}>
+                <Link href={item.href} className="block p-5 rounded-xl border border-slate-200 hover:border-welsh-red/30 hover:shadow-md transition-all group">
+                  <h3 className="font-semibold text-slate-900 group-hover:text-welsh-red transition-colors mb-2 text-sm">{item.title}</h3>
+                  <p className="text-xs text-slate-600 leading-relaxed">{item.desc}</p>
+                </Link>
+              </AnimateOnScroll>
+            ))}
+          </div>
+          <AnimateOnScroll animation="fade-in-up" delay={300}>
+            <div className="text-center mt-8">
+              <Link href="/blog" className="inline-flex items-center gap-1.5 text-sm font-medium text-welsh-red hover:underline">
+                View all guides
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+              </Link>
+            </div>
+          </AnimateOnScroll>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="py-16 sm:py-20 bg-slate-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <AnimateOnScroll animation="slide-in-left">

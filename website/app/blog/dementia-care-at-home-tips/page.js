@@ -4,11 +4,24 @@ import Image from 'next/image';
 export const metadata = {
   title: 'Caring for Someone with Dementia at Home: Practical Tips | Accredilink',
   description: 'Practical advice for families caring for someone with dementia at home. Tips on daily routines, communication, home safety, when to seek professional help, and local dementia services in Wales.',
+  alternates: {
+    canonical: 'https://accredilinkcare.co.uk/blog/dementia-care-at-home-tips',
+  },
 };
 
 export default function DementiaCareAtHomeTips() {
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "Article",
+        headline: "Caring for Someone with Dementia at Home: Practical Tips",
+        description: "Practical advice for families caring for someone with dementia at home. Tips on daily routines, communication, home safety, when to seek professional help, and local dementia services in Wales.",
+        author: { "@type": "Organization", "@id": "https://accredilinkcare.co.uk/#organization", name: "Accredilink Community Response Taskforce" },
+        publisher: { "@type": "Organization", "@id": "https://accredilinkcare.co.uk/#organization" },
+        url: "https://accredilinkcare.co.uk/blog/dementia-care-at-home-tips",
+        mainEntityOfPage: "https://accredilinkcare.co.uk/blog/dementia-care-at-home-tips",
+      }) }} />
       <section className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#B91C1C] via-white to-[#166534]" />
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 relative">

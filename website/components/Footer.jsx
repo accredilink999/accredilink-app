@@ -134,14 +134,22 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Bottom bar */}
-        <div className="mt-12 pt-8 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-xs text-slate-500">
-            &copy; {new Date().getFullYear()} Accredilink Community Response Taskforce. All rights reserved.
-          </p>
-          <p className="text-xs text-slate-500">
-            Regulated by Care Inspectorate Wales (CIW)
-          </p>
+        {/* Legal Links */}
+        <div className="mt-10 pt-6 border-t border-slate-800">
+          <div className="flex flex-wrap justify-center gap-4 sm:gap-6 mb-6">
+            <Link href="/privacy-policy" className="text-xs text-slate-500 hover:text-white transition-colors">Privacy Policy</Link>
+            <Link href="/terms" className="text-xs text-slate-500 hover:text-white transition-colors">Terms & Conditions</Link>
+            <Link href="/accessibility" className="text-xs text-slate-500 hover:text-white transition-colors">Accessibility</Link>
+            <Link href="/cookie-policy" className="text-xs text-slate-500 hover:text-white transition-colors">Cookie Policy</Link>
+          </div>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-xs text-slate-500">
+              &copy; {new Date().getFullYear()} Accredilink Community Response Taskforce. All rights reserved.
+            </p>
+            <p className="text-xs text-slate-500">
+              Regulated by Care Inspectorate Wales (CIW)
+            </p>
+          </div>
         </div>
       </div>
     </footer>

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Bell, Save, ChevronDown } from 'lucide-react';
+import { Bell, Save, ChevronDown, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function NotificationPreferences({ userId }) {
@@ -21,6 +21,11 @@ export default function NotificationPreferences({ userId }) {
       return prefs[0] || null;
     },
     enabled: !!userId,
+  });
+
+  const { data: rotaAreas = [] } = useQuery({
+    queryKey: ['rotaAreas'],
+    queryFn: () => base44.entities.RotaArea.filter({ is_active: true }, 'name'),
   });
 
   useEffect(() => {
@@ -52,6 +57,7 @@ export default function NotificationPreferences({ userId }) {
         quiet_hours_start: '22:00',
         quiet_hours_end: '08:00',
         notification_retention_days: 30,
+        notification_areas: [],
       });
     }
   }, [existingPreferences, userId]);
@@ -167,6 +173,50 @@ export default function NotificationPreferences({ userId }) {
           </CollapsibleContent>
         </Card>
       </Collapsible>
+
+      {rotaAreas.length > 0 && (
+        <Collapsible defaultOpen={false}>
+          <Card>
+            <CollapsibleTrigger className="w-full">
+              <CardHeader className="cursor-pointer bg-green-50 hover:bg-green-100 transition-colors rounded-t-xl">
+                <CardTitle className="flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <MapPin className="w-5 h-5 text-green-600" />
+                    Area Notifications
+                  </span>
+                  <ChevronDown className="w-5 h-5 text-slate-400 transition-transform [[data-state=open]_&]:rotate-180" />
+                </CardTitle>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent>
+                <p className="text-xs text-slate-500 mb-3">Select which rota areas you want to receive notifications for. Leave all unchecked to receive notifications for all areas.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {rotaAreas.map((area) => (
+                    <div key={area.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded">
+                      <Checkbox
+                        checked={(preferences.notification_areas || []).includes(area.id)}
+                        onCheckedChange={(checked) => {
+                          const current = preferences.notification_areas || [];
+                          const updated = checked
+                            ? [...current, area.id]
+                            : current.filter(id => id !== area.id);
+                          setPreferences(prev => ({ ...prev, notification_areas: updated }));
+                          setHasChanges(true);
+                        }}
+                      />
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: area.color || '#0d9488' }} />
+                        <label className="text-sm text-slate-700 cursor-pointer">{area.name}</label>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
+      )}
 
       <Collapsible defaultOpen={false}>
         <Card>

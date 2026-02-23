@@ -42,8 +42,8 @@ export default function MonthView({ currentDate, onShiftClick, onCreateShift, is
    });
 
   const { data: shiftTypes = [] } = useQuery({
-    queryKey: ['shiftTypes'],
-    queryFn: () => ShiftTypeApi.filter({ is_active: true }),
+    queryKey: ['shiftTypes', selectedAreaId],
+    queryFn: () => ShiftTypeApi.filterByArea(selectedAreaId),
   });
 
   const days = [];

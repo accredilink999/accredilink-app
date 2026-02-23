@@ -10,12 +10,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Loader2, Plus, Trash2, FileIcon, Download, X, ChevronDown, ListChecks } from 'lucide-react';
+import { Loader2, Plus, Trash2, FileIcon, Download, X, ChevronDown, ListChecks, Maximize2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { deployClientCallsToRota } from '@/utils/deployPattern';
 import MARChart from '@/components/medications/MARChart';
 import ClientRotaSetup from '@/components/serviceUsers/ClientRotaSetup';
 import DraftRecoveryPrompt from '@/components/ui/DraftRecoveryPrompt';
+import ExpandableTextarea from '@/components/ui/ExpandableTextarea';
+import TextInputDialog from '@/components/ui/TextInputDialog';
 
 // Draft persistence helpers
 const DRAFT_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
@@ -42,6 +44,8 @@ export default function ServiceUserForm({ serviceUser, open, onClose }) {
   const [newServiceUser, setNewServiceUser] = useState(null);
   const [hasDraft, setHasDraft] = useState(false);
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+  const [holdConfirmOpen, setHoldConfirmOpen] = useState(false);
+  const [pendingHoldStatus, setPendingHoldStatus] = useState(null);
   const formDirtyRef = useRef(false);
   const prevOpenRef = useRef(false);
   const draftKey = isEdit ? `draft:service-user:${serviceUser?.id}` : 'draft:service-user:new';
@@ -85,6 +89,8 @@ export default function ServiceUserForm({ serviceUser, open, onClose }) {
       communication_needs: '',
       key_safe_code: '',
       status: 'active',
+      hold_type: 'permanent',
+      hold_remaining_calls: null,
       notes: '',
       quick_reference: '',
       what_matters_to_me: '',
@@ -168,6 +174,9 @@ export default function ServiceUserForm({ serviceUser, open, onClose }) {
   const [additionalRiskCollapsed, setAdditionalRiskCollapsed] = useState(true);
   const [editingRiskIndex, setEditingRiskIndex] = useState(null);
 
+  // State for risk table cell expand dialog
+  const [riskCellDialog, setRiskCellDialog] = useState({ open: false, index: null, col: null, title: '' });
+
   // Only reset form when dialog transitions from closed → open (not on every serviceUser change)
   useEffect(() => {
     const justOpened = open && !prevOpenRef.current;
@@ -210,6 +219,8 @@ export default function ServiceUserForm({ serviceUser, open, onClose }) {
         communication_needs: '',
         key_safe_code: '',
         status: 'active',
+        hold_type: 'permanent',
+        hold_remaining_calls: null,
         notes: '',
         quick_reference: '',
         what_matters_to_me: '',
@@ -592,6 +603,25 @@ ${formData.care_plan ? `CARE PLAN DETAILS:\n${formData.care_plan}` : ''}`;
         </div>
       </AlertDialogContent>
     </AlertDialog>
+    {/* Hold Confirmation Dialog */}
+    <AlertDialog open={holdConfirmOpen} onOpenChange={setHoldConfirmOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Put Client On Hold?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to put {formData.full_name || 'this client'} on hold? Their calls will be suspended. You can configure whether the hold is permanent or temporary after confirming.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div className="flex justify-end gap-2 mt-4">
+          <AlertDialogCancel onClick={() => { setHoldConfirmOpen(false); setPendingHoldStatus(null); }}>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={() => {
+            setFormData({...formData, status: 'on_hold', hold_type: 'permanent', hold_remaining_calls: null});
+            setHoldConfirmOpen(false);
+            setPendingHoldStatus(null);
+          }} className="bg-amber-600 hover:bg-amber-700">Yes, Put On Hold</AlertDialogAction>
+        </div>
+      </AlertDialogContent>
+    </AlertDialog>
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen && !mutation.isPending) handleSafeClose(); }}>
       <DialogContent
         className="max-w-4xl max-h-[90vh] overflow-y-auto"
@@ -729,9 +759,10 @@ ${formData.care_plan ? `CARE PLAN DETAILS:\n${formData.care_plan}` : ''}`;
 
             <div>
               <Label>Allergies</Label>
-              <Textarea
+              <ExpandableTextarea
                 value={formData.allergies}
-                onChange={(e) => setFormData({...formData, allergies: e.target.value})}
+                onChange={(val) => setFormData({...formData, allergies: val})}
+                label="Allergies"
                 placeholder="List any allergies..."
                 rows={2}
               />
@@ -739,9 +770,10 @@ ${formData.care_plan ? `CARE PLAN DETAILS:\n${formData.care_plan}` : ''}`;
 
             <div>
               <Label>Dietary Requirements</Label>
-              <Textarea
+              <ExpandableTextarea
                 value={formData.dietary_requirements}
-                onChange={(e) => setFormData({...formData, dietary_requirements: e.target.value})}
+                onChange={(val) => setFormData({...formData, dietary_requirements: val})}
+                label="Dietary Requirements"
                 placeholder="Any dietary requirements..."
                 rows={2}
               />
@@ -766,7 +798,14 @@ ${formData.care_plan ? `CARE PLAN DETAILS:\n${formData.care_plan}` : ''}`;
               </div>
               <div>
                 <Label>Status</Label>
-                  <Select value={formData.status} onValueChange={(value) => setFormData({...formData, status: value})}>
+                  <Select value={formData.status} onValueChange={(value) => {
+                    if (value === 'on_hold') {
+                      setPendingHoldStatus(value);
+                      setHoldConfirmOpen(true);
+                    } else {
+                      setFormData({...formData, status: value, hold_type: 'permanent', hold_remaining_calls: null});
+                    }
+                  }}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -779,14 +818,60 @@ ${formData.care_plan ? `CARE PLAN DETAILS:\n${formData.care_plan}` : ''}`;
                 </div>
                 </div>
 
-
+            {/* Temporary Hold Fields */}
+            {formData.status === 'on_hold' && (
+              <div className="border rounded-lg p-4 bg-amber-50 border-amber-200">
+                <h3 className="font-semibold text-amber-900 mb-3 text-sm">Hold Configuration</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Hold Type</Label>
+                    <Select value={formData.hold_type || 'permanent'} onValueChange={(value) => {
+                      setFormData({
+                        ...formData,
+                        hold_type: value,
+                        hold_remaining_calls: value === 'permanent' ? null : (formData.hold_remaining_calls || 1)
+                      });
+                    }}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="permanent">Permanent</SelectItem>
+                        <SelectItem value="temporary">Temporary</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {formData.hold_type === 'temporary' && (
+                    <div>
+                      <Label>Number of calls to hold</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={formData.hold_remaining_calls || ''}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || '';
+                          setFormData({...formData, hold_remaining_calls: val});
+                        }}
+                        placeholder="e.g. 5"
+                      />
+                      <p className="text-xs text-amber-700 mt-1">After this many calls are skipped, status will automatically revert to Active.</p>
+                    </div>
+                  )}
+                </div>
+                {formData.hold_type === 'permanent' && (
+                  <p className="text-xs text-amber-700 mt-2">This hold will remain until manually changed back to Active.</p>
+                )}
+              </div>
+            )}
 
             {/* Care Plan Sections */}
             <div className="border rounded-lg p-4 bg-slate-50">
               <h3 className="font-semibold text-slate-900 mb-3 text-lg">My Quick Reference & Preferences</h3>
-              <Textarea
+              <ExpandableTextarea
                 value={formData.quick_reference}
-                onChange={(e) => setFormData({...formData, quick_reference: e.target.value})}
+                onChange={(val) => setFormData({...formData, quick_reference: val})}
+                label="My Quick Reference & Preferences"
                 placeholder="Enter quick reference information and preferences..."
                 rows={3}
               />
@@ -794,9 +879,10 @@ ${formData.care_plan ? `CARE PLAN DETAILS:\n${formData.care_plan}` : ''}`;
 
             <div className="border rounded-lg p-4 bg-slate-50">
               <h3 className="font-semibold text-slate-900 mb-3 text-lg">What Matters To Me</h3>
-              <Textarea
+              <ExpandableTextarea
                 value={formData.what_matters_to_me}
-                onChange={(e) => setFormData({...formData, what_matters_to_me: e.target.value})}
+                onChange={(val) => setFormData({...formData, what_matters_to_me: val})}
+                label="What Matters To Me"
                 placeholder="Describe what is important to you, your values, and priorities..."
                 rows={3}
               />
@@ -804,9 +890,10 @@ ${formData.care_plan ? `CARE PLAN DETAILS:\n${formData.care_plan}` : ''}`;
 
             <div className="border rounded-lg p-4 bg-slate-50">
               <h3 className="font-semibold text-slate-900 mb-3 text-lg">Brief History Of Me</h3>
-              <Textarea
+              <ExpandableTextarea
                 value={formData.brief_history}
-                onChange={(e) => setFormData({...formData, brief_history: e.target.value})}
+                onChange={(val) => setFormData({...formData, brief_history: val})}
+                label="Brief History Of Me"
                 placeholder="Provide a brief history or background information..."
                 rows={3}
               />
@@ -814,9 +901,10 @@ ${formData.care_plan ? `CARE PLAN DETAILS:\n${formData.care_plan}` : ''}`;
 
             <div className="border rounded-lg p-4 bg-slate-50">
               <h3 className="font-semibold text-slate-900 mb-3 text-lg">Communication Needs</h3>
-              <Textarea
+              <ExpandableTextarea
                 value={formData.communication_needs}
-                onChange={(e) => setFormData({...formData, communication_needs: e.target.value})}
+                onChange={(val) => setFormData({...formData, communication_needs: val})}
+                label="Communication Needs"
                 placeholder="Any communication needs..."
                 rows={2}
               />
@@ -824,9 +912,10 @@ ${formData.care_plan ? `CARE PLAN DETAILS:\n${formData.care_plan}` : ''}`;
 
             <div className="border rounded-lg p-4 bg-slate-50">
               <h3 className="font-semibold text-slate-900 mb-3 text-lg">Overall Aims Of My Personal Plan</h3>
-              <Textarea
+              <ExpandableTextarea
                 value={formData.personal_plan_aims}
-                onChange={(e) => setFormData({...formData, personal_plan_aims: e.target.value})}
+                onChange={(val) => setFormData({...formData, personal_plan_aims: val})}
+                label="Overall Aims Of My Personal Plan"
                 placeholder="Outline the main goals and objectives..."
                 rows={3}
               />
@@ -834,9 +923,10 @@ ${formData.care_plan ? `CARE PLAN DETAILS:\n${formData.care_plan}` : ''}`;
 
             <div className="border rounded-lg p-4 bg-slate-50">
               <h3 className="font-semibold text-slate-900 mb-3 text-lg">My Medical History</h3>
-              <Textarea
+              <ExpandableTextarea
                 value={formData.medical_history}
-                onChange={(e) => setFormData({...formData, medical_history: e.target.value})}
+                onChange={(val) => setFormData({...formData, medical_history: val})}
+                label="My Medical History"
                 placeholder="Describe relevant medical history and conditions..."
                 rows={3}
               />
@@ -879,22 +969,42 @@ ${formData.care_plan ? `CARE PLAN DETAILS:\n${formData.care_plan}` : ''}`;
                             {index < riskCategories.length ? riskCategories[index] : row.col1}
                           </td>
                           <td className="border-r border-slate-300 p-2 w-5/12 align-top">
-                            <textarea
-                              value={row.col2}
-                              onChange={(e) => handleUpdateRiskRow(index, 'col2', e.target.value)}
-                              placeholder="Risk/Symptom"
-                              className="w-full bg-transparent border-0 p-0 text-sm focus:outline-none resize-none"
-                              rows="3"
-                            />
+                            <div className="relative">
+                              <textarea
+                                value={row.col2}
+                                onChange={(e) => handleUpdateRiskRow(index, 'col2', e.target.value)}
+                                placeholder="Risk/Symptom"
+                                className="w-full bg-transparent border-0 p-0 pr-6 text-sm focus:outline-none resize-none"
+                                rows="3"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setRiskCellDialog({ open: true, index, col: 'col2', title: `${index < riskCategories.length ? riskCategories[index] : row.col1} - Person Specific Risks` })}
+                                className="absolute top-0 right-0 p-0.5 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors"
+                                title="Expand to full editor"
+                              >
+                                <Maximize2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </td>
                           <td className="p-2 w-1/6 align-top">
-                            <textarea
-                              value={row.col3}
-                              onChange={(e) => handleUpdateRiskRow(index, 'col3', e.target.value)}
-                              placeholder="Managing the risks"
-                              className="w-full bg-transparent border-0 p-0 text-sm focus:outline-none resize-none"
-                              rows="3"
-                            />
+                            <div className="relative">
+                              <textarea
+                                value={row.col3}
+                                onChange={(e) => handleUpdateRiskRow(index, 'col3', e.target.value)}
+                                placeholder="Managing the risks"
+                                className="w-full bg-transparent border-0 p-0 pr-6 text-sm focus:outline-none resize-none"
+                                rows="3"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setRiskCellDialog({ open: true, index, col: 'col3', title: `${index < riskCategories.length ? riskCategories[index] : row.col1} - Managing The Risks` })}
+                                className="absolute top-0 right-0 p-0.5 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors"
+                                title="Expand to full editor"
+                              >
+                                <Maximize2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -921,22 +1031,22 @@ ${formData.care_plan ? `CARE PLAN DETAILS:\n${formData.care_plan}` : ''}`;
                           </div>
                           <div>
                             <Label className="text-xs">Risk/Symptom</Label>
-                            <textarea
+                            <ExpandableTextarea
                               value={newAdditionalRisk.col2}
-                              onChange={(e) => setNewAdditionalRisk({...newAdditionalRisk, col2: e.target.value})}
+                              onChange={(val) => setNewAdditionalRisk({...newAdditionalRisk, col2: val})}
+                              label="Risk/Symptom"
                               placeholder="Describe the risk or symptom..."
-                              className="w-full border border-slate-300 rounded p-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-                              rows="2"
+                              rows={2}
                             />
                           </div>
                           <div>
                             <Label className="text-xs">Managing the Risks</Label>
-                            <textarea
+                            <ExpandableTextarea
                               value={newAdditionalRisk.col3}
-                              onChange={(e) => setNewAdditionalRisk({...newAdditionalRisk, col3: e.target.value})}
+                              onChange={(val) => setNewAdditionalRisk({...newAdditionalRisk, col3: val})}
+                              label="Managing the Risks"
                               placeholder="How to manage or reduce this risk..."
-                              className="w-full border border-slate-300 rounded p-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-                              rows="2"
+                              rows={2}
                             />
                           </div>
                           <Button
@@ -964,9 +1074,10 @@ ${formData.care_plan ? `CARE PLAN DETAILS:\n${formData.care_plan}` : ''}`;
 
                       <div className="mt-4 p-4 bg-white border border-slate-200 rounded-lg">
                         <Label className="font-semibold text-slate-900">Risk Notes</Label>
-                        <Textarea
+                        <ExpandableTextarea
                           value={formData.risk_assessments}
-                          onChange={(e) => setFormData({...formData, risk_assessments: e.target.value})}
+                          onChange={(val) => setFormData({...formData, risk_assessments: val})}
+                          label="Risk Notes"
                           placeholder="Additional risk assessment notes..."
                           rows={6}
                           className="mt-2"
@@ -1022,9 +1133,10 @@ ${formData.care_plan ? `CARE PLAN DETAILS:\n${formData.care_plan}` : ''}`;
 
             <div className="border rounded-lg p-4 bg-slate-50">
               <h3 className="font-semibold text-slate-900 mb-3 text-lg">Assistance Equipment In the Property</h3>
-              <Textarea
+              <ExpandableTextarea
                 value={formData.assistance_equipment}
-                onChange={(e) => setFormData({...formData, assistance_equipment: e.target.value})}
+                onChange={(val) => setFormData({...formData, assistance_equipment: val})}
+                label="Assistance Equipment In the Property"
                 placeholder="List all equipment available in the property..."
                 rows={3}
               />
@@ -1035,27 +1147,30 @@ ${formData.care_plan ? `CARE PLAN DETAILS:\n${formData.care_plan}` : ''}`;
               <div className="space-y-3">
                 <div>
                   <Label>Water Shut Off Location</Label>
-                  <Textarea
+                  <ExpandableTextarea
                     value={formData.emergency_shutoff_water}
-                    onChange={(e) => setFormData({...formData, emergency_shutoff_water: e.target.value})}
+                    onChange={(val) => setFormData({...formData, emergency_shutoff_water: val})}
+                    label="Water Shut Off Location"
                     placeholder="Describe location of water shut off..."
                     rows={2}
                   />
                 </div>
                 <div>
                   <Label>Electricity Shut Off Location</Label>
-                  <Textarea
+                  <ExpandableTextarea
                     value={formData.emergency_shutoff_electricity}
-                    onChange={(e) => setFormData({...formData, emergency_shutoff_electricity: e.target.value})}
+                    onChange={(val) => setFormData({...formData, emergency_shutoff_electricity: val})}
+                    label="Electricity Shut Off Location"
                     placeholder="Describe location of electricity shut off..."
                     rows={2}
                   />
                 </div>
                 <div>
                   <Label>Gas Shut Off Location</Label>
-                  <Textarea
+                  <ExpandableTextarea
                     value={formData.emergency_shutoff_gas}
-                    onChange={(e) => setFormData({...formData, emergency_shutoff_gas: e.target.value})}
+                    onChange={(val) => setFormData({...formData, emergency_shutoff_gas: val})}
+                    label="Gas Shut Off Location"
                     placeholder="Describe location of gas shut off..."
                     rows={2}
                   />
@@ -1083,9 +1198,10 @@ ${formData.care_plan ? `CARE PLAN DETAILS:\n${formData.care_plan}` : ''}`;
               {formData.pets_in_property && !formData.pets_in_property.startsWith('no') && (
                 <div className="mt-3">
                   <Label>Pet Details</Label>
-                  <Textarea
+                  <ExpandableTextarea
                     value={formData.pets_in_property === 'yes' ? '' : formData.pets_in_property}
-                    onChange={(e) => setFormData({...formData, pets_in_property: e.target.value})}
+                    onChange={(val) => setFormData({...formData, pets_in_property: val})}
+                    label="Pet Details"
                     placeholder="List any pets and relevant information..."
                     rows={2}
                   />
@@ -1095,9 +1211,10 @@ ${formData.care_plan ? `CARE PLAN DETAILS:\n${formData.care_plan}` : ''}`;
 
             <div className="border rounded-lg p-4 bg-slate-50">
               <h3 className="font-semibold text-slate-900 mb-3 text-lg">Risk Management</h3>
-              <Textarea
+              <ExpandableTextarea
                 value={formData.risk_management}
-                onChange={(e) => setFormData({...formData, risk_management: e.target.value})}
+                onChange={(val) => setFormData({...formData, risk_management: val})}
+                label="Risk Management"
                 placeholder="Detail risk management strategies..."
                 rows={3}
               />
@@ -1125,27 +1242,30 @@ ${formData.care_plan ? `CARE PLAN DETAILS:\n${formData.care_plan}` : ''}`;
                  </div>
                  <div>
                    <Label className="text-sm font-semibold text-teal-700">Section 1: Intended Outcome</Label>
-                   <Textarea
+                   <ExpandableTextarea
                      value={newPersonCentredCall.section1}
-                     onChange={(e) => setNewPersonCentredCall({...newPersonCentredCall, section1: e.target.value})}
+                     onChange={(val) => setNewPersonCentredCall({...newPersonCentredCall, section1: val})}
+                     label="Section 1: Intended Outcome"
                      placeholder="What is the intended outcome of this call..."
                      rows={3}
                    />
                  </div>
                  <div>
                    <Label className="text-sm font-semibold text-teal-700">Section 2: Needs & Preferences</Label>
-                   <Textarea
+                   <ExpandableTextarea
                      value={newPersonCentredCall.section2}
-                     onChange={(e) => setNewPersonCentredCall({...newPersonCentredCall, section2: e.target.value})}
+                     onChange={(val) => setNewPersonCentredCall({...newPersonCentredCall, section2: val})}
+                     label="Section 2: Needs & Preferences"
                      placeholder="Client's needs and preferences for this call..."
                      rows={3}
                    />
                  </div>
                  <div>
                    <Label className="text-sm font-semibold text-teal-700">Section 3: Care Staff Actions</Label>
-                   <Textarea
+                   <ExpandableTextarea
                      value={newPersonCentredCall.section3}
-                     onChange={(e) => setNewPersonCentredCall({...newPersonCentredCall, section3: e.target.value})}
+                     onChange={(val) => setNewPersonCentredCall({...newPersonCentredCall, section3: val})}
+                     label="Section 3: Care Staff Actions"
                      placeholder="Actions care staff should take during this call..."
                      rows={3}
                    />
@@ -1207,9 +1327,10 @@ ${formData.care_plan ? `CARE PLAN DETAILS:\n${formData.care_plan}` : ''}`;
 
              <div>
               <Label>Notes</Label>
-              <Textarea
+              <ExpandableTextarea
                 value={formData.notes}
-                onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                onChange={(val) => setFormData({...formData, notes: val})}
+                label="Notes"
                 placeholder="Additional notes..."
                 rows={2}
               />
@@ -1426,6 +1547,19 @@ ${formData.care_plan ? `CARE PLAN DETAILS:\n${formData.care_plan}` : ''}`;
         />
       )}
     </Dialog>
+    {/* Risk cell expand dialog */}
+    <TextInputDialog
+      open={riskCellDialog.open}
+      onOpenChange={(isOpen) => setRiskCellDialog(prev => ({ ...prev, open: isOpen }))}
+      title={riskCellDialog.title || 'Edit Risk'}
+      value={riskCellDialog.index !== null && riskCellDialog.col ? riskRows[riskCellDialog.index]?.[riskCellDialog.col] || '' : ''}
+      onSave={(text) => {
+        if (riskCellDialog.index !== null && riskCellDialog.col) {
+          handleUpdateRiskRow(riskCellDialog.index, riskCellDialog.col, text);
+        }
+      }}
+      placeholder={riskCellDialog.col === 'col2' ? 'Describe the person specific risks...' : 'Describe how to manage the risks...'}
+    />
     </>
   );
 }

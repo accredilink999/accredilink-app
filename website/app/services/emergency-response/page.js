@@ -3,12 +3,16 @@ import ServicePageLayout from '@/components/ServicePageLayout';
 export const metadata = {
   title: 'Emergency Response',
   description: 'Emergency care response services in Denbighshire, Conwy and Wrexham. Rapid response with trained emergency care responders available around the clock.',
+  alternates: {
+    canonical: 'https://accredilinkcare.co.uk/services/emergency-response',
+  },
 };
 
 export default function EmergencyResponse() {
   return (
     <ServicePageLayout
       title="Emergency Response"
+      slug="emergency-response"
       description="What sets us apart: Accredilink has its own trained emergency care responders on shift. When an urgent care situation arises, our team provides rapid, professional response — combining domiciliary care expertise with pre-hospital emergency care skills to deliver a service that is unique in North Wales."
       icon={
         <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">

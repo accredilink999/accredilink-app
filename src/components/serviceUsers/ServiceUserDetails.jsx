@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { notifyAdminsOfActivity } from '@/utils/adminNotifications';
 import { deployClientCallsToRota } from '@/utils/deployPattern';
 import { ShiftCallApi } from '@/api/rotaApi';
+import { supabase } from '@/api/supabaseClient';
 import CallTypeManager from '../rota/CallTypeManager';
 import {
   Phone,
@@ -286,6 +287,61 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
     });
   };
 
+  // ── One-off / Impromptu call ──
+  const [showOneOffForm, setShowOneOffForm] = useState(false);
+  const [oneOffCall, setOneOffCall] = useState({ date: new Date().toISOString().split('T')[0], time: '09:00', duration: 30, types: [], notes: '' });
+
+  const oneOffMutation = useMutation({
+    mutationFn: async () => {
+      const areaId = serviceUser?.area_id || serviceUser?.rota_area_id;
+      if (!areaId) throw new Error('Client has no rota area assigned');
+      if (oneOffCall.types.length === 0) throw new Error('Select at least one call type');
+
+      // Find an assigned shift on this date in this area that covers the call time
+      const [ch, cm] = oneOffCall.time.split(':').map(Number);
+      const callMins = ch * 60 + cm;
+      const dur = parseInt(oneOffCall.duration) || 30;
+
+      const { data: areaShifts } = await supabase
+        .from('shifts')
+        .select('id, start_time, end_time')
+        .not('staff_id', 'is', null)
+        .eq('rota_area_id', areaId)
+        .eq('date', oneOffCall.date);
+
+      const match = (areaShifts || []).find(s => {
+        const [sh, sm] = s.start_time.split(':').map(Number);
+        const [eh, em] = s.end_time.split(':').map(Number);
+        return callMins >= sh * 60 + sm && callMins + dur <= eh * 60 + em;
+      });
+
+      if (!match) throw new Error(`No shift found on ${oneOffCall.date} covering ${oneOffCall.time}. Make sure a shift exists in this area.`);
+
+      await ShiftCallApi.create({
+        shift_id: match.id,
+        service_user_id: serviceUser.id,
+        service_user_name: serviceUser.full_name,
+        service_user_address: serviceUser.address || '',
+        scheduled_time: oneOffCall.time,
+        call_time: oneOffCall.time,
+        call_date: oneOffCall.date,
+        call_type: oneOffCall.types[0],
+        call_types: oneOffCall.types,
+        duration_minutes: dur,
+        status: 'pending',
+        notes: oneOffCall.notes || '',
+      });
+    },
+    onSuccess: () => {
+      toast.success('One-off call added to rota');
+      queryClient.invalidateQueries({ queryKey: ['shiftCalls'] });
+      queryClient.invalidateQueries({ queryKey: ['clientCalls'] });
+      setShowOneOffForm(false);
+      setOneOffCall({ date: new Date().toISOString().split('T')[0], time: '09:00', duration: 30, types: [], notes: '' });
+    },
+    onError: (err) => toast.error(err.message || 'Failed to add call'),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: () => base44.entities.ServiceUser.delete(serviceUser.id),
     onSuccess: () => {
@@ -376,6 +432,11 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
                     {serviceUser.status.replace('_', ' ')}
                   </Badge>
                 )}
+                {serviceUser.status === 'on_hold' && serviceUser.hold_type === 'temporary' && serviceUser.hold_remaining_calls > 0 && (
+                  <Badge className="bg-amber-100 text-amber-800 border border-amber-300 ml-1">
+                    {serviceUser.hold_remaining_calls} call{serviceUser.hold_remaining_calls !== 1 ? 's' : ''} remaining
+                  </Badge>
+                )}
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -384,13 +445,6 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
                <Button variant="outline" size="sm" onClick={onEdit}>
                  <Edit className="w-3 h-3 mr-1" />
                  Edit
-               </Button>
-               <Button
-                 variant="destructive"
-                 size="sm"
-                 onClick={() => setDeleteServiceUserConfirmOpen(true)}
-               >
-                 <Trash2 className="w-3 h-3" />
                </Button>
                </>
                )}
@@ -403,7 +457,14 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
             <AlertDialogHeader>
               <AlertDialogTitle>Change Client Status?</AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to change {serviceUser.full_name}'s status from <strong>{serviceUser.status.replace('_', ' ')}</strong> to <strong>{pendingStatus?.replace('_', ' ')}</strong>?
+                {pendingStatus === 'on_hold' ? (
+                  <>Are you sure you want to put <strong>{serviceUser.full_name}</strong> on hold? Their calls will be suspended until the hold is manually removed.</>
+                ) : (
+                  <>Are you sure you want to change {serviceUser.full_name}'s status from <strong>{serviceUser.status.replace('_', ' ')}</strong> to <strong>{pendingStatus?.replace('_', ' ')}</strong>?</>
+                )}
+                {serviceUser.status === 'on_hold' && pendingStatus === 'active' && serviceUser.hold_type === 'temporary' && (
+                  <p className="mt-2 text-amber-600 font-medium">Note: This will cancel the temporary hold ({serviceUser.hold_remaining_calls} calls were remaining).</p>
+                )}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <div className="flex gap-2">
@@ -573,6 +634,73 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
                   {clientArea.name}
                 </Badge>
               </div>
+            )}
+
+            {/* One-off / Impromptu call */}
+            {isAdmin && (
+              <Card className="p-4 border-2 border-dashed border-blue-300 bg-blue-50/50">
+                <button
+                  onClick={() => setShowOneOffForm(!showOneOffForm)}
+                  className="flex items-center gap-2 w-full font-semibold text-blue-700 text-sm"
+                >
+                  <Calendar className="w-4 h-4" />
+                  Add One-Off Call to Rota
+                  <span className={`ml-auto transform transition-transform ${showOneOffForm ? 'rotate-90' : ''}`}>▶</span>
+                </button>
+                {showOneOffForm && (
+                  <div className="mt-3 space-y-3">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <Label className="text-xs">Date</Label>
+                        <Input type="date" value={oneOffCall.date} onChange={(e) => setOneOffCall({ ...oneOffCall, date: e.target.value })} />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Time</Label>
+                        <Input type="time" value={oneOffCall.time} onChange={(e) => setOneOffCall({ ...oneOffCall, time: e.target.value })} />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Duration (min)</Label>
+                        <Input type="number" value={oneOffCall.duration} onChange={(e) => setOneOffCall({ ...oneOffCall, duration: e.target.value })} min="15" step="15" />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Call Types</Label>
+                      <div className="grid grid-cols-2 gap-2 p-2 bg-white rounded border mt-1">
+                        {callTypes.map((ct) => (
+                          <label key={ct.id} className="flex items-center gap-2 cursor-pointer">
+                            <Checkbox
+                              checked={oneOffCall.types.includes(ct.name)}
+                              onCheckedChange={() => setOneOffCall(prev => ({
+                                ...prev,
+                                types: prev.types.includes(ct.name)
+                                  ? prev.types.filter(t => t !== ct.name)
+                                  : [...prev.types, ct.name]
+                              }))}
+                            />
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: ct.color || '#0d9488' }} />
+                              <span className="text-xs text-slate-700">{ct.name}</span>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Notes (optional)</Label>
+                      <Input value={oneOffCall.notes} onChange={(e) => setOneOffCall({ ...oneOffCall, notes: e.target.value })} placeholder="e.g. Emergency welfare check" />
+                    </div>
+                    <Button
+                      onClick={() => oneOffMutation.mutate()}
+                      disabled={oneOffMutation.isPending || oneOffCall.types.length === 0}
+                      className="w-full bg-blue-600 hover:bg-blue-700"
+                    >
+                      {oneOffMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+                      Add to Rota
+                    </Button>
+                    <p className="text-[10px] text-blue-600 text-center">This creates a single call on the specified date — it won't repeat</p>
+                  </div>
+                )}
+              </Card>
             )}
 
             {/* Admin: Add/Edit call time form */}

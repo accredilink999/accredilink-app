@@ -3,12 +3,16 @@ import LocationPageLayout from '@/components/LocationPageLayout';
 export const metadata = {
   title: 'Care Services in Rhyl | Domiciliary Care Rhyl, Denbighshire',
   description: 'Professional domiciliary care, respite, and emergency response services in Rhyl and surrounding coastal areas. CIW regulated, local team.',
+  alternates: {
+    canonical: 'https://accredilinkcare.co.uk/areas/rhyl',
+  },
 };
 
 export default function RhylPage() {
   return (
     <LocationPageLayout
       name="Rhyl"
+      slug="rhyl"
       county="Denbighshire"
       description="We provide comprehensive care services in Rhyl and the surrounding North Wales coast. As the largest town in Denbighshire, Rhyl has significant care needs and our team is here to help."
       challenges="Rhyl is one of the most deprived areas in Wales, with higher than average rates of disability, chronic illness, and social isolation. The town has a significant older population and many residents live alone. The combination of health deprivation, limited mobility, and social isolation creates a strong need for reliable, compassionate domiciliary care. We serve Rhyl and the wider coastal strip including Kinmel Bay and Towyn."

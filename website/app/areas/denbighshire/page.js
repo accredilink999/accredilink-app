@@ -3,12 +3,16 @@ import LocationPageLayout from '@/components/LocationPageLayout';
 export const metadata = {
   title: 'Care Services in Denbighshire | Domiciliary Care Denbighshire',
   description: 'Professional domiciliary care, emergency response, and support services across Denbighshire. CIW regulated. Covering Denbigh, Ruthin, Rhyl, Prestatyn, St Asaph, Corwen, and Llangollen.',
+  alternates: {
+    canonical: 'https://accredilinkcare.co.uk/areas/denbighshire',
+  },
 };
 
 export default function DenbighshirePage() {
   return (
     <LocationPageLayout
       name="Denbighshire"
+      slug="denbighshire"
       county="Denbighshire (Sir Ddinbych)"
       description="We provide a full range of professional care and support services across Denbighshire — from the coast at Rhyl and Prestatyn to the rural Dee Valley around Llangollen and Corwen."
       challenges="Denbighshire has a growing older population, with many people living in rural and semi-rural communities where accessing services can be challenging. Transport links are limited in inland areas, and the mix of coastal towns and isolated rural properties requires a care provider who knows the area well. Our local team understands Denbighshire's geography and communities — from the care homes and sheltered housing in Rhyl to the scattered farmhouses of the Clwydian Range."

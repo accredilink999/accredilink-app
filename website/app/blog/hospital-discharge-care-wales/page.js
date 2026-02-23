@@ -4,11 +4,24 @@ import Image from 'next/image';
 export const metadata = {
   title: 'Hospital Discharge and Home Care in Wales: What Happens Next? | Accredilink',
   description: 'What to expect when a loved one is discharged from hospital in Wales. Learn about reablement, domiciliary care after hospital, discharge planning, and support available in Denbighshire, Conwy, and Wrexham.',
+  alternates: {
+    canonical: 'https://accredilinkcare.co.uk/blog/hospital-discharge-care-wales',
+  },
 };
 
 export default function HospitalDischargeCareWales() {
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "Article",
+        headline: "Hospital Discharge and Home Care in Wales: What Happens Next?",
+        description: "What to expect when a loved one is discharged from hospital in Wales. Learn about reablement, domiciliary care after hospital, discharge planning, and support available in Denbighshire, Conwy, and Wrexham.",
+        author: { "@type": "Organization", "@id": "https://accredilinkcare.co.uk/#organization", name: "Accredilink Community Response Taskforce" },
+        publisher: { "@type": "Organization", "@id": "https://accredilinkcare.co.uk/#organization" },
+        url: "https://accredilinkcare.co.uk/blog/hospital-discharge-care-wales",
+        mainEntityOfPage: "https://accredilinkcare.co.uk/blog/hospital-discharge-care-wales",
+      }) }} />
       <section className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#B91C1C] via-white to-[#166534]" />
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 relative">

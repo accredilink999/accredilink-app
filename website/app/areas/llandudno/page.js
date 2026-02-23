@@ -3,12 +3,16 @@ import LocationPageLayout from '@/components/LocationPageLayout';
 export const metadata = {
   title: 'Care Services in Llandudno | Domiciliary Care Llandudno',
   description: 'Domiciliary care, respite, and emergency response services in Llandudno. CIW regulated care provider serving North Wales.',
+  alternates: {
+    canonical: 'https://accredilinkcare.co.uk/areas/llandudno',
+  },
 };
 
 export default function LlandudnoPage() {
   return (
     <LocationPageLayout
       name="Llandudno"
+      slug="llandudno"
       county="Conwy"
       description="We provide professional care services in Llandudno and the surrounding area including Deganwy, Craig-y-Don, and Penrhyn Bay."
       challenges="Llandudno is one of the most popular retirement destinations in Wales, with a high proportion of residents aged 65 and over. Many retirees have moved from other parts of the UK and may lack local family support. The hilly terrain and Victorian property types can create mobility challenges. Our team provides consistent, compassionate care to help residents remain independent in their homes."

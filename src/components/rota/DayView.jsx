@@ -33,8 +33,8 @@ export default function DayView({ currentDate, onShiftClick, onCreateShift, isAd
    });
 
   const { data: shiftTypes = [] } = useQuery({
-    queryKey: ['shiftTypes'],
-    queryFn: () => ShiftTypeApi.filter({ is_active: true }),
+    queryKey: ['shiftTypes', selectedAreaId],
+    queryFn: () => ShiftTypeApi.filterByArea(selectedAreaId),
   });
 
   const { data: calls = [] } = useQuery({
@@ -114,6 +114,7 @@ export default function DayView({ currentDate, onShiftClick, onCreateShift, isAd
                    className={`h-1.5 flex-1 rounded-full ${
                      call.status === 'completed' ? 'bg-green-300' :
                      call.status === 'in_progress' ? 'bg-blue-300' :
+                     call.status === 'not_at_home' ? 'bg-amber-300' :
                      call.status === 'missed' ? 'bg-red-300' :
                      'bg-white/40'
                    }`}

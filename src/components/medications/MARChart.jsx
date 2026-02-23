@@ -26,9 +26,13 @@ export default function MARChart({ serviceUser, isAdmin }) {
     frequency: '',
     route: 'oral',
     times_per_day: 1,
-    special_instructions: ''
+    special_instructions: '',
+    when_given: [],
+    is_prn: false,
+    is_pill_pouch: false
   });
   const [adminName, setAdminName] = useState('');
+  const [adminOutcome, setAdminOutcome] = useState('given');
   const [selectedMedInfo, setSelectedMedInfo] = useState(null);
   const [showMedInfoPopup, setShowMedInfoPopup] = useState(false);
   const [showArchivedCharts, setShowArchivedCharts] = useState(false);
@@ -113,10 +117,14 @@ export default function MARChart({ serviceUser, isAdmin }) {
       frequency: '',
       route: 'oral',
       times_per_day: 1,
-      special_instructions: ''
+      special_instructions: '',
+      when_given: [],
+      is_prn: false,
+      is_pill_pouch: false
     });
     setEditingMed(null);
     setAdminName('');
+    setAdminOutcome('given');
   };
 
   const handleEditMed = (med) => {
@@ -127,7 +135,10 @@ export default function MARChart({ serviceUser, isAdmin }) {
       frequency: med.frequency,
       route: med.route,
       times_per_day: med.times_per_day || 1,
-      special_instructions: med.special_instructions || ''
+      special_instructions: med.special_instructions || '',
+      when_given: med.when_given || [],
+      is_prn: med.is_prn || false,
+      is_pill_pouch: med.is_pill_pouch || false
     });
     setShowAdminDialog(true);
   };
@@ -161,7 +172,7 @@ export default function MARChart({ serviceUser, isAdmin }) {
       staff_name: adminName,
       administered_at: date,
       instance: instance,
-      outcome: 'given'
+      outcome: adminOutcome
     });
   };
 
@@ -173,7 +184,7 @@ export default function MARChart({ serviceUser, isAdmin }) {
     return administrations.find(
       a => (a.medication_record_id === medId || a.medication_id === medId) &&
            a.administered_at?.split('T')[0] === dateStr &&
-           (a.outcome === 'given' || a.outcome === 'administered') &&
+           (a.outcome === 'given' || a.outcome === 'administered' || a.outcome === 'refused' || a.outcome === 'destroyed') &&
            a.instance === instance
     );
   };
@@ -183,7 +194,7 @@ export default function MARChart({ serviceUser, isAdmin }) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-24">
       {/* Header with navigation */}
        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
          <div>
@@ -257,8 +268,13 @@ export default function MARChart({ serviceUser, isAdmin }) {
                            <Pill className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
                            <div className="min-w-0">
                              <p className="font-medium text-slate-900 text-xs sm:text-sm hover:text-teal-600">{med.medication_name}</p>
+                             {med.is_prn && <Badge variant="outline" className="text-[10px] px-1 py-0 border-amber-400 text-amber-700">PRN</Badge>}
+                             {med.is_pill_pouch && <Badge variant="outline" className="text-[10px] px-1 py-0 border-blue-400 text-blue-700">Pill Pouch</Badge>}
                              <p className="text-xs text-slate-600">{med.dosage}</p>
                              <p className="text-xs text-slate-500">{med.frequency}</p>
+                             {med.when_given && med.when_given.length > 0 && (
+                               <p className="text-xs text-teal-600">{med.when_given.join(', ')}</p>
+                             )}
                            </div>
                          </div>
                        </td>
@@ -275,13 +291,22 @@ export default function MARChart({ serviceUser, isAdmin }) {
                              }}
                              className={`w-full p-1 rounded transition-colors ${
                                admin
-                                 ? 'bg-teal-100 hover:bg-teal-200'
+                                 ? admin.outcome === 'refused' ? 'bg-amber-100 hover:bg-amber-200'
+                                 : admin.outcome === 'destroyed' ? 'bg-red-100 hover:bg-red-200'
+                                 : 'bg-teal-100 hover:bg-teal-200'
                                  : 'bg-slate-100 hover:bg-slate-200'
                              }`}
-                             title={admin ? `Given by ${admin.staff_name}` : 'Record administration'}
+                             title={admin ? `${admin.outcome === 'refused' ? 'Refused' : admin.outcome === 'destroyed' ? 'Destroyed' : 'Given'} by ${admin.staff_name}` : 'Record administration'}
                            >
                              {admin ? (
-                               <span className="text-xs font-bold text-teal-700">{getInitials(admin.staff_name)}</span>
+                               <span className={`text-xs font-bold ${
+                                 admin.outcome === 'refused' ? 'text-amber-700' :
+                                 admin.outcome === 'destroyed' ? 'text-red-700' :
+                                 'text-teal-700'
+                               }`}>
+                                 {admin.outcome === 'refused' ? 'R/' : admin.outcome === 'destroyed' ? 'D/' : ''}
+                                 {getInitials(admin.staff_name)}
+                               </span>
                              ) : (
                                <span className="text-slate-400 text-xs">-</span>
                              )}
@@ -325,7 +350,10 @@ export default function MARChart({ serviceUser, isAdmin }) {
       {/* Record Administration Dialog */}
       <Dialog open={showMedDialog} onOpenChange={(open) => {
         setShowMedDialog(open);
-        if (!open) setAdminName('');
+        if (!open) {
+          setAdminName('');
+          setAdminOutcome('given');
+        }
       }}>
         <DialogContent>
           <DialogHeader>
@@ -341,6 +369,32 @@ export default function MARChart({ serviceUser, isAdmin }) {
               <div>
                 <p className="text-sm font-medium text-slate-700">Date</p>
                 <p className="text-slate-900">{format(new Date(selectedMed.date), 'EEEE, MMMM d, yyyy')}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-slate-700 block mb-2">Outcome *</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAdminOutcome('given')}
+                    className={`p-2 rounded border text-sm font-medium transition-colors ${adminOutcome === 'given' ? 'bg-teal-100 border-teal-400 text-teal-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                  >
+                    Given (G)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAdminOutcome('refused')}
+                    className={`p-2 rounded border text-sm font-medium transition-colors ${adminOutcome === 'refused' ? 'bg-amber-100 border-amber-400 text-amber-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                  >
+                    Refused (R)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAdminOutcome('destroyed')}
+                    className={`p-2 rounded border text-sm font-medium transition-colors ${adminOutcome === 'destroyed' ? 'bg-red-100 border-red-400 text-red-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                  >
+                    Destroyed (D)
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="text-sm font-medium text-slate-700 block mb-2">Staff Member Name *</label>
@@ -359,6 +413,7 @@ export default function MARChart({ serviceUser, isAdmin }) {
             <Button variant="outline" onClick={() => {
               setShowMedDialog(false);
               setAdminName('');
+              setAdminOutcome('given');
             }}>
               Cancel
             </Button>
@@ -395,6 +450,26 @@ export default function MARChart({ serviceUser, isAdmin }) {
                   placeholder="e.g., Amoxicillin"
                 />
               </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="is_prn"
+                  checked={formData.is_prn || false}
+                  onChange={(e) => setFormData({...formData, is_prn: e.target.checked})}
+                  className="rounded border-slate-300"
+                />
+                <label htmlFor="is_prn" className="text-sm font-medium text-slate-700">PRN (As Needed) Medication</label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="is_pill_pouch"
+                  checked={formData.is_pill_pouch || false}
+                  onChange={(e) => setFormData({...formData, is_pill_pouch: e.target.checked})}
+                  className="rounded border-slate-300"
+                />
+                <label htmlFor="is_pill_pouch" className="text-sm font-medium text-slate-700">Pill Pouch / Blister Pack</label>
+              </div>
               <div>
                 <label className="text-sm font-medium text-slate-700 block mb-1">Dosage *</label>
                 <input
@@ -426,6 +501,31 @@ export default function MARChart({ serviceUser, isAdmin }) {
                   className="w-full border rounded px-3 py-2 text-sm"
                   placeholder="e.g., 3"
                 />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-slate-700 block mb-1">When Given</label>
+                <div className="flex flex-wrap gap-2">
+                  {['Morning', 'Afternoon', 'Evening', 'Night', 'As Needed (PRN)'].map(time => (
+                    <button
+                      key={time}
+                      type="button"
+                      onClick={() => {
+                        const current = formData.when_given || [];
+                        const updated = current.includes(time)
+                          ? current.filter(t => t !== time)
+                          : [...current, time];
+                        setFormData({...formData, when_given: updated});
+                      }}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                        (formData.when_given || []).includes(time)
+                          ? 'bg-teal-100 border-teal-400 text-teal-800'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {time}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div>
                 <label className="text-sm font-medium text-slate-700 block mb-1">Route</label>

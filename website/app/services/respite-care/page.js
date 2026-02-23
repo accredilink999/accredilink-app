@@ -3,12 +3,16 @@ import ServicePageLayout from '@/components/ServicePageLayout';
 export const metadata = {
   title: 'Respite Care',
   description: 'Respite care services in Denbighshire, Conwy and Wrexham. CIW-regulated short-term relief for family carers while your loved one receives professional, person-centred care.',
+  alternates: {
+    canonical: 'https://accredilinkcare.co.uk/services/respite-care',
+  },
 };
 
 export default function RespiteCare() {
   return (
     <ServicePageLayout
       title="Respite Care"
+      slug="respite-care"
       description="Caring for a loved one is rewarding but demanding. Our respite care service gives family carers a well-deserved break, knowing their loved one is in safe, professional, and compassionate hands — fully regulated by Care Inspectorate Wales and delivered to the same high standards as all of our care services."
       icon={
         <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">

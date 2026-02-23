@@ -1,9 +1,51 @@
 import Link from 'next/link';
 import Image from 'next/image';
 
-export default function ServicePageLayout({ title, description, features, whoIsItFor, icon, imageSrc, ourApproach, standardsItems, personalChoiceContent }) {
+export default function ServicePageLayout({ title, description, features, whoIsItFor, icon, imageSrc, ourApproach, standardsItems, personalChoiceContent, slug }) {
+  const serviceSchema = {
+    "@context": "https://schema.org",
+    "@type": "Service",
+    name: title,
+    description: description,
+    provider: {
+      "@type": "HomeHealthCareService",
+      "@id": "https://accredilinkcare.co.uk/#localbusiness",
+      name: "Accredilink Community Response Taskforce",
+    },
+    areaServed: [
+      { "@type": "County", name: "Denbighshire" },
+      { "@type": "County", name: "Conwy" },
+      { "@type": "County", name: "Wrexham" },
+    ],
+    ...(slug ? { url: `https://accredilinkcare.co.uk/services/${slug}` } : {}),
+  };
+
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: "https://accredilinkcare.co.uk" },
+      { "@type": "ListItem", position: 2, name: "Services", item: "https://accredilinkcare.co.uk/services" },
+      { "@type": "ListItem", position: 3, name: title },
+    ],
+  };
+
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceSchema) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
+      {/* Breadcrumb nav */}
+      <nav aria-label="Breadcrumb" className="bg-slate-100 border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5">
+          <ol className="flex items-center gap-1.5 text-xs text-slate-500">
+            <li><Link href="/" className="hover:text-welsh-red transition-colors">Home</Link></li>
+            <li>/</li>
+            <li><Link href="/services" className="hover:text-welsh-red transition-colors">Services</Link></li>
+            <li>/</li>
+            <li className="text-slate-700 font-medium">{title}</li>
+          </ol>
+        </div>
+      </nav>
       {/* Header */}
       <section className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-welsh-red via-white to-welsh-green" />

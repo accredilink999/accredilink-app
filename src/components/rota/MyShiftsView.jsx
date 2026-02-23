@@ -172,6 +172,7 @@ export default function MyShiftsView({ currentDate, userId, view, onShiftClick, 
                                 className={`h-2 flex-1 rounded-full ${
                                   call.status === 'completed' ? 'bg-green-500' :
                                   call.status === 'in_progress' ? 'bg-blue-500' :
+                                  call.status === 'not_at_home' ? 'bg-amber-500' :
                                   call.status === 'missed' ? 'bg-red-500' :
                                   'bg-slate-200'
                                 }`}

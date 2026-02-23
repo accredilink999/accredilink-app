@@ -9,9 +9,80 @@ export default function LocationPageLayout({
   localInfo,
   services,
   nearbyAreas,
+  slug,
 }) {
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: "https://accredilinkcare.co.uk" },
+      { "@type": "ListItem", position: 2, name: "Areas We Cover", item: "https://accredilinkcare.co.uk/areas" },
+      ...(county && county !== name ? [{ "@type": "ListItem", position: 3, name: county, item: `https://accredilinkcare.co.uk/areas/${county.toLowerCase()}` }] : []),
+      { "@type": "ListItem", position: county && county !== name ? 4 : 3, name: `Care Services in ${name}` },
+    ],
+  };
+
+  const localBusinessSchema = {
+    "@context": "https://schema.org",
+    "@type": "HomeHealthCareService",
+    name: `Accredilink CRT - ${name}`,
+    description: description,
+    url: slug ? `https://accredilinkcare.co.uk/areas/${slug}` : undefined,
+    telephone: "+441824538688",
+    areaServed: { "@type": "City", name: name },
+    parentOrganization: { "@type": "Organization", "@id": "https://accredilinkcare.co.uk/#organization" },
+  };
+
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: [
+      {
+        "@type": "Question",
+        name: `Do you provide care in ${name}?`,
+        acceptedAnswer: { "@type": "Answer", text: `Yes, we provide a full range of care services in ${name} and the surrounding area, including domiciliary care, respite care, emergency response, and more.` },
+      },
+      {
+        "@type": "Question",
+        name: `How do I arrange care in ${name}?`,
+        acceptedAnswer: { "@type": "Answer", text: `Contact us by phone on 01824 538688 or through our website. We'll arrange a free, no-obligation assessment to understand your needs and create a personalised care plan.` },
+      },
+      {
+        "@type": "Question",
+        name: `Can I get funded care in ${name}?`,
+        acceptedAnswer: { "@type": "Answer", text: `Care funding may be available through your local authority. We can help guide you through the assessment process.` },
+      },
+      {
+        "@type": "Question",
+        name: `Do you offer emergency care in ${name}?`,
+        acceptedAnswer: { "@type": "Answer", text: `Yes, we have our own trained emergency care responders who can provide rapid response in ${name} and across our coverage area.` },
+      },
+    ],
+  };
+
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessSchema) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
+      {/* Breadcrumb nav */}
+      <nav aria-label="Breadcrumb" className="bg-slate-100 border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5">
+          <ol className="flex items-center gap-1.5 text-xs text-slate-500">
+            <li><Link href="/" className="hover:text-welsh-red transition-colors">Home</Link></li>
+            <li>/</li>
+            <li><Link href="/areas" className="hover:text-welsh-red transition-colors">Areas</Link></li>
+            <li>/</li>
+            {county && county !== name && (
+              <>
+                <li><Link href={`/areas/${county.toLowerCase()}`} className="hover:text-welsh-red transition-colors">{county}</Link></li>
+                <li>/</li>
+              </>
+            )}
+            <li className="text-slate-700 font-medium">{name}</li>
+          </ol>
+        </div>
+      </nav>
       {/* Header */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0">

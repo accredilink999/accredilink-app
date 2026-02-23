@@ -1304,15 +1304,15 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
       {/* MAR Chart Popup */}
       {showMARPopup && (
         <div className="fixed inset-0 z-50 flex">
-          <div className="ml-auto w-full max-w-4xl bg-white shadow-lg overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Medication Administration Record - {serviceUser?.full_name}</h2>
+          <div className="flex-1 bg-black/50" onClick={() => setShowMARPopup(false)} />
+          <div className="w-full max-w-4xl bg-white shadow-2xl overflow-y-auto animate-in slide-in-from-right">
+            <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between z-10">
+              <h2 className="text-lg font-semibold">MAR Chart - {serviceUser?.full_name}</h2>
               <Button
-                variant="ghost"
-                size="icon"
                 onClick={() => setShowMARPopup(false)}
+                className="bg-teal-600 hover:bg-teal-700 text-white"
               >
-                <X className="w-5 h-5" />
+                Done — Return to Care Log
               </Button>
             </div>
             <div className="p-4">

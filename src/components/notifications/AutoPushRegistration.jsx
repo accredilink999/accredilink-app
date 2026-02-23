@@ -51,6 +51,31 @@ async function saveFcmToken(token, platform) {
 }
 
 /**
+ * Set up native notification tap handler.
+ * When a user taps a push notification, navigate to the action_url.
+ */
+async function setupNativeNotificationClickHandler(PushNotifications) {
+  PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
+    console.log('[Push] Notification tapped:', JSON.stringify(notification));
+    const data = notification?.notification?.data;
+    const url = data?.url || data?.action_url;
+    if (url) {
+      console.log('[Push] Navigating to:', url);
+      // Use window.location for in-app navigation (React Router picks it up)
+      window.location.href = url;
+    }
+  });
+
+  // Optional: handle foreground notifications (show toast instead of system notification)
+  PushNotifications.addListener('pushNotificationReceived', (notification) => {
+    console.log('[Push] Foreground notification:', JSON.stringify(notification));
+    const title = notification?.title || 'Notification';
+    const body = notification?.body || '';
+    toast.info(`${title}: ${body}`, { duration: 5000 });
+  });
+}
+
+/**
  * Register for push and wait for the token.
  * IMPORTANT: Listeners are set up BEFORE calling register() to avoid
  * a race condition where iOS fires the event before the listener is ready.
@@ -58,6 +83,9 @@ async function saveFcmToken(token, platform) {
 async function registerAndGetToken(PushNotifications) {
   // Clean up any stale listeners from previous calls
   await PushNotifications.removeAllListeners();
+
+  // Set up click/foreground handlers first
+  await setupNativeNotificationClickHandler(PushNotifications);
 
   // Set up listeners FIRST, then register — prevents race condition
   const tokenPromise = new Promise((resolve, reject) => {

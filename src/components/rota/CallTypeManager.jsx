@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,24 +10,34 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Edit, Trash2, X, ListChecks } from 'lucide-react';
 import { toast } from 'sonner';
 
-export default function CallTypeManager({ open, onClose }) {
+export default function CallTypeManager({ open, onClose, selectedAreaId }) {
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({ name: '', color: '#0d9488', default_tasks: [] });
   const [newTask, setNewTask] = useState('');
 
   const { data: callTypes = [], isLoading } = useQuery({
-    queryKey: ['callTypes'],
-    queryFn: () => base44.entities.CallType.filter({ is_active: true }, 'sort_order'),
+    queryKey: ['callTypes', selectedAreaId],
+    queryFn: async () => {
+      let q = supabase.from('call_types').select('*').eq('is_active', true);
+      if (selectedAreaId) q = q.or(`area_id.eq.${selectedAreaId},area_id.is.null`);
+      const { data, error } = await q.order('sort_order');
+      if (error) throw error;
+      return data || [];
+    },
     enabled: !!open,
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.CallType.create({
-      ...data,
-      sort_order: callTypes.length,
-      is_active: true,
-    }),
+    mutationFn: async (data) => {
+      const { data: result, error } = await supabase
+        .from('call_types')
+        .insert({ ...data, sort_order: callTypes.length, is_active: true, ...(selectedAreaId ? { area_id: selectedAreaId } : {}) })
+        .select()
+        .single();
+      if (error) throw error;
+      return result;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['callTypes'] });
       setFormData({ name: '', color: '#0d9488', default_tasks: [] });
@@ -38,7 +48,16 @@ export default function CallTypeManager({ open, onClose }) {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.CallType.update(id, data),
+    mutationFn: async ({ id, data }) => {
+      const { data: result, error } = await supabase
+        .from('call_types')
+        .update(data)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return result;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['callTypes'] });
       setEditingId(null);
@@ -50,7 +69,13 @@ export default function CallTypeManager({ open, onClose }) {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.CallType.update(id, { is_active: false }),
+    mutationFn: async (id) => {
+      const { error } = await supabase
+        .from('call_types')
+        .update({ is_active: false })
+        .eq('id', id);
+      if (error) throw error;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['callTypes'] });
       toast.success('Call type removed');

@@ -3,12 +3,16 @@ import LocationPageLayout from '@/components/LocationPageLayout';
 export const metadata = {
   title: 'Care Services in Prestatyn | Domiciliary Care Prestatyn',
   description: 'Domiciliary care and support services in Prestatyn, Denbighshire. CIW regulated local care provider covering the North Wales coast.',
+  alternates: {
+    canonical: 'https://accredilinkcare.co.uk/areas/prestatyn',
+  },
 };
 
 export default function PrestatynPage() {
   return (
     <LocationPageLayout
       name="Prestatyn"
+      slug="prestatyn"
       county="Denbighshire"
       description="We provide professional care services in Prestatyn and the surrounding coastal area, supporting residents to live safely and independently at home."
       challenges="Prestatyn is a popular coastal town with a significant retired population. Many older residents have relocated here for retirement and may not have local family support networks. The town's ageing population creates growing demand for domiciliary care, companionship, and emergency response services."

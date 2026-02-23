@@ -3,12 +3,16 @@ import ServicePageLayout from '@/components/ServicePageLayout';
 export const metadata = {
   title: 'Social Care',
   description: 'Social care services in Denbighshire, Conwy and Wrexham. Community-based support to maintain independence, build connections, and improve wellbeing.',
+  alternates: {
+    canonical: 'https://accredilinkcare.co.uk/services/social-care',
+  },
 };
 
 export default function SocialCare() {
   return (
     <ServicePageLayout
       title="Social Care"
+      slug="social-care"
       description="Our social care services support individuals to maintain their independence, build meaningful connections, and improve their overall wellbeing within their community. We believe that good care goes beyond physical needs — it includes emotional wellbeing, social participation, and the opportunity to live a fulfilling life."
       icon={
         <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">

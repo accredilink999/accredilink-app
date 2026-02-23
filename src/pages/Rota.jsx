@@ -333,7 +333,7 @@ export default function Rota() {
             {showMyShiftsOnly ? 'My Shifts' : 'All Shifts'}
           </Button>
         </div>
-        <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} className="overflow-hidden">
+        <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} className="overflow-x-hidden">
         <div className={`rota-view-wrapper ${getSlideClass()}`}>
         <TabsContent value="month" className="mt-6">
           <MonthView

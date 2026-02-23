@@ -262,7 +262,7 @@ export default function ControlRoom() {
       const realCalls = calls.filter(c => c.call_type !== 'sitin_cover');
       // Only count as in_progress if staff has actually clocked in
       const hasInProgress = realCalls.some(c => c.status === 'in_progress' && c.clock_in_time);
-      const allCompleted = realCalls.length > 0 && realCalls.every(c => c.status === 'completed' || c.status === 'missed');
+      const allCompleted = realCalls.length > 0 && realCalls.every(c => c.status === 'completed' || c.status === 'missed' || c.status === 'not_at_home');
       const latestCall = realCalls[realCalls.length - 1] || calls[calls.length - 1];
 
       let markerStatus = 'pending';
@@ -515,11 +515,13 @@ export default function ControlRoom() {
                 {client.calls.map((call, idx) => {
                   const statusBg = call.status === 'in_progress' ? 'bg-amber-100 text-amber-700'
                     : call.status === 'completed' ? 'bg-green-100 text-green-700'
+                    : call.status === 'not_at_home' ? 'bg-amber-100 text-amber-700'
                     : call.status === 'missed' ? 'bg-red-100 text-red-700'
                     : 'bg-slate-100 text-slate-600';
                   const statusText = call.status === 'in_progress' ? 'In Progress'
                     : call.status === 'completed' ? 'Completed'
-                    : call.status === 'missed' ? 'Not Home'
+                    : call.status === 'not_at_home' ? 'Not at Home'
+                    : call.status === 'missed' ? 'Missed'
                     : 'Pending';
 
                   return (

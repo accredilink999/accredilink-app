@@ -240,7 +240,7 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
     const completedCalls = regularCalls.filter(c => c.status === 'completed').length;
     const inProgressCalls = regularCalls.filter(c => c.status === 'in_progress').length;
     const pendingCalls = regularCalls.filter(c => c.status === 'pending').length;
-    const missedCalls = regularCalls.filter(c => c.status === 'missed').length;
+    const missedCalls = regularCalls.filter(c => c.status === 'missed' || c.status === 'not_at_home').length;
     const droveCalls = regularCalls.filter(c => c.drove_to_call);
     const didNotDriveCalls = regularCalls.filter(c => c.drove_to_call === false);
 
@@ -252,7 +252,7 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
     // Outstanding logs = calls without a care log (exclude sitin_cover)
     // Also exclude logs already completed by the shift partner on shared shifts
     const outstandingLogs = regularCalls.filter(c => {
-      if (c.status === 'missed') return false; // missed calls don't need logs
+      if (c.status === 'missed' || c.status === 'not_at_home') return false; // missed/not-at-home calls don't need logs
       const hasLog = shiftCareLogs.some(log => {
         if (log.id === c.care_log_id || log.shift_call_id === c.id) return true;
         // Partner-completed: match via the partner's call for same client + same scheduled time
@@ -625,7 +625,7 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
   const hasWorkedCalls = calls.length > 0 && calls.some(c => c.status === 'completed' || c.status === 'in_progress');
   const canClockOff = (isMyShift || isAdmin) && !currentShift.clock_out_time && (currentShift.clock_in_time || hasWorkedCalls) && !serviceUserOnHold;
   const regularCallsForDone = calls.filter(c => c.call_type !== 'sitin_cover');
-  const allCallsDone = regularCallsForDone.length > 0 && regularCallsForDone.every(c => c.status === 'completed' || c.status === 'missed');
+  const allCallsDone = regularCallsForDone.length > 0 && regularCallsForDone.every(c => c.status === 'completed' || c.status === 'missed' || c.status === 'not_at_home');
 
   return (
     <>
@@ -1145,10 +1145,11 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
                                {call.status === 'completed' && <CheckCircle className="w-4 h-4 text-green-500" />}
                                {call.status === 'in_progress' && <Play className="w-4 h-4 text-blue-500" />}
                                {call.status === 'pending' && <Clock className="w-4 h-4 text-amber-500" />}
+                               {call.status === 'not_at_home' && <MapPin className="w-4 h-4 text-amber-500" />}
                                {call.status === 'missed' && <AlertCircle className="w-4 h-4 text-red-500" />}
                                {hasLog ? (
                                  <FileText className="w-4 h-4 text-green-500" />
-                               ) : call.status !== 'missed' ? (
+                               ) : call.status !== 'missed' && call.status !== 'not_at_home' ? (
                                  <FileText className="w-4 h-4 text-red-400" />
                                ) : null}
                              </div>

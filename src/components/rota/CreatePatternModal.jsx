@@ -30,7 +30,7 @@ const defaultFormData = {
 const hasMeaningfulData = (data) =>
   data.pattern_name || data.staff_id || data.rota_area_id || data.shifts.length > 0;
 
-export default function CreatePatternModal({ open, onClose, pattern = null }) {
+export default function CreatePatternModal({ open, onClose, pattern = null, selectedAreaId }) {
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState(
       pattern ? {
@@ -109,8 +109,8 @@ export default function CreatePatternModal({ open, onClose, pattern = null }) {
   });
 
   const { data: shiftTypes = [] } = useQuery({
-    queryKey: ['shiftTypes'],
-    queryFn: () => ShiftTypeApi.filter({ is_active: true }),
+    queryKey: ['shiftTypes', selectedAreaId],
+    queryFn: () => ShiftTypeApi.filterByArea(selectedAreaId),
   });
 
   // When editing, sync shift times from current shift type definitions

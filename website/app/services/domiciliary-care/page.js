@@ -3,12 +3,16 @@ import ServicePageLayout from '@/components/ServicePageLayout';
 export const metadata = {
   title: 'Domiciliary Care',
   description: 'Professional domiciliary care services in Denbighshire, Conwy and Wrexham. CIW-regulated personal care, medication support, and daily living assistance in your own home.',
+  alternates: {
+    canonical: 'https://accredilinkcare.co.uk/services/domiciliary-care',
+  },
 };
 
 export default function DomiciliaryCare() {
   return (
     <ServicePageLayout
       title="Domiciliary Care"
+      slug="domiciliary-care"
       description="Our domiciliary care service provides professional, person-centred support in the comfort of your own home. From personal care to medication management, our trained carers help you maintain your independence and quality of life — delivered to the highest standards set by Care Inspectorate Wales."
       icon={
         <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">

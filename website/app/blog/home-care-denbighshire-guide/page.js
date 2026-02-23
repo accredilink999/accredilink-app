@@ -11,6 +11,9 @@ export const metadata = {
     publishedTime: '2026-02-22T00:00:00Z',
     authors: ['Accredilink Community Response Taskforce'],
   },
+  alternates: {
+    canonical: 'https://accredilinkcare.co.uk/blog/home-care-denbighshire-guide',
+  },
 };
 
 export default function HomeCareGuide() {

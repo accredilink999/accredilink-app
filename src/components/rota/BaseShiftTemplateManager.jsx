@@ -32,7 +32,7 @@ const DAY_NAME_MAP = {
   4: 'thursday', 5: 'friday', 6: 'saturday',
 };
 
-export default function BaseShiftTemplateManager({ open, onClose }) {
+export default function BaseShiftTemplateManager({ open, onClose, selectedAreaId }) {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -48,10 +48,15 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
     days_of_week: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
   });
 
-  const { data: templates = [], isLoading } = useQuery({
+  const { data: allTemplates = [], isLoading } = useQuery({
     queryKey: ['baseShiftTemplates'],
     queryFn: () => base44.entities.BaseShiftTemplate.list('name'),
   });
+
+  // Filter templates to the selected area
+  const templates = selectedAreaId
+    ? allTemplates.filter(t => t.area_id === selectedAreaId)
+    : allTemplates;
 
   const { data: rotaAreas = [] } = useQuery({
     queryKey: ['rotaAreas'],
@@ -59,8 +64,8 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
   });
 
   const { data: shiftTypes = [] } = useQuery({
-    queryKey: ['shiftTypes'],
-    queryFn: () => ShiftTypeApi.filter({ is_active: true }),
+    queryKey: ['shiftTypes', selectedAreaId],
+    queryFn: () => ShiftTypeApi.filterByArea(selectedAreaId),
   });
 
   const saveMutation = useMutation({
@@ -253,14 +258,16 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
     if (!clearStartDate || !clearEndDate) return;
     setClearing(true);
     try {
-      // Count how many will be deleted — ONLY template-generated unassigned shifts
-      const { count, error: countErr } = await supabase
+      // Count how many will be deleted — ONLY template-generated unassigned shifts for this area
+      let countQ = supabase
         .from('shifts')
         .select('id', { count: 'exact', head: true })
         .is('staff_id', null)
         .eq('is_base_shift', true)
         .gte('date', clearStartDate)
         .lte('date', clearEndDate);
+      if (selectedAreaId) countQ = countQ.eq('rota_area_id', selectedAreaId);
+      const { count, error: countErr } = await countQ;
 
       if (countErr) throw countErr;
 
@@ -270,14 +277,16 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
         return;
       }
 
-      // Delete only template-generated unassigned shifts
-      const { error: delError } = await supabase
+      // Delete only template-generated unassigned shifts for this area
+      let delQ = supabase
         .from('shifts')
         .delete()
         .is('staff_id', null)
         .eq('is_base_shift', true)
         .gte('date', clearStartDate)
         .lte('date', clearEndDate);
+      if (selectedAreaId) delQ = delQ.eq('rota_area_id', selectedAreaId);
+      const { error: delError } = await delQ;
 
       if (delError) throw delError;
 
@@ -386,7 +395,7 @@ export default function BaseShiftTemplateManager({ open, onClose }) {
     setEditId(null);
     setFormData({
       name: '',
-      area_id: '',
+      area_id: selectedAreaId || '',
       shift_type_name: '',
       start_time: '09:00',
       end_time: '17:00',

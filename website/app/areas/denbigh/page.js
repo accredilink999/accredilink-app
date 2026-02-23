@@ -3,12 +3,16 @@ import LocationPageLayout from '@/components/LocationPageLayout';
 export const metadata = {
   title: 'Care Services in Denbigh | Domiciliary Care Denbigh, North Wales',
   description: 'Domiciliary care, emergency response, and support services in Denbigh and surrounding areas. Local carers, CIW regulated.',
+  alternates: {
+    canonical: 'https://accredilinkcare.co.uk/areas/denbigh',
+  },
 };
 
 export default function DenbighPage() {
   return (
     <LocationPageLayout
       name="Denbigh"
+      slug="denbigh"
       county="Denbighshire"
       description="Based in the heart of Denbighshire, we provide professional care services in and around the historic market town of Denbigh (Dinbych). Our team knows this area intimately."
       challenges="Denbigh is a small market town surrounded by rural communities in the Vale of Clwyd. Many residents are elderly and live in scattered properties in the surrounding countryside, where reaching care services can be difficult. The town itself has an ageing population with growing demand for domiciliary care, respite, and emergency response. As a locally-based provider, we are well-placed to serve Denbigh and its surrounding villages."

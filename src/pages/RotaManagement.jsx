@@ -316,6 +316,7 @@ export default function RotaManagement() {
         <PatternManager
           open={isPatternManagerOpen}
           onClose={() => setIsPatternManagerOpen(false)}
+          selectedAreaId={selectedAreaId}
         />
       )}
 
@@ -323,6 +324,7 @@ export default function RotaManagement() {
         <ClientCallManager
           open={isCallManagerOpen}
           onClose={() => setIsCallManagerOpen(false)}
+          selectedAreaId={selectedAreaId}
         />
       )}
 
@@ -330,6 +332,7 @@ export default function RotaManagement() {
         <ShiftTypeManager
           open={isShiftTypeManagerOpen}
           onClose={() => setIsShiftTypeManagerOpen(false)}
+          selectedAreaId={selectedAreaId}
         />
       )}
 
@@ -337,6 +340,7 @@ export default function RotaManagement() {
         <BaseShiftTemplateManager
           open={isTemplateManagerOpen}
           onClose={() => setIsTemplateManagerOpen(false)}
+          selectedAreaId={selectedAreaId}
         />
       )}
 

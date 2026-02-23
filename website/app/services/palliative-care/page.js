@@ -3,12 +3,16 @@ import ServicePageLayout from '@/components/ServicePageLayout';
 export const metadata = {
   title: 'Palliative Care',
   description: 'Palliative and end-of-life care services in Denbighshire, Conwy and Wrexham. Compassionate, CIW-regulated support ensuring dignity, comfort, and personal choice.',
+  alternates: {
+    canonical: 'https://accredilinkcare.co.uk/services/palliative-care',
+  },
 };
 
 export default function PalliativeCare() {
   return (
     <ServicePageLayout
       title="Palliative Care"
+      slug="palliative-care"
       description="When a loved one is approaching end of life, compassionate and dignified care matters most. Our palliative care team provides specialist support to ensure comfort, peace, and quality of life for both the individual and their family — delivered with sensitivity, professionalism, and deep respect for personal wishes."
       icon={
         <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">

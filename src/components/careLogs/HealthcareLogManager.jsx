@@ -64,6 +64,11 @@ export default function HealthcareLogManager({ serviceUser, logType = 'communica
             notes: ''
           });
           setIsAdding(false);
+          toast.success('Communication log saved');
+        },
+        onError: (err) => {
+          console.error('Failed to save communication log:', err);
+          toast.error('Failed to save communication log: ' + (err.message || 'Unknown error'));
         },
       });
 
@@ -135,7 +140,18 @@ export default function HealthcareLogManager({ serviceUser, logType = 'communica
     });
 
   const handleSubmit = () => {
-          if (!formData.visit_date || !formData.notes.trim()) return;
+          if (!formData.visit_date) {
+            toast.error(logType === 'sitting' ? 'Please enter a date and time' : 'Please enter a visit date');
+            return;
+          }
+          if (!formData.notes.trim()) {
+            toast.error(logType === 'sitting' ? 'Please enter details' : 'Please enter notes');
+            return;
+          }
+          if (!currentUser?.id) {
+            toast.error('Unable to identify current user. Please refresh and try again.');
+            return;
+          }
 
           const logData = {
             service_user_id: serviceUser.id,

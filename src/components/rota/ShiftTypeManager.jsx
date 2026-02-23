@@ -13,7 +13,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 const DEFAULT_TYPES = ['Early', 'Late', 'Sit In E', 'Sit In L', 'Sit In FD', 'SSCC'];
 
-export default function ShiftTypeManager({ open, onClose }) {
+export default function ShiftTypeManager({ open, onClose, selectedAreaId }) {
   const queryClient = useQueryClient();
   const [newType, setNewType] = useState('');
   const [newStartTime, setNewStartTime] = useState('09:00');
@@ -29,15 +29,15 @@ export default function ShiftTypeManager({ open, onClose }) {
   const [pendingDeleteName, setPendingDeleteName] = useState('');
 
   const { data: shiftTypes = [] } = useQuery({
-    queryKey: ['shiftTypes'],
-    queryFn: () => ShiftTypeApi.filter({ is_active: true }),
+    queryKey: ['shiftTypes', selectedAreaId],
+    queryFn: () => ShiftTypeApi.filterByArea(selectedAreaId),
     enabled: open,
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => ShiftTypeApi.create(data),
+    mutationFn: (data) => ShiftTypeApi.create({ ...data, ...(selectedAreaId ? { area_id: selectedAreaId } : {}) }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['shiftTypes'] });
+      queryClient.invalidateQueries({ queryKey: ['shiftTypes', selectedAreaId] });
       toast.success('Shift type created');
       setNewType('');
       setNewStartTime('09:00');
@@ -139,7 +139,7 @@ export default function ShiftTypeManager({ open, onClose }) {
       return summary;
     },
     onSuccess: (summary, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['shiftTypes'] });
+      queryClient.invalidateQueries({ queryKey: ['shiftTypes'] }); // invalidate all area variants
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       queryClient.invalidateQueries({ queryKey: ['baseShiftTemplates'] });
       const parts = [`Shift type saved: ${variables.name} (${variables.start_time} - ${variables.end_time})`];
@@ -179,7 +179,7 @@ export default function ShiftTypeManager({ open, onClose }) {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['shiftTypes'] });
+      queryClient.invalidateQueries({ queryKey: ['shiftTypes'] }); // invalidate all area variants
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       toast.success('Shift type deleted');
     },
@@ -206,12 +206,13 @@ export default function ShiftTypeManager({ open, onClose }) {
       const type = DEFAULT_TYPES[i];
       const exists = shiftTypes.some(st => st.name === type);
       if (!exists) {
-        await createMutation.mutateAsync({ 
-          name: type, 
-          start_time: '09:00', 
-          end_time: '17:00', 
+        await createMutation.mutateAsync({
+          name: type,
+          start_time: '09:00',
+          end_time: '17:00',
           color: colors[i % colors.length],
-          is_active: true 
+          is_active: true,
+          ...(selectedAreaId ? { area_id: selectedAreaId } : {}),
         });
       }
     }

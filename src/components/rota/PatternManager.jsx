@@ -23,7 +23,7 @@ import { Plus, Trash2, Play, Square, Calendar, Edit, Zap, Eraser, UserX } from '
 import { toast } from 'sonner';
 import { deployPatternShifts, clearPatternShifts } from '@/utils/deployPattern';
 
-export default function PatternManager({ open, onClose }) {
+export default function PatternManager({ open, onClose, selectedAreaId }) {
   const queryClient = useQueryClient();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingPattern, setEditingPattern] = useState(null);
@@ -559,6 +559,7 @@ export default function PatternManager({ open, onClose }) {
         <CreatePatternModal
           open={isCreateModalOpen}
           onClose={() => setIsCreateModalOpen(false)}
+          selectedAreaId={selectedAreaId}
         />
       )}
 
@@ -567,6 +568,7 @@ export default function PatternManager({ open, onClose }) {
           open={!!editingPattern}
           onClose={() => setEditingPattern(null)}
           pattern={editingPattern}
+          selectedAreaId={selectedAreaId}
         />
       )}
 

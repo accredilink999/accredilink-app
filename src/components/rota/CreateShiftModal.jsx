@@ -93,10 +93,10 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
   });
 
   const { data: shiftTypes = [], error: shiftTypesError } = useQuery({
-    queryKey: ['shiftTypes'],
+    queryKey: ['shiftTypes', selectedAreaId],
     queryFn: async () => {
       console.log('[CreateShiftModal] Fetching shift types...');
-      const result = await ShiftTypeApi.filter({ is_active: true });
+      const result = await ShiftTypeApi.filterByArea(selectedAreaId);
       console.log('[CreateShiftModal] Shift types result:', result?.length, result);
       return result;
     },
@@ -109,8 +109,14 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
   });
 
   const { data: callTypesData = [] } = useQuery({
-    queryKey: ['callTypes'],
-    queryFn: () => base44.entities.CallType.filter({ is_active: true }, 'sort_order'),
+    queryKey: ['callTypes', selectedAreaId],
+    queryFn: async () => {
+      let q = supabase.from('call_types').select('*').eq('is_active', true);
+      if (selectedAreaId) q = q.or(`area_id.eq.${selectedAreaId},area_id.is.null`);
+      const { data, error } = await q.order('sort_order');
+      if (error) throw error;
+      return data || [];
+    },
   });
 
   // Helper: get default tasks for a call type name

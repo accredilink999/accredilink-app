@@ -3,12 +3,16 @@ import ServicePageLayout from '@/components/ServicePageLayout';
 export const metadata = {
   title: 'Event Medical Services',
   description: 'Professional event medical cover for community events, festivals, sports fixtures, and public gatherings across Denbighshire, Conwy, and Wrexham. Qualified pre-hospital emergency care responders.',
+  alternates: {
+    canonical: 'https://accredilinkcare.co.uk/services/event-medical-services',
+  },
 };
 
 export default function EventMedicalServicesPage() {
   return (
     <ServicePageLayout
       title="Event Medical Services"
+      slug="event-medical-services"
       description="Professional medical cover for community events, festivals, sporting fixtures, and public gatherings across North Wales."
       icon={
         <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">

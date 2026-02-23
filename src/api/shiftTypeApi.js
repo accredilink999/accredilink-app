@@ -54,6 +54,15 @@ const directApi = {
     if (error) throw error
     return data
   },
+
+  /** Fetch active shift types for an area, including legacy types with no area set */
+  async filterByArea(areaId) {
+    let q = supabase.from('shift_types').select('*').eq('is_active', true)
+    if (areaId) q = q.or(`area_id.eq.${areaId},area_id.is.null`)
+    const { data, error } = await q.order('name')
+    if (error) throw error
+    return data || []
+  },
 }
 
 /**

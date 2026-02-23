@@ -3,12 +3,16 @@ import ServicePageLayout from '@/components/ServicePageLayout';
 export const metadata = {
   title: 'Training Services',
   description: 'Care training and pre-hospital emergency care courses in Denbighshire, Conwy and Wrexham. Accredited professional development for individuals and organisations.',
+  alternates: {
+    canonical: 'https://accredilinkcare.co.uk/services/training',
+  },
 };
 
 export default function Training() {
   return (
     <ServicePageLayout
       title="Training"
+      slug="training"
       description="We don't just deliver care — we train others to do the same. Accredilink offers professional training in both care skills and pre-hospital emergency care, equipping individuals and organisations with the knowledge and confidence to respond effectively. Our courses are designed to meet the standards required by Care Inspectorate Wales and Social Care Wales."
       icon={
         <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
