@@ -4,9 +4,36 @@ import Image from 'next/image';
 export const metadata = {
   title: 'Blog | Care Guides, Advice & News',
   description: 'Expert advice on domiciliary care, funding guidance, dementia support, hospital discharge, and care in Wales. From the Accredilink team.',
+  alternates: {
+    canonical: 'https://accredilinkcare.co.uk/blog',
+  },
 };
 
 const posts = [
+  {
+    slug: 'how-much-does-home-care-cost-wales',
+    title: 'How Much Does Home Care Cost in Wales? A 2026 Guide',
+    excerpt: 'A clear breakdown of domiciliary care costs in Wales — hourly rates, local authority funding, the Welsh charge cap, Attendance Allowance, and how to make care affordable.',
+    category: 'Funding',
+    date: '2026-02-23',
+    thumbnail: '/images/funding.jpg',
+  },
+  {
+    slug: 'care-home-vs-home-care',
+    title: 'Care Home vs Home Care: What Is the Difference?',
+    excerpt: 'Understanding the key differences between residential care homes and domiciliary home care — costs, independence, regulation, and how to decide which is right.',
+    category: 'Guides',
+    date: '2026-02-20',
+    thumbnail: '/images/hero-home.jpg',
+  },
+  {
+    slug: 'how-to-get-carers-assessment-wales',
+    title: 'How to Get a Carer\'s Assessment in Wales: Your Complete Guide',
+    excerpt: 'Your legal right to a carer\'s assessment in Wales — what it is, who qualifies, how to request one, and what support it can lead to.',
+    category: 'Guides',
+    date: '2026-02-16',
+    thumbnail: '/images/hero-care.jpg',
+  },
   {
     slug: 'how-to-arrange-domiciliary-care-in-wales',
     title: 'How to Arrange Domiciliary Care in Wales: A Complete Guide',
@@ -54,6 +81,14 @@ const posts = [
     category: 'Dementia',
     date: '2026-01-06',
     thumbnail: '/images/palliative-care.jpg',
+  },
+  {
+    slug: 'home-care-denbighshire-guide',
+    title: 'Home Care in Denbighshire: Your Complete Guide to Local Care Services',
+    excerpt: 'Everything you need to know about arranging home care in Denbighshire — from choosing a provider to understanding local authority support.',
+    category: 'Local Guides',
+    date: '2025-12-30',
+    thumbnail: '/images/hero-home.jpg',
   },
 ];
 
