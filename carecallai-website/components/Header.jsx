@@ -8,6 +8,7 @@ const features = [
   { name: "Scheduling & Rota", href: "/features/scheduling" },
   { name: "Care Logging", href: "/features/care-logging" },
   { name: "Medication / MAR Charts", href: "/features/medication-management" },
+  { name: "GPS Check-In & Tracking", href: "/features/gps-tracking" },
   { name: "Staff Management", href: "/features/staff-management" },
   { name: "Compliance & Auditing", href: "/features/compliance" },
   { name: "Invoicing & Payroll", href: "/features/invoicing-payroll" },

@@ -8,6 +8,7 @@ import {
   Receipt,
   Smartphone,
   Bot,
+  MapPin,
   ArrowRight,
 } from "lucide-react";
 import FeatureCard from "@/components/FeatureCard";
@@ -49,6 +50,13 @@ const allFeatures = [
     href: "/features/medication-management",
   },
   {
+    icon: MapPin,
+    title: "GPS Check-In & Tracking",
+    description:
+      "GPS-verified check-in and check-out, QR code scanning, live staff tracking on a real-time map and automatic mileage logging for fuel expense claims.",
+    href: "/features/gps-tracking",
+  },
+  {
     icon: Users,
     title: "Staff Management",
     description:
@@ -66,7 +74,7 @@ const allFeatures = [
     icon: Receipt,
     title: "Invoicing & Payroll",
     description:
-      "Generate client invoices from logged visits, calculate staff payroll from shift hours, manage expenses and track payments — all in one place.",
+      "Bill councils and private clients from logged visits, calculate staff payroll from shifts, and sync to QuickBooks, Sage or Xero automatically.",
     href: "/features/invoicing-payroll",
   },
   {

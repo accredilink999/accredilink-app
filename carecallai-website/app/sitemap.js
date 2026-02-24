@@ -16,6 +16,7 @@ export default function sitemap() {
     { url: `${BASE_URL}/features/invoicing-payroll`, changeFrequency: "monthly", priority: 0.8 },
     { url: `${BASE_URL}/features/mobile-app`, changeFrequency: "monthly", priority: 0.8 },
     { url: `${BASE_URL}/features/ai-assistant`, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${BASE_URL}/features/gps-tracking`, changeFrequency: "monthly", priority: 0.8 },
     { url: `${BASE_URL}/pricing`, changeFrequency: "monthly", priority: 0.9 },
     { url: `${BASE_URL}/about`, changeFrequency: "monthly", priority: 0.7 },
     { url: `${BASE_URL}/contact`, changeFrequency: "monthly", priority: 0.7 },
