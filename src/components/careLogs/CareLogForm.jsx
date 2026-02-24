@@ -1316,7 +1316,7 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
               </Button>
             </div>
             <div className="p-4">
-              <MARChart serviceUserId={serviceUser?.id} />
+              <MARChart serviceUser={serviceUser} />
             </div>
           </div>
         </div>
