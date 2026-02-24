@@ -124,17 +124,17 @@ export default function BaseShiftTemplateManager({ open, onClose, selectedAreaId
       });
       console.log(`[DeployAll] Date range: ${deployAllStartDate} to ${deployAllEndDate} (${days.length} days)`);
 
-      // Query existing BLANK shifts only — assigned shifts should NOT prevent
-      // new blank slots from being created (blanks are "available to claim" slots)
-      const { data: existingShifts = [], error: fetchErr } = await supabase
+      // Query existing shifts in this date range — scoped to selected area
+      let existQ = supabase
         .from('shifts')
-        .select('id, date, shift_name, start_time, end_time, rota_area_id, area_id')
-        .is('staff_id', null)
+        .select('id, date, shift_name, start_time, end_time, rota_area_id, area_id, staff_id')
         .gte('date', deployAllStartDate)
         .lte('date', deployAllEndDate)
         .limit(5000);
+      if (selectedAreaId) existQ = existQ.eq('rota_area_id', selectedAreaId);
+      const { data: existingShifts = [], error: fetchErr } = await existQ;
       if (fetchErr) throw fetchErr;
-      console.log(`[DeployAll] Found ${existingShifts.length} existing BLANK shifts in range`);
+      console.log(`[DeployAll] Found ${existingShifts.length} existing shifts in range`);
 
       const existingCount = {};
       for (const s of existingShifts) {
@@ -313,14 +313,14 @@ export default function BaseShiftTemplateManager({ open, onClose, selectedAreaId
         end: parseISO(endDate),
       });
 
-      // Count existing BLANK shifts per key — assigned shifts should NOT block
-      // creating new available slots (blanks are "available to claim" slots)
-      const { data: existingShifts = [], error: fetchErr } = await supabase
+      // Count existing shifts per key — scoped to this template's area
+      let genQ = supabase
         .from('shifts')
         .select('id, date, shift_name, start_time, end_time, rota_area_id, area_id')
-        .is('staff_id', null)
         .gte('date', startDate)
         .lte('date', endDate);
+      if (template.area_id) genQ = genQ.eq('rota_area_id', template.area_id);
+      const { data: existingShifts = [], error: fetchErr } = await genQ;
       if (fetchErr) throw fetchErr;
 
       const existingCount = {};

@@ -8,7 +8,7 @@
  *   base44.agents.addMessage(conv, { role, content })
  *
  * Backed by the `ai_conversations` Supabase table.
- * LLM responses are powered by the `invokeLLM` edge function (OpenAI GPT-4o).
+ * LLM responses are powered by the `invokeLLM` edge function.
  */
 
 import { supabase } from './supabaseClient'

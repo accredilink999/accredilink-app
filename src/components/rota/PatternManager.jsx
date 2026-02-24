@@ -43,14 +43,16 @@ export default function PatternManager({ open, onClose, selectedAreaId }) {
   // Fetch distinct staff who have assigned future shifts (for orphan cleanup)
   const today = new Date().toISOString().split('T')[0];
   const { data: assignedStaff = [] } = useQuery({
-    queryKey: ['assigned-staff-shifts', today],
+    queryKey: ['assigned-staff-shifts', today, selectedAreaId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from('shifts')
         .select('staff_id, staff_name')
         .not('staff_id', 'is', null)
         .gte('date', today)
         .order('staff_name');
+      if (selectedAreaId) q = q.eq('rota_area_id', selectedAreaId);
+      const { data, error } = await q;
       if (error) throw error;
       // Deduplicate by staff_id
       const seen = new Set();
@@ -68,12 +70,14 @@ export default function PatternManager({ open, onClose, selectedAreaId }) {
       const staffName = assignedStaff.find(s => s.staff_id === staffId)?.staff_name || 'Unknown';
       toast.info(`Clearing all future shifts for ${staffName}...`);
 
-      // Find all future shifts for this staff member (include paired_shift_id for partner cleanup)
-      const { data: staffShifts, error } = await supabase
+      // Find all future shifts for this staff member IN THIS AREA ONLY
+      let cleanupQ = supabase
         .from('shifts')
         .select('id, paired_shift_id')
         .eq('staff_id', staffId)
         .gte('date', today);
+      if (selectedAreaId) cleanupQ = cleanupQ.eq('rota_area_id', selectedAreaId);
+      const { data: staffShifts, error } = await cleanupQ;
       if (error) throw error;
       if (!staffShifts || staffShifts.length === 0) return { totalCleared: 0, staffName };
 
@@ -234,16 +238,14 @@ export default function PatternManager({ open, onClose, selectedAreaId }) {
       }
 
       // 2. Fallback: also find by staff_id + rota_area_id for orphaned shifts
-      if (pattern.staff_id) {
+      // ALWAYS scope by area to prevent cross-area clearing
+      if (pattern.staff_id && pattern.rota_area_id) {
         let fallbackQuery = supabase
           .from('shifts')
           .select('id, shift_name, paired_shift_id')
           .eq('staff_id', pattern.staff_id)
+          .eq('rota_area_id', pattern.rota_area_id)
           .gte('date', new Date().toISOString().split('T')[0]);
-
-        if (pattern.rota_area_id) {
-          fallbackQuery = fallbackQuery.eq('rota_area_id', pattern.rota_area_id);
-        }
 
         const { data: staffShifts } = await fallbackQuery;
         if (staffShifts && staffShifts.length > 0) {

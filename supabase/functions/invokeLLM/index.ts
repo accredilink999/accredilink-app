@@ -8,12 +8,13 @@
  *
  * Returns: { reply: string }
  *
- * Secret required:  supabase secrets set GROQ_API_KEY=gsk_...
+ * Secret required:  supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
  */
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
-const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY')
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')
+const ANTHROPIC_MODEL = Deno.env.get('ANTHROPIC_MODEL') || 'claude-3-5-sonnet-latest'
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -21,6 +22,16 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+function extractAnthropicReply(content: unknown): string {
+  if (!Array.isArray(content)) return ''
+
+  return content
+    .filter((item) => item && typeof item === 'object' && (item as { type?: string }).type === 'text')
+    .map((item) => (item as { text?: string }).text || '')
+    .join('\n')
+    .trim()
 }
 
 /** Fetch app context data for the authenticated user */
@@ -149,9 +160,9 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders })
     }
 
-    if (!GROQ_API_KEY) {
+    if (!ANTHROPIC_API_KEY) {
       return Response.json(
-        { error: 'GROQ_API_KEY secret not configured.' },
+        { error: 'ANTHROPIC_API_KEY secret not configured.' },
         { status: 500, headers: corsHeaders }
       )
     }
@@ -181,27 +192,31 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Provide either "prompt" or "messages"' }, { status: 400, headers: corsHeaders })
     }
 
-    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: chatMessages,
+        model: ANTHROPIC_MODEL,
+        system: enrichedSystemPrompt || undefined,
+        messages: chatMessages
+          .filter((m) => m.role !== 'system')
+          .map((m) => ({ role: m.role, content: m.content })),
         temperature: 0.7,
         max_tokens: 2048,
       }),
     })
 
-    if (!groqRes.ok) {
-      const errText = await groqRes.text()
-      throw new Error(`Groq API error: ${errText}`)
+    if (!anthropicRes.ok) {
+      const errText = await anthropicRes.text()
+      throw new Error(`Anthropic API error: ${errText}`)
     }
 
-    const groqData = await groqRes.json()
-    const reply = groqData.choices?.[0]?.message?.content ?? ''
+    const anthropicData = await anthropicRes.json()
+    const reply = extractAnthropicReply(anthropicData?.content)
 
     return Response.json({ reply }, { headers: corsHeaders })
   } catch (error) {
