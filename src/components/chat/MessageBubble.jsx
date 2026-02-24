@@ -323,14 +323,15 @@ const MessageBubble = React.memo(({
       {showContextMenu && (
         <div
           ref={menuRef}
-          className="fixed z-[9999] bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 w-[240px] sm:w-auto"
+          className="fixed z-[9999] bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden overflow-y-auto animate-in fade-in zoom-in-95 duration-150 w-[240px] sm:w-auto"
           style={{
             left: window.innerWidth < 640
               ? Math.max(8, (window.innerWidth - 240) / 2)
               : Math.max(8, Math.min(menuPosition.x, window.innerWidth - 220)),
             top: window.innerWidth < 640
-              ? Math.max(80, Math.min(menuPosition.y - 40, window.innerHeight - 280))
-              : Math.max(8, Math.min(menuPosition.y - 60, window.innerHeight - 300)),
+              ? Math.max(8, Math.min(menuPosition.y - 40, window.innerHeight - 380))
+              : Math.max(8, Math.min(menuPosition.y - 60, window.innerHeight - 400)),
+            maxHeight: 'calc(100vh - 16px)',
           }}
         >
           {/* Quick reactions */}
