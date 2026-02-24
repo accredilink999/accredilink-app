@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { ShiftTypeApi } from '@/api/shiftTypeApi';
-import { ShiftApi, ShiftCallApi } from '@/api/rotaApi';
+import { ShiftApi, ShiftCallApi, applyAreaFilter } from '@/api/rotaApi';
 import { supabase } from '@/api/supabaseClient';
 import { useFormPersistence } from '@/hooks/useFormPersistence';
 import DraftRecoveryPrompt from '@/components/ui/DraftRecoveryPrompt';
@@ -135,7 +135,7 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
       return [];
     }
     // Require a valid area — don't auto-assign across all areas
-    if (!areaId || areaId === 'default') {
+    if (!areaId) {
       console.log('[CreateShift] getMatchingCalls bail: no valid area, areaId=', areaId);
       return [];
     }
@@ -196,13 +196,14 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
 
        let allBlanks = [];
        for (const aid of areaIds) {
-         const { data, error } = await supabase
+         let q = supabase
            .from('shifts')
            .select('*')
            .is('staff_id', null)
-           .eq('rota_area_id', aid)
            .gte('date', dates[0])
            .lte('date', dates[dates.length - 1]);
+         q = applyAreaFilter(q, aid);
+         const { data, error } = await q;
          if (!error && data) allBlanks.push(...data);
        }
        console.log('[CreateShift] Found', allBlanks.length, 'blank shifts in date range');
@@ -230,7 +231,7 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
          const { _sitInCover, ...shiftData } = rawShiftData;
 
          // Find a blank shift to replace — prefer matching by shift_name, fall back to times
-         const areaId = shiftData.rota_area_id || 'default';
+         const areaId = shiftData.rota_area_id || shiftData.area_id || '';
          let blankShift = null;
 
          // 1. Try matching by shift name (most reliable)
@@ -382,7 +383,7 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
 
     const staffMember = staff.find(s => s.id === formData.staff_id);
     const serviceUser = serviceUsers.find(s => s.id === formData.service_user_id);
-    const areaId = selectedRotaAreaId || selectedAreaId || 'default';
+    const areaId = selectedRotaAreaId || selectedAreaId || null;
 
     let dates = [format(shiftDate, 'yyyy-MM-dd')];
     if (useMultipleDays && endDate) {
@@ -410,6 +411,7 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
       visit_details: formData.visit_details || 'Follow Care Plans & Citizens Wishes at all times',
       status: 'scheduled',
       rota_area_id: areaId,
+      area_id: areaId,
       _matchingCalls: matchCount, // preview only, stripped before create
       _sitInCover: (tab === 'staff' && sitInCoverRequired === 'yes' && sitInTimeOn && sitInTimeOff)
         ? { time_on: sitInTimeOn, time_off: sitInTimeOff }

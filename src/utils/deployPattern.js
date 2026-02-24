@@ -1,5 +1,5 @@
 import { supabase } from '@/api/supabaseClient';
-import { ShiftCallApi } from '@/api/rotaApi';
+import { ShiftCallApi, applyAreaFilter } from '@/api/rotaApi';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
 
@@ -96,14 +96,15 @@ export async function deployPatternShifts({
 
   // ── Step 1b: Fix shifts missing shift_name (set from shift_types by times) ──
   {
-    const { data: noNameShifts } = await supabase
+    let noNameQ = supabase
       .from('shifts')
       .select('id, start_time, end_time')
       .is('shift_name', null)
-      .eq('rota_area_id', areaId)
       .gte('date', startDate)
       .lte('date', endDate)
       .limit(2000);
+    noNameQ = applyAreaFilter(noNameQ, areaId);
+    const { data: noNameShifts } = await noNameQ;
 
     if (noNameShifts && noNameShifts.length > 0) {
       // Fetch shift types to match by times
@@ -138,15 +139,16 @@ export async function deployPatternShifts({
   let blanks = [];
   let offset = 0;
   while (true) {
-    const { data, error } = await supabase
+    let blankQ = supabase
       .from('shifts')
       .select('id, date, start_time, end_time, shift_name')
       .is('staff_id', null)
       .not('shift_name', 'is', null)
-      .eq('rota_area_id', areaId)
       .gte('date', startDate)
       .lte('date', endDate)
       .range(offset, offset + PAGE - 1);
+    blankQ = applyAreaFilter(blankQ, areaId);
+    const { data, error } = await blankQ;
     if (error) throw error;
     if (!data || data.length === 0) break;
     blanks.push(...data);
@@ -274,14 +276,15 @@ export async function deployPatternShifts({
       let assigned = [];
       let pOff = 0;
       while (true) {
-        const { data, error } = await supabase
+        let pairQ = supabase
           .from('shifts')
           .select('id, date, start_time, end_time, staff_id, staff_name, paired_shift_id, shift_name')
           .not('staff_id', 'is', null)
-          .eq('rota_area_id', areaId)
           .gte('date', filledDates[0])
           .lte('date', filledDates[filledDates.length - 1])
           .range(pOff, pOff + PAGE - 1);
+        pairQ = applyAreaFilter(pairQ, areaId);
+        const { data, error } = await pairQ;
         if (error || !data || data.length === 0) break;
         assigned.push(...data);
         if (data.length < PAGE) break;
@@ -373,10 +376,10 @@ export async function clearPatternShifts({ patternId, staffId, areaId }) {
     }
   }
 
-  // 2. Fallback: by staff_id + area
-  if (staffId) {
+  // 2. Fallback: by staff_id + area (ALWAYS scoped to area to prevent cross-area clearing)
+  if (staffId && areaId) {
     let q = supabase.from('shifts').select('id, shift_name, paired_shift_id').eq('staff_id', staffId).gte('date', today);
-    if (areaId) q = q.eq('rota_area_id', areaId);
+    q = applyAreaFilter(q, areaId);
     const { data } = await q;
 
     if (data && data.length > 0) {
@@ -466,13 +469,14 @@ export async function deployClientCallsToRota({ serviceUserId, serviceUserName, 
   let shifts = [];
   offset = 0;
   while (true) {
-    const { data, error } = await supabase
+    let clientQ = supabase
       .from('shifts')
       .select('id, date, start_time, end_time, shift_name')
       .not('staff_id', 'is', null)
-      .eq('rota_area_id', areaId)
       .gte('date', today)
       .range(offset, offset + PAGE - 1);
+    clientQ = applyAreaFilter(clientQ, areaId);
+    const { data, error } = await clientQ;
     if (error || !data || data.length === 0) break;
     shifts.push(...data.filter(s => !isSitIn(s.shift_name)));
     if (data.length < PAGE) break;

@@ -17,6 +17,22 @@ function parseOrder(orderStr) {
   return { column, ascending: !desc }
 }
 
+// ── Area filter helper ───────────────────────────────────────────────
+// The shifts table has both `area_id` (original) and `rota_area_id` (added later).
+// Different code paths may have set one or the other. This helper ensures queries
+// match shifts regardless of which column holds the area value.
+export function applyAreaFilter(query, areaId) {
+  if (!areaId) return query
+  return query.or(`rota_area_id.eq.${areaId},area_id.eq.${areaId}`)
+}
+
+// When writing a shift, always set BOTH area columns so all queries find it.
+export function withBothAreaColumns(record) {
+  const areaId = record.rota_area_id || record.area_id
+  if (!areaId) return record
+  return { ...record, area_id: areaId, rota_area_id: areaId }
+}
+
 // ── Shift API ────────────────────────────────────────────────────────
 
 export const ShiftApi = {
@@ -50,7 +66,7 @@ export const ShiftApi = {
   async create(record) {
     const { data, error } = await supabase
       .from('shifts')
-      .insert(record)
+      .insert(withBothAreaColumns(record))
       .select()
       .single()
     if (error) throw error
@@ -81,7 +97,7 @@ export const ShiftApi = {
     const BATCH_SIZE = 50
     const allData = []
     for (let i = 0; i < records.length; i += BATCH_SIZE) {
-      const batch = records.slice(i, i + BATCH_SIZE)
+      const batch = records.slice(i, i + BATCH_SIZE).map(withBothAreaColumns)
       const { data, error } = await supabase
         .from('shifts')
         .insert(batch)

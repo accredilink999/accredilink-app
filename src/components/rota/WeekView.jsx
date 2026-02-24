@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ShiftApi, ShiftCallApi } from '@/api/rotaApi';
+import { ShiftApi, ShiftCallApi, applyAreaFilter } from '@/api/rotaApi';
 import { ShiftTypeApi } from '@/api/shiftTypeApi';
 import { supabase } from '@/api/supabaseClient';
 import { format, startOfWeek, addDays, isSameDay, parseISO } from 'date-fns';
@@ -28,9 +28,7 @@ export default function WeekView({ currentDate, onShiftClick, onCreateShift, isA
          .select('*')
          .gte('date', weekStartStr)
          .lte('date', weekEndStr);
-       if (selectedAreaId) {
-         query = query.or(`rota_area_id.eq.${selectedAreaId},area_id.eq.${selectedAreaId}`);
-       }
+       query = applyAreaFilter(query, selectedAreaId);
        const { data: allShifts = [], error } = await query;
        if (error) throw error;
        console.log('[WeekView] Shifts for week:', allShifts?.length);

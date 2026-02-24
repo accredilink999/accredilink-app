@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ShiftApi, ShiftCallApi } from '@/api/rotaApi';
+import { ShiftApi, ShiftCallApi, applyAreaFilter } from '@/api/rotaApi';
 import { ShiftTypeApi } from '@/api/shiftTypeApi';
 import { supabase } from '@/api/supabaseClient';
 import { format, isSameDay, parseISO } from 'date-fns';
@@ -19,9 +19,7 @@ export default function DayView({ currentDate, onShiftClick, onCreateShift, isAd
          .from('shifts')
          .select('*')
          .eq('date', dateStr);
-       if (selectedAreaId) {
-         query = query.or(`rota_area_id.eq.${selectedAreaId},area_id.eq.${selectedAreaId}`);
-       }
+       query = applyAreaFilter(query, selectedAreaId);
        const { data: allShifts = [], error } = await query;
        if (error) throw error;
        let filtered = allShifts;
