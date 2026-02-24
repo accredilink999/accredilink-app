@@ -124,23 +124,37 @@ export default function BaseShiftTemplateManager({ open, onClose, selectedAreaId
       });
       console.log(`[DeployAll] Date range: ${deployAllStartDate} to ${deployAllEndDate} (${days.length} days)`);
 
-      // Query existing shifts in this date range — scoped to selected area
-      let existQ = supabase
-        .from('shifts')
-        .select('id, date, shift_name, start_time, end_time, rota_area_id, area_id, staff_id')
-        .gte('date', deployAllStartDate)
-        .lte('date', deployAllEndDate)
-        .limit(5000);
-      if (selectedAreaId) existQ = existQ.eq('rota_area_id', selectedAreaId);
-      const { data: existingShifts = [], error: fetchErr } = await existQ;
-      if (fetchErr) throw fetchErr;
+      // Query ALL existing shifts (blank + assigned) — a blank becomes the
+      // assigned shift when a pattern fills it, so there should only ever be
+      // ONE shift per slot. Skip creating a blank if ANY shift already exists.
+      // Paginate to avoid Supabase default 1000-row limit.
+      let existingShifts = [];
+      let page = 0;
+      const PAGE_SIZE = 1000;
+      while (true) {
+        let existQ = supabase
+          .from('shifts')
+          .select('id, date, shift_name, start_time, end_time, rota_area_id, area_id')
+          .gte('date', deployAllStartDate)
+          .lte('date', deployAllEndDate)
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+        if (selectedAreaId) existQ = existQ.eq('rota_area_id', selectedAreaId);
+        const { data: batch = [], error: fetchErr } = await existQ;
+        if (fetchErr) throw fetchErr;
+        existingShifts = existingShifts.concat(batch);
+        if (batch.length < PAGE_SIZE) break;
+        page++;
+      }
       console.log(`[DeployAll] Found ${existingShifts.length} existing shifts in range`);
+
+      // Normalize time to HH:MM (DB returns HH:MM:SS, templates use HH:MM)
+      const hhmm = (t) => (t || '').slice(0, 5);
 
       const existingCount = {};
       for (const s of existingShifts) {
         if (!s.date) continue;
         const sArea = s.rota_area_id || s.area_id;
-        const key = `${sArea}|${s.date}|${s.shift_name}|${s.start_time}|${s.end_time}`;
+        const key = `${sArea}|${s.date}|${s.shift_name}|${hhmm(s.start_time)}|${hhmm(s.end_time)}`;
         existingCount[key] = (existingCount[key] || 0) + 1;
       }
 
@@ -187,7 +201,7 @@ export default function BaseShiftTemplateManager({ open, onClose, selectedAreaId
           if (!templateDays.has(dayName)) continue;
 
           const dateStr = format(day, 'yyyy-MM-dd');
-          const key = `${template.area_id}|${dateStr}|${template.shift_type_name}|${template.start_time}|${template.end_time}`;
+          const key = `${template.area_id}|${dateStr}|${template.shift_type_name}|${hhmm(template.start_time)}|${hhmm(template.end_time)}`;
 
           templatesSeen[key] = (templatesSeen[key] || 0) + 1;
           const needed = templatesSeen[key];
@@ -313,15 +327,27 @@ export default function BaseShiftTemplateManager({ open, onClose, selectedAreaId
         end: parseISO(endDate),
       });
 
-      // Count existing shifts per key — scoped to this template's area
-      let genQ = supabase
-        .from('shifts')
-        .select('id, date, shift_name, start_time, end_time, rota_area_id, area_id')
-        .gte('date', startDate)
-        .lte('date', endDate);
-      if (template.area_id) genQ = genQ.eq('rota_area_id', template.area_id);
-      const { data: existingShifts = [], error: fetchErr } = await genQ;
-      if (fetchErr) throw fetchErr;
+      // Count ALL existing shifts (blank + assigned) — one shift per slot,
+      // blanks become assigned when patterns fill them.
+      // Paginate to avoid Supabase default 1000-row limit.
+      let existingShifts = [];
+      let genPage = 0;
+      while (true) {
+        let genQ = supabase
+          .from('shifts')
+          .select('id, date, shift_name, start_time, end_time, rota_area_id, area_id')
+          .gte('date', startDate)
+          .lte('date', endDate)
+          .range(genPage * 1000, (genPage + 1) * 1000 - 1);
+        if (template.area_id) genQ = genQ.eq('rota_area_id', template.area_id);
+        const { data: batch = [], error: fetchErr } = await genQ;
+        if (fetchErr) throw fetchErr;
+        existingShifts = existingShifts.concat(batch);
+        if (batch.length < 1000) break;
+        genPage++;
+      }
+
+      const hhmm = (t) => (t || '').slice(0, 5);
 
       const existingCount = {};
       // Also count how many templates share the same params to know total slots needed
@@ -337,7 +363,7 @@ export default function BaseShiftTemplateManager({ open, onClose, selectedAreaId
         if (!s.date) continue;
         const sArea = s.rota_area_id || s.area_id;
         if (sArea === template.area_id) {
-          const key = `${s.date}|${s.shift_name}|${s.start_time}|${s.end_time}`;
+          const key = `${s.date}|${s.shift_name}|${hhmm(s.start_time)}|${hhmm(s.end_time)}`;
           existingCount[key] = (existingCount[key] || 0) + 1;
         }
       }
@@ -351,7 +377,7 @@ export default function BaseShiftTemplateManager({ open, onClose, selectedAreaId
         if (!templateDays.has(dayName)) continue;
 
         const dateStr = format(day, 'yyyy-MM-dd');
-        const key = `${dateStr}|${template.shift_type_name}|${template.start_time}|${template.end_time}`;
+        const key = `${dateStr}|${template.shift_type_name}|${hhmm(template.start_time)}|${hhmm(template.end_time)}`;
 
         // Skip only if enough shifts already exist to cover all templates with these params
         const existing = existingCount[key] || 0;

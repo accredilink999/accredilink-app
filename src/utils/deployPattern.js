@@ -7,6 +7,9 @@ const VER = 'v5';
 const BATCH = 50;
 const PAGE = 1000;
 
+/** Normalize time to HH:MM (DB returns HH:MM:SS, patterns use HH:MM) */
+const hhmm = (t) => (t || '').slice(0, 5);
+
 /** Build tasks array for a shift_call from call_time tasks (string[]) */
 function buildTasks(callTime) {
   const tasks = [];
@@ -112,12 +115,12 @@ export async function deployPatternShifts({
       if (stTypes && stTypes.length > 0) {
         const typeMap = {};
         for (const st of stTypes) {
-          typeMap[`${st.start_time}|${st.end_time}`] = st.name;
+          typeMap[`${hhmm(st.start_time)}|${hhmm(st.end_time)}`] = st.name;
         }
         // Group by matched type for batch updates
         const byName = {};
         for (const s of noNameShifts) {
-          const name = typeMap[`${s.start_time}|${s.end_time}`];
+          const name = typeMap[`${hhmm(s.start_time)}|${hhmm(s.end_time)}`];
           if (name) {
             if (!byName[name]) byName[name] = [];
             byName[name].push(s.id);
@@ -162,7 +165,7 @@ export async function deployPatternShifts({
   // ── Step 3: Index blanks by "date|start|end" for O(1) lookup ──
   const blanksBySlot = {};
   for (const b of blanks) {
-    const key = `${b.date}|${b.start_time}|${b.end_time}`;
+    const key = `${b.date}|${hhmm(b.start_time)}|${hhmm(b.end_time)}`;
     if (!blanksBySlot[key]) blanksBySlot[key] = [];
     blanksBySlot[key].push(b);
   }
@@ -170,7 +173,7 @@ export async function deployPatternShifts({
   const toFill = [];
   let noMatch = 0;
   for (const target of targets) {
-    const key = `${target.date}|${target.start_time}|${target.end_time}`;
+    const key = `${target.date}|${hhmm(target.start_time)}|${hhmm(target.end_time)}`;
     const available = blanksBySlot[key];
     if (available && available.length > 0) {
       toFill.push(available.shift()); // take first available
@@ -297,7 +300,7 @@ export async function deployPatternShifts({
       // Index all assigned shifts by slot
       const bySlot = {};
       for (const s of assigned) {
-        const k = `${s.date}|${s.start_time}|${s.end_time}`;
+        const k = `${s.date}|${hhmm(s.start_time)}|${hhmm(s.end_time)}`;
         if (!bySlot[k]) bySlot[k] = [];
         bySlot[k].push(s);
       }
