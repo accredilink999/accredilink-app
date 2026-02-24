@@ -336,6 +336,7 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
         title: `Shift started: ${shift.staff_name || 'Staff'}`,
         message: `${shift.staff_name || 'Staff'} has clocked on to their shift.`,
         excludeUserId: shift.staff_id,
+        areaId: shift.rota_area_id || shift.area_id,
       });
     },
     onError: (error) => {
@@ -408,6 +409,7 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
           title: `Shift completed: ${shift.staff_name || 'Staff'}`,
           message: `${shift.staff_name || 'Staff'} has clocked off their shift.`,
           excludeUserId: shift.staff_id,
+          areaId: shiftAreaId,
         });
       }
 
@@ -524,6 +526,7 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
             title: 'Sit-in cover added',
             message: `Sit-in cover added to ${shift.staff_name || 'staff'}'s shift (${sitInTimeOn} - ${sitInTimeOff}).`,
             excludeUserId: shift.staff_id,
+            areaId: shift.rota_area_id || shift.area_id,
           });
         }
       } else if (sitInCoverRequired === 'no' && existingSitinCall) {

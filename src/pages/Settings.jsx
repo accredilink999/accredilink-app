@@ -961,6 +961,7 @@ export default function Settings() {
   const [companyLogo, setCompanyLogo] = useState(null);
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.job_title === 'admin' || user?.job_title === 'manager';
   const [shiftActivityNotifs, setShiftActivityNotifs] = useState(true);
+  const [shiftNotifScope, setShiftNotifScope] = useState('all'); // 'all' or 'my_team'
   const { isPasswordRecovery, clearPasswordRecovery } = useAuth();
 
   // Change Password state
@@ -1035,7 +1036,10 @@ export default function Settings() {
     if (user?.id && isAdmin) {
       base44.entities.User.list().then(users => {
         const me = users.find(u => u.id === user.id);
-        if (me) setShiftActivityNotifs(me.shift_activity_notifications !== false);
+        if (me) {
+          setShiftActivityNotifs(me.shift_activity_notifications !== false);
+          setShiftNotifScope(me.shift_notification_scope || 'all');
+        }
       }).catch(() => {});
     }
   }, [user?.id, isAdmin]);
@@ -1077,6 +1081,17 @@ export default function Settings() {
     onSuccess: (_, enabled) => {
       setShiftActivityNotifs(enabled);
       toast.success(enabled ? 'Shift activity notifications enabled' : 'Shift activity notifications disabled');
+    },
+    onError: () => toast.error('Failed to update preference'),
+  });
+
+  const toggleShiftNotifScopeMutation = useMutation({
+    mutationFn: async (scope) => {
+      return base44.entities.User.update(user.id, { shift_notification_scope: scope });
+    },
+    onSuccess: (_, scope) => {
+      setShiftNotifScope(scope);
+      toast.success(scope === 'my_team' ? 'You will only receive notifications for your team' : 'You will receive notifications for all teams');
     },
     onError: () => toast.error('Failed to update preference'),
   });
@@ -1291,6 +1306,23 @@ export default function Settings() {
               disabled={toggleShiftActivityMutation.isPending}
             />
           </div>
+          {shiftActivityNotifs && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
+              <div>
+                <p className="font-medium text-slate-900">My Team Only</p>
+                <p className="text-sm text-slate-500">
+                  {shiftNotifScope === 'my_team'
+                    ? 'Only receiving notifications for areas you manage'
+                    : 'Receiving notifications for all teams'}
+                </p>
+              </div>
+              <Switch
+                checked={shiftNotifScope === 'my_team'}
+                onCheckedChange={(checked) => toggleShiftNotifScopeMutation.mutate(checked ? 'my_team' : 'all')}
+                disabled={toggleShiftNotifScopeMutation.isPending}
+              />
+            </div>
+          )}
           <p className="text-xs text-slate-400 mt-3">
             Turn off when you're not working to avoid shift update notifications. All other notifications will still be sent.
           </p>

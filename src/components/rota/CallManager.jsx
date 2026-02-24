@@ -267,6 +267,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
         title: `Call check-in: ${clientName}`,
         message: `${staffName} has checked in to ${clientName}'s call.`,
         excludeUserId: shift?.staff_id,
+        areaId: shift?.rota_area_id || shift?.area_id,
       });
     },
   });
@@ -312,6 +313,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
         title: `Call check-out: ${coClientName}`,
         message: `${coStaffName} has checked out of ${coClientName}'s call.`,
         excludeUserId: shift?.staff_id,
+        areaId: shift?.rota_area_id || shift?.area_id,
       });
     },
   });
@@ -477,6 +479,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
         title: `Call removed: ${call.service_user_name}`,
         message: `${shift?.staff_name || 'Staff'} removed ${call.service_user_name}'s ${call.scheduled_time} call from their shift.`,
         excludeUserId: shift?.staff_id,
+        areaId: shift?.rota_area_id || shift?.area_id,
       });
 
       return call.service_user_name;
@@ -527,6 +530,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
         title: `Sit-in cover accepted`,
         message: `${acceptorName} has accepted the sit-in cover call on ${shift?.staff_name || 'the'} shift.`,
         excludeUserId: acceptorId,
+        areaId: shift?.rota_area_id || shift?.area_id,
       });
 
       // Notify paired shift partner if exists

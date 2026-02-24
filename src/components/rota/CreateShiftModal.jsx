@@ -356,6 +356,7 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
              title: 'Sit-in cover created',
              message: `Sit-in cover added to ${shiftData.staff_name || 'staff'}'s shift on ${shiftData.date} (${time_on} - ${time_off}).`,
              excludeUserId: shiftData.staff_id,
+             areaId: shiftData.rota_area_id || shiftData.area_id,
            });
          }
        }
