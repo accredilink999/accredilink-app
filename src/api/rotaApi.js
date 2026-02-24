@@ -23,7 +23,8 @@ function parseOrder(orderStr) {
 // match shifts regardless of which column holds the area value.
 export function applyAreaFilter(query, areaId) {
   if (!areaId) return query
-  return query.or(`rota_area_id.eq.${areaId},area_id.eq.${areaId}`)
+  // Also include shifts with NO area set (orphaned) so they remain visible
+  return query.or(`rota_area_id.eq.${areaId},area_id.eq.${areaId},and(rota_area_id.is.null,area_id.is.null)`)
 }
 
 // When writing a shift, always set BOTH area columns so all queries find it.
