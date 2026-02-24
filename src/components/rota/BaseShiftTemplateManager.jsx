@@ -124,15 +124,17 @@ export default function BaseShiftTemplateManager({ open, onClose, selectedAreaId
       });
       console.log(`[DeployAll] Date range: ${deployAllStartDate} to ${deployAllEndDate} (${days.length} days)`);
 
-      // Query existing shifts in this date range directly from Supabase
+      // Query existing BLANK shifts only — assigned shifts should NOT prevent
+      // new blank slots from being created (blanks are "available to claim" slots)
       const { data: existingShifts = [], error: fetchErr } = await supabase
         .from('shifts')
-        .select('id, date, shift_name, start_time, end_time, rota_area_id, area_id, staff_id')
+        .select('id, date, shift_name, start_time, end_time, rota_area_id, area_id')
+        .is('staff_id', null)
         .gte('date', deployAllStartDate)
         .lte('date', deployAllEndDate)
         .limit(5000);
       if (fetchErr) throw fetchErr;
-      console.log(`[DeployAll] Found ${existingShifts.length} existing shifts in range`);
+      console.log(`[DeployAll] Found ${existingShifts.length} existing BLANK shifts in range`);
 
       const existingCount = {};
       for (const s of existingShifts) {
@@ -311,11 +313,12 @@ export default function BaseShiftTemplateManager({ open, onClose, selectedAreaId
         end: parseISO(endDate),
       });
 
-      // Count existing shifts per key in this area (supports multiple staff slots)
-      // Query only shifts in the date range + area — avoids Supabase row limits
+      // Count existing BLANK shifts per key — assigned shifts should NOT block
+      // creating new available slots (blanks are "available to claim" slots)
       const { data: existingShifts = [], error: fetchErr } = await supabase
         .from('shifts')
         .select('id, date, shift_name, start_time, end_time, rota_area_id, area_id')
+        .is('staff_id', null)
         .gte('date', startDate)
         .lte('date', endDate);
       if (fetchErr) throw fetchErr;
