@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { APIProvider, Map, AdvancedMarker, InfoWindow, useMap } from '@vis.gl/react-google-maps';
+import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow, useMap } from '@vis.gl/react-google-maps';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { ShiftApi, ShiftCallApi } from '@/api/rotaApi';
@@ -26,18 +26,6 @@ import { Trash2 } from 'lucide-react';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
-// ── Pulse animation styles (injected once) ─────────────────────────────────
-const pulseCSS = `
-@keyframes markerPulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.7; transform: scale(1.15); }
-}
-@keyframes staffPulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.8; transform: scale(1.1); }
-}
-`;
-
 // ── FlyTo helper (runs inside <Map>) ────────────────────────────────────────
 function FlyToLocation({ lat, lng, zoom, onComplete }) {
   const map = useMap();
@@ -50,62 +38,6 @@ function FlyToLocation({ lat, lng, zoom, onComplete }) {
     }
   }, [lat, lng, zoom, map, onComplete]);
   return null;
-}
-
-// ── Client lollipop marker (React component) ───────────────────────────────
-function ClientLollipopMarker({ color, name, isInProgress }) {
-  const labelText = name.length > 15 ? name.substring(0, 14) + '...' : name;
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
-      <div style={{
-        fontSize: 9, fontWeight: 600, color: '#334155',
-        background: 'white', padding: '1px 4px', borderRadius: 3,
-        boxShadow: '0 1px 2px rgba(0,0,0,0.15)', whiteSpace: 'nowrap',
-        marginBottom: 2, maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis',
-      }}>
-        {labelText}
-      </div>
-      <div style={{
-        width: 18, height: 18, background: color, borderRadius: '50%',
-        border: '2px solid white', boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
-        animation: isInProgress ? 'markerPulse 2s infinite' : 'none',
-      }} />
-      <div style={{ width: 2, height: 16, background: color, borderRadius: 1 }} />
-    </div>
-  );
-}
-
-// ── Staff GPS marker (React component) ──────────────────────────────────────
-function StaffGpsMarker({ name, isLive }) {
-  const color = isLive ? '#3B82F6' : '#9CA3AF';
-  const labelText = name.length > 15 ? name.substring(0, 14) + '...' : name;
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
-      <div style={{
-        fontSize: 9, fontWeight: 600, color: 'white', background: color,
-        padding: '1px 5px', borderRadius: 3, boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
-        whiteSpace: 'nowrap', marginBottom: 2, maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis',
-      }}>
-        {labelText}
-      </div>
-      <div style={{
-        position: 'relative', width: 22, height: 22, background: color, borderRadius: '50%',
-        border: '2px solid white', boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        animation: isLive ? 'staffPulse 2s infinite' : 'none',
-      }}>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="white">
-          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-        </svg>
-        {isLive && (
-          <div style={{
-            width: 7, height: 7, background: '#22C55E', borderRadius: '50%',
-            position: 'absolute', top: -1, right: -1, border: '1.5px solid white',
-          }} />
-        )}
-      </div>
-    </div>
-  );
 }
 
 export default function ControlRoom() {
@@ -495,14 +427,15 @@ export default function ControlRoom() {
   // ── Render map content (shared between normal + maximized) ─────
   const renderMapContent = () => (
     <>
-      {/* Staff markers */}
+      {/* Staff markers — blue pin (live) / grey pin (last known) */}
       {staffMarkers.map(s => (
         <AdvancedMarker
           key={`staff-${s.staffId}`}
           position={{ lat: s.lat, lng: s.lng }}
+          title={s.staffName}
           onClick={() => setOpenInfoWindow(openInfoWindow === `staff-${s.staffId}` ? null : `staff-${s.staffId}`)}
         >
-          <StaffGpsMarker name={s.staffName} isLive={s.isLive} />
+          <Pin background={s.isLive ? '#3B82F6' : '#9CA3AF'} borderColor={s.isLive ? '#1D4ED8' : '#6B7280'} glyphColor="white" />
         </AdvancedMarker>
       ))}
       {staffMarkers.map(s => openInfoWindow === `staff-${s.staffId}` && (
@@ -510,7 +443,6 @@ export default function ControlRoom() {
           key={`staff-info-${s.staffId}`}
           position={{ lat: s.lat, lng: s.lng }}
           onCloseClick={() => setOpenInfoWindow(null)}
-          pixelOffset={[0, -50]}
         >
           <div className="text-sm p-1 w-48">
             <p className="font-bold text-slate-900">{s.staffName}</p>
@@ -532,14 +464,15 @@ export default function ControlRoom() {
         </InfoWindow>
       ))}
 
-      {/* Client markers */}
+      {/* Client markers — colored pin by status */}
       {clientMarkers.map(client => (
         <AdvancedMarker
           key={`client-${client.id}`}
           position={{ lat: client.lat, lng: client.lng }}
+          title={client.name}
           onClick={() => setOpenInfoWindow(openInfoWindow === `client-${client.id}` ? null : `client-${client.id}`)}
         >
-          <ClientLollipopMarker color={client.statusColor} name={client.name} isInProgress={client.markerStatus === 'in_progress'} />
+          <Pin background={client.statusColor} borderColor={client.markerStatus === 'in_progress' ? '#D97706' : '#059669'} glyphColor="white" />
         </AdvancedMarker>
       ))}
       {clientMarkers.map(client => openInfoWindow === `client-${client.id}` && (
@@ -547,7 +480,6 @@ export default function ControlRoom() {
           key={`client-info-${client.id}`}
           position={{ lat: client.lat, lng: client.lng }}
           onCloseClick={() => setOpenInfoWindow(null)}
-          pixelOffset={[0, -58]}
         >
           <div className="text-sm p-1 w-56 space-y-2">
             <p className="font-bold text-slate-900">{client.name}</p>
@@ -621,8 +553,7 @@ export default function ControlRoom() {
   if (mapMaximized) {
     return (
       <div className="fixed inset-0 z-50 bg-white flex flex-col">
-        <style>{pulseCSS}</style>
-        <div className="flex items-center justify-between p-4 border-b border-slate-200">
+                <div className="flex items-center justify-between p-4 border-b border-slate-200">
           <h1 className="text-xl font-bold text-slate-900">Control Room — Live Map</h1>
           <Button variant="outline" onClick={() => setMapMaximized(false)}>Minimize</Button>
         </div>
@@ -631,7 +562,7 @@ export default function ControlRoom() {
             <Map
               defaultCenter={{ lat: centerLat, lng: centerLng }}
               defaultZoom={13}
-              mapId="control-room-map"
+
               gestureHandling="greedy"
               disableDefaultUI={false}
               style={{ width: '100%', height: '100%' }}
@@ -646,8 +577,7 @@ export default function ControlRoom() {
 
   return (
     <div className="space-y-6">
-      <style>{pulseCSS}</style>
-      <PageHeader
+            <PageHeader
         title="Control Room"
         subtitle="Live client map & staff tracking"
         icon={Navigation}
@@ -714,7 +644,7 @@ export default function ControlRoom() {
               <Map
                 defaultCenter={{ lat: centerLat, lng: centerLng }}
                 defaultZoom={13}
-                mapId="control-room-card"
+
                 gestureHandling="greedy"
                 disableDefaultUI={false}
                 style={{ width: '100%', height: '100%' }}
