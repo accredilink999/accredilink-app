@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow, useMap } from '@vis.gl/react-google-maps';
+import { APIProvider, Map as GoogleMap, Marker, InfoWindow, useMap } from '@vis.gl/react-google-maps';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { ShiftApi, ShiftCallApi } from '@/api/rotaApi';
@@ -429,14 +429,23 @@ export default function ControlRoom() {
     <>
       {/* Staff markers — blue pin (live) / grey pin (last known) */}
       {staffMarkers.map(s => (
-        <AdvancedMarker
+        <Marker
           key={`staff-${s.staffId}`}
           position={{ lat: s.lat, lng: s.lng }}
           title={s.staffName}
+          label={{ text: s.staffName.substring(0, 1), color: 'white', fontWeight: 'bold' }}
+          icon={{
+            path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z',
+            fillColor: s.isLive ? '#3B82F6' : '#9CA3AF',
+            fillOpacity: 1,
+            strokeColor: 'white',
+            strokeWeight: 2,
+            scale: 1.5,
+            anchor: { x: 12, y: 24 },
+            labelOrigin: { x: 12, y: 10 },
+          }}
           onClick={() => setOpenInfoWindow(openInfoWindow === `staff-${s.staffId}` ? null : `staff-${s.staffId}`)}
-        >
-          <Pin background={s.isLive ? '#3B82F6' : '#9CA3AF'} borderColor={s.isLive ? '#1D4ED8' : '#6B7280'} glyphColor="white" />
-        </AdvancedMarker>
+        />
       ))}
       {staffMarkers.map(s => openInfoWindow === `staff-${s.staffId}` && (
         <InfoWindow
@@ -466,14 +475,23 @@ export default function ControlRoom() {
 
       {/* Client markers — colored pin by status */}
       {clientMarkers.map(client => (
-        <AdvancedMarker
+        <Marker
           key={`client-${client.id}`}
           position={{ lat: client.lat, lng: client.lng }}
           title={client.name}
+          label={{ text: client.name.substring(0, 1), color: 'white', fontWeight: 'bold' }}
+          icon={{
+            path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z',
+            fillColor: client.statusColor,
+            fillOpacity: 1,
+            strokeColor: 'white',
+            strokeWeight: 2,
+            scale: 1.5,
+            anchor: { x: 12, y: 24 },
+            labelOrigin: { x: 12, y: 10 },
+          }}
           onClick={() => setOpenInfoWindow(openInfoWindow === `client-${client.id}` ? null : `client-${client.id}`)}
-        >
-          <Pin background={client.statusColor} borderColor={client.markerStatus === 'in_progress' ? '#D97706' : '#059669'} glyphColor="white" />
-        </AdvancedMarker>
+        />
       ))}
       {clientMarkers.map(client => openInfoWindow === `client-${client.id}` && (
         <InfoWindow
@@ -559,7 +577,7 @@ export default function ControlRoom() {
         </div>
         <div className="flex-1 overflow-hidden">
           <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
-            <Map
+            <GoogleMap
               defaultCenter={{ lat: centerLat, lng: centerLng }}
               defaultZoom={13}
 
@@ -568,7 +586,7 @@ export default function ControlRoom() {
               style={{ width: '100%', height: '100%' }}
             >
               {renderMapContent()}
-            </Map>
+            </GoogleMap>
           </APIProvider>
         </div>
       </div>
@@ -641,7 +659,7 @@ export default function ControlRoom() {
         <Card className="p-0 bg-white border-0 shadow-sm overflow-hidden relative group h-[350px] z-0">
           {GOOGLE_MAPS_API_KEY ? (
             <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
-              <Map
+              <GoogleMap
                 defaultCenter={{ lat: centerLat, lng: centerLng }}
                 defaultZoom={13}
 
@@ -650,7 +668,7 @@ export default function ControlRoom() {
                 style={{ width: '100%', height: '100%' }}
               >
                 {renderMapContent()}
-              </Map>
+              </GoogleMap>
             </APIProvider>
           ) : (
             <div className="flex items-center justify-center h-full bg-slate-100">
