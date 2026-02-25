@@ -35,6 +35,8 @@ import {
   ChevronUp,
   Users,
   User,
+  HelpCircle,
+  Info,
 } from 'lucide-react';
 import {
   format,
@@ -60,7 +62,7 @@ import {
 
 // ── Regulation Filing Form (dynamic from config) ────────────────────────────
 
-function RegulationFilingForm({ regulation, user, onClose, onSubmit, isPending }) {
+function RegulationFilingForm({ regulation, user, onClose, onSubmit, isPending, onShowHelp }) {
   const [formData, setFormData] = useState({});
   const [title, setTitle] = useState(
     `${regulation.shortTitle || regulation.title} - ${format(new Date(), 'MMM yyyy')}`
@@ -92,13 +94,27 @@ function RegulationFilingForm({ regulation, user, onClose, onSubmit, isPending }
   return (
     <div className="space-y-4 py-2">
       <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-        <p className="text-xs text-blue-700 font-medium">{regulation.legalRef}</p>
-        <p className="text-sm text-blue-900 mt-1">{regulation.description}</p>
-        {regulation.cycle && (
-          <Badge className="mt-2 bg-blue-100 text-blue-700">
-            Every {regulation.cycle.months} months
-          </Badge>
-        )}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1">
+            <p className="text-xs text-blue-700 font-medium">{regulation.legalRef}</p>
+            <p className="text-sm text-blue-900 mt-1">{regulation.description}</p>
+            {regulation.cycle && (
+              <Badge className="mt-2 bg-blue-100 text-blue-700">
+                Every {regulation.cycle.months} months
+              </Badge>
+            )}
+          </div>
+          {regulation.guidance && (
+            <button
+              type="button"
+              onClick={() => onShowHelp(regulation)}
+              className="shrink-0 w-8 h-8 rounded-full bg-blue-200 hover:bg-blue-300 flex items-center justify-center text-blue-700 transition-colors"
+              title="View guidance & instructions"
+            >
+              <span className="font-bold text-sm">?</span>
+            </button>
+          )}
+        </div>
       </div>
 
       <div>
@@ -318,6 +334,9 @@ export default function ComplianceManagement() {
   const [expandedStaffIds, setExpandedStaffIds] = useState(new Set());
   const [viewingSupervision, setViewingSupervision] = useState(null);
   const [supervisionFormData, setSupervisionFormData] = useState({});
+
+  // Help/guidance dialog
+  const [helpRegulation, setHelpRegulation] = useState(null);
 
   // Load framework setting
   const { data: frameworkSettings = [] } = useQuery({
@@ -827,6 +846,17 @@ export default function ComplianceManagement() {
                           {!reg.cycle && (
                             <Badge className="bg-slate-100 text-slate-500">As needed</Badge>
                           )}
+                          {reg.guidance && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-slate-400 hover:text-teal-600 p-1 h-8 w-8"
+                              onClick={(e) => { e.stopPropagation(); setHelpRegulation(reg); }}
+                              title="View guidance & instructions"
+                            >
+                              <HelpCircle className="w-4 h-4" />
+                            </Button>
+                          )}
                           <Button size="sm" variant="outline" className="text-xs">
                             <Plus className="w-3 h-3 mr-1" />
                             File
@@ -863,10 +893,47 @@ export default function ComplianceManagement() {
             </Card>
           </div>
 
-          <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg">
+          <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg flex items-start justify-between gap-2">
             <p className="text-sm text-amber-800">
               <strong>12-Weekly Staff Supervisions</strong> — Required under CIW Regulation 36 / CQC Regulation 18. Click on a staff member to expand, or start a new supervision.
             </p>
+            <button
+              type="button"
+              onClick={() => setHelpRegulation({
+                number: '36/18',
+                title: 'Staff Supervision',
+                legalRef: 'CIW: RISCA Regulation 36 | CQC: HSCA 2008 Regulation 18 | NICE QS123 Statement 6',
+                guidance: {
+                  what: 'Staff supervision is a formal, structured 1:1 meeting between a staff member and their line manager. It is a legal requirement under CIW Regulation 36 (Wales) and CQC Regulation 18 (England). NICE Quality Standard QS123 specifies that home care workers should have supervision at least every 3 months.',
+                  when: 'Every 12 weeks (84 days). This exceeds the minimum quarterly requirement. New staff, those on probation, or those with performance concerns should have more frequent supervision (e.g. monthly).',
+                  howToComplete: [
+                    'Select the staff member from the dropdown — their name will be pre-filled.',
+                    'The supervisor field auto-fills with your name. Change it if someone else is supervising.',
+                    'The date defaults to today and the next due date auto-calculates to +12 weeks.',
+                    'Work through each of the 13 agenda sections during the supervision meeting.',
+                    'Section 1 (Previous Actions): Review what was agreed last time — was it completed?',
+                    'Section 2 (Workload): Discuss their current rota, service users, and any scheduling concerns.',
+                    'Section 3 (Care Quality): Discuss care delivery, spot-check findings, and practice standards.',
+                    'Section 4 (Safeguarding): Ask if they have any safeguarding concerns. Check they know how to escalate.',
+                    'Section 5 (Medication): Discuss any medication errors, MAR chart issues, or competency concerns.',
+                    'Section 6 (Health & Wellbeing): Check how they\'re coping — work-life balance, stress, health.',
+                    'Section 7 (Training): Review mandatory training status, identify any gaps or development needs.',
+                    'Section 8 (Policies): Check awareness of current policies, PPE compliance, uniform, ID badge.',
+                    'Section 9 (Communication): Discuss teamwork, office communication, and feedback.',
+                    'Section 10 (Incidents): Review any incidents, complaints, or compliments since last supervision.',
+                    'Section 11 (Reflective Practice): Ask what went well and what they\'d do differently.',
+                    'Section 12 (Agreed Actions): Set SMART objectives with clear deadlines and ownership.',
+                    'Section 13 (AOB): Ask if there\'s anything else they want to raise.',
+                    'Confirm the supervisee agrees with the record. If they disagree, note their comments.',
+                  ],
+                  tips: 'Prepare before the meeting — review previous actions, check training records, and note any incidents. Hold supervisions in a private, comfortable space. Listen more than you talk. Both parties should sign/agree to the record. Keep supervision records for at least 6 years after employment ends.',
+                },
+              })}
+              className="shrink-0 w-8 h-8 rounded-full bg-amber-200 hover:bg-amber-300 flex items-center justify-center text-amber-700 transition-colors"
+              title="View supervision guidance"
+            >
+              <span className="font-bold text-sm">?</span>
+            </button>
           </div>
 
           {/* Staff list with expandable cards */}
@@ -1450,6 +1517,7 @@ export default function ComplianceManagement() {
               }}
               onSubmit={(data) => createReportMutation.mutate(data)}
               isPending={createReportMutation.isPending}
+              onShowHelp={(reg) => setHelpRegulation(reg)}
             />
           )}
         </DialogContent>
@@ -1693,6 +1761,75 @@ export default function ComplianceManagement() {
                   <Badge className="bg-orange-100 text-orange-700">Supervisee Disagreed</Badge>
                 )}
               </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Guidance / Help Dialog */}
+      <Dialog open={!!helpRegulation} onOpenChange={() => setHelpRegulation(null)}>
+        <DialogContent
+          className="max-w-2xl max-h-[90vh] overflow-y-auto"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <HelpCircle className="w-5 h-5 text-blue-600" />
+              {helpRegulation?.title
+                ? `Regulation ${helpRegulation.number} — ${helpRegulation.title}`
+                : helpRegulation?.label || 'Guidance'}
+            </DialogTitle>
+          </DialogHeader>
+          {helpRegulation?.guidance && (
+            <div className="space-y-4 pr-1">
+              {/* What */}
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs font-bold text-blue-700 uppercase mb-1">What is this?</p>
+                <p className="text-sm text-blue-900">{helpRegulation.guidance.what}</p>
+              </div>
+
+              {/* When */}
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <p className="text-xs font-bold text-amber-700 uppercase mb-1">When is it required?</p>
+                <p className="text-sm text-amber-900">{helpRegulation.guidance.when}</p>
+              </div>
+
+              {/* Legal reference */}
+              {helpRegulation.legalRef && (
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                  <p className="text-xs font-bold text-slate-600 uppercase mb-1">Legal Reference</p>
+                  <p className="text-sm text-slate-800 font-mono">{helpRegulation.legalRef}</p>
+                </div>
+              )}
+
+              {/* How to complete */}
+              {helpRegulation.guidance.howToComplete && (
+                <div>
+                  <p className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-1">
+                    <Info className="w-4 h-4 text-teal-600" />
+                    How to complete this form
+                  </p>
+                  <div className="space-y-2">
+                    {helpRegulation.guidance.howToComplete.map((step, idx) => (
+                      <div key={idx} className="flex gap-3 items-start">
+                        <div className="w-6 h-6 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-bold text-xs shrink-0 mt-0.5">
+                          {idx + 1}
+                        </div>
+                        <p className="text-sm text-slate-700">{step}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Tips */}
+              {helpRegulation.guidance.tips && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-xs font-bold text-green-700 uppercase mb-1">Top Tips</p>
+                  <p className="text-sm text-green-900">{helpRegulation.guidance.tips}</p>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
