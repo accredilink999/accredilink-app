@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,6 @@ export default function InvoicingSettings({ settings }) {
   const queryClient = useQueryClient();
   const [logoUrl, setLogoUrl] = useState(settings?.logo_url || '');
 
-  // Update logoUrl when settings change
   React.useEffect(() => {
     if (settings?.logo_url) {
       setLogoUrl(settings.logo_url);
@@ -29,10 +28,9 @@ export default function InvoicingSettings({ settings }) {
     company_address: settings?.company_address || '',
     company_city: settings?.company_city || '',
     company_postcode: settings?.company_postcode || '',
-    company_country: settings?.company_country || 'United Kingdom',
-    tax_id: settings?.tax_id || '',
+    vat_number: settings?.vat_number || '',
     currency: settings?.currency || 'GBP',
-    tax_rate: settings?.tax_rate || 20,
+    default_tax_rate: settings?.default_tax_rate || 20,
     invoice_prefix: settings?.invoice_prefix || 'INV',
     brand_color: settings?.brand_color || '#0f766e',
     invoice_notes: settings?.invoice_notes || '',
@@ -49,32 +47,60 @@ export default function InvoicingSettings({ settings }) {
   const [newRate, setNewRate] = useState('');
 
   const updateMutation = useMutation({
-    mutationFn: (data) => base44.entities.InvoicingSettings.update(settings.id, {
-      ...data,
-      logo_url: logoUrl,
-    }),
+    mutationFn: async (data) => {
+      const payload = {
+        ...data,
+        logo_url: logoUrl,
+      };
+      const { data: result, error } = await supabase
+        .from('invoicing_settings')
+        .update(payload)
+        .eq('id', settings.id)
+        .select()
+        .single();
+      if (error) throw error;
+      return result;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoicingSettings'] });
       toast.success('Settings updated successfully');
+    },
+    onError: (error) => {
+      toast.error('Failed to save: ' + error.message);
     },
   });
 
   const handleUploadLogo = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     try {
-      const response = await base44.integrations.Core.UploadFile({ file });
-      setLogoUrl(response.file_url);
-      
+      const fileExt = file.name.split('.').pop();
+      const fileName = `logo_${Date.now()}.${fileExt}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('uploads')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('uploads')
+        .getPublicUrl(fileName);
+
+      const newUrl = urlData.publicUrl;
+      setLogoUrl(newUrl);
+
       // Auto-save logo after upload
-      await base44.entities.InvoicingSettings.update(settings.id, {
-        logo_url: response.file_url,
-      });
+      const { error } = await supabase
+        .from('invoicing_settings')
+        .update({ logo_url: newUrl })
+        .eq('id', settings.id);
+      if (error) throw error;
+
       queryClient.invalidateQueries({ queryKey: ['invoicingSettings'] });
       toast.success('Logo uploaded successfully');
     } catch (error) {
-      toast.error('Failed to upload logo');
+      toast.error('Failed to upload logo: ' + error.message);
     }
   };
 
@@ -302,10 +328,10 @@ export default function InvoicingSettings({ settings }) {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-900 mb-2">Tax/VAT ID</label>
+                <label className="block text-sm font-medium text-slate-900 mb-2">Tax/VAT Number</label>
                 <Input
-                  value={formData.tax_id}
-                  onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
+                  value={formData.vat_number}
+                  onChange={(e) => setFormData({ ...formData, vat_number: e.target.value })}
                   placeholder="GB123456789"
                 />
               </div>
@@ -327,8 +353,8 @@ export default function InvoicingSettings({ settings }) {
                   <label className="block text-sm font-medium text-slate-900 mb-2">Default Tax Rate (%)</label>
                   <Input
                     type="number"
-                    value={formData.tax_rate}
-                    onChange={(e) => setFormData({ ...formData, tax_rate: parseFloat(e.target.value) })}
+                    value={formData.default_tax_rate}
+                    onChange={(e) => setFormData({ ...formData, default_tax_rate: parseFloat(e.target.value) })}
                     step="0.1"
                   />
                 </div>
@@ -392,7 +418,7 @@ export default function InvoicingSettings({ settings }) {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-slate-600">Manage the call types available when creating invoices</p>
-              
+
               <div className="space-y-3">
                 <div className="flex gap-2">
                   <Input
@@ -438,7 +464,7 @@ export default function InvoicingSettings({ settings }) {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-slate-600">Manage the hour options available when adding items to specific days</p>
-              
+
               <div className="space-y-3">
                 <div className="flex gap-2">
                   <Input
@@ -486,7 +512,7 @@ export default function InvoicingSettings({ settings }) {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-slate-600">Manage hourly rates available for day-specific items</p>
-              
+
               <div className="space-y-3">
                 <div className="flex gap-2">
                   <Input

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,17 +27,60 @@ export default function ClientManager({ clients, invoices }) {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.Client.create(data),
+    mutationFn: async (data) => {
+      const { data: result, error } = await supabase
+        .from('clients')
+        .insert(data)
+        .select()
+        .single();
+      if (error) throw error;
+      return result;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       handleCloseDialog();
+      toast.success('Client saved');
+    },
+    onError: (error) => {
+      toast.error('Failed: ' + error.message);
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }) => {
+      const { data: result, error } = await supabase
+        .from('clients')
+        .update(data)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      handleCloseDialog();
+      toast.success('Client updated');
+    },
+    onError: (error) => {
+      toast.error('Failed: ' + error.message);
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Client.delete(id),
+    mutationFn: async (id) => {
+      const { error } = await supabase
+        .from('clients')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
+      toast.success('Client deleted');
+    },
+    onError: (error) => {
+      toast.error('Failed: ' + error.message);
     },
   });
 
@@ -75,12 +118,16 @@ export default function ClientManager({ clients, invoices }) {
       toast.error('Please fill in required fields');
       return;
     }
-    createMutation.mutate(formData);
+    if (editingClient) {
+      updateMutation.mutate({ id: editingClient.id, data: formData });
+    } else {
+      createMutation.mutate(formData);
+    }
   };
 
-  const filteredClients = clients.filter(c =>
-    c.client_name.toLowerCase().includes(search.toLowerCase()) ||
-    c.client_email.toLowerCase().includes(search.toLowerCase())
+  const filteredClients = (clients || []).filter(c =>
+    (c.client_name || '').toLowerCase().includes(search.toLowerCase()) ||
+    (c.client_email || '').toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -115,7 +162,7 @@ export default function ClientManager({ clients, invoices }) {
                   <p className="text-sm text-slate-600">{client.client_email}</p>
                   {client.client_phone && <p className="text-sm text-slate-600">{client.client_phone}</p>}
                 </div>
-                
+
                 <div className="bg-slate-50 rounded-lg p-3 space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-slate-600">Invoices:</span>
@@ -215,10 +262,10 @@ export default function ClientManager({ clients, invoices }) {
             <Button variant="outline" onClick={handleCloseDialog}>Cancel</Button>
             <Button
               onClick={handleSubmit}
-              disabled={createMutation.isPending}
+              disabled={createMutation.isPending || updateMutation.isPending}
               className="bg-teal-600 hover:bg-teal-700"
             >
-              {createMutation.isPending ? 'Saving...' : 'Save Client'}
+              {(createMutation.isPending || updateMutation.isPending) ? 'Saving...' : 'Save Client'}
             </Button>
           </DialogFooter>
         </DialogContent>

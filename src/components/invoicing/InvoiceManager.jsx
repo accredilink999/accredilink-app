@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,16 +25,19 @@ export default function InvoiceManager({ invoices, clients, settings }) {
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const queryClient = useQueryClient();
 
-  // Subscribe to invoice updates
-  React.useEffect(() => {
-    const unsubscribe = base44.entities.Invoice.subscribe(() => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-    });
-    return unsubscribe;
+  // Real-time invoice updates via Supabase
+  useEffect(() => {
+    const channel = supabase
+      .channel('invoices-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [queryClient]);
 
   const [lineItems, setLineItems] = useState([]);
-  const [entityType, setEntityType] = useState('client'); // 'client' or 'service_user'
+  const [entityType, setEntityType] = useState('client');
   const [useManualEntry, setUseManualEntry] = useState(false);
   const [confirmedClient, setConfirmedClient] = useState(null);
   const [confirmedServiceUser, setConfirmedServiceUser] = useState(null);
@@ -57,19 +60,41 @@ export default function InvoiceManager({ invoices, clients, settings }) {
 
   const { data: serviceUsers = [] } = useQuery({
     queryKey: ['serviceUsers'],
-    queryFn: () => base44.entities.ServiceUser.list('-created_date', 500),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('service_users')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return data || [];
+    },
   });
 
   const { data: invoicingSettings = {} } = useQuery({
     queryKey: ['invoicingSettings'],
     queryFn: async () => {
-      const settings = await base44.entities.InvoicingSettings.list();
-      return settings[0] || {};
+      const { data, error } = await supabase
+        .from('invoicing_settings')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      if (error && error.code !== 'PGRST116') throw error;
+      return data || {};
     },
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.Invoice.create(data),
+    mutationFn: async (data) => {
+      const { data: result, error } = await supabase
+        .from('invoices')
+        .insert(data)
+        .select()
+        .single();
+      if (error) throw error;
+      return result;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       handleCloseDialog();
@@ -81,7 +106,13 @@ export default function InvoiceManager({ invoices, clients, settings }) {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Invoice.delete(id),
+    mutationFn: async (id) => {
+      const { error } = await supabase
+        .from('invoices')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       toast.success('Invoice deleted');
@@ -92,8 +123,13 @@ export default function InvoiceManager({ invoices, clients, settings }) {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status, is_recurring }) =>
-      base44.entities.Invoice.update(id, { status, is_recurring }),
+    mutationFn: async ({ id, status, is_recurring }) => {
+      const { error } = await supabase
+        .from('invoices')
+        .update({ status, is_recurring })
+        .eq('id', id);
+      if (error) throw error;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       toast.success('Invoice status updated');
@@ -105,23 +141,25 @@ export default function InvoiceManager({ invoices, clients, settings }) {
 
   const createRecurringMutation = useMutation({
     mutationFn: async ({ recurringData, originalInvoiceId }) => {
-      // Update the original invoice status to recurring first
-      await base44.entities.Invoice.update(originalInvoiceId, { 
-        status: 'recurring',
-        is_recurring: true 
-      });
-      // Then create the recurring invoice
-      const recurringInvoice = await base44.entities.RecurringInvoice.create(recurringData);
-      return { recurringInvoice, originalInvoiceId };
+      // Update the original invoice status to recurring
+      const { error: updateErr } = await supabase
+        .from('invoices')
+        .update({ status: 'recurring', is_recurring: true })
+        .eq('id', originalInvoiceId);
+      if (updateErr) throw updateErr;
+
+      // Create the recurring invoice record
+      const { data: result, error } = await supabase
+        .from('recurring_invoices')
+        .insert(recurringData)
+        .select()
+        .single();
+      if (error) throw error;
+      return { recurringInvoice: result, originalInvoiceId };
     },
-    onSuccess: async ({ originalInvoiceId }) => {
-      // Force cache invalidation
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.removeQueries({ queryKey: ['invoices'] });
-
-      // Wait for refetch
       await queryClient.refetchQueries({ queryKey: ['invoices'] });
-
       setShowRecurringDialog(false);
       setRecurringInvoiceData(null);
       toast.success('Recurring invoice created successfully');
@@ -141,43 +179,36 @@ export default function InvoiceManager({ invoices, clients, settings }) {
       setLineItems(items);
       const isManual = !invoice.client_id || !clients.find(c => c.id === invoice.client_id);
       setUseManualEntry(isManual);
-      
-      // Set entity type based on what was saved
+
       if (invoice.service_user_id) {
         setEntityType('service_user');
       } else {
         setEntityType('client');
       }
-      
-      // Load repeating days if present
+
       if (invoice.repeating_days && Array.isArray(invoice.repeating_days)) {
         setRepeatingDays(invoice.repeating_days);
       }
-      
-      // Load day items if present
+
       if (invoice.day_items) {
         try {
-          const parsedDayItems = JSON.parse(invoice.day_items);
+          const parsedDayItems = typeof invoice.day_items === 'string'
+            ? JSON.parse(invoice.day_items)
+            : invoice.day_items;
           setDayItems(parsedDayItems);
         } catch (e) {
           setDayItems({});
         }
       }
-      
-      // Auto-confirm client if editing
+
       if (invoice.client_id && !isManual) {
         const client = clients.find(c => c.id === invoice.client_id);
-        if (client) {
-          setConfirmedClient(client);
-        }
+        if (client) setConfirmedClient(client);
       }
-      
-      // Auto-confirm service user if editing
+
       if (invoice.service_user_id) {
         const serviceUser = serviceUsers.find(u => u.id === invoice.service_user_id);
-        if (serviceUser) {
-          setConfirmedServiceUser(serviceUser);
-        }
+        if (serviceUser) setConfirmedServiceUser(serviceUser);
       }
 
       setFormData({
@@ -244,10 +275,9 @@ export default function InvoiceManager({ invoices, clients, settings }) {
     try {
       const { jsPDF } = await import('jspdf');
       const html2canvas = await import('html2canvas').then(m => m.default);
-      
+
       const serviceUser = invoice.service_user_id ? serviceUsers.find(u => u.id === invoice.service_user_id) : null;
-      
-      // Create a hidden div to render the printable invoice
+
       const container = document.createElement('div');
       container.style.position = 'absolute';
       container.style.left = '-9999px';
@@ -316,9 +346,9 @@ export default function InvoiceManager({ invoices, clients, settings }) {
           ` : ''}
 
           <div style="margin-bottom: 25px; margin-top: 30px;">
-            ${invoice.repeating_days && invoice.repeating_days.length > 0 && invoice.day_items ? 
+            ${invoice.repeating_days && invoice.repeating_days.length > 0 && invoice.day_items ?
               (() => {
-                const dayItems = JSON.parse(invoice.day_items || '{}');
+                const dayItemsParsed = typeof invoice.day_items === 'string' ? JSON.parse(invoice.day_items || '{}') : invoice.day_items;
                 const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                 return invoice.repeating_days.map(dayIdx => `
                   <div style="margin-bottom: 20px;">
@@ -326,14 +356,14 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                       ${dayNames[dayIdx]}
                     </div>
                     <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
-                      ${(dayItems[dayIdx] || []).map((item, idx) => `
+                      ${(dayItemsParsed[dayIdx] || []).map((item) => `
                         <tr style="border-bottom: 1px solid #e5e7eb;">
                           <td style="padding: 8px; text-align: left; flex: 1;">${item.description || ''}</td>
                           <td style="padding: 8px; text-align: center; width: 60px;">${item.quantity || 0}</td>
-                          <td style="padding: 8px; text-align: right; width: 70px;">£${(item.unit_price || 0).toFixed(2)}</td>
+                          <td style="padding: 8px; text-align: right; width: 70px;">\u00a3${(item.unit_price || 0).toFixed(2)}</td>
                           ${item.double_handed ? '<td style="padding: 8px; text-align: center; width: 40px;">(x2)</td>' : ''}
                           <td style="padding: 8px; text-align: right; width: 70px; font-weight: bold;">
-                            £${((item.quantity || 0) * (item.unit_price || 0) * (item.double_handed ? 2 : 1)).toFixed(2)}
+                            \u00a3${((item.quantity || 0) * (item.unit_price || 0) * (item.double_handed ? 2 : 1)).toFixed(2)}
                           </td>
                         </tr>
                       `).join('')}
@@ -341,9 +371,9 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                   </div>
                 `).join('');
               })()
-            : 
+            :
               (() => {
-                const lineItems = JSON.parse(invoice.line_items || '[]');
+                const lineItemsParsed = JSON.parse(invoice.line_items || '[]');
                 return `
                   <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
                     <thead>
@@ -355,13 +385,13 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                       </tr>
                     </thead>
                     <tbody>
-                      ${lineItems.map((item, idx) => `
+                      ${lineItemsParsed.map((item) => `
                         <tr style="border-bottom: 1px solid #e5e7eb;">
                           <td style="padding: 8px; text-align: left;">${item.description || ''}</td>
                           <td style="padding: 8px; text-align: center;">${item.quantity || 0}</td>
-                          <td style="padding: 8px; text-align: right;">£${(item.unit_price || 0).toFixed(2)}</td>
+                          <td style="padding: 8px; text-align: right;">\u00a3${(item.unit_price || 0).toFixed(2)}</td>
                           <td style="padding: 8px; text-align: right; font-weight: bold;">
-                            £${((item.quantity || 0) * (item.unit_price || 0)).toFixed(2)}
+                            \u00a3${((item.quantity || 0) * (item.unit_price || 0)).toFixed(2)}
                           </td>
                         </tr>
                       `).join('')}
@@ -376,22 +406,22 @@ export default function InvoiceManager({ invoices, clients, settings }) {
             <div style="font-size: 12px;">
               <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #d1d5db;">
                 <span style="margin-right: 30px;">Subtotal:</span>
-                <span style="font-weight: bold;">£${(invoice.subtotal || 0).toFixed(2)}</span>
+                <span style="font-weight: bold;">\u00a3${(invoice.subtotal || 0).toFixed(2)}</span>
               </div>
               ${invoice.tax_amount > 0 ? `
                 <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #d1d5db;">
                   <span style="margin-right: 60px;">Tax:</span>
-                  <span style="font-weight: bold;">£${(invoice.tax_amount || 0).toFixed(2)}</span>
+                  <span style="font-weight: bold;">\u00a3${(invoice.tax_amount || 0).toFixed(2)}</span>
                 </div>
               ` : ''}
               ${invoice.discount_amount > 0 ? `
                 <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #d1d5db;">
                   <span style="margin-right: 40px;">Discount:</span>
-                  <span style="font-weight: bold;">-£${(invoice.discount_amount || 0).toFixed(2)}</span>
+                  <span style="font-weight: bold;">-\u00a3${(invoice.discount_amount || 0).toFixed(2)}</span>
                 </div>
               ` : ''}
               <div style="background-color: ${invoicingSettings.brand_color || '#0f766e'}; color: white; padding: 10px 15px; margin-top: 10px; font-size: 14px; font-weight: bold; text-align: right;">
-                TOTAL: £${(invoice.total_amount || 0).toFixed(2)}
+                TOTAL: \u00a3${(invoice.total_amount || 0).toFixed(2)}
               </div>
             </div>
           </div>
@@ -419,7 +449,6 @@ export default function InvoiceManager({ invoices, clients, settings }) {
         </div>
       `;
 
-      // Convert to canvas
       const canvas = await html2canvas(container, {
         scale: 2,
         useCORS: true,
@@ -429,7 +458,6 @@ export default function InvoiceManager({ invoices, clients, settings }) {
         windowHeight: container.scrollHeight
       });
 
-      // Create PDF
       const doc = new jsPDF.jsPDF({
         orientation: 'portrait',
         unit: 'mm',
@@ -455,7 +483,6 @@ export default function InvoiceManager({ invoices, clients, settings }) {
         heightLeft -= pageHeight;
       }
 
-      // Download
       doc.save(`${invoice.invoice_number}.pdf`);
       document.body.removeChild(container);
       toast.success('Invoice downloaded successfully');
@@ -465,7 +492,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.invoice_number || !formData.invoice_date || !formData.due_date) {
       toast.error('Please fill in all required fields');
       return;
@@ -479,7 +506,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
     if (!useManualEntry && !confirmedClient) {
        toast.error('Please confirm a client');
        return;
-     }
+    }
 
     const allItems = repeatingDays.length > 0 ? Object.values(dayItems).flat() : lineItems;
     if (allItems.length === 0) {
@@ -521,7 +548,6 @@ export default function InvoiceManager({ invoices, clients, settings }) {
 
     let totalAmount = totals.subtotal + totals.tax - finalDiscount;
 
-    // For recurring invoices with repeating days, calculate grand total from day items
     if (repeatingDays.length > 0 && Object.keys(dayItems).length > 0) {
       const grandTotal = repeatingDays.reduce((sum, dayIdx) => {
         return sum + (dayItems[dayIdx] || []).reduce((daySum, item) => {
@@ -532,9 +558,14 @@ export default function InvoiceManager({ invoices, clients, settings }) {
     }
 
     const invoiceData = {
-       ...formData,
-       client_id: confirmedClient?.id || '',
-       service_user_id: confirmedServiceUser?.id || '',
+       invoice_number: formData.invoice_number,
+       client_id: confirmedClient?.id || null,
+       service_user_id: confirmedServiceUser?.id || null,
+       invoice_date: formData.invoice_date,
+       due_date: formData.due_date,
+       notes: formData.notes,
+       discount_type: formData.discount_type,
+       discount_value: formData.discount_value,
        client_name: recipientName,
        client_email: recipientEmail,
        line_items: JSON.stringify(allItems),
@@ -544,24 +575,32 @@ export default function InvoiceManager({ invoices, clients, settings }) {
        amount_due: Math.max(0, totalAmount),
        status: 'draft',
        currency: settings?.currency || 'GBP',
-       repeating_days: repeatingDays,
+       repeating_days: repeatingDays.length > 0 ? repeatingDays : null,
        day_items: repeatingDays.length > 0 ? JSON.stringify(dayItems) : null,
      };
 
     if (editingInvoice) {
-      base44.entities.Invoice.update(editingInvoice.id, invoiceData).then(() => {
+      try {
+        const { error } = await supabase
+          .from('invoices')
+          .update(invoiceData)
+          .eq('id', editingInvoice.id);
+        if (error) throw error;
         queryClient.invalidateQueries({ queryKey: ['invoices'] });
         handleCloseDialog();
-      });
+        toast.success('Invoice updated');
+      } catch (error) {
+        toast.error('Failed: ' + error.message);
+      }
     } else {
       createMutation.mutate(invoiceData);
     }
   };
 
   const filteredInvoices = invoices
-    .filter(i => 
-      (search === '' || i.invoice_number.toLowerCase().includes(search.toLowerCase()) || 
-       i.client_name.toLowerCase().includes(search.toLowerCase())) &&
+    .filter(i =>
+      (search === '' || (i.invoice_number || '').toLowerCase().includes(search.toLowerCase()) ||
+       (i.client_name || '').toLowerCase().includes(search.toLowerCase())) &&
       (statusFilter === 'all' || i.status === statusFilter)
     )
     .sort((a, b) => new Date(b.invoice_date) - new Date(a.invoice_date));
@@ -618,7 +657,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                       invoice.status === 'draft' ? 'bg-amber-100 text-amber-800' :
                       'bg-slate-100 text-slate-800'
                     }`}>
-                      {invoice.status.replace('_', ' ').toUpperCase()}
+                      {(invoice.status || '').replace('_', ' ').toUpperCase()}
                     </span>
                   </div>
                   <p className="text-sm text-slate-600 mb-1">{invoice.client_name}</p>
@@ -698,9 +737,9 @@ export default function InvoiceManager({ invoices, clients, settings }) {
               <div className="flex items-center justify-between gap-6 pb-6 border-b border-slate-200">
                 <div className="flex items-center gap-6">
                   {invoicingSettings.logo_url && (
-                    <img 
-                      src={invoicingSettings.logo_url} 
-                      alt="Company Logo" 
+                    <img
+                      src={invoicingSettings.logo_url}
+                      alt="Company Logo"
                       className="h-16 w-auto object-contain"
                     />
                   )}
@@ -715,12 +754,11 @@ export default function InvoiceManager({ invoices, clients, settings }) {
             </CardContent>
           </Card>
 
-          {/* Selected Recipient Display - Bill To Section */}
+          {/* Selected Recipient Display */}
           {(confirmedClient || (useManualEntry && formData.manual_name)) && (
             <Card className="bg-teal-50 border-teal-200">
               <CardContent className="pt-6">
                 <div className="space-y-4">
-                  {/* Bill To Section */}
                   <div>
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Bill To</p>
                     <div className="space-y-1">
@@ -753,7 +791,6 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                     </div>
                   </div>
 
-                  {/* Service User Info - Show under Bill To when selected */}
                   {confirmedServiceUser && (
                     <div className="border-t border-teal-200 pt-4">
                       <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Service User</p>
@@ -771,7 +808,6 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                     </div>
                   )}
 
-                  {/* Repeating Days - Show under Service User when selected */}
                   {repeatingDays.length > 0 && (
                     <div className="border-t border-teal-200 pt-4">
                       <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Repeating Days</p>
@@ -1003,28 +1039,28 @@ export default function InvoiceManager({ invoices, clients, settings }) {
 
             {/* Day-Specific Items */}
             {repeatingDays.length > 0 && (
-              <DaySpecificItems 
+              <DaySpecificItems
                 repeatingDays={repeatingDays}
                 dayItems={dayItems}
                 onDayItemsChange={setDayItems}
                 callTypes={settings?.call_types || []}
                 hoursOptions={settings?.hours_options || []}
                 hourlyRates={settings?.hourly_rates || []}
-                taxRate={settings?.tax_rate || 20}
+                taxRate={settings?.default_tax_rate || 20}
               />
             )}
 
-            {/* Line Items Editor - for non-repeating invoices */}
+            {/* Line Items Editor */}
             {repeatingDays.length === 0 && (
-              <InvoiceLineItemEditor 
+              <InvoiceLineItemEditor
                 items={lineItems}
                 onItemsChange={setLineItems}
-                taxRate={settings?.tax_rate || 20}
+                taxRate={settings?.default_tax_rate || 20}
               />
             )}
 
             {/* Calculations Summary */}
-            <InvoiceCalculations 
+            <InvoiceCalculations
               items={repeatingDays.length > 0 ? Object.values(dayItems).flat() : lineItems}
               discountAmount={0}
               discountType="fixed"
@@ -1047,9 +1083,9 @@ export default function InvoiceManager({ invoices, clients, settings }) {
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-center gap-4 border-t border-slate-200 pt-3">
                 {invoicingSettings.logo_url && (
-                  <img 
-                    src={invoicingSettings.logo_url} 
-                    alt="Company Logo" 
+                  <img
+                    src={invoicingSettings.logo_url}
+                    alt="Company Logo"
                     className="h-8 w-auto object-contain"
                   />
                 )}
@@ -1088,9 +1124,9 @@ export default function InvoiceManager({ invoices, clients, settings }) {
           {recurringInvoiceData && (
             <RecurringInvoiceForm
               invoice={recurringInvoiceData}
-              onSubmit={(data) => createRecurringMutation.mutate({ 
-                recurringData: data, 
-                originalInvoiceId: recurringInvoiceData.id 
+              onSubmit={(data) => createRecurringMutation.mutate({
+                recurringData: data,
+                originalInvoiceId: recurringInvoiceData.id
               })}
               onCancel={() => setShowRecurringDialog(false)}
               isLoading={createRecurringMutation.isPending}
@@ -1129,8 +1165,7 @@ function RecurringInvoiceForm({ invoice, onSubmit, onCancel, isLoading }) {
   });
   const [neverEnd, setNeverEnd] = useState(true);
 
-  // Auto-calculate period days based on frequency
-  React.useEffect(() => {
+  useEffect(() => {
     let days = 30;
     if (formData.frequency === 'weekly') days = 7;
     else if (formData.frequency === 'bi-weekly') days = 14;
@@ -1193,8 +1228,8 @@ function RecurringInvoiceForm({ invoice, onSubmit, onCancel, isLoading }) {
         {(formData.frequency === 'weekly' || formData.frequency === 'bi-weekly') && (
           <div>
             <label className="block text-sm font-medium text-slate-900 mb-2">Day of Week to Create Invoice</label>
-            <Select 
-              value={formData.day_of_week.toString()} 
+            <Select
+              value={formData.day_of_week.toString()}
               onValueChange={(value) => setFormData({ ...formData, day_of_week: parseInt(value) })}
             >
               <SelectTrigger>
@@ -1230,8 +1265,8 @@ function RecurringInvoiceForm({ invoice, onSubmit, onCancel, isLoading }) {
         {formData.frequency === 'monthly' && (
           <div>
             <label className="block text-sm font-medium text-slate-900 mb-2">Day of Month to Create Invoice</label>
-            <Select 
-              value={formData.day_of_month.toString()} 
+            <Select
+              value={formData.day_of_month.toString()}
               onValueChange={(value) => setFormData({ ...formData, day_of_month: parseInt(value) })}
             >
               <SelectTrigger>

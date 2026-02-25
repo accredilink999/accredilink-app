@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +28,15 @@ export default function PaymentTracker({ payments, invoices, clients }) {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.Payment.create(data),
+    mutationFn: async (data) => {
+      const { data: result, error } = await supabase
+        .from('payments')
+        .insert(data)
+        .select()
+        .single();
+      if (error) throw error;
+      return result;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
@@ -41,7 +49,13 @@ export default function PaymentTracker({ payments, invoices, clients }) {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Payment.delete(id),
+    mutationFn: async (id) => {
+      const { error } = await supabase
+        .from('payments')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
@@ -94,7 +108,7 @@ export default function PaymentTracker({ payments, invoices, clients }) {
       ...formData,
       amount: parseFloat(formData.amount),
       client_id: invoice?.client_id,
-      client_name: client?.client_name,
+      client_name: client?.client_name || invoice?.client_name,
       status: 'completed',
     });
   };
@@ -121,9 +135,9 @@ export default function PaymentTracker({ payments, invoices, clients }) {
 
   const filteredPayments = payments.filter(p => {
     const invoice = invoices.find(i => i.id === p.invoice_id);
-    return search === '' || 
+    return search === '' ||
            p.reference?.toLowerCase().includes(search.toLowerCase()) ||
-           invoice?.invoice_number.toLowerCase().includes(search.toLowerCase());
+           invoice?.invoice_number?.toLowerCase().includes(search.toLowerCase());
   });
 
   return (
@@ -218,7 +232,7 @@ export default function PaymentTracker({ payments, invoices, clients }) {
                       <p className="text-sm text-slate-600 mb-2">{payment.client_name}</p>
                       <div className="flex gap-4 text-xs text-slate-500">
                         <span>Date: {new Date(payment.payment_date).toLocaleDateString()}</span>
-                        <span>Method: {payment.payment_method.replace('_', ' ').toUpperCase()}</span>
+                        <span>Method: {(payment.payment_method || '').replace('_', ' ').toUpperCase()}</span>
                         {payment.reference && <span>Ref: {payment.reference}</span>}
                       </div>
                     </div>

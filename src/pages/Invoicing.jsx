@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
 import PageHeader from '@/components/ui/PageHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -18,32 +18,58 @@ export default function Invoicing() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const queryClient = useQueryClient();
 
-  const { data: user } = useQuery({
-    queryKey: ['currentUser'],
-    queryFn: () => base44.auth.me(),
-  });
-
-  const { data: settings } = useQuery({
+  const { data: settings, isLoading: settingsLoading } = useQuery({
     queryKey: ['invoicingSettings'],
     queryFn: async () => {
-      const data = await base44.entities.InvoicingSettings.list('-created_date', 1);
-      return data?.[0];
+      const { data, error } = await supabase
+        .from('invoicing_settings')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      if (error && error.code !== 'PGRST116') throw error;
+      return data;
     },
   });
 
+
   const { data: invoices = [] } = useQuery({
     queryKey: ['invoices'],
-    queryFn: () => base44.entities.Invoice.list('-created_date', 100),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data || [];
+    },
   });
 
   const { data: clients = [] } = useQuery({
     queryKey: ['clients'],
-    queryFn: () => base44.entities.Client.list('-created_date', 500),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return data || [];
+    },
   });
 
   const { data: payments = [] } = useQuery({
     queryKey: ['payments'],
-    queryFn: () => base44.entities.Payment.list('-created_date', 100),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('payments')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data || [];
+    },
   });
 
   // Calculate KPIs
@@ -60,14 +86,22 @@ export default function Invoicing() {
     .reduce((sum, i) => sum + (i.amount_due || 0), 0);
 
   // Show setup wizard if not completed
-  if (!settings?.setup_completed) {
+  if (!settingsLoading && !settings?.is_configured) {
     return <InvoicingSetupWizard />;
+  }
+
+  if (settingsLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <p className="text-slate-500">Loading invoicing...</p>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <PageHeader 
+        <PageHeader
           title="Invoicing & Financials"
           subtitle="Manage invoices, clients, and track payments"
           icon={FileText}

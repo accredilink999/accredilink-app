@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,8 +11,14 @@ export default function InvoiceLineItemEditor({ items = [], onItemsChange, taxRa
   const { data: settings } = useQuery({
     queryKey: ['invoicingSettings'],
     queryFn: async () => {
-      const results = await base44.entities.InvoicingSettings.list();
-      return results?.[0];
+      const { data, error } = await supabase
+        .from('invoicing_settings')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      if (error && error.code !== 'PGRST116') throw error;
+      return data;
     },
   });
 
@@ -22,12 +28,11 @@ export default function InvoiceLineItemEditor({ items = [], onItemsChange, taxRa
     Object.values(dayItems).forEach(dayItemsList => {
       if (Array.isArray(dayItemsList)) {
         dayItemsList.forEach(item => {
-          const section = item.type === 'client_call' ? 'Client Calls' : 
+          const section = item.type === 'client_call' ? 'Client Calls' :
                          item.type === 'service' ? 'Services' : 'Extra Charges';
-          
-          // Check if this item already exists in items
+
           const exists = items.some(existingItem => existingItem.id === item.id);
-          
+
           if (!exists) {
             dayItemsArray.push({
               ...item,
@@ -81,7 +86,7 @@ export default function InvoiceLineItemEditor({ items = [], onItemsChange, taxRa
   };
 
   const sections = ['Services', 'Client Calls', 'Extra Charges'];
-  
+
   const groupedItems = {};
   sections.forEach(section => {
     groupedItems[section] = items.filter(item => item.section === section);
