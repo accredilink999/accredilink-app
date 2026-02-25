@@ -568,7 +568,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
        discount_value: formData.discount_value,
        client_name: recipientName,
        client_email: recipientEmail,
-       line_items: JSON.stringify(allItems),
+       line_items: allItems,
        subtotal: totals.subtotal,
        tax_amount: totals.tax,
        total_amount: Math.max(0, totalAmount),
@@ -576,7 +576,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
        status: 'draft',
        currency: settings?.currency || 'GBP',
        repeating_days: repeatingDays.length > 0 ? repeatingDays : null,
-       day_items: repeatingDays.length > 0 ? JSON.stringify(dayItems) : null,
+       day_items: repeatingDays.length > 0 ? dayItems : null,
      };
 
     if (editingInvoice) {
