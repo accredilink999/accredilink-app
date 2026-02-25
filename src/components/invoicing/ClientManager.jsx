@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Edit2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -19,6 +20,7 @@ export default function ClientManager({ clients, invoices }) {
 
   const [formData, setFormData] = useState({
     client_name: '',
+    client_type: 'invoice',
     client_email: '',
     client_phone: '',
     billing_address: '',
@@ -89,6 +91,7 @@ export default function ClientManager({ clients, invoices }) {
       setEditingClient(client);
       setFormData({
         client_name: client.client_name,
+        client_type: client.client_type || 'invoice',
         client_email: client.client_email,
         client_phone: client.client_phone || '',
         billing_address: client.billing_address || '',
@@ -98,6 +101,7 @@ export default function ClientManager({ clients, invoices }) {
     } else {
       setFormData({
         client_name: '',
+        client_type: 'invoice',
         client_email: '',
         client_phone: '',
         billing_address: '',
@@ -158,7 +162,17 @@ export default function ClientManager({ clients, invoices }) {
             <Card key={client.id} className="p-4 hover:shadow-md transition-shadow">
               <div className="space-y-3">
                 <div>
-                  <h3 className="font-semibold text-slate-900">{client.client_name}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-slate-900">{client.client_name}</h3>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                      client.client_type === 'local_authority' ? 'bg-blue-100 text-blue-700' :
+                      client.client_type === 'direct_payment' ? 'bg-purple-100 text-purple-700' :
+                      'bg-slate-100 text-slate-700'
+                    }`}>
+                      {client.client_type === 'local_authority' ? 'Local Authority' :
+                       client.client_type === 'direct_payment' ? 'Direct Payment' : 'Invoice'}
+                    </span>
+                  </div>
                   <p className="text-sm text-slate-600">{client.client_email}</p>
                   {client.client_phone && <p className="text-sm text-slate-600">{client.client_phone}</p>}
                 </div>
@@ -218,6 +232,19 @@ export default function ClientManager({ clients, invoices }) {
                 value={formData.client_name}
                 onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-900 mb-2">Client Type *</label>
+              <Select value={formData.client_type} onValueChange={(value) => setFormData({ ...formData, client_type: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="local_authority">Local Authority</SelectItem>
+                  <SelectItem value="direct_payment">Direct Payment</SelectItem>
+                  <SelectItem value="invoice">Invoice</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-900 mb-2">Email *</label>
