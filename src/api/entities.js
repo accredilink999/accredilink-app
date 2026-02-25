@@ -362,6 +362,10 @@ export const entities = {
   Payment:                     buildEntity('payments'),
   HolidayAllowance:            buildEntity('holiday_allowances'),
 
+  // Compliance & Safeguarding
+  ComplianceReport:            buildEntity('compliance_reports'),
+  SafeguardingReport:          buildEntity('safeguarding_reports'),
+
   // Communications / Meetings
   Meeting:                     buildEntity('meetings'),
   MeetingParticipant:          buildEntity('meeting_participants'),

@@ -23,6 +23,7 @@ import { deployClientCallsToRota } from '@/utils/deployPattern';
 import { ShiftCallApi } from '@/api/rotaApi';
 import { supabase } from '@/api/supabaseClient';
 import CallTypeManager from '../rota/CallTypeManager';
+import SafeguardingReports from './SafeguardingReports';
 import {
   Phone,
   MapPin,
@@ -38,7 +39,8 @@ import {
   X,
   Plus,
   Clock,
-  ListChecks
+  ListChecks,
+  Shield
 } from 'lucide-react';
 
 export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit, onEditDisabled = false, careLogs = [] }) {
@@ -497,6 +499,10 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
              </TabsTrigger>
              <TabsTrigger value="communications" className="text-xs sm:text-sm font-bold rounded-lg py-2 px-2 sm:px-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-50 data-[state=active]:to-teal-100 data-[state=active]:border data-[state=active]:border-teal-300 data-[state=active]:text-teal-900 data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:bg-slate-50 transition-all">Comms</TabsTrigger>
              <TabsTrigger value="sitting" className="text-xs sm:text-sm font-bold rounded-lg py-2 px-2 sm:px-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-50 data-[state=active]:to-teal-100 data-[state=active]:border data-[state=active]:border-teal-300 data-[state=active]:text-teal-900 data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:bg-slate-50 transition-all">Sitting</TabsTrigger>
+             <TabsTrigger value="safeguarding" className="text-xs sm:text-sm font-bold rounded-lg py-2 px-2 sm:px-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-50 data-[state=active]:to-purple-100 data-[state=active]:border data-[state=active]:border-purple-300 data-[state=active]:text-purple-900 data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:bg-slate-50 transition-all">
+               <Shield className="w-3 h-3 mr-1 inline" />
+               Safe
+             </TabsTrigger>
            </TabsList>
 
           <TabsContent value="info" className="space-y-4 mt-4">
@@ -1064,6 +1070,10 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
 
            <TabsContent value="sitting" className="space-y-3 mt-4">
            <HealthcareLogManager serviceUser={serviceUser} logType="sitting" />
+           </TabsContent>
+
+           <TabsContent value="safeguarding" className="space-y-3 mt-4">
+             <SafeguardingReports serviceUser={serviceUser} />
            </TabsContent>
            </Tabs>
            </div>
