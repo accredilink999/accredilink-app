@@ -15,6 +15,7 @@ import StaffPermissions from '@/components/staff/StaffPermissions';
 import RotaAreaPermissions from '@/components/staff/RotaAreaPermissions';
 import StaffHRManagement from '@/components/staff/StaffHRManagement';
 import StaffLeaveBalance from '@/components/staff/StaffLeaveBalance';
+import StaffSupervisions from '@/components/staff/StaffSupervisions';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from 'sonner';
 import { ArrowLeft, Edit, Shield, MapPin, UserX, UserCheck, Trash2, Mail, Loader2 } from 'lucide-react';
@@ -320,13 +321,14 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
       </AlertDialog>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5 sm:grid-cols-6 h-auto gap-1">
+        <TabsList className="grid w-full grid-cols-5 sm:grid-cols-7 h-auto gap-1">
           <TabsTrigger value="overview" className="text-xs sm:text-sm p-1 sm:p-2 h-8 sm:h-10">Overview</TabsTrigger>
           <TabsTrigger value="employment" className="text-xs sm:text-sm p-1 sm:p-2 h-8 sm:h-10">Employment</TabsTrigger>
           <TabsTrigger value="permissions" className="text-xs sm:text-sm p-1 sm:p-2 h-8 sm:h-10">Perms</TabsTrigger>
           <TabsTrigger value="rota" className="text-xs sm:text-sm p-1 sm:p-2 h-8 sm:h-10">Rota</TabsTrigger>
           <TabsTrigger value="leave" className="text-xs sm:text-sm p-1 sm:p-2 h-8 sm:h-10">Leave</TabsTrigger>
           <TabsTrigger value="hr" className="text-xs sm:text-sm p-1 sm:p-2 h-8 sm:h-10">HR</TabsTrigger>
+          <TabsTrigger value="supervision" className="text-xs sm:text-sm p-1 sm:p-2 h-8 sm:h-10">Supv</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-6">
@@ -351,6 +353,10 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
 
         <TabsContent value="hr" className="mt-6">
           <StaffHRManagement staffId={staffId} isAdmin={isAdmin} isOwnProfile={isOwnProfile} />
+        </TabsContent>
+
+        <TabsContent value="supervision" className="mt-6">
+          <StaffSupervisions staffId={staffId} isAdmin={isAdmin} staffName={staff?.full_name} />
         </TabsContent>
       </Tabs>
 

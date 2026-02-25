@@ -365,6 +365,7 @@ export const entities = {
   // Compliance & Safeguarding
   ComplianceReport:            buildEntity('compliance_reports'),
   SafeguardingReport:          buildEntity('safeguarding_reports'),
+  SupervisionRecord:           buildEntity('supervision_records'),
 
   // Communications / Meetings
   Meeting:                     buildEntity('meetings'),

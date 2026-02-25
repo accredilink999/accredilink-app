@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CalendarItemModal from '@/components/calendar/CalendarItemModal';
 import StatusBadge from '@/components/ui/StatusBadge';
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Shield,
   ChevronLeft,
@@ -29,6 +30,11 @@ import {
   Plus,
   BookOpen,
   Filter,
+  ClipboardCheck,
+  ChevronDown,
+  ChevronUp,
+  Users,
+  User,
 } from 'lucide-react';
 import {
   format,
@@ -43,6 +49,7 @@ import {
   startOfWeek,
   endOfWeek,
   addDays,
+  differenceInDays,
 } from 'date-fns';
 import {
   getRegulationsByFramework,
@@ -304,6 +311,14 @@ export default function ComplianceManagement() {
   const [reportSearch, setReportSearch] = useState('');
   const [reportStatusFilter, setReportStatusFilter] = useState('all');
 
+  // Supervision state
+  const [supervisionFormOpen, setSupervisionFormOpen] = useState(false);
+  const [supervisionStaffId, setSupervisionStaffId] = useState(null);
+  const [supervisionStaffName, setSupervisionStaffName] = useState('');
+  const [expandedStaffIds, setExpandedStaffIds] = useState(new Set());
+  const [viewingSupervision, setViewingSupervision] = useState(null);
+  const [supervisionFormData, setSupervisionFormData] = useState({});
+
   // Load framework setting
   const { data: frameworkSettings = [] } = useQuery({
     queryKey: ['complianceFramework'],
@@ -340,6 +355,25 @@ export default function ComplianceManagement() {
   const { data: documentRequirements = [] } = useQuery({
     queryKey: ['documentRequirements'],
     queryFn: () => base44.entities.DocumentRequirement.list(),
+  });
+
+  // Supervision data
+  const { data: allSupervisions = [] } = useQuery({
+    queryKey: ['allSupervisions'],
+    queryFn: () => base44.entities.SupervisionRecord.list('-supervision_date'),
+  });
+
+  const { data: staffList = [] } = useQuery({
+    queryKey: ['staffMembers'],
+    queryFn: async () => {
+      try {
+        const response = await base44.functions.invoke('getAllStaff', {});
+        return response.staffList || response.data?.staffList || [];
+      } catch {
+        const profiles = await base44.entities.User.list();
+        return profiles.map(p => ({ id: p.id, name: p.staff_full_name || p.full_name || p.email, job_title: p.job_title, is_active: p.is_active }));
+      }
+    },
   });
 
   // ── Mutations ──
@@ -398,11 +432,118 @@ export default function ComplianceManagement() {
     },
   });
 
+  const createSupervisionMutation = useMutation({
+    mutationFn: (data) => base44.entities.SupervisionRecord.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['allSupervisions'] });
+      setSupervisionFormOpen(false);
+      setSupervisionStaffId(null);
+      setSupervisionStaffName('');
+      setSupervisionFormData({});
+    },
+  });
+
   // ── Framework toggle handler ──
 
   const handleFrameworkChange = (fw) => {
     setFramework(fw);
     saveFrameworkMutation.mutate(fw);
+  };
+
+  // ── Supervision data ──
+
+  const SUPERVISION_CYCLE_DAYS = 84; // 12 weeks
+
+  const SUPERVISION_SECTIONS = [
+    { key: 'previous_actions_review', label: '1. Review of Previous Actions', placeholder: 'Review action points from last supervision. What was agreed? What progress has been made?' },
+    { key: 'workload_discussion', label: '2. Workload & Caseload Discussion', placeholder: 'Current rota, service users, any concerns about workload or scheduling' },
+    { key: 'care_quality', label: '3. Quality of Care & Practice', placeholder: 'Observations on care delivery, spot-check outcomes, standards of practice' },
+    { key: 'safeguarding', label: '4. Safeguarding', placeholder: 'Any safeguarding concerns? Awareness of procedures and escalation routes' },
+    { key: 'medication', label: '5. Medication', placeholder: 'Any medication errors or concerns? MAR chart accuracy, competency' },
+    { key: 'health_wellbeing', label: '6. Health & Wellbeing', placeholder: 'How is the staff member coping? Work-life balance, any health concerns affecting work' },
+    { key: 'training_development', label: '7. Training & Development', placeholder: 'Mandatory training status, recent training completed, future training needs' },
+    { key: 'policies_compliance', label: '8. Policies & Compliance', placeholder: 'Awareness of key policies, PPE, uniform, ID badge' },
+    { key: 'communication_teamwork', label: '9. Communication & Teamwork', placeholder: 'Relationships with colleagues, office communication, feedback' },
+    { key: 'incidents_complaints', label: '10. Incidents / Complaints / Compliments', placeholder: 'Any since last supervision' },
+    { key: 'reflective_practice', label: '11. Reflective Practice', placeholder: 'What went well? What could improve? Difficult situations?' },
+    { key: 'agreed_actions', label: '12. Agreed Actions & Objectives', placeholder: 'SMART objectives, specific actions with ownership and deadlines' },
+    { key: 'any_other_business', label: '13. Any Other Business', placeholder: 'Anything else to raise' },
+  ];
+
+  const staffSupervisionData = useMemo(() => {
+    const activeStaff = staffList.filter(s => s.is_active !== false);
+    return activeStaff.map(staff => {
+      const staffSupervisions = allSupervisions.filter(sv => sv.staff_id === staff.id);
+      const lastSupervision = staffSupervisions[0]; // already sorted by -supervision_date
+      const lastDate = lastSupervision?.supervision_date ? new Date(lastSupervision.supervision_date) : null;
+      const nextDueDate = lastDate ? addDays(lastDate, SUPERVISION_CYCLE_DAYS) : null;
+      const now = new Date();
+
+      let dueStatus = 'never';
+      if (nextDueDate) {
+        if (nextDueDate < now) dueStatus = 'overdue';
+        else if (differenceInDays(nextDueDate, now) <= 14) dueStatus = 'due_soon';
+        else dueStatus = 'up_to_date';
+      }
+
+      return {
+        ...staff,
+        staffName: staff.name || staff.full_name,
+        supervisions: staffSupervisions,
+        lastSupervision,
+        lastDate,
+        nextDueDate,
+        dueStatus,
+        totalCount: staffSupervisions.length,
+      };
+    }).sort((a, b) => {
+      const order = { never: 0, overdue: 1, due_soon: 2, up_to_date: 3 };
+      return (order[a.dueStatus] ?? 4) - (order[b.dueStatus] ?? 4);
+    });
+  }, [staffList, allSupervisions]);
+
+  const supervisionSummary = useMemo(() => {
+    const overdue = staffSupervisionData.filter(s => s.dueStatus === 'overdue').length;
+    const dueSoon = staffSupervisionData.filter(s => s.dueStatus === 'due_soon').length;
+    const upToDate = staffSupervisionData.filter(s => s.dueStatus === 'up_to_date').length;
+    const never = staffSupervisionData.filter(s => s.dueStatus === 'never').length;
+    return { overdue, dueSoon, upToDate, never };
+  }, [staffSupervisionData]);
+
+  const toggleStaffExpanded = (staffId) => {
+    setExpandedStaffIds(prev => {
+      const next = new Set(prev);
+      if (next.has(staffId)) next.delete(staffId);
+      else next.add(staffId);
+      return next;
+    });
+  };
+
+  const openSupervisionForm = (staff) => {
+    setSupervisionStaffId(staff?.id || null);
+    setSupervisionStaffName(staff?.staffName || '');
+    setSupervisionFormData({
+      supervision_date: format(new Date(), 'yyyy-MM-dd'),
+      supervision_type: 'formal_1to1',
+      next_supervision_date: format(addDays(new Date(), SUPERVISION_CYCLE_DAYS), 'yyyy-MM-dd'),
+      supervisor_name: user?.full_name || '',
+      supervisor_id: user?.id || '',
+      supervisee_agreed: true,
+    });
+    setSupervisionFormOpen(true);
+  };
+
+  const handleSupervisionSubmit = () => {
+    const staffId = supervisionStaffId;
+    const staffName = supervisionStaffName || staffList.find(s => s.id === supervisionFormData.staff_id)?.name || '';
+    const count = allSupervisions.filter(sv => sv.staff_id === (supervisionFormData.staff_id || staffId)).length;
+
+    createSupervisionMutation.mutate({
+      ...supervisionFormData,
+      staff_id: supervisionFormData.staff_id || staffId,
+      staff_name: supervisionFormData.staff_name || staffName,
+      supervision_number: count + 1,
+    });
   };
 
   // ── Calendar data (same as before) ──
@@ -580,13 +721,25 @@ export default function ComplianceManagement() {
       </PageHeader>
 
       <Tabs defaultValue="regulations" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 h-auto bg-transparent p-0 mb-4">
+        <TabsList className="grid w-full grid-cols-4 h-auto bg-transparent p-0 mb-4">
           <TabsTrigger
             value="regulations"
             className="text-xs sm:text-sm font-bold rounded-lg py-2 px-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-50 data-[state=active]:to-teal-100 data-[state=active]:border data-[state=active]:border-teal-300 data-[state=active]:text-teal-900 data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:bg-slate-50 transition-all"
           >
             <BookOpen className="w-4 h-4 mr-1.5" />
             Regulations
+          </TabsTrigger>
+          <TabsTrigger
+            value="supervisions"
+            className="text-xs sm:text-sm font-bold rounded-lg py-2 px-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-50 data-[state=active]:to-amber-100 data-[state=active]:border data-[state=active]:border-amber-300 data-[state=active]:text-amber-900 data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:bg-slate-50 transition-all"
+          >
+            <ClipboardCheck className="w-4 h-4 mr-1.5" />
+            Supervisions
+            {supervisionSummary.overdue > 0 && (
+              <Badge className="ml-1.5 bg-red-600 text-white text-xs">
+                {supervisionSummary.overdue}
+              </Badge>
+            )}
           </TabsTrigger>
           <TabsTrigger
             value="reports"
@@ -686,6 +839,142 @@ export default function ComplianceManagement() {
               </div>
             </div>
           ))}
+        </TabsContent>
+
+        {/* ── TAB: Supervisions ── */}
+        <TabsContent value="supervisions" className="space-y-4 mt-4">
+          {/* Summary banner */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Card className="p-3 text-center border-red-200 bg-red-50">
+              <p className="text-2xl font-bold text-red-700">{supervisionSummary.overdue}</p>
+              <p className="text-xs text-red-600">Overdue</p>
+            </Card>
+            <Card className="p-3 text-center border-orange-200 bg-orange-50">
+              <p className="text-2xl font-bold text-orange-700">{supervisionSummary.dueSoon}</p>
+              <p className="text-xs text-orange-600">Due Soon</p>
+            </Card>
+            <Card className="p-3 text-center border-green-200 bg-green-50">
+              <p className="text-2xl font-bold text-green-700">{supervisionSummary.upToDate}</p>
+              <p className="text-xs text-green-600">Up to Date</p>
+            </Card>
+            <Card className="p-3 text-center border-slate-200 bg-slate-50">
+              <p className="text-2xl font-bold text-slate-700">{supervisionSummary.never}</p>
+              <p className="text-xs text-slate-600">Never Done</p>
+            </Card>
+          </div>
+
+          <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg">
+            <p className="text-sm text-amber-800">
+              <strong>12-Weekly Staff Supervisions</strong> — Required under CIW Regulation 36 / CQC Regulation 18. Click on a staff member to expand, or start a new supervision.
+            </p>
+          </div>
+
+          {/* Staff list with expandable cards */}
+          <div className="space-y-2">
+            {staffSupervisionData.map((staff) => {
+              const isExpanded = expandedStaffIds.has(staff.id);
+              const dueBadge = {
+                overdue: <Badge className="bg-red-100 text-red-700 text-xs">Overdue</Badge>,
+                due_soon: <Badge className="bg-orange-100 text-orange-700 text-xs">Due Soon</Badge>,
+                up_to_date: <Badge className="bg-green-100 text-green-700 text-xs">Up to Date</Badge>,
+                never: <Badge className="bg-slate-100 text-slate-600 text-xs">Never Done</Badge>,
+              };
+              const borderColor = {
+                overdue: 'border-l-red-500',
+                due_soon: 'border-l-orange-500',
+                up_to_date: 'border-l-green-500',
+                never: 'border-l-slate-400',
+              };
+
+              return (
+                <Card key={staff.id} className={`border-l-4 ${borderColor[staff.dueStatus] || 'border-l-slate-300'}`}>
+                  {/* Header row - always visible */}
+                  <div
+                    className="p-3 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors"
+                    onClick={() => toggleStaffExpanded(staff.id)}
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                        <User className="w-4 h-4 text-amber-700" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm text-slate-900 truncate">{staff.staffName}</p>
+                        <p className="text-xs text-slate-500">
+                          {staff.job_title || 'Staff'} — {staff.totalCount} supervision{staff.totalCount !== 1 ? 's' : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {dueBadge[staff.dueStatus]}
+                      <div className="hidden sm:block text-right text-xs text-slate-500 mr-2">
+                        {staff.lastDate ? (
+                          <>Last: {format(staff.lastDate, 'dd MMM yyyy')}</>
+                        ) : (
+                          'No record'
+                        )}
+                        {staff.nextDueDate && (
+                          <div>Next: {format(staff.nextDueDate, 'dd MMM yyyy')}</div>
+                        )}
+                      </div>
+                      {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                    </div>
+                  </div>
+
+                  {/* Expanded content */}
+                  {isExpanded && (
+                    <div className="px-3 pb-3 border-t border-slate-100 pt-3 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold text-slate-600 uppercase">Recent Supervisions</p>
+                        <Button
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); openSupervisionForm(staff); }}
+                          className="bg-amber-600 hover:bg-amber-700 text-xs"
+                        >
+                          <Plus className="w-3 h-3 mr-1" />
+                          New Supervision
+                        </Button>
+                      </div>
+
+                      {staff.supervisions.length === 0 ? (
+                        <p className="text-sm text-slate-500 italic py-2">No supervisions recorded yet.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {staff.supervisions.slice(0, 3).map((sv, idx) => (
+                            <div
+                              key={sv.id}
+                              className="p-2 bg-slate-50 rounded-lg flex items-center justify-between cursor-pointer hover:bg-slate-100"
+                              onClick={() => setViewingSupervision(sv)}
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-amber-200 flex items-center justify-center text-amber-800 text-xs font-bold">
+                                  #{staff.supervisions.length - idx}
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium text-slate-800">{sv.supervision_date}</p>
+                                  <p className="text-xs text-slate-500">Supervisor: {sv.supervisor_name || 'N/A'}</p>
+                                </div>
+                              </div>
+                              <Eye className="w-4 h-4 text-slate-400" />
+                            </div>
+                          ))}
+                          {staff.supervisions.length > 3 && (
+                            <p className="text-xs text-slate-500 text-center">+ {staff.supervisions.length - 3} more records</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+
+            {staffSupervisionData.length === 0 && (
+              <Card className="p-8 text-center text-slate-500">
+                <Users className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                <p>No active staff found.</p>
+              </Card>
+            )}
+          </div>
         </TabsContent>
 
         {/* ── TAB: Filed Reports ── */}
@@ -1191,6 +1480,220 @@ export default function ComplianceManagement() {
               }
               isPending={updateReportMutation.isPending}
             />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Supervision Form Dialog */}
+      <Dialog open={supervisionFormOpen} onOpenChange={setSupervisionFormOpen}>
+        <DialogContent
+          className="max-w-2xl max-h-[90vh] overflow-y-auto"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardCheck className="w-5 h-5 text-amber-600" />
+              New Staff Supervision
+              {supervisionStaffName && ` — ${supervisionStaffName}`}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-2">
+            {/* Staff picker + header fields */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium">Staff Member *</Label>
+                {supervisionStaffId ? (
+                  <Input value={supervisionStaffName} disabled className="mt-1 bg-slate-50" />
+                ) : (
+                  <Select
+                    value={supervisionFormData.staff_id || ''}
+                    onValueChange={(val) => {
+                      const s = staffList.find(st => st.id === val);
+                      setSupervisionFormData(prev => ({
+                        ...prev,
+                        staff_id: val,
+                        staff_name: s?.name || s?.full_name || '',
+                      }));
+                    }}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select staff member" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {staffList.filter(s => s.is_active !== false).map(s => (
+                        <SelectItem key={s.id} value={s.id}>{s.name || s.full_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+              <div>
+                <Label className="text-sm font-medium">Supervisor</Label>
+                <Input
+                  value={supervisionFormData.supervisor_name || ''}
+                  onChange={(e) => setSupervisionFormData(prev => ({ ...prev, supervisor_name: e.target.value }))}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <Label className="text-sm font-medium">Supervision Date *</Label>
+                <Input
+                  type="date"
+                  value={supervisionFormData.supervision_date || ''}
+                  onChange={(e) => setSupervisionFormData(prev => ({ ...prev, supervision_date: e.target.value }))}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium">Type</Label>
+                <Select
+                  value={supervisionFormData.supervision_type || 'formal_1to1'}
+                  onValueChange={(v) => setSupervisionFormData(prev => ({ ...prev, supervision_type: v }))}
+                >
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="formal_1to1">Formal 1:1</SelectItem>
+                    <SelectItem value="observed_practice">Observed Practice</SelectItem>
+                    <SelectItem value="group">Group Supervision</SelectItem>
+                    <SelectItem value="spot_check">Spot Check</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm font-medium">Next Due Date</Label>
+                <Input
+                  type="date"
+                  value={supervisionFormData.next_supervision_date || ''}
+                  onChange={(e) => setSupervisionFormData(prev => ({ ...prev, next_supervision_date: e.target.value }))}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+
+            {/* Pre-populated agenda sections */}
+            <div className="border-t border-slate-200 pt-4">
+              <p className="text-sm font-semibold text-slate-700 mb-3">Supervision Discussion</p>
+            </div>
+
+            {SUPERVISION_SECTIONS.map(section => (
+              <div key={section.key}>
+                <Label className="text-sm font-medium text-slate-700">{section.label}</Label>
+                <Textarea
+                  value={supervisionFormData[section.key] || ''}
+                  onChange={(e) => setSupervisionFormData(prev => ({ ...prev, [section.key]: e.target.value }))}
+                  placeholder={section.placeholder}
+                  className="mt-1 min-h-[70px]"
+                />
+              </div>
+            ))}
+
+            {/* Sign-off */}
+            <div className="border-t border-slate-200 pt-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="supv_agreed"
+                  checked={supervisionFormData.supervisee_agreed !== false}
+                  onCheckedChange={(checked) => setSupervisionFormData(prev => ({ ...prev, supervisee_agreed: checked }))}
+                />
+                <Label htmlFor="supv_agreed" className="text-sm">Supervisee agrees with this record</Label>
+              </div>
+              <div>
+                <Label className="text-sm font-medium">Additional Comments</Label>
+                <Textarea
+                  value={supervisionFormData.additional_comments || ''}
+                  onChange={(e) => setSupervisionFormData(prev => ({ ...prev, additional_comments: e.target.value }))}
+                  placeholder="Any disagreements or additional notes"
+                  className="mt-1"
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="pt-4">
+              <Button variant="outline" onClick={() => setSupervisionFormOpen(false)}>Cancel</Button>
+              <Button
+                onClick={handleSupervisionSubmit}
+                disabled={!(supervisionStaffId || supervisionFormData.staff_id) || !supervisionFormData.supervision_date || createSupervisionMutation.isPending}
+                className="bg-amber-600 hover:bg-amber-700"
+              >
+                {createSupervisionMutation.isPending ? 'Saving...' : 'Save Supervision'}
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Supervision Viewer Dialog */}
+      <Dialog open={!!viewingSupervision} onOpenChange={() => setViewingSupervision(null)}>
+        <DialogContent
+          className="max-w-2xl max-h-[90vh] overflow-y-auto"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardCheck className="w-5 h-5 text-amber-600" />
+              Supervision Record — {viewingSupervision?.staff_name}
+            </DialogTitle>
+          </DialogHeader>
+          {viewingSupervision && (
+            <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                <div>
+                  <span className="text-slate-500">Staff</span>
+                  <p className="font-medium">{viewingSupervision.staff_name}</p>
+                </div>
+                <div>
+                  <span className="text-slate-500">Supervisor</span>
+                  <p className="font-medium">{viewingSupervision.supervisor_name || 'N/A'}</p>
+                </div>
+                <div>
+                  <span className="text-slate-500">Date</span>
+                  <p className="font-medium">{viewingSupervision.supervision_date}</p>
+                </div>
+                <div>
+                  <span className="text-slate-500">Type</span>
+                  <p className="font-medium">{viewingSupervision.supervision_type?.replace(/_/g, ' ')}</p>
+                </div>
+              </div>
+
+              {SUPERVISION_SECTIONS.map(section => {
+                const value = viewingSupervision[section.key];
+                if (!value) return null;
+                return (
+                  <div key={section.key}>
+                    <Label className="text-sm font-semibold text-slate-700">{section.label}</Label>
+                    <p className="text-sm text-slate-600 mt-1 whitespace-pre-wrap bg-slate-50 rounded p-3">{value}</p>
+                  </div>
+                );
+              })}
+
+              {viewingSupervision.next_supervision_date && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <p className="text-sm text-amber-800">
+                    <strong>Next supervision due:</strong> {viewingSupervision.next_supervision_date}
+                  </p>
+                </div>
+              )}
+
+              {viewingSupervision.additional_comments && (
+                <div>
+                  <Label className="text-sm font-semibold">Additional Comments</Label>
+                  <p className="text-sm text-slate-600 mt-1 whitespace-pre-wrap bg-slate-50 rounded p-3">{viewingSupervision.additional_comments}</p>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 text-sm">
+                {viewingSupervision.supervisee_agreed !== false ? (
+                  <Badge className="bg-green-100 text-green-700">Supervisee Agreed</Badge>
+                ) : (
+                  <Badge className="bg-orange-100 text-orange-700">Supervisee Disagreed</Badge>
+                )}
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>
