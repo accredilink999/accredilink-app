@@ -234,9 +234,8 @@ export default function DaySpecificItems({ repeatingDays, dayItems, onDayItemsCh
                            </SelectTrigger>
                            <SelectContent>
                              {(() => {
-                               // Convert all hoursOptions through parser (handles 0.45 → 0.75 etc), deduplicate
-                               const parsed = (hoursOptions || []).map(h => parseDurationToHours(h));
-                               const opts = [...new Set(parsed)];
+                               // hoursOptions are already in hours — just deduplicate
+                               const opts = [...new Set((hoursOptions || []).map(h => parseFloat(h) || 0).filter(h => h > 0))];
                                const currentQty = item.quantity;
                                if (currentQty && !opts.includes(currentQty)) {
                                  opts.push(currentQty);

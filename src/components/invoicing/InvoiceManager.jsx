@@ -89,6 +89,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
       if (error) throw error;
       return data || [];
     },
+    staleTime: 0,
   });
 
   const { data: invoicingSettings = {} } = useQuery({
