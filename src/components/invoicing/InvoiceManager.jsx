@@ -525,9 +525,19 @@ export default function InvoiceManager({ invoices, clients, settings }) {
   };
 
   const handleSubmit = async () => {
-    if (!formData.invoice_number || !formData.invoice_date || !formData.due_date) {
-      toast.error('Please fill in all required fields');
+    if (!formData.invoice_number) {
+      toast.error('Please enter an invoice number');
       return;
+    }
+
+    // Auto-calculate due_date from payment terms if not set
+    if (!formData.due_date && formData.payment_terms !== 'custom') {
+      const days = parseInt(formData.payment_terms) || 30;
+      const from = formData.invoice_date ? new Date(formData.invoice_date) : new Date();
+      formData.due_date = new Date(from.getTime() + days * 86400000).toISOString().split('T')[0];
+    }
+    if (!formData.invoice_date) {
+      formData.invoice_date = new Date().toISOString().split('T')[0];
     }
 
     if (useManualEntry && !formData.manual_name) {
@@ -1075,7 +1085,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-900 mb-2">Invoice Period From *</label>
+                <label className="block text-sm font-medium text-slate-900 mb-2">Invoice Date</label>
                 <Input
                   type="date"
                   value={formData.invoice_date}
@@ -1092,7 +1102,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-900 mb-2">Invoice Period To *</label>
+                <label className="block text-sm font-medium text-slate-900 mb-2">Due Date</label>
                 <Input
                   type="date"
                   value={formData.due_date}
