@@ -559,7 +559,15 @@ export default function InvoiceManager({ invoices, clients, settings }) {
         heightLeft -= pageHeight;
       }
 
-      doc.save(`${suName ? suName + ' - ' : ''}${invoice.invoice_number}.pdf`);
+      const pdfBlob = doc.output('blob');
+      const url = URL.createObjectURL(new Blob([pdfBlob], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${suName ? suName + ' - ' : ''}${invoice.invoice_number}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
       document.body.removeChild(container);
       toast.success('Invoice downloaded');
     } catch (error) {
