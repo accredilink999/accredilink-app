@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Edit2, Trash2, Download, Send, Check, MoreVertical, FileDown, ArrowRight, CheckCircle2, Eye } from 'lucide-react';
+import { Plus, Edit2, Trash2, Download, Send, Check, MoreVertical, FileDown, ArrowRight, CheckCircle2, Eye, Layers } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from 'sonner';
 import InvoiceLineItemEditor from './InvoiceLineItemEditor';
@@ -40,6 +40,8 @@ export default function InvoiceManager({ invoices, clients, settings }) {
   const [showImportAllDropdown, setShowImportAllDropdown] = useState(false);
   const [viewingInvoice, setViewingInvoice] = useState(null);
   const [downloadChoiceInvoice, setDownloadChoiceInvoice] = useState(null);
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState(new Set());
+  const [combineLoading, setCombineLoading] = useState(false);
   const queryClient = useQueryClient();
 
   // Real-time invoice updates via Supabase
@@ -576,6 +578,325 @@ export default function InvoiceManager({ invoices, clients, settings }) {
     }
   };
 
+  const handleCombineInvoices = async (selectedInvoices) => {
+    if (selectedInvoices.length < 2) return;
+    setCombineLoading(true);
+    try {
+      const s = invoicingSettings;
+      const bc = s.brand_color || '#0f766e';
+
+      // Get and increment batch number
+      let batchNum = s.next_batch_number || 1;
+      const batchPrefix = s.batch_prefix || 'BATCH-';
+      const batchRef = `${batchPrefix}${String(batchNum).padStart(4, '0')}`;
+
+      // Sort selected invoices by invoice_number
+      const sorted = [...selectedInvoices].sort((a, b) => (a.invoice_number || '').localeCompare(b.invoice_number || ''));
+
+      // Build cover sheet HTML
+      let runningTotal = 0;
+      const rowsHtml = sorted.map((inv, idx) => {
+        const suName = getServiceUserName(inv);
+        const periodText = inv.period_from
+          ? `${new Date(inv.period_from).toLocaleDateString('en-GB')}${inv.period_to ? ' — ' + new Date(inv.period_to).toLocaleDateString('en-GB') : ''}`
+          : '';
+        runningTotal += (inv.total_amount || 0);
+        return `<tr style="border-bottom:1px solid #e5e7eb;">
+          <td style="padding:8px;font-size:11px;text-align:center;">${idx + 1}</td>
+          <td style="padding:8px;font-size:11px;font-weight:600;">${inv.invoice_number}</td>
+          <td style="padding:8px;font-size:11px;">${suName || inv.client_name || ''}</td>
+          <td style="padding:8px;font-size:11px;">${periodText}</td>
+          <td style="padding:8px;font-size:11px;text-align:right;">\u00a3${(inv.total_amount || 0).toFixed(2)}</td>
+          <td style="padding:8px;font-size:11px;text-align:right;font-weight:600;">\u00a3${runningTotal.toFixed(2)}</td>
+        </tr>`;
+      }).join('');
+
+      const grandTotal = sorted.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+
+      const coverHtml = `
+        <div style="width:210mm;background:white;padding:18mm 20mm;font-family:'Segoe UI',Arial,sans-serif;color:#1f2937;box-sizing:border-box;">
+          <!-- Header -->
+          <table style="width:100%;margin-bottom:20px;">
+            <tr>
+              <td style="vertical-align:top;width:60%;">
+                ${s.logo_url ? `<img src="${s.logo_url}" alt="" style="height:55px;object-fit:contain;margin-bottom:8px;display:block;" />` : ''}
+                <div style="font-size:20px;font-weight:800;color:${bc};">${s.company_name || 'Company'}</div>
+                ${s.company_address ? `<div style="font-size:10px;color:#6b7280;">${s.company_address}</div>` : ''}
+                ${s.company_city || s.company_postcode ? `<div style="font-size:10px;color:#6b7280;">${s.company_city || ''}${s.company_city && s.company_postcode ? ', ' : ''}${s.company_postcode || ''}</div>` : ''}
+                ${s.company_phone ? `<div style="font-size:10px;color:#6b7280;">Tel: ${s.company_phone}</div>` : ''}
+                ${s.company_email ? `<div style="font-size:10px;color:#6b7280;">${s.company_email}</div>` : ''}
+              </td>
+              <td style="vertical-align:top;text-align:right;">
+                <div style="font-size:28px;font-weight:900;color:${bc};letter-spacing:2px;margin-bottom:6px;">COMPOSITE<br/>INVOICE</div>
+                <table style="margin-left:auto;font-size:11px;">
+                  <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Reference:</td><td style="padding:3px 0;font-weight:700;font-size:13px;">${batchRef}</td></tr>
+                  <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Date:</td><td style="padding:3px 0;">${new Date().toLocaleDateString('en-GB')}</td></tr>
+                  <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Invoices:</td><td style="padding:3px 0;">${sorted.length}</td></tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+
+          <div style="height:2px;background:${bc};margin:15px 0 20px;"></div>
+
+          <!-- Bill To -->
+          ${sorted[0].client_name ? `
+            <div style="margin-bottom:20px;">
+              <div style="font-size:9px;font-weight:700;color:${bc};text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Bill To</div>
+              <div style="font-size:14px;font-weight:700;">${sorted[0].client_name}</div>
+            </div>
+          ` : ''}
+
+          <!-- Summary Table -->
+          <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+            <thead>
+              <tr style="background:${bc};">
+                <th style="padding:8px;text-align:center;font-size:10px;font-weight:700;color:white;text-transform:uppercase;width:35px;">#</th>
+                <th style="padding:8px;text-align:left;font-size:10px;font-weight:700;color:white;text-transform:uppercase;">Invoice No</th>
+                <th style="padding:8px;text-align:left;font-size:10px;font-weight:700;color:white;text-transform:uppercase;">Service User</th>
+                <th style="padding:8px;text-align:left;font-size:10px;font-weight:700;color:white;text-transform:uppercase;">Period</th>
+                <th style="padding:8px;text-align:right;font-size:10px;font-weight:700;color:white;text-transform:uppercase;width:80px;">Amount</th>
+                <th style="padding:8px;text-align:right;font-size:10px;font-weight:700;color:white;text-transform:uppercase;width:90px;">Running Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+
+          <!-- Grand Total -->
+          <table style="width:100%;">
+            <tr>
+              <td style="width:60%;"></td>
+              <td style="width:40%;">
+                <table style="width:100%;font-size:12px;">
+                  <tr>
+                    <td colspan="2" style="padding:0;"><div style="height:2px;background:${bc};margin:6px 0;"></div></td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0;font-size:18px;font-weight:800;color:${bc};">GRAND TOTAL</td>
+                    <td style="padding:8px 0;text-align:right;font-size:18px;font-weight:800;color:${bc};">\u00a3${grandTotal.toFixed(2)}</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+
+          <!-- Banking Details -->
+          ${s.bank_account_name || s.bank_sort_code || s.bank_account_number ? `
+            <div style="margin-top:25px;padding:15px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;">
+              <h3 style="margin:0 0 10px;font-size:11px;font-weight:bold;color:${bc};text-transform:uppercase;letter-spacing:0.05em;">Payment Details</h3>
+              <table style="font-size:11px;color:#374151;">
+                ${s.bank_account_name ? `<tr><td style="padding:2px 15px 2px 0;color:#6b7280;font-weight:600;">Account Name:</td><td>${s.bank_account_name}</td></tr>` : ''}
+                ${s.bank_sort_code ? `<tr><td style="padding:2px 15px 2px 0;color:#6b7280;font-weight:600;">Sort Code:</td><td>${s.bank_sort_code}</td></tr>` : ''}
+                ${s.bank_account_number ? `<tr><td style="padding:2px 15px 2px 0;color:#6b7280;font-weight:600;">Account Number:</td><td>${s.bank_account_number}</td></tr>` : ''}
+              </table>
+            </div>
+          ` : ''}
+
+          <!-- Footer -->
+          <div style="margin-top:30px;padding-top:12px;border-top:2px solid ${bc};text-align:center;">
+            <p style="margin:0;font-size:9px;color:#6b7280;">
+              ${s.company_name || ''} ${s.company_address ? ' | ' + s.company_address : ''}${s.company_city ? ', ' + s.company_city : ''}${s.company_postcode ? ' ' + s.company_postcode : ''}
+            </p>
+            <p style="margin:6px 0 0;font-size:8px;color:#9ca3af;">This document contains ${sorted.length} individual invoices attached below</p>
+          </div>
+        </div>
+      `;
+
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+
+      // Helper: render HTML to PDF pages
+      const renderHtmlToPages = async (html, isFirstSection) => {
+        const container = document.createElement('div');
+        container.style.cssText = 'position:absolute;left:-9999px;top:0;width:210mm;background:white;';
+        document.body.appendChild(container);
+        container.innerHTML = html;
+
+        const images = container.querySelectorAll('img');
+        if (images.length > 0) {
+          await Promise.all([...images].map(img =>
+            img.complete ? Promise.resolve() : new Promise(res => { img.onload = res; img.onerror = res; })
+          ));
+        }
+
+        const canvas = await html2canvas(container, {
+          scale: 1,
+          useCORS: true,
+          allowTaint: true,
+          logging: false,
+          backgroundColor: '#ffffff',
+          width: container.scrollWidth,
+          height: container.scrollHeight,
+        });
+
+        const ratio = pageWidth / canvas.width;
+        const pageCanvasHeight = Math.floor(pageHeight / ratio);
+        const totalPages = Math.ceil(canvas.height / pageCanvasHeight);
+
+        for (let i = 0; i < totalPages; i++) {
+          if (!isFirstSection || i > 0) doc.addPage();
+          const sliceHeight = Math.min(pageCanvasHeight, canvas.height - i * pageCanvasHeight);
+          const pageCanvas = document.createElement('canvas');
+          pageCanvas.width = canvas.width;
+          pageCanvas.height = sliceHeight;
+          const ctx = pageCanvas.getContext('2d');
+          ctx.drawImage(canvas, 0, -i * pageCanvasHeight);
+          const pageImg = pageCanvas.toDataURL('image/jpeg', 0.75);
+          doc.addImage(pageImg, 'JPEG', 0, 0, pageWidth, sliceHeight * ratio);
+        }
+
+        document.body.removeChild(container);
+      };
+
+      // 1. Render cover sheet
+      await renderHtmlToPages(coverHtml, true);
+
+      // 2. Render each individual invoice
+      for (const inv of sorted) {
+        const serviceUser = inv.service_user_id ? serviceUsers.find(u => u.id === inv.service_user_id) : null;
+        const suName = getServiceUserName(inv);
+        const client = inv.client_id ? clients.find(c => c.id === inv.client_id) : null;
+
+        let itemsHtml = '';
+        if (inv.repeating_days && inv.repeating_days.length > 0 && inv.day_items) {
+          const dayItemsParsed = typeof inv.day_items === 'string' ? JSON.parse(inv.day_items || '{}') : inv.day_items;
+          const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+          itemsHtml = inv.repeating_days.sort((a,b)=>a-b).map(dayIdx => {
+            const items = dayItemsParsed[dayIdx] || [];
+            const dayTotal = items.reduce((sum,it) => sum + ((it.quantity||0)*(it.unit_price||0)*(it.double_handed?2:1)), 0);
+            return `
+              <tr><td colspan="5" style="padding:10px 8px 4px;font-weight:bold;font-size:12px;color:${bc};border-bottom:2px solid ${bc};">${dayNames[dayIdx]}</td></tr>
+              ${items.map(it => {
+                const amt = (it.quantity||0)*(it.unit_price||0)*(it.double_handed?2:1);
+                return `<tr style="border-bottom:1px solid #e5e7eb;">
+                  <td style="padding:6px 8px;font-size:11px;">${it.service_user_name ? '<span style="color:#7c3aed;font-weight:600;">'+it.service_user_name+'</span> — ' : ''}${it.description||''}</td>
+                  <td style="padding:6px 8px;text-align:center;font-size:11px;">${it.quantity||0}h</td>
+                  <td style="padding:6px 8px;text-align:right;font-size:11px;">\u00a3${(it.unit_price||0).toFixed(2)}</td>
+                  <td style="padding:6px 8px;text-align:center;font-size:11px;">${it.double_handed?'x2':''}</td>
+                  <td style="padding:6px 8px;text-align:right;font-size:11px;font-weight:600;">\u00a3${amt.toFixed(2)}</td>
+                </tr>`;
+              }).join('')}
+              <tr><td colspan="4" style="padding:4px 8px;text-align:right;font-size:11px;color:#6b7280;">${dayNames[dayIdx]} subtotal:</td>
+              <td style="padding:4px 8px;text-align:right;font-size:11px;font-weight:700;border-bottom:1px solid #d1d5db;">\u00a3${dayTotal.toFixed(2)}</td></tr>
+            `;
+          }).join('');
+        } else {
+          const lineItemsParsed = typeof inv.line_items === 'string' ? JSON.parse(inv.line_items || '[]') : (inv.line_items || []);
+          itemsHtml = lineItemsParsed.map(it => {
+            const amt = (it.quantity||0)*(it.unit_price||0);
+            return `<tr style="border-bottom:1px solid #e5e7eb;">
+              <td style="padding:8px;font-size:11px;">${it.description||''}</td>
+              <td style="padding:8px;text-align:center;font-size:11px;">${it.quantity||0}</td>
+              <td style="padding:8px;text-align:right;font-size:11px;">\u00a3${(it.unit_price||0).toFixed(2)}</td>
+              <td style="padding:8px;text-align:center;font-size:11px;"></td>
+              <td style="padding:8px;text-align:right;font-size:11px;font-weight:600;">\u00a3${amt.toFixed(2)}</td>
+            </tr>`;
+          }).join('');
+        }
+
+        const invoiceHtml = `
+          <div style="width:210mm;background:white;padding:18mm 20mm;font-family:'Segoe UI',Arial,sans-serif;color:#1f2937;box-sizing:border-box;">
+            <table style="width:100%;margin-bottom:0;">
+              <tr>
+                <td style="vertical-align:top;width:60%;">
+                  ${s.logo_url ? `<img src="${s.logo_url}" alt="" style="height:55px;object-fit:contain;margin-bottom:8px;display:block;" />` : ''}
+                  <div style="font-size:20px;font-weight:800;color:${bc};">${s.company_name || 'Company'}</div>
+                  ${s.company_address ? `<div style="font-size:10px;color:#6b7280;">${s.company_address}</div>` : ''}
+                  ${s.company_city || s.company_postcode ? `<div style="font-size:10px;color:#6b7280;">${s.company_city || ''}${s.company_city && s.company_postcode ? ', ' : ''}${s.company_postcode || ''}</div>` : ''}
+                </td>
+                <td style="vertical-align:top;text-align:right;">
+                  <div style="font-size:36px;font-weight:900;color:${bc};letter-spacing:2px;margin-bottom:4px;">INVOICE</div>
+                  ${suName ? `<div style="font-size:14px;font-weight:700;color:#374151;margin-bottom:10px;">${suName}</div>` : ''}
+                  <table style="margin-left:auto;font-size:11px;">
+                    <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Invoice No:</td><td style="padding:3px 0;font-weight:700;">${inv.invoice_number}</td></tr>
+                    <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Batch Ref:</td><td style="padding:3px 0;color:${bc};font-weight:700;">${batchRef}</td></tr>
+                    ${inv.period_from ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Period:</td><td style="padding:3px 0;">${new Date(inv.period_from).toLocaleDateString('en-GB')} — ${inv.period_to ? new Date(inv.period_to).toLocaleDateString('en-GB') : ''}</td></tr>` : ''}
+                    <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Date:</td><td style="padding:3px 0;">${new Date(inv.invoice_date).toLocaleDateString('en-GB')}</td></tr>
+                    <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Due Date:</td><td style="padding:3px 0;">${new Date(inv.due_date).toLocaleDateString('en-GB')}</td></tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+            <div style="height:2px;background:${bc};margin:15px 0 20px;"></div>
+            <table style="width:100%;margin-bottom:20px;">
+              <tr>
+                <td style="vertical-align:top;width:50%;padding-right:20px;">
+                  <div style="font-size:9px;font-weight:700;color:${bc};text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Bill To</div>
+                  <div style="font-size:14px;font-weight:700;margin-bottom:3px;">${inv.client_name || ''}</div>
+                  ${client?.billing_address ? `<div style="font-size:11px;color:#4b5563;">${client.billing_address}</div>` : ''}
+                </td>
+                ${serviceUser ? `
+                  <td style="vertical-align:top;width:50%;">
+                    <div style="font-size:9px;font-weight:700;color:${bc};text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Service User</div>
+                    <div style="font-size:14px;font-weight:700;margin-bottom:3px;">${serviceUser.full_name}</div>
+                    ${serviceUser.address ? `<div style="font-size:11px;color:#4b5563;">${serviceUser.address}</div>` : ''}
+                  </td>
+                ` : '<td></td>'}
+              </tr>
+            </table>
+            <table style="width:100%;border-collapse:collapse;margin-bottom:5px;">
+              <thead>
+                <tr style="background:${bc};">
+                  <th style="padding:8px;text-align:left;font-size:10px;font-weight:700;color:white;text-transform:uppercase;">Description</th>
+                  <th style="padding:8px;text-align:center;font-size:10px;font-weight:700;color:white;text-transform:uppercase;width:55px;">Hours</th>
+                  <th style="padding:8px;text-align:right;font-size:10px;font-weight:700;color:white;text-transform:uppercase;width:65px;">Rate</th>
+                  <th style="padding:8px;text-align:center;font-size:10px;font-weight:700;color:white;text-transform:uppercase;width:35px;">DH</th>
+                  <th style="padding:8px;text-align:right;font-size:10px;font-weight:700;color:white;text-transform:uppercase;width:70px;">Amount</th>
+                </tr>
+              </thead>
+              <tbody>${itemsHtml}</tbody>
+            </table>
+            <table style="width:100%;margin-top:15px;">
+              <tr>
+                <td style="vertical-align:top;width:55%;">
+                  ${inv.notes ? `<div style="padding:12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;"><div style="font-size:9px;font-weight:700;color:${bc};text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">Notes</div><p style="margin:0;font-size:10px;color:#4b5563;white-space:pre-wrap;">${inv.notes}</p></div>` : ''}
+                </td>
+                <td style="vertical-align:top;width:45%;padding-left:20px;">
+                  <table style="width:100%;font-size:12px;">
+                    <tr><td style="padding:6px 0;color:#6b7280;">Subtotal:</td><td style="padding:6px 0;text-align:right;font-weight:600;">\u00a3${(inv.total_amount || 0).toFixed(2)}</td></tr>
+                    <tr><td colspan="2" style="padding:0;"><div style="height:2px;background:${bc};margin:6px 0;"></div></td></tr>
+                    <tr><td style="padding:8px 0;font-size:16px;font-weight:800;color:${bc};">TOTAL DUE</td><td style="padding:8px 0;text-align:right;font-size:16px;font-weight:800;color:${bc};">\u00a3${(inv.total_amount || 0).toFixed(2)}</td></tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </div>
+        `;
+
+        await renderHtmlToPages(invoiceHtml, false);
+      }
+
+      // Save combined PDF
+      const pdfBlob = doc.output('blob');
+      const url = URL.createObjectURL(new Blob([pdfBlob], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${batchRef}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      // Increment batch number in DB (column may not exist yet — ignore errors)
+      try {
+        await supabase.from('invoicing_settings').update({ next_batch_number: batchNum + 1 }).eq('id', s.id);
+        queryClient.invalidateQueries({ queryKey: ['invoicingSettings'] });
+      } catch (e) { console.warn('Could not update batch number:', e); }
+
+      toast.success(`Composite invoice ${batchRef} downloaded with ${sorted.length} invoices`);
+      setSelectedInvoiceIds(new Set());
+    } catch (error) {
+      toast.error('Combine failed: ' + error.message);
+      console.error('Combine error:', error);
+      alert('Combine failed: ' + error.message);
+    } finally {
+      setCombineLoading(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!formData.invoice_number) {
       toast.error('Please enter an invoice number');
@@ -747,8 +1068,23 @@ export default function InvoiceManager({ invoices, clients, settings }) {
   const renderInvoiceCard = (invoice) => {
     const suName = getServiceUserName(invoice);
     return (
-    <Card key={invoice.id} className="p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setViewingInvoice(invoice)}>
+    <Card key={invoice.id} className={`p-4 hover:shadow-md transition-shadow cursor-pointer ${selectedInvoiceIds.has(invoice.id) ? 'ring-2 ring-teal-500 bg-teal-50/30' : ''}`} onClick={() => setViewingInvoice(invoice)}>
       <div className="flex items-start justify-between">
+        <div className="shrink-0 mr-3 pt-1" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={selectedInvoiceIds.has(invoice.id)}
+            onChange={() => {
+              setSelectedInvoiceIds(prev => {
+                const next = new Set(prev);
+                if (next.has(invoice.id)) next.delete(invoice.id);
+                else next.add(invoice.id);
+                return next;
+              });
+            }}
+            className="w-4 h-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+          />
+        </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 mb-2 flex-wrap">
             <h3 className="font-semibold text-slate-900">{suName ? suName + ' — ' : ''}{invoice.invoice_number}</h3>
@@ -873,6 +1209,63 @@ export default function InvoiceManager({ invoices, clients, settings }) {
           </button>
         ))}
       </div>
+
+      {/* Selection Toolbar */}
+      {(() => {
+        const currentInvoices = sections.find(s => s.key === activeSection)?.invoices || [];
+        const selectedCount = currentInvoices.filter(i => selectedInvoiceIds.has(i.id)).length;
+        const allSelected = currentInvoices.length > 0 && currentInvoices.every(i => selectedInvoiceIds.has(i.id));
+        const selectedTotal = currentInvoices.filter(i => selectedInvoiceIds.has(i.id)).reduce((sum, i) => sum + (i.total_amount || 0), 0);
+        return (
+          <div className="flex items-center gap-3 flex-wrap">
+            <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={allSelected && currentInvoices.length > 0}
+                onChange={() => {
+                  if (allSelected) {
+                    setSelectedInvoiceIds(prev => {
+                      const next = new Set(prev);
+                      currentInvoices.forEach(i => next.delete(i.id));
+                      return next;
+                    });
+                  } else {
+                    setSelectedInvoiceIds(prev => {
+                      const next = new Set(prev);
+                      currentInvoices.forEach(i => next.add(i.id));
+                      return next;
+                    });
+                  }
+                }}
+                className="w-4 h-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+              />
+              Select All
+            </label>
+            {selectedCount > 0 && (
+              <>
+                <span className="text-sm text-slate-500">{selectedCount} selected — £{selectedTotal.toLocaleString('en-GB', { minimumFractionDigits: 2 })}</span>
+                <Button
+                  size="sm"
+                  className="bg-teal-600 hover:bg-teal-700"
+                  disabled={selectedCount < 2 || combineLoading}
+                  onClick={() => handleCombineInvoices(currentInvoices.filter(i => selectedInvoiceIds.has(i.id)))}
+                >
+                  <Layers className="w-4 h-4 mr-2" />
+                  {combineLoading ? 'Generating...' : `Combine & Download (${selectedCount})`}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setSelectedInvoiceIds(new Set())}
+                  className="text-xs"
+                >
+                  Clear
+                </Button>
+              </>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Active Section Invoice List */}
       <div className="space-y-3">
