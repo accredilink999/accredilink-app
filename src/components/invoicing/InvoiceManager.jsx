@@ -526,7 +526,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
       }
 
       const canvas = await html2canvas(container, {
-        scale: 1.5,
+        scale: 1,
         useCORS: true,
         allowTaint: true,
         logging: false,
@@ -541,23 +541,22 @@ export default function InvoiceManager({ invoices, clients, settings }) {
         format: 'a4'
       });
 
-      const imgData = canvas.toDataURL('image/jpeg', 0.85);
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * pageWidth) / canvas.width;
+      const ratio = pageWidth / canvas.width;
+      const pageCanvasHeight = Math.floor(pageHeight / ratio);
+      const totalPages = Math.ceil(canvas.height / pageCanvasHeight);
 
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      doc.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        doc.addPage();
-        doc.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+      for (let i = 0; i < totalPages; i++) {
+        if (i > 0) doc.addPage();
+        const sliceHeight = Math.min(pageCanvasHeight, canvas.height - i * pageCanvasHeight);
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = sliceHeight;
+        const ctx = pageCanvas.getContext('2d');
+        ctx.drawImage(canvas, 0, -i * pageCanvasHeight);
+        const pageImg = pageCanvas.toDataURL('image/jpeg', 0.75);
+        doc.addImage(pageImg, 'JPEG', 0, 0, pageWidth, sliceHeight * ratio);
       }
 
       const pdfBlob = doc.output('blob');
