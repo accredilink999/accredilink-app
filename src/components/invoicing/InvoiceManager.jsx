@@ -32,7 +32,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
   const [showDialog, setShowDialog] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null);
   const [search, setSearch] = useState('');
-  const [activeSection, setActiveSection] = useState('created');
+  const [activeSection, setActiveSection] = useState('draft');
   const [showRecurringDialog, setShowRecurringDialog] = useState(false);
   const [recurringInvoiceData, setRecurringInvoiceData] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -634,7 +634,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
   const recurringInvoices = searchedInvoices.filter(i => i.status === 'recurring' || i.is_recurring);
 
   const sections = [
-    { key: 'created', label: 'Created', count: createdInvoices.length, invoices: createdInvoices },
+    { key: 'draft', label: 'Draft', count: createdInvoices.length, invoices: createdInvoices },
     { key: 'sent', label: 'Sent', count: sentInvoices.length, invoices: sentInvoices },
     { key: 'paid', label: 'Paid', count: paidInvoices.length, invoices: paidInvoices },
     { key: 'recurring', label: 'Recurring', count: recurringInvoices.length, invoices: recurringInvoices },
@@ -687,9 +687,9 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                   <CheckCircle2 className="w-4 h-4 mr-2" /> Mark as Paid
                 </DropdownMenuItem>
               )}
-              {activeSection !== 'created' && (
+              {activeSection !== 'draft' && (
                 <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: invoice.id, status: 'draft', is_recurring: invoice.is_recurring })}>
-                  <ArrowRight className="w-4 h-4 mr-2" /> Move to Created
+                  <ArrowRight className="w-4 h-4 mr-2" /> Move to Draft
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem onClick={() => handleOpenDialog(invoice)}>
@@ -734,7 +734,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
             onClick={() => setActiveSection(sec.key)}
             className={`flex-1 py-2.5 px-3 rounded-md text-sm font-medium transition-all ${
               activeSection === sec.key
-                ? sec.key === 'created' ? 'bg-white shadow text-amber-700'
+                ? sec.key === 'draft' ? 'bg-white shadow text-amber-700'
                 : sec.key === 'sent' ? 'bg-white shadow text-purple-700'
                 : sec.key === 'recurring' ? 'bg-white shadow text-indigo-700'
                 : 'bg-white shadow text-green-700'
@@ -744,7 +744,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
             {sec.label}
             <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${
               activeSection === sec.key
-                ? sec.key === 'created' ? 'bg-amber-100 text-amber-700'
+                ? sec.key === 'draft' ? 'bg-amber-100 text-amber-700'
                 : sec.key === 'sent' ? 'bg-purple-100 text-purple-700'
                 : sec.key === 'recurring' ? 'bg-indigo-100 text-indigo-700'
                 : 'bg-green-100 text-green-700'
