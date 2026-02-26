@@ -713,7 +713,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 mb-2 flex-wrap">
-            <h3 className="font-semibold text-slate-900">{invoice.invoice_number}</h3>
+            <h3 className="font-semibold text-slate-900">{invoice.client_name} — {invoice.invoice_number}</h3>
             <span className={`text-xs font-medium px-2 py-1 rounded ${
               invoice.status === 'paid' ? 'bg-green-100 text-green-800' :
               invoice.status === 'overdue' ? 'bg-red-100 text-red-800' :
@@ -723,7 +723,6 @@ export default function InvoiceManager({ invoices, clients, settings }) {
               {(invoice.status || 'draft').replace('_', ' ').toUpperCase()}
             </span>
           </div>
-          <p className="text-sm text-slate-600 mb-1">{invoice.client_name}</p>
           <div className="flex gap-4 text-xs text-slate-500 flex-wrap">
             <span>Issued: {new Date(invoice.invoice_date).toLocaleDateString('en-GB')}</span>
             <span>Due: {new Date(invoice.due_date).toLocaleDateString('en-GB')}</span>
