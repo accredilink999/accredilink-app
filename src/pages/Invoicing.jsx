@@ -78,12 +78,16 @@ export default function Invoicing() {
     .reduce((sum, i) => sum + (i.total_amount || 0), 0);
 
   const outstandingAmount = invoices
-    .filter(i => ['sent', 'viewed', 'partial', 'overdue'].includes(i.status))
-    .reduce((sum, i) => sum + (i.amount_due || 0), 0);
+    .filter(i => !i.status || ['draft', 'live', 'sent', 'viewed', 'partial', 'overdue'].includes(i.status))
+    .reduce((sum, i) => sum + (i.amount_due || i.total_amount || 0), 0);
 
-  const overduAmount = invoices
-    .filter(i => i.status === 'overdue')
-    .reduce((sum, i) => sum + (i.amount_due || 0), 0);
+  const overdueInvoices = invoices.filter(i => {
+    if (i.status === 'overdue') return true;
+    if (i.status === 'paid') return false;
+    if (i.due_date && new Date(i.due_date) < new Date()) return true;
+    return false;
+  });
+  const overduAmount = overdueInvoices.reduce((sum, i) => sum + (i.amount_due || i.total_amount || 0), 0);
 
   // Show setup wizard if not completed
   if (!settingsLoading && !settings?.is_configured) {
@@ -141,7 +145,7 @@ export default function Invoicing() {
                 <p className="text-3xl font-bold text-amber-600">
                   {settings?.currency || 'GBP'} {outstandingAmount.toLocaleString('en-GB', { minimumFractionDigits: 2 })}
                 </p>
-                <p className="text-xs text-slate-500 mt-2">{invoices.filter(i => ['sent', 'viewed', 'partial'].includes(i.status)).length} invoices</p>
+                <p className="text-xs text-slate-500 mt-2">{invoices.filter(i => !i.status || ['draft', 'live', 'sent', 'viewed', 'partial', 'overdue'].includes(i.status)).length} invoices</p>
               </div>
               <Receipt className="w-8 h-8 text-amber-600 opacity-20" />
             </div>
@@ -156,7 +160,7 @@ export default function Invoicing() {
                 <p className="text-3xl font-bold text-red-600">
                   {settings?.currency || 'GBP'} {overduAmount.toLocaleString('en-GB', { minimumFractionDigits: 2 })}
                 </p>
-                <p className="text-xs text-slate-500 mt-2">{invoices.filter(i => i.status === 'overdue').length} overdue invoices</p>
+                <p className="text-xs text-slate-500 mt-2">{overdueInvoices.length} overdue invoices</p>
               </div>
               <BarChart3 className="w-8 h-8 text-red-600 opacity-20" />
             </div>
