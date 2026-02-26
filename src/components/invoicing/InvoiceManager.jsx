@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +15,18 @@ import InvoiceLineItemEditor from './InvoiceLineItemEditor';
 import InvoiceCalculations from './InvoiceCalculations';
 import DaySpecificItems from './DaySpecificItems';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+
+// Parse duration stored as minutes (45), decimal hours (0.5), or clock notation (0.45 = 45 mins)
+const parseDurationToHours = (dur) => {
+  const raw = parseFloat(dur) || 30;
+  if (raw >= 10) return Math.round((raw / 60) * 100) / 100;
+  const decMatch = String(dur || '').match(/\.(\d{2,})$/);
+  if (decMatch) {
+    const mins = parseInt(decMatch[1].slice(0, 2));
+    if (mins > 0 && mins <= 59) return Math.round((Math.floor(raw) + mins / 60) * 100) / 100;
+  }
+  return raw;
+};
 
 export default function InvoiceManager({ invoices, clients, settings }) {
   const [showDialog, setShowDialog] = useState(false);
@@ -274,181 +288,190 @@ export default function InvoiceManager({ invoices, clients, settings }) {
 
   const handleDownloadInvoice = async (invoice) => {
     try {
-      const { jsPDF } = await import('jspdf');
-      const html2canvas = await import('html2canvas').then(m => m.default);
-
+      const s = invoicingSettings; // shorthand
+      const bc = s.brand_color || '#0f766e';
       const serviceUser = invoice.service_user_id ? serviceUsers.find(u => u.id === invoice.service_user_id) : null;
+      const client = invoice.client_id ? clients.find(c => c.id === invoice.client_id) : null;
+
+      // Build line items HTML
+      let itemsHtml = '';
+      if (invoice.repeating_days && invoice.repeating_days.length > 0 && invoice.day_items) {
+        const dayItemsParsed = typeof invoice.day_items === 'string' ? JSON.parse(invoice.day_items || '{}') : invoice.day_items;
+        const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+        let daySubtotals = [];
+        itemsHtml = invoice.repeating_days.sort((a,b)=>a-b).map(dayIdx => {
+          const items = dayItemsParsed[dayIdx] || [];
+          const dayTotal = items.reduce((sum,it) => sum + ((it.quantity||0)*(it.unit_price||0)*(it.double_handed?2:1)), 0);
+          daySubtotals.push(dayTotal);
+          return `
+            <tr><td colspan="5" style="padding:10px 8px 4px;font-weight:bold;font-size:12px;color:${bc};border-bottom:2px solid ${bc};">${dayNames[dayIdx]}</td></tr>
+            ${items.map(it => {
+              const amt = (it.quantity||0)*(it.unit_price||0)*(it.double_handed?2:1);
+              return `<tr style="border-bottom:1px solid #e5e7eb;">
+                <td style="padding:6px 8px;font-size:11px;">${it.service_user_name ? '<span style="color:#7c3aed;font-weight:600;">'+it.service_user_name+'</span> — ' : ''}${it.description||''}</td>
+                <td style="padding:6px 8px;text-align:center;font-size:11px;">${it.quantity||0}h</td>
+                <td style="padding:6px 8px;text-align:right;font-size:11px;">\u00a3${(it.unit_price||0).toFixed(2)}</td>
+                <td style="padding:6px 8px;text-align:center;font-size:11px;">${it.double_handed?'x2':''}</td>
+                <td style="padding:6px 8px;text-align:right;font-size:11px;font-weight:600;">\u00a3${amt.toFixed(2)}</td>
+              </tr>`;
+            }).join('')}
+            <tr><td colspan="4" style="padding:4px 8px;text-align:right;font-size:11px;color:#6b7280;">${dayNames[dayIdx]} subtotal:</td>
+            <td style="padding:4px 8px;text-align:right;font-size:11px;font-weight:700;border-bottom:1px solid #d1d5db;">\u00a3${dayTotal.toFixed(2)}</td></tr>
+          `;
+        }).join('');
+      } else {
+        const lineItemsParsed = typeof invoice.line_items === 'string' ? JSON.parse(invoice.line_items || '[]') : (invoice.line_items || []);
+        itemsHtml = lineItemsParsed.map(it => {
+          const amt = (it.quantity||0)*(it.unit_price||0);
+          return `<tr style="border-bottom:1px solid #e5e7eb;">
+            <td style="padding:8px;font-size:11px;">${it.description||''}</td>
+            <td style="padding:8px;text-align:center;font-size:11px;">${it.quantity||0}</td>
+            <td style="padding:8px;text-align:right;font-size:11px;">\u00a3${(it.unit_price||0).toFixed(2)}</td>
+            <td style="padding:8px;text-align:center;font-size:11px;"></td>
+            <td style="padding:8px;text-align:right;font-size:11px;font-weight:600;">\u00a3${amt.toFixed(2)}</td>
+          </tr>`;
+        }).join('');
+      }
+
+      // Build banking details section
+      const hasBanking = s.bank_account_name || s.bank_sort_code || s.bank_account_number;
+      const bankingHtml = hasBanking ? `
+        <div style="margin-top:25px;padding:15px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;">
+          <h3 style="margin:0 0 10px;font-size:11px;font-weight:bold;color:${bc};text-transform:uppercase;letter-spacing:0.05em;">Payment Details</h3>
+          <table style="font-size:11px;color:#374151;">
+            ${s.bank_account_name ? `<tr><td style="padding:2px 15px 2px 0;color:#6b7280;font-weight:600;">Account Name:</td><td style="padding:2px 0;">${s.bank_account_name}</td></tr>` : ''}
+            ${s.bank_sort_code ? `<tr><td style="padding:2px 15px 2px 0;color:#6b7280;font-weight:600;">Sort Code:</td><td style="padding:2px 0;">${s.bank_sort_code}</td></tr>` : ''}
+            ${s.bank_account_number ? `<tr><td style="padding:2px 15px 2px 0;color:#6b7280;font-weight:600;">Account Number:</td><td style="padding:2px 0;">${s.bank_account_number}</td></tr>` : ''}
+            ${s.bank_iban ? `<tr><td style="padding:2px 15px 2px 0;color:#6b7280;font-weight:600;">IBAN:</td><td style="padding:2px 0;">${s.bank_iban}</td></tr>` : ''}
+          </table>
+          ${s.payment_terms ? `<p style="margin:8px 0 0;font-size:10px;color:#6b7280;">Payment Terms: ${s.payment_terms}</p>` : ''}
+        </div>
+      ` : '';
 
       const container = document.createElement('div');
-      container.style.position = 'absolute';
-      container.style.left = '-9999px';
-      container.style.top = '0';
-      container.style.width = '210mm';
-      container.style.backgroundColor = 'white';
+      container.style.cssText = 'position:absolute;left:-9999px;top:0;width:210mm;background:white;';
       document.body.appendChild(container);
 
       container.innerHTML = `
-        <div style="width: 210mm; background: white; padding: 20mm; font-family: Arial, sans-serif; color: #1f2937;">
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 3px solid ${invoicingSettings.brand_color || '#0f766e'};">
-            <div style="display: flex; align-items: center; gap: 15px;">
-              ${invoicingSettings.logo_url ? `<img src="${invoicingSettings.logo_url}" alt="Logo" style="height: 60px; object-fit: contain;" />` : ''}
-              <div>
-                <h1 style="margin: 0; font-size: 24px; font-weight: bold; color: ${invoicingSettings.brand_color || '#0f766e'};">
-                  ${invoicingSettings.company_name || 'Company'}
-                </h1>
-              </div>
-            </div>
-            <div style="text-align: right;">
-              <h2 style="margin: 0; font-size: 48px; font-weight: bold; color: #d1d5db;">INVOICE</h2>
-            </div>
-          </div>
+        <div style="width:210mm;background:white;padding:18mm 20mm;font-family:'Segoe UI',Arial,sans-serif;color:#1f2937;box-sizing:border-box;">
 
-          <div style="display: flex; justify-content: space-between; margin-bottom: 30px; margin-top: 15px;">
-            <div />
-            <div style="text-align: right; font-size: 13px;">
-              <div style="margin-bottom: 5px;">
-                <span style="color: #6b7280; font-weight: bold;">Invoice #: </span>
-                <span>${invoice.invoice_number}</span>
-              </div>
-              <div style="margin-bottom: 5px;">
-                <span style="color: #6b7280; font-weight: bold;">Date: </span>
-                <span>${new Date(invoice.invoice_date).toLocaleDateString()}</span>
-              </div>
-              <div>
-                <span style="color: #6b7280; font-weight: bold;">Due: </span>
-                <span>${new Date(invoice.due_date).toLocaleDateString()}</span>
-              </div>
-            </div>
-          </div>
+          <!-- HEADER -->
+          <table style="width:100%;margin-bottom:0;">
+            <tr>
+              <td style="vertical-align:top;width:60%;">
+                ${s.logo_url ? `<img src="${s.logo_url}" alt="" style="height:55px;object-fit:contain;margin-bottom:8px;display:block;" />` : ''}
+                <div style="font-size:20px;font-weight:800;color:${bc};margin-bottom:2px;">${s.company_name || 'Company'}</div>
+                ${s.company_address ? `<div style="font-size:10px;color:#6b7280;">${s.company_address}</div>` : ''}
+                ${s.company_city || s.company_postcode ? `<div style="font-size:10px;color:#6b7280;">${s.company_city || ''}${s.company_city && s.company_postcode ? ', ' : ''}${s.company_postcode || ''}</div>` : ''}
+                ${s.company_phone ? `<div style="font-size:10px;color:#6b7280;">Tel: ${s.company_phone}</div>` : ''}
+                ${s.company_email ? `<div style="font-size:10px;color:#6b7280;">${s.company_email}</div>` : ''}
+                ${s.company_website ? `<div style="font-size:10px;color:#6b7280;">${s.company_website}</div>` : ''}
+                ${s.vat_number ? `<div style="font-size:10px;color:#6b7280;margin-top:4px;">VAT: ${s.vat_number}</div>` : ''}
+              </td>
+              <td style="vertical-align:top;text-align:right;">
+                <div style="font-size:36px;font-weight:900;color:${bc};letter-spacing:2px;margin-bottom:12px;">INVOICE</div>
+                <table style="margin-left:auto;font-size:11px;">
+                  <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Invoice No:</td><td style="padding:3px 0;font-weight:700;">${invoice.invoice_number}</td></tr>
+                  <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Date:</td><td style="padding:3px 0;">${new Date(invoice.invoice_date).toLocaleDateString('en-GB')}</td></tr>
+                  <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Due Date:</td><td style="padding:3px 0;">${new Date(invoice.due_date).toLocaleDateString('en-GB')}</td></tr>
+                  <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Status:</td><td style="padding:3px 0;text-transform:uppercase;font-weight:600;color:${invoice.status==='paid'?'#16a34a':invoice.status==='overdue'?'#dc2626':bc};">${invoice.status || 'Draft'}</td></tr>
+                </table>
+              </td>
+            </tr>
+          </table>
 
-          <div style="margin-bottom: 25px;">
-            <h3 style="margin: 0 0 10px 0; font-size: 14px; font-weight: bold; color: ${invoicingSettings.brand_color || '#0f766e'}; text-transform: uppercase; letter-spacing: 0.05em;">
-              Bill To
-            </h3>
-            <h2 style="margin: 0 0 5px 0; font-size: 16px; font-weight: bold;">
-              ${invoice.client_name}
-            </h2>
-            ${invoice.client_email ? `<p style="margin: 0; font-size: 12px; color: #6b7280;">Email: ${invoice.client_email}</p>` : ''}
-          </div>
+          <div style="height:2px;background:${bc};margin:15px 0 20px;"></div>
 
-          ${invoice.service_user_id && serviceUser ? `
-            <div style="margin-bottom: 25px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
-              <h3 style="margin: 0 0 10px 0; font-size: 14px; font-weight: bold; color: ${invoicingSettings.brand_color || '#0f766e'}; text-transform: uppercase; letter-spacing: 0.05em;">
-                Service User
-              </h3>
-              <h2 style="margin: 0 0 5px 0; font-size: 16px; font-weight: bold;">
-                ${serviceUser.full_name}
-              </h2>
-              <p style="margin: 0; font-size: 12px; color: #6b7280;">
-                ${serviceUser.address}
-              </p>
-              ${serviceUser.postcode ? `<p style="margin: 0; font-size: 12px; color: #6b7280;">${serviceUser.postcode}</p>` : ''}
-            </div>
-          ` : ''}
+          <!-- BILL TO / SERVICE USER -->
+          <table style="width:100%;margin-bottom:20px;">
+            <tr>
+              <td style="vertical-align:top;width:50%;padding-right:20px;">
+                <div style="font-size:9px;font-weight:700;color:${bc};text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Bill To</div>
+                <div style="font-size:14px;font-weight:700;margin-bottom:3px;">${invoice.client_name || ''}</div>
+                ${client?.billing_address ? `<div style="font-size:11px;color:#4b5563;">${client.billing_address}</div>` : ''}
+                ${client?.billing_city || client?.billing_postcode ? `<div style="font-size:11px;color:#4b5563;">${client.billing_city || ''}${client.billing_city && client.billing_postcode ? ', ' : ''}${client.billing_postcode || ''}</div>` : ''}
+                ${client?.client_phone ? `<div style="font-size:11px;color:#4b5563;">Tel: ${client.client_phone}</div>` : ''}
+                ${invoice.client_email ? `<div style="font-size:11px;color:#4b5563;">${invoice.client_email}</div>` : ''}
+              </td>
+              ${serviceUser ? `
+                <td style="vertical-align:top;width:50%;">
+                  <div style="font-size:9px;font-weight:700;color:${bc};text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Service User</div>
+                  <div style="font-size:14px;font-weight:700;margin-bottom:3px;">${serviceUser.full_name}</div>
+                  ${serviceUser.address ? `<div style="font-size:11px;color:#4b5563;">${serviceUser.address}</div>` : ''}
+                  ${serviceUser.postcode ? `<div style="font-size:11px;color:#4b5563;">${serviceUser.postcode}</div>` : ''}
+                </td>
+              ` : '<td></td>'}
+            </tr>
+          </table>
 
-          <div style="margin-bottom: 25px; margin-top: 30px;">
-            ${invoice.repeating_days && invoice.repeating_days.length > 0 && invoice.day_items ?
-              (() => {
-                const dayItemsParsed = typeof invoice.day_items === 'string' ? JSON.parse(invoice.day_items || '{}') : invoice.day_items;
-                const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                return invoice.repeating_days.map(dayIdx => `
-                  <div style="margin-bottom: 20px;">
-                    <div style="background-color: ${invoicingSettings.brand_color || '#0f766e'}; color: white; padding: 8px 12px; margin-bottom: 10px; font-size: 13px; font-weight: bold;">
-                      ${dayNames[dayIdx]}
-                    </div>
-                    <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
-                      ${(dayItemsParsed[dayIdx] || []).map((item) => `
-                        <tr style="border-bottom: 1px solid #e5e7eb;">
-                          <td style="padding: 8px; text-align: left; flex: 1;">${item.description || ''}</td>
-                          <td style="padding: 8px; text-align: center; width: 60px;">${item.quantity || 0}</td>
-                          <td style="padding: 8px; text-align: right; width: 70px;">\u00a3${(item.unit_price || 0).toFixed(2)}</td>
-                          ${item.double_handed ? '<td style="padding: 8px; text-align: center; width: 40px;">(x2)</td>' : ''}
-                          <td style="padding: 8px; text-align: right; width: 70px; font-weight: bold;">
-                            \u00a3${((item.quantity || 0) * (item.unit_price || 0) * (item.double_handed ? 2 : 1)).toFixed(2)}
-                          </td>
-                        </tr>
-                      `).join('')}
-                    </table>
+          <!-- LINE ITEMS TABLE -->
+          <table style="width:100%;border-collapse:collapse;margin-bottom:5px;">
+            <thead>
+              <tr style="background:${bc};">
+                <th style="padding:8px;text-align:left;font-size:10px;font-weight:700;color:white;text-transform:uppercase;letter-spacing:0.5px;">Description</th>
+                <th style="padding:8px;text-align:center;font-size:10px;font-weight:700;color:white;text-transform:uppercase;width:55px;">Hours</th>
+                <th style="padding:8px;text-align:right;font-size:10px;font-weight:700;color:white;text-transform:uppercase;width:65px;">Rate</th>
+                <th style="padding:8px;text-align:center;font-size:10px;font-weight:700;color:white;text-transform:uppercase;width:35px;">DH</th>
+                <th style="padding:8px;text-align:right;font-size:10px;font-weight:700;color:white;text-transform:uppercase;width:70px;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+
+          <!-- TOTALS -->
+          <table style="width:100%;margin-top:15px;">
+            <tr>
+              <td style="vertical-align:top;width:55%;">
+                ${invoice.notes ? `
+                  <div style="padding:12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;">
+                    <div style="font-size:9px;font-weight:700;color:${bc};text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">Notes</div>
+                    <p style="margin:0;font-size:10px;color:#4b5563;white-space:pre-wrap;line-height:1.5;">${invoice.notes}</p>
                   </div>
-                `).join('');
-              })()
-            :
-              (() => {
-                const lineItemsParsed = JSON.parse(invoice.line_items || '[]');
-                return `
-                  <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
-                    <thead>
-                      <tr style="background-color: ${invoicingSettings.brand_color || '#0f766e'}; color: white;">
-                        <th style="padding: 8px; text-align: left; font-weight: bold;">Description</th>
-                        <th style="padding: 8px; text-align: center; font-weight: bold; width: 60px;">Qty</th>
-                        <th style="padding: 8px; text-align: right; font-weight: bold; width: 70px;">Rate</th>
-                        <th style="padding: 8px; text-align: right; font-weight: bold; width: 70px;">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      ${lineItemsParsed.map((item) => `
-                        <tr style="border-bottom: 1px solid #e5e7eb;">
-                          <td style="padding: 8px; text-align: left;">${item.description || ''}</td>
-                          <td style="padding: 8px; text-align: center;">${item.quantity || 0}</td>
-                          <td style="padding: 8px; text-align: right;">\u00a3${(item.unit_price || 0).toFixed(2)}</td>
-                          <td style="padding: 8px; text-align: right; font-weight: bold;">
-                            \u00a3${((item.quantity || 0) * (item.unit_price || 0)).toFixed(2)}
-                          </td>
-                        </tr>
-                      `).join('')}
-                    </tbody>
-                  </table>
-                `;
-              })()
-            }
-          </div>
+                ` : ''}
+              </td>
+              <td style="vertical-align:top;width:45%;padding-left:20px;">
+                <table style="width:100%;font-size:12px;">
+                  <tr><td style="padding:6px 0;color:#6b7280;">Subtotal:</td><td style="padding:6px 0;text-align:right;font-weight:600;">\u00a3${(invoice.total_amount || 0).toFixed(2)}</td></tr>
+                  ${invoice.tax_amount > 0 ? `<tr><td style="padding:6px 0;color:#6b7280;">VAT${s.default_tax_rate ? ' ('+s.default_tax_rate+'%)' : ''}:</td><td style="padding:6px 0;text-align:right;font-weight:600;">\u00a3${(invoice.tax_amount||0).toFixed(2)}</td></tr>` : ''}
+                  ${invoice.discount_amount > 0 ? `<tr><td style="padding:6px 0;color:#6b7280;">Discount:</td><td style="padding:6px 0;text-align:right;font-weight:600;color:#dc2626;">-\u00a3${(invoice.discount_amount||0).toFixed(2)}</td></tr>` : ''}
+                  <tr>
+                    <td colspan="2" style="padding:0;"><div style="height:2px;background:${bc};margin:6px 0;"></div></td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0;font-size:16px;font-weight:800;color:${bc};">TOTAL DUE</td>
+                    <td style="padding:8px 0;text-align:right;font-size:16px;font-weight:800;color:${bc};">\u00a3${(invoice.total_amount || 0).toFixed(2)}</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
 
-          <div style="display: flex; justify-content: flex-end; margin-top: 30px; gap: 80px;">
-            <div style="font-size: 12px;">
-              <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #d1d5db;">
-                <span style="margin-right: 30px;">Subtotal:</span>
-                <span style="font-weight: bold;">\u00a3${(invoice.subtotal || 0).toFixed(2)}</span>
-              </div>
-              ${invoice.tax_amount > 0 ? `
-                <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #d1d5db;">
-                  <span style="margin-right: 60px;">Tax:</span>
-                  <span style="font-weight: bold;">\u00a3${(invoice.tax_amount || 0).toFixed(2)}</span>
-                </div>
-              ` : ''}
-              ${invoice.discount_amount > 0 ? `
-                <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #d1d5db;">
-                  <span style="margin-right: 40px;">Discount:</span>
-                  <span style="font-weight: bold;">-\u00a3${(invoice.discount_amount || 0).toFixed(2)}</span>
-                </div>
-              ` : ''}
-              <div style="background-color: ${invoicingSettings.brand_color || '#0f766e'}; color: white; padding: 10px 15px; margin-top: 10px; font-size: 14px; font-weight: bold; text-align: right;">
-                TOTAL: \u00a3${(invoice.total_amount || 0).toFixed(2)}
-              </div>
-            </div>
-          </div>
+          <!-- BANKING DETAILS -->
+          ${bankingHtml}
 
-          ${invoice.notes ? `
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
-              <h3 style="margin: 0 0 10px 0; font-size: 12px; font-weight: bold; color: ${invoicingSettings.brand_color || '#0f766e'}; text-transform: uppercase;">
-                Notes
-              </h3>
-              <p style="margin: 0; font-size: 11px; color: #4b5563; white-space: pre-wrap;">
-                ${invoice.notes}
-              </p>
-            </div>
-          ` : ''}
-
-          <div style="margin-top: 40px; padding-top: 20px; border-top: 2px solid ${invoicingSettings.brand_color || '#0f766e'}; font-size: 10px; color: #6b7280; text-align: center;">
-            <p style="margin: 5px 0;">
-              ${invoicingSettings.company_name}
-              ${invoicingSettings.company_address ? ` | ${invoicingSettings.company_address}` : ''}
-              ${invoicingSettings.company_city ? `, ${invoicingSettings.company_city}` : ''}
-              ${invoicingSettings.company_postcode ? ` ${invoicingSettings.company_postcode}` : ''}
-              ${invoicingSettings.company_phone ? ` | ${invoicingSettings.company_phone}` : ''}
+          <!-- FOOTER -->
+          <div style="margin-top:30px;padding-top:12px;border-top:2px solid ${bc};text-align:center;">
+            <p style="margin:0;font-size:9px;color:#6b7280;">
+              ${s.company_name || ''}
+              ${s.company_address ? ' | ' + s.company_address : ''}${s.company_city ? ', ' + s.company_city : ''}${s.company_postcode ? ' ' + s.company_postcode : ''}
+              ${s.company_phone ? ' | Tel: ' + s.company_phone : ''}
+              ${s.company_email ? ' | ' + s.company_email : ''}
             </p>
+            ${s.vat_number ? `<p style="margin:3px 0 0;font-size:9px;color:#6b7280;">VAT Registration: ${s.vat_number}</p>` : ''}
+            <p style="margin:6px 0 0;font-size:8px;color:#9ca3af;">Thank you for your business</p>
           </div>
         </div>
       `;
+
+      // Wait for any images to load
+      const images = container.querySelectorAll('img');
+      if (images.length > 0) {
+        await Promise.all([...images].map(img =>
+          img.complete ? Promise.resolve() : new Promise(res => { img.onload = res; img.onerror = res; })
+        ));
+      }
 
       const canvas = await html2canvas(container, {
         scale: 2,
@@ -456,10 +479,11 @@ export default function InvoiceManager({ invoices, clients, settings }) {
         allowTaint: true,
         logging: false,
         backgroundColor: '#ffffff',
-        windowHeight: container.scrollHeight
+        width: container.scrollWidth,
+        height: container.scrollHeight,
       });
 
-      const doc = new jsPDF.jsPDF({
+      const doc = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
         format: 'a4'
@@ -486,9 +510,9 @@ export default function InvoiceManager({ invoices, clients, settings }) {
 
       doc.save(`${invoice.invoice_number}.pdf`);
       document.body.removeChild(container);
-      toast.success('Invoice downloaded successfully');
+      toast.success('Invoice downloaded');
     } catch (error) {
-      toast.error('Failed to download invoice: ' + error.message);
+      toast.error('Download failed: ' + error.message);
       console.error('Invoice download error:', error);
     }
   };
@@ -1057,21 +1081,13 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                         toast.error(`${su.full_name} has no scheduled calls`);
                         return;
                       }
-                      const hoursOpts = settings?.hours_options || [];
                       // Sort calls by time (earliest first)
                       const sorted = [...calls].sort((a, b) => (a.time || '').localeCompare(b.time || ''));
                       const newItems = { ...dayItems };
                       repeatingDays.forEach(dayIdx => {
                         if (!newItems[dayIdx]) newItems[dayIdx] = [];
                         sorted.forEach(call => {
-                          const durationMins = parseFloat(call.duration) || 30;
-                          const durationHours = durationMins / 60;
-                          let bestHours = durationHours;
-                          if (hoursOpts.length > 0) {
-                            bestHours = hoursOpts.reduce((prev, curr) =>
-                              Math.abs(curr - durationHours) < Math.abs(prev - durationHours) ? curr : prev
-                            );
-                          }
+                          const bestHours = parseDurationToHours(call.duration);
                           const callTime = call.time ? call.time.slice(0, 5) : '';
                           newItems[dayIdx].push({
                             id: Date.now() + Math.random(),
