@@ -56,30 +56,22 @@ const AuthenticatedApp = () => {
     return <Navigate to="/Settings" replace />;
   }
 
-  // Render the main app
+  // Determine current page from URL
+  const pageName = location.pathname.replace('/', '') || mainPageKey;
+  const currentPageName = Pages[pageName] ? pageName : null;
+
+  // Render the main app — Layout stays mounted, pages swap inside it
   return (
     <>
     <AutoPushRegistration />
     <AppUpdateChecker />
-    <Routes>
-      <Route path="/" element={
-        <LayoutWrapper currentPageName={mainPageKey}>
-          <MainPage />
-        </LayoutWrapper>
-      } />
-      {Object.entries(Pages).map(([path, Page]) => (
-        <Route
-          key={path}
-          path={`/${path}`}
-          element={
-            <LayoutWrapper currentPageName={path}>
-              <Page />
-            </LayoutWrapper>
-          }
-        />
-      ))}
-      <Route path="*" element={<PageNotFound />} />
-    </Routes>
+    {currentPageName ? (
+      <LayoutWrapper currentPageName={currentPageName}>
+        {null}
+      </LayoutWrapper>
+    ) : (
+      <PageNotFound />
+    )}
     </>
   );
 };
