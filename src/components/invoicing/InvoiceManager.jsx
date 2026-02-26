@@ -227,7 +227,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
         manual_postcode: '',
       });
     } else {
-      const nextNumber = (settings?.next_invoice_number || 1001);
+      const nextNumber = (settings?.next_invoice_number || 2000);
       setLineItems([]);
       setUseManualEntry(false);
       setEntityType('client');
