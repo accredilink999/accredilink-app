@@ -116,7 +116,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
     },
     onSuccess: async () => {
       // Increment next_invoice_number in settings
-      const currentNum = settings?.next_invoice_number || 2000;
+      const currentNum = invoicingSettings?.next_invoice_number || settings?.next_invoice_number || 2000;
       await supabase
         .from('invoicing_settings')
         .update({ next_invoice_number: currentNum + 1 })
@@ -258,8 +258,8 @@ export default function InvoiceManager({ invoices, clients, settings }) {
         period_to: invoice.period_to || '',
       });
     } else {
-      const prefix = settings?.invoice_prefix || 'INV';
-      const settingsNum = settings?.next_invoice_number || 2000;
+      const prefix = invoicingSettings?.invoice_prefix || settings?.invoice_prefix || 'INV';
+      const settingsNum = invoicingSettings?.next_invoice_number || settings?.next_invoice_number || 2000;
       // Find highest existing number to avoid duplicates
       const existingNums = invoices
         .map(i => {
