@@ -115,12 +115,19 @@ export default function InvoiceManager({ invoices, clients, settings }) {
       return result;
     },
     onSuccess: async () => {
-      // Increment next_invoice_number in settings
-      const currentNum = invoicingSettings?.next_invoice_number || settings?.next_invoice_number || 2000;
-      await supabase
+      // Fetch latest settings and increment atomically
+      const { data: latest } = await supabase
         .from('invoicing_settings')
-        .update({ next_invoice_number: currentNum + 1 })
-        .eq('id', invoicingSettings.id);
+        .select('id, next_invoice_number')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      if (latest) {
+        await supabase
+          .from('invoicing_settings')
+          .update({ next_invoice_number: (latest.next_invoice_number || 2000) + 1 })
+          .eq('id', latest.id);
+      }
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoicingSettings'] });
       queryClient.invalidateQueries({ queryKey: ['invoicing-settings'] });
