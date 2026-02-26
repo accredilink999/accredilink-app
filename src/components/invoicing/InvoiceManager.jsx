@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Edit2, Trash2, Download, Send, Check, MoreVertical, FileDown, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Download, Send, Check, MoreVertical, FileDown, ArrowRight, CheckCircle2, Eye } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from 'sonner';
 import InvoiceLineItemEditor from './InvoiceLineItemEditor';
@@ -38,6 +38,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [showImportAllDropdown, setShowImportAllDropdown] = useState(false);
+  const [viewingInvoice, setViewingInvoice] = useState(null);
   const queryClient = useQueryClient();
 
   // Real-time invoice updates via Supabase
@@ -665,7 +666,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
   ];
 
   const renderInvoiceCard = (invoice) => (
-    <Card key={invoice.id} className="p-4 hover:shadow-md transition-shadow">
+    <Card key={invoice.id} className="p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setViewingInvoice(invoice)}>
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 mb-2 flex-wrap">
@@ -690,7 +691,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
             £{(invoice.total_amount || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
           </p>
         </div>
-        <div className="flex gap-1 shrink-0">
+        <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm">
@@ -1328,6 +1329,169 @@ export default function InvoiceManager({ invoices, clients, settings }) {
               isLoading={createRecurringMutation.isPending}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* View Invoice Dialog */}
+      <Dialog open={!!viewingInvoice} onOpenChange={(open) => !open && setViewingInvoice(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          {viewingInvoice && (() => {
+            const inv = viewingInvoice;
+            const s = invoicingSettings;
+            const bc = s.brand_color || '#0f766e';
+            const client = inv.client_id ? clients.find(c => c.id === inv.client_id) : null;
+            const su = inv.service_user_id ? serviceUsers.find(u => u.id === inv.service_user_id) : null;
+            const dayItemsParsed = inv.day_items ? (typeof inv.day_items === 'string' ? JSON.parse(inv.day_items) : inv.day_items) : {};
+            const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+            const termsLabel = inv.payment_terms === '0' ? 'On Receipt' : inv.payment_terms === 'custom' ? 'Custom' : (inv.payment_terms || '30') + ' Days';
+
+            return (
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="flex justify-between items-start">
+                  <div>
+                    {s.logo_url && <img src={s.logo_url} alt="" className="h-12 mb-2" />}
+                    <h2 className="text-xl font-bold" style={{ color: bc }}>{s.company_name || 'Company'}</h2>
+                    {s.company_address && <p className="text-xs text-slate-500">{s.company_address}</p>}
+                    {(s.company_city || s.company_postcode) && <p className="text-xs text-slate-500">{s.company_city}{s.company_city && s.company_postcode ? ', ' : ''}{s.company_postcode}</p>}
+                    {s.company_phone && <p className="text-xs text-slate-500">Tel: {s.company_phone}</p>}
+                  </div>
+                  <div className="text-right">
+                    <h1 className="text-3xl font-black tracking-wide" style={{ color: bc }}>INVOICE</h1>
+                    <div className="mt-2 text-sm space-y-0.5">
+                      <p><span className="text-slate-500">No:</span> <span className="font-bold">{inv.invoice_number}</span></p>
+                      <p><span className="text-slate-500">Date:</span> {new Date(inv.invoice_date).toLocaleDateString('en-GB')}</p>
+                      <p><span className="text-slate-500">Due:</span> {new Date(inv.due_date).toLocaleDateString('en-GB')}</p>
+                      <p><span className="text-slate-500">Terms:</span> {termsLabel}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="h-0.5 w-full" style={{ backgroundColor: bc }} />
+
+                {/* Bill To / Service User */}
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: bc }}>Bill To</p>
+                    <p className="font-bold">{inv.client_name}</p>
+                    {client?.billing_address && <p className="text-sm text-slate-600">{client.billing_address}</p>}
+                    {(client?.billing_city || client?.billing_postcode) && <p className="text-sm text-slate-600">{client.billing_city}{client.billing_city && client.billing_postcode ? ', ' : ''}{client.billing_postcode}</p>}
+                    {inv.client_email && <p className="text-sm text-slate-600">{inv.client_email}</p>}
+                  </div>
+                  {su && (
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: bc }}>Service User</p>
+                      <p className="font-bold">{su.full_name}</p>
+                      {su.address && <p className="text-sm text-slate-600">{su.address}</p>}
+                      {su.postcode && <p className="text-sm text-slate-600">{su.postcode}</p>}
+                    </div>
+                  )}
+                </div>
+
+                {/* Line Items */}
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr style={{ backgroundColor: bc }} className="text-white">
+                        <th className="text-left p-2 font-semibold text-xs">Description</th>
+                        <th className="text-center p-2 font-semibold text-xs w-16">Hours</th>
+                        <th className="text-right p-2 font-semibold text-xs w-16">Rate</th>
+                        <th className="text-center p-2 font-semibold text-xs w-10">DH</th>
+                        <th className="text-right p-2 font-semibold text-xs w-20">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {inv.repeating_days && inv.repeating_days.length > 0 ? (
+                        inv.repeating_days.sort((a,b) => a-b).map(dayIdx => {
+                          const items = dayItemsParsed[dayIdx] || [];
+                          const dayTotal = items.reduce((sum, it) => sum + ((it.quantity||0)*(it.unit_price||0)*(it.double_handed?2:1)), 0);
+                          return (
+                            <React.Fragment key={dayIdx}>
+                              <tr><td colSpan={5} className="px-2 pt-3 pb-1 font-bold text-xs" style={{ color: bc, borderBottom: `2px solid ${bc}` }}>{dayNames[dayIdx]}</td></tr>
+                              {items.map((it, idx) => {
+                                const amt = (it.quantity||0)*(it.unit_price||0)*(it.double_handed?2:1);
+                                return (
+                                  <tr key={idx} className="border-b border-slate-100">
+                                    <td className="p-2 text-xs">{it.service_user_name && <span className="text-purple-600 font-semibold">{it.service_user_name}</span>}{it.service_user_name ? ' — ' : ''}{it.description || ''}</td>
+                                    <td className="p-2 text-center text-xs">{it.quantity||0}h</td>
+                                    <td className="p-2 text-right text-xs">£{(it.unit_price||0).toFixed(2)}</td>
+                                    <td className="p-2 text-center text-xs">{it.double_handed ? 'x2' : ''}</td>
+                                    <td className="p-2 text-right text-xs font-semibold">£{amt.toFixed(2)}</td>
+                                  </tr>
+                                );
+                              })}
+                              <tr><td colSpan={4} className="px-2 py-1 text-right text-xs text-slate-500">{dayNames[dayIdx]} subtotal:</td><td className="px-2 py-1 text-right text-xs font-bold border-b border-slate-200">£{dayTotal.toFixed(2)}</td></tr>
+                            </React.Fragment>
+                          );
+                        })
+                      ) : (
+                        (() => {
+                          const lineItemsParsed = typeof inv.line_items === 'string' ? JSON.parse(inv.line_items || '[]') : (inv.line_items || []);
+                          return lineItemsParsed.map((it, idx) => {
+                            const amt = (it.quantity||0)*(it.unit_price||0);
+                            return (
+                              <tr key={idx} className="border-b border-slate-100">
+                                <td className="p-2 text-xs">{it.description || ''}</td>
+                                <td className="p-2 text-center text-xs">{it.quantity||0}</td>
+                                <td className="p-2 text-right text-xs">£{(it.unit_price||0).toFixed(2)}</td>
+                                <td className="p-2 text-center text-xs"></td>
+                                <td className="p-2 text-right text-xs font-semibold">£{amt.toFixed(2)}</td>
+                              </tr>
+                            );
+                          });
+                        })()
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Totals */}
+                <div className="flex justify-end">
+                  <div className="w-64 space-y-1 text-sm">
+                    <div className="flex justify-between"><span className="text-slate-500">Subtotal:</span><span className="font-semibold">£{(inv.total_amount || 0).toFixed(2)}</span></div>
+                    {inv.tax_amount > 0 && <div className="flex justify-between"><span className="text-slate-500">VAT:</span><span className="font-semibold">£{(inv.tax_amount||0).toFixed(2)}</span></div>}
+                    {inv.discount_amount > 0 && <div className="flex justify-between"><span className="text-slate-500">Discount:</span><span className="font-semibold text-red-600">-£{(inv.discount_amount||0).toFixed(2)}</span></div>}
+                    <div className="h-0.5 w-full" style={{ backgroundColor: bc }} />
+                    <div className="flex justify-between text-lg"><span className="font-bold" style={{ color: bc }}>TOTAL DUE</span><span className="font-bold" style={{ color: bc }}>£{(inv.total_amount || 0).toFixed(2)}</span></div>
+                  </div>
+                </div>
+
+                {/* Notes */}
+                {inv.notes && (
+                  <div className="bg-slate-50 border rounded-lg p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: bc }}>Notes</p>
+                    <p className="text-xs text-slate-600 whitespace-pre-wrap">{inv.notes}</p>
+                  </div>
+                )}
+
+                {/* Banking */}
+                {(s.bank_account_name || s.bank_sort_code || s.bank_account_number) && (
+                  <div className="bg-slate-50 border rounded-lg p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: bc }}>Payment Details</p>
+                    <div className="text-xs space-y-0.5">
+                      {s.bank_account_name && <p><span className="text-slate-500 font-semibold">Account Name:</span> {s.bank_account_name}</p>}
+                      {s.bank_sort_code && <p><span className="text-slate-500 font-semibold">Sort Code:</span> {s.bank_sort_code}</p>}
+                      {s.bank_account_number && <p><span className="text-slate-500 font-semibold">Account Number:</span> {s.bank_account_number}</p>}
+                      {s.bank_iban && <p><span className="text-slate-500 font-semibold">IBAN:</span> {s.bank_iban}</p>}
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-2 border-t">
+                  <Button onClick={() => { setViewingInvoice(null); handleOpenDialog(inv); }} className="bg-teal-600 hover:bg-teal-700">
+                    <Edit2 className="w-4 h-4 mr-2" /> Edit Invoice
+                  </Button>
+                  <Button variant="outline" onClick={() => handleDownloadInvoice(inv)}>
+                    <Download className="w-4 h-4 mr-2" /> Download PDF
+                  </Button>
+                  <Button variant="outline" onClick={() => { updateStatusMutation.mutate({ id: inv.id, status: 'sent', is_recurring: inv.is_recurring }); setViewingInvoice(null); }}>
+                    <Send className="w-4 h-4 mr-2" /> Mark as Sent
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
