@@ -75,12 +75,6 @@ export default function Layout({ children, currentPageName }) {
   const navigate = useNavigate();
   const visitedPagesRef = useRef(new Set());
 
-  // Debug: detect if Layout remounts (would reset keep-alive)
-  useEffect(() => {
-    console.log('[Layout] MOUNTED — keep-alive active');
-    return () => console.log('[Layout] UNMOUNTED — keep-alive lost!');
-  }, []);
-
 
   
   const { data: user, isLoading: userLoading, error: userError } = useQuery({
