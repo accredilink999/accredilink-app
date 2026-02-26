@@ -616,7 +616,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
        total_amount: Math.max(0, totalAmount),
        amount_due: Math.max(0, totalAmount),
        payment_terms: formData.payment_terms,
-       status: 'draft',
+       status: editingInvoice ? editingInvoice.status : 'draft',
        currency: settings?.currency || 'GBP',
        repeating_days: repeatingDays.length > 0 ? repeatingDays : null,
        day_items: repeatingDays.length > 0 ? dayItems : null,
@@ -624,9 +624,14 @@ export default function InvoiceManager({ invoices, clients, settings }) {
 
     if (editingInvoice) {
       try {
+        const updateData = { ...invoiceData };
+        // Don't update invoice_number if unchanged to avoid unique constraint
+        if (updateData.invoice_number === editingInvoice.invoice_number) {
+          delete updateData.invoice_number;
+        }
         const { error } = await supabase
           .from('invoices')
-          .update(invoiceData)
+          .update(updateData)
           .eq('id', editingInvoice.id);
         if (error) throw error;
         queryClient.invalidateQueries({ queryKey: ['invoices'] });
