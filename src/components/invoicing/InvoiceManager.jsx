@@ -374,7 +374,6 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                   <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Invoice No:</td><td style="padding:3px 0;font-weight:700;">${invoice.invoice_number}</td></tr>
                   <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Date:</td><td style="padding:3px 0;">${new Date(invoice.invoice_date).toLocaleDateString('en-GB')}</td></tr>
                   <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Due Date:</td><td style="padding:3px 0;">${new Date(invoice.due_date).toLocaleDateString('en-GB')}</td></tr>
-                  <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Status:</td><td style="padding:3px 0;text-transform:uppercase;font-weight:600;color:${invoice.status==='paid'?'#16a34a':invoice.status==='overdue'?'#dc2626':bc};">${invoice.status || 'Draft'}</td></tr>
                 </table>
               </td>
             </tr>
