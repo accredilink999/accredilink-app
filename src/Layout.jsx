@@ -1,11 +1,8 @@
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from './utils';
 import { base44 } from '@/api/base44Client';
-const Dashboard = React.lazy(() => import('@/pages/Dashboard'));
-const Rota = React.lazy(() => import('@/pages/Rota'));
-const Incidents = React.lazy(() => import('@/pages/Incidents'));
-const Documents = React.lazy(() => import('@/pages/Documents'));
+import { PAGES } from './pages.config';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import AnnouncementAcknowledgementModal from '@/components/AnnouncementAcknowledgementModal';
@@ -77,6 +74,7 @@ const ROOT_PAGES = ['Dashboard'];
 
 export default function Layout({ children, currentPageName }) {
   const navigate = useNavigate();
+  const visitedPagesRef = useRef(new Set());
 
 
   
@@ -716,34 +714,21 @@ export default function Layout({ children, currentPageName }) {
                                      {/* App Update Banner */}
                                      <AppUpdateBanner />
                                      <GpsWarningBanner />
-                                     <AnimatePresence mode="wait">
-                                       <motion.div 
-                                         key={currentPageName}
-                                         className={currentPageName === 'Chat' ? 'p-0 md:p-3 lg:p-4' : 'p-2 md:p-3 lg:p-4'}
-                                         initial={{ opacity: 0, y: 10 }}
-                                         animate={{ opacity: 1, y: 0 }}
-                                         exit={{ opacity: 0, y: -10 }}
-                                         transition={{ duration: 0.2 }}
-                                       >
-                      {/* Offstage Pattern with Suspense - Keep tab pages mounted to preserve state */}
-                      <Suspense fallback={<div className="flex items-center justify-center h-96"><div className="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin"></div></div>}>
-                        <div style={{ display: currentPageName === 'Dashboard' ? 'block' : 'none' }}>
-                          {currentPageName === 'Dashboard' && <Dashboard />}
-                        </div>
-                        <div style={{ display: currentPageName === 'Rota' ? 'block' : 'none' }}>
-                          {currentPageName === 'Rota' && <Rota />}
-                        </div>
-                        <div style={{ display: currentPageName === 'Incidents' ? 'block' : 'none' }}>
-                          {currentPageName === 'Incidents' && <Incidents />}
-                        </div>
-                        <div style={{ display: currentPageName === 'Documents' ? 'block' : 'none' }}>
-                          {currentPageName === 'Documents' && <Documents />}
-                        </div>
-                      </Suspense>
-                      {/* Render other pages normally */}
-                      {!['Dashboard', 'Rota', 'Incidents', 'Documents'].includes(currentPageName) && children}
-                      </motion.div>
-                     </AnimatePresence>
+                                     {/* Keep-alive: all visited pages stay mounted, hidden with display:none */}
+                                     <div className={currentPageName === 'Chat' ? 'p-0 md:p-3 lg:p-4' : 'p-2 md:p-3 lg:p-4'}>
+                                       <Suspense fallback={<div className="flex items-center justify-center h-96"><div className="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin"></div></div>}>
+                                         {Object.entries(PAGES).map(([pageName, PageComponent]) => {
+                                           const isActive = pageName === currentPageName;
+                                           if (!isActive && !visitedPagesRef.current.has(pageName)) return null;
+                                           if (isActive) visitedPagesRef.current.add(pageName);
+                                           return (
+                                             <div key={pageName} style={{ display: isActive ? 'block' : 'none' }}>
+                                               <PageComponent />
+                                             </div>
+                                           );
+                                         })}
+                                       </Suspense>
+                                     </div>
                       </main>
 
                       {/* Bottom Navigation for Mobile */}
