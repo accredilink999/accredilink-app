@@ -39,6 +39,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [showImportAllDropdown, setShowImportAllDropdown] = useState(false);
   const [viewingInvoice, setViewingInvoice] = useState(null);
+  const [downloadChoiceInvoice, setDownloadChoiceInvoice] = useState(null);
   const queryClient = useQueryClient();
 
   // Real-time invoice updates via Supabase
@@ -338,6 +339,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
       const s = invoicingSettings; // shorthand
       const bc = s.brand_color || '#0f766e';
       const serviceUser = invoice.service_user_id ? serviceUsers.find(u => u.id === invoice.service_user_id) : null;
+      const suName = getServiceUserName(invoice);
       const client = invoice.client_id ? clients.find(c => c.id === invoice.client_id) : null;
 
       // Build line items HTML
@@ -416,7 +418,8 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                 ${s.vat_number ? `<div style="font-size:10px;color:#6b7280;margin-top:4px;">VAT: ${s.vat_number}</div>` : ''}
               </td>
               <td style="vertical-align:top;text-align:right;">
-                <div style="font-size:36px;font-weight:900;color:${bc};letter-spacing:2px;margin-bottom:12px;">INVOICE</div>
+                <div style="font-size:36px;font-weight:900;color:${bc};letter-spacing:2px;margin-bottom:4px;">INVOICE</div>
+                ${suName ? `<div style="font-size:14px;font-weight:700;color:#374151;margin-bottom:10px;">${suName}</div>` : ''}
                 <table style="margin-left:auto;font-size:11px;">
                   <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Invoice No:</td><td style="padding:3px 0;font-weight:700;">${invoice.invoice_number}</td></tr>
                   ${invoice.period_from ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Period:</td><td style="padding:3px 0;">${new Date(invoice.period_from).toLocaleDateString('en-GB')} — ${invoice.period_to ? new Date(invoice.period_to).toLocaleDateString('en-GB') : ''}</td></tr>` : ''}
@@ -556,7 +559,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
         heightLeft -= pageHeight;
       }
 
-      doc.save(`${invoice.invoice_number}.pdf`);
+      doc.save(`${suName ? suName + ' - ' : ''}${invoice.invoice_number}.pdf`);
       document.body.removeChild(container);
       toast.success('Invoice downloaded');
     } catch (error) {
@@ -708,12 +711,39 @@ export default function InvoiceManager({ invoices, clients, settings }) {
     { key: 'recurring', label: 'Recurring', count: recurringInvoices.length, invoices: recurringInvoices },
   ];
 
-  const renderInvoiceCard = (invoice) => (
+  const getServiceUserName = (invoice) => {
+    // 1. Look up from service_user_id
+    if (invoice.service_user_id) {
+      const su = serviceUsers.find(u => u.id === invoice.service_user_id);
+      if (su) return su.full_name;
+    }
+    // 2. Extract from day_items (repeating invoices)
+    if (invoice.day_items) {
+      const di = typeof invoice.day_items === 'string' ? JSON.parse(invoice.day_items || '{}') : invoice.day_items;
+      for (const items of Object.values(di)) {
+        if (Array.isArray(items)) {
+          const found = items.find(it => it.service_user_name);
+          if (found) return found.service_user_name;
+        }
+      }
+    }
+    // 3. Extract from line_items
+    if (invoice.line_items) {
+      const li = typeof invoice.line_items === 'string' ? JSON.parse(invoice.line_items || '[]') : (invoice.line_items || []);
+      const found = li.find(it => it.service_user_name);
+      if (found) return found.service_user_name;
+    }
+    return null;
+  };
+
+  const renderInvoiceCard = (invoice) => {
+    const suName = getServiceUserName(invoice);
+    return (
     <Card key={invoice.id} className="p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setViewingInvoice(invoice)}>
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 mb-2 flex-wrap">
-            <h3 className="font-semibold text-slate-900">{invoice.client_name} — {invoice.invoice_number}</h3>
+            <h3 className="font-semibold text-slate-900">{suName ? suName + ' — ' : ''}{invoice.invoice_number}</h3>
             <span className={`text-xs font-medium px-2 py-1 rounded ${
               invoice.status === 'paid' ? 'bg-green-100 text-green-800' :
               invoice.status === 'overdue' ? 'bg-red-100 text-red-800' :
@@ -744,9 +774,21 @@ export default function InvoiceManager({ invoices, clients, settings }) {
               <DropdownMenuItem onClick={() => handleDownloadInvoice(invoice)}>
                 <Download className="w-4 h-4 mr-2" /> Download PDF
               </DropdownMenuItem>
+              {activeSection !== 'sent' && activeSection !== 'paid' && (
+                <DropdownMenuItem onSelect={(e) => {
+                  e.preventDefault();
+                  const inv = invoice;
+                  setTimeout(async () => {
+                    await handleDownloadInvoice(inv);
+                    updateStatusMutation.mutate({ id: inv.id, status: 'sent', is_recurring: inv.is_recurring });
+                  }, 0);
+                }}>
+                  <Send className="w-4 h-4 mr-2" /> Download & Mark as Sent
+                </DropdownMenuItem>
+              )}
               {activeSection !== 'sent' && (
                 <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: invoice.id, status: 'sent', is_recurring: invoice.is_recurring })}>
-                  <Send className="w-4 h-4 mr-2" /> Mark as Sent
+                  <ArrowRight className="w-4 h-4 mr-2" /> Mark as Sent
                 </DropdownMenuItem>
               )}
               {activeSection !== 'paid' && (
@@ -774,6 +816,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
       </div>
     </Card>
   );
+  };
 
   return (
     <div className="space-y-4">
@@ -1402,6 +1445,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
             const bc = s.brand_color || '#0f766e';
             const client = inv.client_id ? clients.find(c => c.id === inv.client_id) : null;
             const su = inv.service_user_id ? serviceUsers.find(u => u.id === inv.service_user_id) : null;
+            const suName = getServiceUserName(inv);
             const dayItemsParsed = inv.day_items ? (typeof inv.day_items === 'string' ? JSON.parse(inv.day_items) : inv.day_items) : {};
             const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
             const termsLabel = inv.payment_terms === '0' ? 'On Receipt' : inv.payment_terms === 'custom' ? 'Custom' : (inv.payment_terms || '30') + ' Days';
@@ -1419,6 +1463,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                   </div>
                   <div className="text-right">
                     <h1 className="text-3xl font-black tracking-wide" style={{ color: bc }}>INVOICE</h1>
+                    {suName && <p className="font-bold text-sm text-slate-800 mt-1">{suName}</p>}
                     <div className="mt-2 text-sm space-y-0.5">
                       <p><span className="text-slate-500">No:</span> <span className="font-bold">{inv.invoice_number}</span></p>
                       {inv.period_from && <p><span className="text-slate-500">Period:</span> {new Date(inv.period_from).toLocaleDateString('en-GB')} — {inv.period_to ? new Date(inv.period_to).toLocaleDateString('en-GB') : ''}</p>}
@@ -1544,7 +1589,14 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                   <Button onClick={() => { setViewingInvoice(null); handleOpenDialog(inv); }} className="bg-teal-600 hover:bg-teal-700">
                     <Edit2 className="w-4 h-4 mr-2" /> Edit Invoice
                   </Button>
-                  <Button variant="outline" onClick={() => handleDownloadInvoice(inv)}>
+                  <Button variant="outline" onClick={() => {
+                    if (inv.status === 'sent' || inv.status === 'paid') {
+                      handleDownloadInvoice(inv);
+                    } else {
+                      setViewingInvoice(null);
+                      setDownloadChoiceInvoice(inv);
+                    }
+                  }}>
                     <Download className="w-4 h-4 mr-2" /> Download PDF
                   </Button>
                   <Button variant="outline" onClick={() => { updateStatusMutation.mutate({ id: inv.id, status: 'sent', is_recurring: inv.is_recurring }); setViewingInvoice(null); }}>
@@ -1571,6 +1623,40 @@ export default function InvoiceManager({ invoices, clients, settings }) {
           }
         }}
       />
+
+      {/* Download choice popup */}
+      <Dialog open={!!downloadChoiceInvoice} onOpenChange={(open) => !open && setDownloadChoiceInvoice(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Download Invoice</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-slate-600">Would you like to mark this invoice as sent?</p>
+          <div className="flex flex-col gap-3 mt-2">
+            <Button
+              className="w-full"
+              onClick={async () => {
+                const inv = downloadChoiceInvoice;
+                setDownloadChoiceInvoice(null);
+                await handleDownloadInvoice(inv);
+                updateStatusMutation.mutate({ id: inv.id, status: 'sent', is_recurring: inv.is_recurring });
+              }}
+            >
+              <Send className="w-4 h-4 mr-2" /> Download & Mark as Sent
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={async () => {
+                const inv = downloadChoiceInvoice;
+                setDownloadChoiceInvoice(null);
+                await handleDownloadInvoice(inv);
+              }}
+            >
+              <Download className="w-4 h-4 mr-2" /> Download Only
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );
