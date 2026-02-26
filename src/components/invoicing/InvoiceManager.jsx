@@ -120,6 +120,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
       toast.success('Invoice created');
     },
     onError: (error) => {
+      alert('Create invoice error: ' + error.message);
       toast.error('Failed: ' + error.message);
     },
   });
@@ -648,6 +649,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
         handleCloseDialog();
         toast.success('Invoice updated');
       } catch (error) {
+        alert('Update invoice error: ' + error.message);
         toast.error('Failed: ' + error.message);
       }
     } else {
