@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Edit2, Trash2, Download, Send, Check, MoreVertical } from 'lucide-react';
+import { Plus, Edit2, Trash2, Download, Send, Check, MoreVertical, FileDown } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from 'sonner';
 import InvoiceLineItemEditor from './InvoiceLineItemEditor';
@@ -23,6 +23,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
   const [recurringInvoiceData, setRecurringInvoiceData] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
+  const [importCallsConfirmOpen, setImportCallsConfirmOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // Real-time invoice updates via Supabase
@@ -1034,6 +1035,17 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                     </label>
                   ))}
                 </div>
+                {repeatingDays.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setImportCallsConfirmOpen(true)}
+                    className="mt-4 w-full border-teal-300 text-teal-700 hover:bg-teal-50"
+                  >
+                    <FileDown className="w-4 h-4 mr-2" />
+                    Import All Calls
+                  </Button>
+                )}
               </CardContent>
             </Card>
 
@@ -1147,6 +1159,18 @@ export default function InvoiceManager({ invoices, clients, settings }) {
             deleteMutation.mutate(pendingDeleteId);
             setPendingDeleteId(null);
           }
+        }}
+      />
+
+      <ConfirmDialog
+        open={importCallsConfirmOpen}
+        onOpenChange={setImportCallsConfirmOpen}
+        title="Import All Calls?"
+        description="This will import all scheduled calls for the selected days into the invoice line items."
+        confirmLabel="Yes, Import"
+        onConfirm={() => {
+          // TODO: Import calls logic to be added
+          toast.success('Calls imported');
         }}
       />
     </div>

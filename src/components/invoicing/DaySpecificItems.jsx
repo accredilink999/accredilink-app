@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/api/supabaseClient';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronUp, Users } from 'lucide-react';
+import { toast } from 'sonner';
 
 const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -11,6 +14,19 @@ export default function DaySpecificItems({ repeatingDays, dayItems, onDayItemsCh
   const [expandedDays, setExpandedDays] = useState({});
   const [addingType, setAddingType] = useState({});
   const [tempValues, setTempValues] = useState({});
+
+  const { data: serviceUsers = [] } = useQuery({
+    queryKey: ['service-users-active'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('service_users')
+        .select('id, full_name, call_times, status')
+        .eq('status', 'active')
+        .order('full_name');
+      if (error) throw error;
+      return data || [];
+    },
+  });
 
   const toggleDayExpanded = (dayIdx) => {
     setExpandedDays(prev => ({
@@ -147,6 +163,9 @@ export default function DaySpecificItems({ repeatingDays, dayItems, onDayItemsCh
                   <div className="flex items-start justify-between mb-3">
                     <span className="text-xs font-medium text-slate-600 uppercase">
                       {item.type === 'client_call' ? 'Client Call' : 'Service'}
+                      {item.service_user_name && (
+                        <span className="ml-2 text-purple-600 normal-case font-semibold">- {item.service_user_name}</span>
+                      )}
                     </span>
                     <Button
                       variant="ghost"
@@ -250,15 +269,66 @@ export default function DaySpecificItems({ repeatingDays, dayItems, onDayItemsCh
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setAddingType(prev => ({ ...prev, [dayIdx]: true }))}
+                  onClick={() => setAddingType(prev => ({ ...prev, [dayIdx]: 'choose' }))}
                   className="w-full text-teal-600 border-teal-200 hover:bg-teal-50"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Add Item
                 </Button>
+              ) : addingType[dayIdx] === 'import' ? (
+                <div className="space-y-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Select Care Client</label>
+                  <Select onValueChange={(suId) => {
+                    const su = serviceUsers.find(s => s.id === suId);
+                    if (!su) return;
+                    const calls = su.call_times || [];
+                    if (calls.length === 0) {
+                      toast.error(`${su.full_name} has no scheduled calls`);
+                      return;
+                    }
+                    const newItems = { ...dayItems };
+                    if (!newItems[dayIdx]) newItems[dayIdx] = [];
+                    calls.forEach(call => {
+                      const durationMins = parseFloat(call.duration) || 30;
+                      const durationHours = durationMins / 60;
+                      newItems[dayIdx].push({
+                        id: Date.now() + Math.random(),
+                        type: 'client_call',
+                        description: call.type || 'Care Call',
+                        quantity: durationHours,
+                        unit_price: 0,
+                        double_handed: false,
+                        service_user_name: su.full_name,
+                        service_user_id: su.id,
+                      });
+                    });
+                    onDayItemsChange(newItems);
+                    setAddingType(prev => ({ ...prev, [dayIdx]: null }));
+                    toast.success(`${calls.length} call${calls.length > 1 ? 's' : ''} imported for ${su.full_name}`);
+                  }}>
+                    <SelectTrigger className="text-sm">
+                      <SelectValue placeholder="Choose a care client..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {serviceUsers.map(su => (
+                        <SelectItem key={su.id} value={su.id}>
+                          {su.full_name} ({(su.call_times || []).length} calls)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAddingType(prev => ({ ...prev, [dayIdx]: 'choose' }))}
+                    className="w-full text-xs"
+                  >
+                    Back
+                  </Button>
+                </div>
               ) : (
                 <div className="space-y-2 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <Button
                       size="sm"
                       onClick={() => addItemToDay(dayIdx, 'service')}
@@ -272,6 +342,14 @@ export default function DaySpecificItems({ repeatingDays, dayItems, onDayItemsCh
                       className="bg-green-600 hover:bg-green-700 text-xs"
                     >
                       Call
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => setAddingType(prev => ({ ...prev, [dayIdx]: 'import' }))}
+                      className="bg-purple-600 hover:bg-purple-700 text-xs"
+                    >
+                      <Users className="w-3 h-3 mr-1" />
+                      Import
                     </Button>
                   </div>
                   <Button
