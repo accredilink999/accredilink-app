@@ -40,11 +40,16 @@ export default function InvoicingSettings({ settings }) {
     bank_iban: settings?.bank_iban || '',
     call_types: settings?.call_types || ['Early Call', 'Morning Call', 'Lunch Call', 'Tea Call', 'Bed Call', 'Social Care Call'],
     hours_options: settings?.hours_options || [0.5, 1, 1.5, 2, 2.5, 3, 4],
-    hourly_rates: settings?.hourly_rates || [15, 20, 25, 30, 40],
+    rates: settings?.rates || (settings?.hourly_rates
+      ? (Array.isArray(settings.hourly_rates) && typeof settings.hourly_rates[0] === 'number'
+        ? settings.hourly_rates.map(r => ({ amount: r, unit: 'hour' }))
+        : settings.hourly_rates)
+      : [{ amount: 15, unit: 'hour' }, { amount: 20, unit: 'hour' }, { amount: 25, unit: 'hour' }]),
   });
   const [newCallType, setNewCallType] = useState('');
   const [newHours, setNewHours] = useState('');
   const [newRate, setNewRate] = useState('');
+  const [newRateUnit, setNewRateUnit] = useState('hour');
 
   const updateMutation = useMutation({
     mutationFn: async (data) => {
@@ -154,24 +159,25 @@ export default function InvoicingSettings({ settings }) {
   const handleAddRate = () => {
     const rateValue = parseFloat(newRate);
     if (!newRate || isNaN(rateValue)) {
-      toast.error('Enter a valid hourly rate');
+      toast.error('Enter a valid rate');
       return;
     }
-    if (formData.hourly_rates.includes(rateValue)) {
+    const exists = formData.rates.some(r => r.amount === rateValue && r.unit === newRateUnit);
+    if (exists) {
       toast.error('This rate already exists');
       return;
     }
     setFormData({
       ...formData,
-      hourly_rates: [...formData.hourly_rates, rateValue].sort((a, b) => a - b)
+      rates: [...formData.rates, { amount: rateValue, unit: newRateUnit }].sort((a, b) => a.amount - b.amount)
     });
     setNewRate('');
   };
 
-  const handleRemoveRate = (rate) => {
+  const handleRemoveRate = (idx) => {
     setFormData({
       ...formData,
-      hourly_rates: formData.hourly_rates.filter(r => r !== rate)
+      rates: formData.rates.filter((_, i) => i !== idx)
     });
   };
 
@@ -197,7 +203,7 @@ export default function InvoicingSettings({ settings }) {
           <TabsTrigger value="banking">Banking</TabsTrigger>
           <TabsTrigger value="call-types">Call Types</TabsTrigger>
           <TabsTrigger value="hours">Hours Options</TabsTrigger>
-          <TabsTrigger value="rates">Hourly Rates</TabsTrigger>
+          <TabsTrigger value="rates">Rates</TabsTrigger>
         </TabsList>
 
         <TabsContent value="company" className="space-y-4">
@@ -508,10 +514,10 @@ export default function InvoicingSettings({ settings }) {
         <TabsContent value="rates" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Hourly Rates</CardTitle>
+              <CardTitle>Rates</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-slate-600">Manage hourly rates available for day-specific items</p>
+              <p className="text-sm text-slate-600">Manage rates available when creating invoices</p>
 
               <div className="space-y-3">
                 <div className="flex gap-2">
@@ -520,8 +526,21 @@ export default function InvoicingSettings({ settings }) {
                     value={newRate}
                     onChange={(e) => setNewRate(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleAddRate()}
-                    placeholder="e.g., 15, 20, 25"
+                    placeholder="e.g., 15, 250, 0.45"
+                    className="flex-1"
                   />
+                  <Select value={newRateUnit} onValueChange={setNewRateUnit}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="hour">Per Hour</SelectItem>
+                      <SelectItem value="day">Per Day</SelectItem>
+                      <SelectItem value="week">Per Week</SelectItem>
+                      <SelectItem value="month">Per Month</SelectItem>
+                      <SelectItem value="mile">Per Mile</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <Button
                     type="button"
                     onClick={handleAddRate}
@@ -532,14 +551,16 @@ export default function InvoicingSettings({ settings }) {
                 </div>
 
                 <div className="space-y-2 mt-4">
-                  {formData.hourly_rates.map((rate, idx) => (
+                  {formData.rates.map((rate, idx) => (
                     <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded border border-slate-200">
-                      <span className="text-slate-900 font-medium">£{rate}/hour</span>
+                      <span className="text-slate-900 font-medium">
+                        £{rate.amount}/{rate.unit}
+                      </span>
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleRemoveRate(rate)}
+                        onClick={() => handleRemoveRate(idx)}
                         className="text-red-600 hover:text-red-700 hover:bg-red-50"
                       >
                         <Trash2 className="w-4 h-4" />
