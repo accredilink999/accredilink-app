@@ -188,7 +188,8 @@ export default function InvoiceManager({ invoices, clients, settings }) {
   const handleOpenDialog = (invoice = null) => {
     if (invoice) {
       setEditingInvoice(invoice);
-      const items = JSON.parse(invoice.line_items || '[]').map((item, idx) => ({
+      const rawItems = typeof invoice.line_items === 'string' ? JSON.parse(invoice.line_items || '[]') : (invoice.line_items || []);
+      const items = rawItems.map((item, idx) => ({
         ...item,
         id: item.id || idx
       }));
