@@ -296,14 +296,24 @@ export default function DaySpecificItems({ repeatingDays, dayItems, onDayItemsCh
                     }
                     const newItems = { ...dayItems };
                     if (!newItems[dayIdx]) newItems[dayIdx] = [];
-                    calls.forEach(call => {
+                    // Sort calls by time (earliest first)
+                    const sorted = [...calls].sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+                    sorted.forEach(call => {
                       const durationMins = parseFloat(call.duration) || 30;
                       const durationHours = durationMins / 60;
+                      // Snap to nearest hours_option if available
+                      let bestHours = durationHours;
+                      if (hoursOptions.length > 0) {
+                        bestHours = hoursOptions.reduce((prev, curr) =>
+                          Math.abs(curr - durationHours) < Math.abs(prev - durationHours) ? curr : prev
+                        );
+                      }
+                      const callTime = call.time ? call.time.slice(0, 5) : '';
                       newItems[dayIdx].push({
                         id: Date.now() + Math.random(),
                         type: 'client_call',
-                        description: call.type || 'Care Call',
-                        quantity: durationHours,
+                        description: `${call.type || 'Care Call'}${callTime ? ' (' + callTime + ')' : ''}`,
+                        quantity: bestHours,
                         unit_price: 0,
                         double_handed: false,
                         service_user_name: su.full_name,

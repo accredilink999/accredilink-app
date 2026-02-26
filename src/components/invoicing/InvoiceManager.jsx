@@ -1057,17 +1057,27 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                         toast.error(`${su.full_name} has no scheduled calls`);
                         return;
                       }
+                      const hoursOpts = settings?.hours_options || [];
+                      // Sort calls by time (earliest first)
+                      const sorted = [...calls].sort((a, b) => (a.time || '').localeCompare(b.time || ''));
                       const newItems = { ...dayItems };
                       repeatingDays.forEach(dayIdx => {
                         if (!newItems[dayIdx]) newItems[dayIdx] = [];
-                        calls.forEach(call => {
+                        sorted.forEach(call => {
                           const durationMins = parseFloat(call.duration) || 30;
                           const durationHours = durationMins / 60;
+                          let bestHours = durationHours;
+                          if (hoursOpts.length > 0) {
+                            bestHours = hoursOpts.reduce((prev, curr) =>
+                              Math.abs(curr - durationHours) < Math.abs(prev - durationHours) ? curr : prev
+                            );
+                          }
+                          const callTime = call.time ? call.time.slice(0, 5) : '';
                           newItems[dayIdx].push({
                             id: Date.now() + Math.random(),
                             type: 'client_call',
-                            description: call.type || 'Care Call',
-                            quantity: durationHours,
+                            description: `${call.type || 'Care Call'}${callTime ? ' (' + callTime + ')' : ''}`,
+                            quantity: bestHours,
                             unit_price: 0,
                             double_handed: false,
                             service_user_name: su.full_name,
