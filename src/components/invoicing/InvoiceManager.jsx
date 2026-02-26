@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Edit2, Trash2, Download, Send, Check, MoreVertical, FileDown } from 'lucide-react';
+import { Plus, Edit2, Trash2, Download, Send, Check, MoreVertical, FileDown, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from 'sonner';
 import InvoiceLineItemEditor from './InvoiceLineItemEditor';
@@ -32,7 +32,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
   const [showDialog, setShowDialog] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [activeSection, setActiveSection] = useState('created');
   const [showRecurringDialog, setShowRecurringDialog] = useState(false);
   const [recurringInvoiceData, setRecurringInvoiceData] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -621,36 +621,102 @@ export default function InvoiceManager({ invoices, clients, settings }) {
     }
   };
 
-  const filteredInvoices = invoices
+  const searchedInvoices = invoices
     .filter(i =>
-      (search === '' || (i.invoice_number || '').toLowerCase().includes(search.toLowerCase()) ||
-       (i.client_name || '').toLowerCase().includes(search.toLowerCase())) &&
-      (statusFilter === 'all' || i.status === statusFilter)
+      search === '' || (i.invoice_number || '').toLowerCase().includes(search.toLowerCase()) ||
+      (i.client_name || '').toLowerCase().includes(search.toLowerCase())
     )
     .sort((a, b) => new Date(b.invoice_date) - new Date(a.invoice_date));
+
+  const createdInvoices = searchedInvoices.filter(i => !i.status || i.status === 'draft' || i.status === 'live');
+  const sentInvoices = searchedInvoices.filter(i => i.status === 'sent' || i.status === 'viewed' || i.status === 'overdue');
+  const paidInvoices = searchedInvoices.filter(i => i.status === 'paid');
+  const recurringInvoices = searchedInvoices.filter(i => i.status === 'recurring' || i.is_recurring);
+
+  const sections = [
+    { key: 'created', label: 'Created', count: createdInvoices.length, invoices: createdInvoices },
+    { key: 'sent', label: 'Sent', count: sentInvoices.length, invoices: sentInvoices },
+    { key: 'paid', label: 'Paid', count: paidInvoices.length, invoices: paidInvoices },
+    { key: 'recurring', label: 'Recurring', count: recurringInvoices.length, invoices: recurringInvoices },
+  ];
+
+  const renderInvoiceCard = (invoice) => (
+    <Card key={invoice.id} className="p-4 hover:shadow-md transition-shadow">
+      <div className="flex items-start justify-between">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3 mb-2 flex-wrap">
+            <h3 className="font-semibold text-slate-900">{invoice.invoice_number}</h3>
+            <span className={`text-xs font-medium px-2 py-1 rounded ${
+              invoice.status === 'paid' ? 'bg-green-100 text-green-800' :
+              invoice.status === 'overdue' ? 'bg-red-100 text-red-800' :
+              invoice.status === 'sent' || invoice.status === 'viewed' ? 'bg-purple-100 text-purple-800' :
+              'bg-amber-100 text-amber-800'
+            }`}>
+              {(invoice.status || 'draft').replace('_', ' ').toUpperCase()}
+            </span>
+          </div>
+          <p className="text-sm text-slate-600 mb-1">{invoice.client_name}</p>
+          <div className="flex gap-4 text-xs text-slate-500 flex-wrap">
+            <span>Issued: {new Date(invoice.invoice_date).toLocaleDateString('en-GB')}</span>
+            <span>Due: {new Date(invoice.due_date).toLocaleDateString('en-GB')}</span>
+          </div>
+        </div>
+        <div className="text-right mr-4 shrink-0">
+          <p className="text-xl font-bold text-slate-900">
+            £{(invoice.total_amount || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+          </p>
+        </div>
+        <div className="flex gap-1 shrink-0">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm">
+                <MoreVertical className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleDownloadInvoice(invoice)}>
+                <Download className="w-4 h-4 mr-2" /> Download PDF
+              </DropdownMenuItem>
+              {activeSection !== 'sent' && (
+                <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: invoice.id, status: 'sent', is_recurring: invoice.is_recurring })}>
+                  <Send className="w-4 h-4 mr-2" /> Mark as Sent
+                </DropdownMenuItem>
+              )}
+              {activeSection !== 'paid' && (
+                <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: invoice.id, status: 'paid', is_recurring: invoice.is_recurring })}>
+                  <CheckCircle2 className="w-4 h-4 mr-2" /> Mark as Paid
+                </DropdownMenuItem>
+              )}
+              {activeSection !== 'created' && (
+                <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: invoice.id, status: 'draft', is_recurring: invoice.is_recurring })}>
+                  <ArrowRight className="w-4 h-4 mr-2" /> Move to Created
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onClick={() => handleOpenDialog(invoice)}>
+                <Edit2 className="w-4 h-4 mr-2" /> Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-red-600"
+                onClick={() => { setPendingDeleteId(invoice.id); setConfirmOpen(true); }}
+              >
+                <Trash2 className="w-4 h-4 mr-2" /> Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    </Card>
+  );
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
-        <div className="flex-1 flex gap-2 max-w-md">
-          <Input
-            placeholder="Search invoices..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="draft">Draft</SelectItem>
-              <SelectItem value="sent">Sent</SelectItem>
-              <SelectItem value="paid">Paid</SelectItem>
-              <SelectItem value="overdue">Overdue</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <Input
+          placeholder="Search invoices..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-sm"
+        />
         <Button
           onClick={() => handleOpenDialog()}
           className="bg-teal-600 hover:bg-teal-700 w-full md:w-auto"
@@ -660,91 +726,44 @@ export default function InvoiceManager({ invoices, clients, settings }) {
         </Button>
       </div>
 
+      {/* Section Tabs */}
+      <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
+        {sections.map(sec => (
+          <button
+            key={sec.key}
+            onClick={() => setActiveSection(sec.key)}
+            className={`flex-1 py-2.5 px-3 rounded-md text-sm font-medium transition-all ${
+              activeSection === sec.key
+                ? sec.key === 'created' ? 'bg-white shadow text-amber-700'
+                : sec.key === 'sent' ? 'bg-white shadow text-purple-700'
+                : sec.key === 'recurring' ? 'bg-white shadow text-indigo-700'
+                : 'bg-white shadow text-green-700'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {sec.label}
+            <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${
+              activeSection === sec.key
+                ? sec.key === 'created' ? 'bg-amber-100 text-amber-700'
+                : sec.key === 'sent' ? 'bg-purple-100 text-purple-700'
+                : sec.key === 'recurring' ? 'bg-indigo-100 text-indigo-700'
+                : 'bg-green-100 text-green-700'
+                : 'bg-slate-200 text-slate-500'
+            }`}>
+              {sec.count}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Active Section Invoice List */}
       <div className="space-y-3">
-        {filteredInvoices.length === 0 ? (
+        {sections.find(s => s.key === activeSection)?.invoices.length === 0 ? (
           <Card className="p-8 text-center bg-slate-50">
-            <p className="text-slate-500">No invoices found</p>
+            <p className="text-slate-500">No {activeSection} invoices</p>
           </Card>
         ) : (
-          filteredInvoices.map(invoice => (
-            <Card key={invoice.id} className="p-4 hover:shadow-md transition-shadow">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="font-semibold text-slate-900">{invoice.invoice_number}</h3>
-                    <span className={`text-xs font-medium px-2 py-1 rounded ${
-                      invoice.status === 'paid' ? 'bg-green-100 text-green-800' :
-                      invoice.status === 'overdue' ? 'bg-red-100 text-red-800' :
-                      invoice.status === 'live' ? 'bg-blue-100 text-blue-800' :
-                      invoice.status === 'recurring' ? 'bg-indigo-100 text-indigo-800' :
-                      invoice.status === 'sent' || invoice.status === 'viewed' ? 'bg-purple-100 text-purple-800' :
-                      invoice.status === 'draft' ? 'bg-amber-100 text-amber-800' :
-                      'bg-slate-100 text-slate-800'
-                    }`}>
-                      {(invoice.status || '').replace('_', ' ').toUpperCase()}
-                    </span>
-                  </div>
-                  <p className="text-sm text-slate-600 mb-1">{invoice.client_name}</p>
-                  <div className="flex gap-4 text-xs text-slate-500">
-                    <span>Issued: {new Date(invoice.invoice_date).toLocaleDateString()}</span>
-                    <span>Due: {new Date(invoice.due_date).toLocaleDateString()}</span>
-                  </div>
-                </div>
-                <div className="text-right mr-4">
-                  <p className="text-xl font-bold text-slate-900">
-                    {settings?.currency || 'GBP'} {(invoice.total_amount || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
-                  </p>
-                  <p className="text-xs text-slate-600">
-                    Due: {settings?.currency || 'GBP'} {(invoice.amount_due || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreVertical className="w-4 h-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                       <DropdownMenuItem onClick={() => handleDownloadInvoice(invoice)}>
-                         Download Invoice
-                       </DropdownMenuItem>
-                       <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: invoice.id, status: 'live', is_recurring: invoice.is_recurring })}>
-                         Make Invoice Live
-                       </DropdownMenuItem>
-                       <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: invoice.id, status: 'draft', is_recurring: invoice.is_recurring })}>
-                         Make Invoice Draft
-                       </DropdownMenuItem>
-                       <DropdownMenuItem onClick={() => {
-                         setRecurringInvoiceData(invoice);
-                         setShowRecurringDialog(true);
-                       }}>
-                         Make Invoice Recurring
-                       </DropdownMenuItem>
-                     </DropdownMenuContent>
-                  </DropdownMenu>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleOpenDialog(invoice)}
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-red-600 hover:text-red-700"
-                    onClick={() => {
-                      setPendingDeleteId(invoice.id);
-                      setConfirmOpen(true);
-                    }}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          ))
+          sections.find(s => s.key === activeSection)?.invoices.map(renderInvoiceCard)
         )}
       </div>
 
