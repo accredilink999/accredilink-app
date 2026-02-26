@@ -114,8 +114,16 @@ export default function InvoiceManager({ invoices, clients, settings }) {
       if (error) throw error;
       return result;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
+      // Increment next_invoice_number in settings
+      const currentNum = settings?.next_invoice_number || 2000;
+      await supabase
+        .from('invoicing_settings')
+        .update({ next_invoice_number: currentNum + 1 })
+        .eq('id', invoicingSettings.id);
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoicingSettings'] });
+      queryClient.invalidateQueries({ queryKey: ['invoicing-settings'] });
       handleCloseDialog();
       toast.success('Invoice created');
     },
@@ -250,7 +258,17 @@ export default function InvoiceManager({ invoices, clients, settings }) {
         period_to: invoice.period_to || '',
       });
     } else {
-      const nextNumber = (settings?.next_invoice_number || 2000);
+      const prefix = settings?.invoice_prefix || 'INV';
+      const settingsNum = settings?.next_invoice_number || 2000;
+      // Find highest existing number to avoid duplicates
+      const existingNums = invoices
+        .map(i => {
+          const match = (i.invoice_number || '').match(new RegExp(`^${prefix}-(\\d+)$`));
+          return match ? parseInt(match[1]) : 0;
+        })
+        .filter(n => n > 0);
+      const maxExisting = existingNums.length > 0 ? Math.max(...existingNums) : 0;
+      const nextNumber = Math.max(settingsNum, maxExisting + 1);
       setLineItems([]);
       setUseManualEntry(false);
       setEntityType('client');
@@ -258,7 +276,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
       const defaultTerms = '30';
       const defaultDue = new Date(new Date().getTime() + 30 * 86400000).toISOString().split('T')[0];
       setFormData({
-        invoice_number: `${settings?.invoice_prefix || 'INV'}-${nextNumber}`,
+        invoice_number: `${prefix}-${nextNumber}`,
         client_id: '',
         service_user_id: '',
         invoice_date: today,
