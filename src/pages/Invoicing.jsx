@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import PageHeader from '@/components/ui/PageHeader';
@@ -17,6 +17,14 @@ import InvoicingSettings from '@/components/invoicing/InvoicingSettings.jsx';
 export default function Invoicing() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const queryClient = useQueryClient();
+  const mountCountRef = useRef(0);
+  mountCountRef.current++;
+
+  // DEBUG: track mount/unmount to diagnose keep-alive
+  useEffect(() => {
+    console.log('[Invoicing] MOUNTED (mount #' + mountCountRef.current + ')');
+    return () => console.log('[Invoicing] UNMOUNTED');
+  }, []);
 
   const { data: settings, isLoading: settingsLoading } = useQuery({
     queryKey: ['invoicingSettings'],

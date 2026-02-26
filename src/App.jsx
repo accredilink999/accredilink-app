@@ -1,12 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Toaster } from "@/components/ui/toaster"
 import { Toaster as SonnerToaster } from 'sonner'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import NavigationTracker from '@/lib/NavigationTracker'
 import { pagesConfig } from './pages.config'
-import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
-import PageNotFound from './lib/PageNotFound';
+import { BrowserRouter as Router, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import Login from './pages/Login';
@@ -18,15 +17,19 @@ import AppUpdateChecker from '@/components/AppUpdateChecker';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
-const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
 
-const LayoutWrapper = ({ children, currentPageName }) => Layout ?
-  <Layout currentPageName={currentPageName}>{children}</Layout>
-  : <>{children}</>;
-
-const AuthenticatedApp = () => {
+/**
+ * AppShell — no <Routes>, no route matching, no remounting.
+ * Layout renders once and stays mounted forever.
+ * Pages are swapped via the keep-alive pattern inside Layout.
+ */
+const AppShell = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated, isPasswordRecovery } = useAuth();
   const location = useLocation();
+  const hasEverAuthedRef = useRef(false);
+
+  if (isAuthenticated) hasEverAuthedRef.current = true;
+
   const isLoading = isLoadingPublicSettings || isLoadingAuth;
 
   // Hide splash screen once auth check is done
@@ -34,44 +37,38 @@ const AuthenticatedApp = () => {
     if (!isLoading && window.hideSplash) window.hideSplash();
   }, [isLoading]);
 
-  // Splash screen covers the loading state — no spinner needed
-  if (isLoading) return null;
+  // First load only — splash covers this
+  if (!hasEverAuthedRef.current && isLoading) return null;
 
-  // Handle authentication errors
-  if (authError) {
-    if (authError.type === 'user_not_registered') {
-      return <UserNotRegisteredError />;
-    } else if (authError.type === 'auth_required') {
-      return <Navigate to="/login" replace />;
-    }
+  // Login page
+  if (location.pathname === '/login') return <Login />;
+
+  // Auth error (before first auth only)
+  if (!hasEverAuthedRef.current && authError) {
+    if (authError.type === 'user_not_registered') return <UserNotRegisteredError />;
+    return <Login />;
   }
 
-  // Redirect to login if not authenticated
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+  // Not authenticated (before first auth only)
+  if (!hasEverAuthedRef.current && !isAuthenticated) {
+    return <Login />;
   }
 
-  // Redirect to Settings for password recovery (user clicked reset link in email)
+  // Password recovery redirect
   if (isPasswordRecovery && !location.pathname.toLowerCase().includes('settings')) {
     return <Navigate to="/Settings" replace />;
   }
 
-  // Determine current page from URL
-  const pageName = location.pathname.replace('/', '') || mainPageKey;
-  const currentPageName = Pages[pageName] ? pageName : null;
+  // Extract page name from URL — always fall back to Dashboard
+  const pageName = location.pathname.replace(/^\//, '') || mainPageKey;
+  const currentPageName = Pages[pageName] ? pageName : mainPageKey;
 
-  // Render the main app — Layout stays mounted, pages swap inside it
+  // Layout renders ONCE and never unmounts
   return (
     <>
-    <AutoPushRegistration />
-    <AppUpdateChecker />
-    {currentPageName ? (
-      <LayoutWrapper currentPageName={currentPageName}>
-        {null}
-      </LayoutWrapper>
-    ) : (
-      <PageNotFound />
-    )}
+      <AutoPushRegistration />
+      <AppUpdateChecker />
+      <Layout currentPageName={currentPageName} />
     </>
   );
 };
@@ -84,10 +81,7 @@ function App() {
         <DevicePreview>
           <Router>
             <NavigationTracker />
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route path="/*" element={<AuthenticatedApp />} />
-            </Routes>
+            <AppShell />
             <HelpButton />
           </Router>
           <Toaster />
