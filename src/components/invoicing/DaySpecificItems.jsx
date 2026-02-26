@@ -76,8 +76,12 @@ export default function DaySpecificItems({ repeatingDays, dayItems, onDayItemsCh
   const repeatToAllDays = (sourceDayIdx) => {
     const sourceItems = dayItems[sourceDayIdx];
     if (!sourceItems || sourceItems.length === 0) return;
-    
-    const newItems = { ...dayItems };
+
+    const newItems = {};
+    // Deep copy all existing day items
+    Object.keys(dayItems).forEach(key => {
+      newItems[key] = dayItems[key].map(item => ({ ...item }));
+    });
     repeatingDays.forEach(dayIdx => {
       if (dayIdx !== sourceDayIdx) {
         newItems[dayIdx] = sourceItems.map(item => ({
@@ -87,6 +91,7 @@ export default function DaySpecificItems({ repeatingDays, dayItems, onDayItemsCh
       }
     });
     onDayItemsChange(newItems);
+    toast.success(`Items copied to ${repeatingDays.length - 1} other days`);
   };
 
   const calculateItemTotal = (item) => {

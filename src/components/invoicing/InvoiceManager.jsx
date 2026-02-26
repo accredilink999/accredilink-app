@@ -1114,7 +1114,11 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                 onDayItemsChange={setDayItems}
                 callTypes={settings?.call_types || []}
                 hoursOptions={settings?.hours_options || []}
-                hourlyRates={settings?.hourly_rates || []}
+                hourlyRates={
+                  settings?.rates
+                    ? settings.rates.map(r => typeof r === 'number' ? r : r.amount)
+                    : (settings?.hourly_rates || [])
+                }
                 taxRate={settings?.default_tax_rate || 20}
               />
             )}
