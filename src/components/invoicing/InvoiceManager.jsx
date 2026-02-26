@@ -526,7 +526,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
       }
 
       const canvas = await html2canvas(container, {
-        scale: 2,
+        scale: 1.5,
         useCORS: true,
         allowTaint: true,
         logging: false,
@@ -541,7 +541,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
         format: 'a4'
       });
 
-      const imgData = canvas.toDataURL('image/png');
+      const imgData = canvas.toDataURL('image/jpeg', 0.85);
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       const imgWidth = pageWidth;
@@ -550,13 +550,13 @@ export default function InvoiceManager({ invoices, clients, settings }) {
       let heightLeft = imgHeight;
       let position = 0;
 
-      doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      doc.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
       heightLeft -= pageHeight;
 
       while (heightLeft >= 0) {
         position = heightLeft - imgHeight;
         doc.addPage();
-        doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        doc.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
         heightLeft -= pageHeight;
       }
 
