@@ -217,11 +217,14 @@ export default function DaySpecificItems({ repeatingDays, dayItems, onDayItemsCh
                            </SelectTrigger>
                            <SelectContent>
                              {hoursOptions && hoursOptions.length > 0 ? (
-                               hoursOptions.map(hours => (
-                                 <SelectItem key={hours} value={String(hours)}>
-                                   {hours}h
-                                 </SelectItem>
-                               ))
+                               hoursOptions.map(hours => {
+                                 const mins = Math.round(hours * 60);
+                                 return (
+                                   <SelectItem key={hours} value={String(hours)}>
+                                     {hours}h ({mins}m)
+                                   </SelectItem>
+                                 );
+                               })
                              ) : (
                                <SelectItem value="no-options" disabled>No hours configured</SelectItem>
                              )}
