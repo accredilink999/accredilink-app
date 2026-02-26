@@ -44,7 +44,8 @@ export default function ClientManager({ clients, invoices }) {
       toast.success('Client saved');
     },
     onError: (error) => {
-      toast.error('Failed: ' + error.message);
+      handleCloseDialog();
+      toast.error('Failed to create client: ' + error.message);
     },
   });
 
@@ -65,7 +66,8 @@ export default function ClientManager({ clients, invoices }) {
       toast.success('Client updated');
     },
     onError: (error) => {
-      toast.error('Failed: ' + error.message);
+      handleCloseDialog();
+      toast.error('Failed to update client: ' + error.message);
     },
   });
 
@@ -221,7 +223,7 @@ export default function ClientManager({ clients, invoices }) {
       </div>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent>
+        <DialogContent className="max-h-[85dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingClient ? 'Edit Client' : 'Add New Client'}</DialogTitle>
           </DialogHeader>
@@ -285,7 +287,7 @@ export default function ClientManager({ clients, invoices }) {
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="pb-6 sm:pb-0">
             <Button variant="outline" onClick={handleCloseDialog}>Cancel</Button>
             <Button
               onClick={handleSubmit}
