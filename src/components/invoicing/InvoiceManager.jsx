@@ -73,6 +73,8 @@ export default function InvoiceManager({ invoices, clients, settings }) {
     manual_city: '',
     manual_postcode: '',
     payment_terms: '30',
+    period_from: '',
+    period_to: '',
   });
 
   const { data: serviceUsers = [] } = useQuery({
@@ -243,6 +245,8 @@ export default function InvoiceManager({ invoices, clients, settings }) {
         manual_city: '',
         manual_postcode: '',
         payment_terms: invoice.payment_terms || '30',
+        period_from: invoice.period_from || '',
+        period_to: invoice.period_to || '',
       });
     } else {
       const nextNumber = (settings?.next_invoice_number || 2000);
@@ -266,6 +270,8 @@ export default function InvoiceManager({ invoices, clients, settings }) {
         manual_city: '',
         manual_postcode: '',
         payment_terms: defaultTerms,
+        period_from: '',
+        period_to: '',
       });
     }
     setShowDialog(true);
@@ -380,6 +386,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                 <div style="font-size:36px;font-weight:900;color:${bc};letter-spacing:2px;margin-bottom:12px;">INVOICE</div>
                 <table style="margin-left:auto;font-size:11px;">
                   <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Invoice No:</td><td style="padding:3px 0;font-weight:700;">${invoice.invoice_number}</td></tr>
+                  ${invoice.period_from ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Period:</td><td style="padding:3px 0;">${new Date(invoice.period_from).toLocaleDateString('en-GB')} — ${invoice.period_to ? new Date(invoice.period_to).toLocaleDateString('en-GB') : ''}</td></tr>` : ''}
                   <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Date:</td><td style="padding:3px 0;">${new Date(invoice.invoice_date).toLocaleDateString('en-GB')}</td></tr>
                   <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Due Date:</td><td style="padding:3px 0;">${new Date(invoice.due_date).toLocaleDateString('en-GB')}</td></tr>
                   <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Terms:</td><td style="padding:3px 0;">${invoice.payment_terms === '0' ? 'On Receipt' : invoice.payment_terms === 'custom' ? 'Custom' : (invoice.payment_terms || '30') + ' Days'}</td></tr>
@@ -617,6 +624,8 @@ export default function InvoiceManager({ invoices, clients, settings }) {
        total_amount: Math.max(0, totalAmount),
        amount_due: Math.max(0, totalAmount),
        payment_terms: formData.payment_terms,
+       period_from: formData.period_from || null,
+       period_to: formData.period_to || null,
        status: editingInvoice ? editingInvoice.status : 'draft',
        currency: settings?.currency || 'GBP',
        repeating_days: repeatingDays.length > 0 ? repeatingDays : null,
@@ -1091,6 +1100,25 @@ export default function InvoiceManager({ invoices, clients, settings }) {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
+                <label className="block text-sm font-medium text-slate-900 mb-2">Invoice Period From</label>
+                <Input
+                  type="date"
+                  value={formData.period_from}
+                  onChange={(e) => setFormData({ ...formData, period_from: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-900 mb-2">Invoice Period To</label>
+                <Input
+                  type="date"
+                  value={formData.period_to}
+                  onChange={(e) => setFormData({ ...formData, period_to: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
                 <label className="block text-sm font-medium text-slate-900 mb-2">Invoice Date</label>
                 <Input
                   type="date"
@@ -1360,6 +1388,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                     <h1 className="text-3xl font-black tracking-wide" style={{ color: bc }}>INVOICE</h1>
                     <div className="mt-2 text-sm space-y-0.5">
                       <p><span className="text-slate-500">No:</span> <span className="font-bold">{inv.invoice_number}</span></p>
+                      {inv.period_from && <p><span className="text-slate-500">Period:</span> {new Date(inv.period_from).toLocaleDateString('en-GB')} — {inv.period_to ? new Date(inv.period_to).toLocaleDateString('en-GB') : ''}</p>}
                       <p><span className="text-slate-500">Date:</span> {new Date(inv.invoice_date).toLocaleDateString('en-GB')}</p>
                       <p><span className="text-slate-500">Due:</span> {new Date(inv.due_date).toLocaleDateString('en-GB')}</p>
                       <p><span className="text-slate-500">Terms:</span> {termsLabel}</p>
