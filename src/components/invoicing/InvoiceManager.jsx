@@ -23,7 +23,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
   const [recurringInvoiceData, setRecurringInvoiceData] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
-  const [importCallsConfirmOpen, setImportCallsConfirmOpen] = useState(false);
+  const [showImportAllDropdown, setShowImportAllDropdown] = useState(false);
   const queryClient = useQueryClient();
 
   // Real-time invoice updates via Supabase
@@ -1035,16 +1035,70 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                     </label>
                   ))}
                 </div>
-                {repeatingDays.length > 0 && (
+                {repeatingDays.length > 0 && !showImportAllDropdown && (
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setImportCallsConfirmOpen(true)}
+                    onClick={() => setShowImportAllDropdown(true)}
                     className="mt-4 w-full border-teal-300 text-teal-700 hover:bg-teal-50"
                   >
                     <FileDown className="w-4 h-4 mr-2" />
                     Import All Calls
                   </Button>
+                )}
+                {repeatingDays.length > 0 && showImportAllDropdown && (
+                  <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200 space-y-2">
+                    <label className="block text-xs font-medium text-slate-700">Select Care Client to Import</label>
+                    <Select onValueChange={(suId) => {
+                      const su = serviceUsers.find(s => s.id === suId);
+                      if (!su) return;
+                      const calls = su.call_times || [];
+                      if (calls.length === 0) {
+                        toast.error(`${su.full_name} has no scheduled calls`);
+                        return;
+                      }
+                      const newItems = { ...dayItems };
+                      repeatingDays.forEach(dayIdx => {
+                        if (!newItems[dayIdx]) newItems[dayIdx] = [];
+                        calls.forEach(call => {
+                          const durationMins = parseFloat(call.duration) || 30;
+                          const durationHours = durationMins / 60;
+                          newItems[dayIdx].push({
+                            id: Date.now() + Math.random(),
+                            type: 'client_call',
+                            description: call.type || 'Care Call',
+                            quantity: durationHours,
+                            unit_price: 0,
+                            double_handed: false,
+                            service_user_name: su.full_name,
+                            service_user_id: su.id,
+                          });
+                        });
+                      });
+                      setDayItems(newItems);
+                      setShowImportAllDropdown(false);
+                      toast.success(`${calls.length} call${calls.length > 1 ? 's' : ''} imported for ${su.full_name} across ${repeatingDays.length} days`);
+                    }}>
+                      <SelectTrigger className="text-sm">
+                        <SelectValue placeholder="Choose a care client..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {serviceUsers.filter(su => su.status === 'active').map(su => (
+                          <SelectItem key={su.id} value={su.id}>
+                            {su.full_name} ({(su.call_times || []).length} calls)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowImportAllDropdown(false)}
+                      className="w-full text-xs"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -1162,17 +1216,6 @@ export default function InvoiceManager({ invoices, clients, settings }) {
         }}
       />
 
-      <ConfirmDialog
-        open={importCallsConfirmOpen}
-        onOpenChange={setImportCallsConfirmOpen}
-        title="Import All Calls?"
-        description="This will import all scheduled calls for the selected days into the invoice line items."
-        confirmLabel="Yes, Import"
-        onConfirm={() => {
-          // TODO: Import calls logic to be added
-          toast.success('Calls imported');
-        }}
-      />
     </div>
   );
 }
