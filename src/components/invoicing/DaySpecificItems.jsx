@@ -10,6 +10,19 @@ import { toast } from 'sonner';
 
 const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+// Parse duration stored as minutes (45), decimal hours (0.5), or clock notation (0.45 = 45 mins)
+const parseDurationToHours = (dur) => {
+  const raw = parseFloat(dur) || 30;
+  if (raw >= 10) return Math.round((raw / 60) * 100) / 100; // minutes: 45 → 0.75h
+  // Check string for clock notation like "0.45" (2+ decimal digits where digits ≤ 59)
+  const decMatch = String(dur || '').match(/\.(\d{2,})$/);
+  if (decMatch) {
+    const mins = parseInt(decMatch[1].slice(0, 2));
+    if (mins > 0 && mins <= 59) return Math.round((Math.floor(raw) + mins / 60) * 100) / 100;
+  }
+  return raw; // decimal hours: 0.5 → 0.5h, 0.75 → 0.75h
+};
+
 export default function DaySpecificItems({ repeatingDays, dayItems, onDayItemsChange, callTypes, hoursOptions = [], hourlyRates = [], taxRate = 20 }) {
   const [expandedDays, setExpandedDays] = useState({});
   const [addingType, setAddingType] = useState({});
@@ -56,12 +69,16 @@ export default function DaySpecificItems({ repeatingDays, dayItems, onDayItemsCh
   };
 
   const updateDayItem = (dayIdx, itemId, field, value) => {
-    const newItems = { ...dayItems };
-    const item = newItems[dayIdx].find(i => i.id === itemId);
-    if (item) {
-      item[field] = value;
-      onDayItemsChange(newItems);
+    // Full deep clone to guarantee React detects the change
+    const newItems = {};
+    for (const key of Object.keys(dayItems)) {
+      newItems[key] = dayItems[key].map(item => ({ ...item }));
     }
+    const target = newItems[dayIdx]?.find(i => i.id === itemId);
+    if (target) {
+      target[field] = value;
+    }
+    onDayItemsChange(newItems);
   };
 
   const removeDayItem = (dayIdx, itemId) => {
@@ -188,7 +205,7 @@ export default function DaySpecificItems({ repeatingDays, dayItems, onDayItemsCh
                      <SelectTrigger className="text-sm">
                        <SelectValue placeholder="Select call type..." />
                      </SelectTrigger>
-                     <SelectContent>
+                     <SelectContent className="max-h-60 overflow-y-auto" position="popper" sideOffset={4}>
                        {callTypes && callTypes.length > 0 ? (
                          callTypes.map(callType => (
                            <SelectItem key={callType} value={callType}>
@@ -216,18 +233,28 @@ export default function DaySpecificItems({ repeatingDays, dayItems, onDayItemsCh
                              <SelectValue placeholder="Select hours..." />
                            </SelectTrigger>
                            <SelectContent>
-                             {hoursOptions && hoursOptions.length > 0 ? (
-                               hoursOptions.map(hours => {
-                                 const mins = Math.round(hours * 60);
-                                 return (
-                                   <SelectItem key={hours} value={String(hours)}>
-                                     {hours}h ({mins}m)
-                                   </SelectItem>
-                                 );
-                               })
-                             ) : (
-                               <SelectItem value="no-options" disabled>No hours configured</SelectItem>
-                             )}
+                             {(() => {
+                               // Convert all hoursOptions through parser (handles 0.45 → 0.75 etc), deduplicate
+                               const parsed = (hoursOptions || []).map(h => parseDurationToHours(h));
+                               const opts = [...new Set(parsed)];
+                               const currentQty = item.quantity;
+                               if (currentQty && !opts.includes(currentQty)) {
+                                 opts.push(currentQty);
+                               }
+                               opts.sort((a, b) => a - b);
+                               return opts.length > 0 ? (
+                                 opts.map(hours => {
+                                   const mins = Math.round(hours * 60);
+                                   return (
+                                     <SelectItem key={hours} value={String(hours)}>
+                                       {hours}h ({mins}m)
+                                     </SelectItem>
+                                   );
+                                 })
+                               ) : (
+                                 <SelectItem value="no-options" disabled>No hours configured</SelectItem>
+                               );
+                             })()}
                            </SelectContent>
                          </Select>
                        </div>
@@ -265,6 +292,11 @@ export default function DaySpecificItems({ repeatingDays, dayItems, onDayItemsCh
                          <label className="text-xs text-slate-500 block mb-1">Sub Total</label>
                          <div className="text-sm font-semibold text-teal-700 bg-teal-50 rounded px-3 py-2 border border-teal-200">
                            £{(((item.quantity || 0) * (item.unit_price || 0)) * (item.double_handed ? 2 : 1)).toFixed(2)}
+                           {item.double_handed && (
+                             <span className="block text-[10px] text-teal-600 font-normal mt-1">
+                               {item.quantity}h × £{item.unit_price} × 2
+                             </span>
+                           )}
                          </div>
                        </div>
                        </div>
@@ -299,15 +331,7 @@ export default function DaySpecificItems({ repeatingDays, dayItems, onDayItemsCh
                     // Sort calls by time (earliest first)
                     const sorted = [...calls].sort((a, b) => (a.time || '').localeCompare(b.time || ''));
                     sorted.forEach(call => {
-                      const durationMins = parseFloat(call.duration) || 30;
-                      const durationHours = durationMins / 60;
-                      // Snap to nearest hours_option if available
-                      let bestHours = durationHours;
-                      if (hoursOptions.length > 0) {
-                        bestHours = hoursOptions.reduce((prev, curr) =>
-                          Math.abs(curr - durationHours) < Math.abs(prev - durationHours) ? curr : prev
-                        );
-                      }
+                      const bestHours = parseDurationToHours(call.duration);
                       const callTime = call.time ? call.time.slice(0, 5) : '';
                       newItems[dayIdx].push({
                         id: Date.now() + Math.random(),
