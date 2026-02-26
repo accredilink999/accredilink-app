@@ -204,7 +204,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
     },
   });
 
-  const handleOpenDialog = (invoice = null) => {
+  const handleOpenDialog = async (invoice = null) => {
     if (invoice) {
       setEditingInvoice(invoice);
       const rawItems = typeof invoice.line_items === 'string' ? JSON.parse(invoice.line_items || '[]') : (invoice.line_items || []);
@@ -265,8 +265,15 @@ export default function InvoiceManager({ invoices, clients, settings }) {
         period_to: invoice.period_to || '',
       });
     } else {
-      const prefix = invoicingSettings?.invoice_prefix || settings?.invoice_prefix || 'INV';
-      const settingsNum = invoicingSettings?.next_invoice_number || settings?.next_invoice_number || 2000;
+      // Fetch latest settings fresh from DB to get current next_invoice_number
+      const { data: freshSettings } = await supabase
+        .from('invoicing_settings')
+        .select('invoice_prefix, next_invoice_number')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      const prefix = freshSettings?.invoice_prefix || invoicingSettings?.invoice_prefix || settings?.invoice_prefix || 'INV';
+      const settingsNum = freshSettings?.next_invoice_number || invoicingSettings?.next_invoice_number || settings?.next_invoice_number || 2000;
       // Find highest existing number to avoid duplicates
       const existingNums = invoices
         .map(i => {
