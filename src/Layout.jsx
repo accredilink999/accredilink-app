@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from './utils';
 import { base44 } from '@/api/base44Client';
 import { PAGES } from './pages.config';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import AnnouncementAcknowledgementModal from '@/components/AnnouncementAcknowledgementModal';
 import BottomNavigation from '@/components/ui/BottomNavigation';
@@ -75,6 +74,12 @@ const ROOT_PAGES = ['Dashboard'];
 export default function Layout({ children, currentPageName }) {
   const navigate = useNavigate();
   const visitedPagesRef = useRef(new Set());
+
+  // Debug: detect if Layout remounts (would reset keep-alive)
+  useEffect(() => {
+    console.log('[Layout] MOUNTED — keep-alive active');
+    return () => console.log('[Layout] UNMOUNTED — keep-alive lost!');
+  }, []);
 
 
   
@@ -716,18 +721,18 @@ export default function Layout({ children, currentPageName }) {
                                      <GpsWarningBanner />
                                      {/* Keep-alive: all visited pages stay mounted, hidden with display:none */}
                                      <div className={currentPageName === 'Chat' ? 'p-0 md:p-3 lg:p-4' : 'p-2 md:p-3 lg:p-4'}>
-                                       <Suspense fallback={<div className="flex items-center justify-center h-96"><div className="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin"></div></div>}>
                                          {Object.entries(PAGES).map(([pageName, PageComponent]) => {
                                            const isActive = pageName === currentPageName;
                                            if (!isActive && !visitedPagesRef.current.has(pageName)) return null;
                                            if (isActive) visitedPagesRef.current.add(pageName);
                                            return (
                                              <div key={pageName} style={{ display: isActive ? 'block' : 'none' }}>
-                                               <PageComponent />
+                                               <Suspense fallback={<div className="flex items-center justify-center h-96"><div className="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin"></div></div>}>
+                                                 <PageComponent />
+                                               </Suspense>
                                              </div>
                                            );
                                          })}
-                                       </Suspense>
                                      </div>
                       </main>
 
