@@ -1076,6 +1076,9 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                         });
                       });
                       setDayItems(newItems);
+                      // Auto-populate service user on the invoice
+                      setFormData(prev => ({ ...prev, service_user_id: su.id }));
+                      setConfirmedServiceUser(su);
                       setShowImportAllDropdown(false);
                       toast.success(`${calls.length} call${calls.length > 1 ? 's' : ''} imported for ${su.full_name} across ${repeatingDays.length} days`);
                     }}>
