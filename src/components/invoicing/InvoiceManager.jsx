@@ -71,6 +71,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
     manual_address: '',
     manual_city: '',
     manual_postcode: '',
+    payment_terms: '30',
   });
 
   const { data: serviceUsers = [] } = useQuery({
@@ -239,18 +240,22 @@ export default function InvoiceManager({ invoices, clients, settings }) {
         manual_address: '',
         manual_city: '',
         manual_postcode: '',
+        payment_terms: invoice.payment_terms || '30',
       });
     } else {
       const nextNumber = (settings?.next_invoice_number || 2000);
       setLineItems([]);
       setUseManualEntry(false);
       setEntityType('client');
+      const today = new Date().toISOString().split('T')[0];
+      const defaultTerms = '30';
+      const defaultDue = new Date(new Date().getTime() + 30 * 86400000).toISOString().split('T')[0];
       setFormData({
         invoice_number: `${settings?.invoice_prefix || 'INV'}-${nextNumber}`,
         client_id: '',
         service_user_id: '',
-        invoice_date: new Date().toISOString().split('T')[0],
-        due_date: '',
+        invoice_date: today,
+        due_date: defaultDue,
         notes: settings?.invoice_notes || '',
         discount_type: 'fixed',
         discount_value: 0,
@@ -258,6 +263,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
         manual_address: '',
         manual_city: '',
         manual_postcode: '',
+        payment_terms: defaultTerms,
       });
     }
     setShowDialog(true);
@@ -374,6 +380,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                   <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Invoice No:</td><td style="padding:3px 0;font-weight:700;">${invoice.invoice_number}</td></tr>
                   <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Date:</td><td style="padding:3px 0;">${new Date(invoice.invoice_date).toLocaleDateString('en-GB')}</td></tr>
                   <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Due Date:</td><td style="padding:3px 0;">${new Date(invoice.due_date).toLocaleDateString('en-GB')}</td></tr>
+                  <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Terms:</td><td style="padding:3px 0;">${invoice.payment_terms === '0' ? 'On Receipt' : invoice.payment_terms === 'custom' ? 'Custom' : (invoice.payment_terms || '30') + ' Days'}</td></tr>
                 </table>
               </td>
             </tr>
@@ -597,6 +604,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
        tax_amount: totals.tax,
        total_amount: Math.max(0, totalAmount),
        amount_due: Math.max(0, totalAmount),
+       payment_terms: formData.payment_terms,
        status: 'draft',
        currency: settings?.currency || 'GBP',
        repeating_days: repeatingDays.length > 0 ? repeatingDays : null,
@@ -1018,13 +1026,68 @@ export default function InvoiceManager({ invoices, clients, settings }) {
               </div>
               ) : null}
 
+            {/* Payment Terms */}
+            <div>
+              <label className="block text-sm font-medium text-slate-900 mb-2">Payment Terms</label>
+              <div className="flex gap-3">
+                <Select
+                  value={formData.payment_terms}
+                  onValueChange={(value) => {
+                    const updated = { ...formData, payment_terms: value };
+                    if (value !== 'custom' && value !== '0' && formData.invoice_date) {
+                      const days = parseInt(value);
+                      const from = new Date(formData.invoice_date);
+                      const due = new Date(from.getTime() + days * 86400000);
+                      updated.due_date = due.toISOString().split('T')[0];
+                    } else if (value === '0') {
+                      updated.due_date = formData.invoice_date;
+                    }
+                    setFormData(updated);
+                  }}
+                >
+                  <SelectTrigger className="w-48">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">On Receipt</SelectItem>
+                    <SelectItem value="7">7 Days</SelectItem>
+                    <SelectItem value="14">14 Days</SelectItem>
+                    <SelectItem value="30">30 Days</SelectItem>
+                    <SelectItem value="60">60 Days</SelectItem>
+                    <SelectItem value="90">90 Days</SelectItem>
+                    <SelectItem value="custom">Custom Date</SelectItem>
+                  </SelectContent>
+                </Select>
+                {formData.payment_terms === 'custom' && (
+                  <Input
+                    type="date"
+                    value={formData.due_date}
+                    onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                    className="flex-1"
+                  />
+                )}
+                {formData.payment_terms !== 'custom' && formData.due_date && (
+                  <span className="text-sm text-slate-500 self-center">Due: {new Date(formData.due_date).toLocaleDateString('en-GB')}</span>
+                )}
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-900 mb-2">Invoice Period From *</label>
                 <Input
                   type="date"
                   value={formData.invoice_date}
-                  onChange={(e) => setFormData({ ...formData, invoice_date: e.target.value })}
+                  onChange={(e) => {
+                    const updated = { ...formData, invoice_date: e.target.value };
+                    if (formData.payment_terms !== 'custom' && e.target.value) {
+                      const days = parseInt(formData.payment_terms) || 0;
+                      const from = new Date(e.target.value);
+                      const due = new Date(from.getTime() + days * 86400000);
+                      updated.due_date = due.toISOString().split('T')[0];
+                    }
+                    setFormData(updated);
+                  }}
                 />
               </div>
               <div>
@@ -1032,7 +1095,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                 <Input
                   type="date"
                   value={formData.due_date}
-                  onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, due_date: e.target.value, payment_terms: 'custom' })}
                 />
               </div>
             </div>
