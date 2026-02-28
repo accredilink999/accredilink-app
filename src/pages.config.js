@@ -44,6 +44,7 @@ import TrainingMatrix from './pages/TrainingMatrix';
 import WorkCalendar from './pages/WorkCalendar';
 import ControlRoom from './pages/ControlRoom';
 import CourseSeeder from './pages/CourseSeeder';
+import PlatformAdmin from './pages/PlatformAdmin';
 import __Layout from './Layout.jsx';
 
 
@@ -91,6 +92,7 @@ export const PAGES = {
     "WorkCalendar": WorkCalendar,
     "ControlRoom": ControlRoom,
     "CourseSeeder": CourseSeeder,
+    "PlatformAdmin": PlatformAdmin,
 }
 
 export const pagesConfig = {
