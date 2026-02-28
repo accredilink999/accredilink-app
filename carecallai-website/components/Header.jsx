@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Menu, X, ChevronDown } from "lucide-react";
+import { Menu, X, ChevronDown, Building2 } from "lucide-react";
 
 const features = [
   { name: "Scheduling & Rota", href: "/features/scheduling" },
@@ -26,9 +26,7 @@ export default function Header() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-teal-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">CC</span>
-            </div>
+            <img src="/logo-icon.png" alt="CareCall AI" className="w-9 h-9 rounded-lg" />
             <span className="text-xl font-bold text-slate-900">
               CareCall<span className="text-teal-600">AI</span>
             </span>
@@ -78,6 +76,14 @@ export default function Header() {
               Compliance
             </Link>
             <Link
+              href="/beta"
+              className="text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors flex items-center gap-1"
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              Home
+              <span className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-bold ml-0.5">BETA</span>
+            </Link>
+            <Link
               href="/blog"
               className="text-sm font-medium text-slate-700 hover:text-teal-600 transition-colors"
             >
@@ -106,7 +112,7 @@ export default function Header() {
               Login
             </Link>
             <Link
-              href="/demo"
+              href="/signup"
               className="px-5 py-2.5 bg-teal-600 text-white text-sm font-semibold rounded-lg hover:bg-teal-700 transition-colors shadow-sm"
             >
               Start Free Trial
@@ -159,6 +165,15 @@ export default function Header() {
               Compliance
             </Link>
             <Link
+              href="/beta"
+              className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-50 rounded-lg"
+              onClick={() => setMobileOpen(false)}
+            >
+              <Building2 className="w-4 h-4" />
+              CareCallAI Home
+              <span className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-bold">BETA</span>
+            </Link>
+            <Link
               href="/blog"
               className="block px-3 py-2 text-sm font-medium text-slate-700 hover:bg-teal-50 rounded-lg"
               onClick={() => setMobileOpen(false)}
@@ -188,7 +203,7 @@ export default function Header() {
                 Login
               </Link>
               <Link
-                href="/demo"
+                href="/signup"
                 className="block px-3 py-2 text-sm font-semibold text-center text-white bg-teal-600 rounded-lg"
                 onClick={() => setMobileOpen(false)}
               >

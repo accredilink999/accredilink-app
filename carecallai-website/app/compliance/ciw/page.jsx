@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ShieldCheck, Check, FileText, AlertTriangle, Users, Pill, ClipboardList } from "lucide-react";
 import AnimateOnScroll from "@/components/AnimateOnScroll";
 import CTABanner from "@/components/CTABanner";
+import BetaPromo from "@/components/BetaPromo";
 import FAQ from "@/components/FAQ";
 import { BreadcrumbJsonLd, FAQJsonLd } from "@/components/SEO/JsonLd";
 
@@ -98,7 +99,7 @@ export default function CIWCompliancePage() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link
-                href="/demo"
+                href="/signup"
                 className="px-8 py-3 bg-teal-600 text-white font-semibold rounded-lg hover:bg-teal-700 transition-colors"
               >
                 Start Free Trial
@@ -161,6 +162,7 @@ export default function CIWCompliancePage() {
         </div>
       </section>
 
+      <BetaPromo />
       <CTABanner
         title="Ready for your next CIW inspection?"
         subtitle="Start your free trial and see how CareCallAI makes compliance effortless."

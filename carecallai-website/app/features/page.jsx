@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import FeatureCard from "@/components/FeatureCard";
 import CTABanner from "@/components/CTABanner";
+import BetaPromo from "@/components/BetaPromo";
 import AnimateOnScroll from "@/components/AnimateOnScroll";
 import { BreadcrumbJsonLd } from "@/components/SEO/JsonLd";
 
@@ -142,6 +143,7 @@ export default function FeaturesPage() {
         </div>
       </section>
 
+      <BetaPromo />
       <CTABanner />
     </>
   );

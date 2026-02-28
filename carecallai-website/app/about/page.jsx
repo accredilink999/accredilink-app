@@ -1,6 +1,7 @@
 import { Heart, Shield, Zap, Users, Target, Globe } from "lucide-react";
 import AnimateOnScroll from "@/components/AnimateOnScroll";
 import CTABanner from "@/components/CTABanner";
+import BetaPromo from "@/components/BetaPromo";
 import { BreadcrumbJsonLd } from "@/components/SEO/JsonLd";
 
 export const metadata = {
@@ -121,6 +122,7 @@ export default function AboutPage() {
         </div>
       </section>
 
+      <BetaPromo />
       <CTABanner
         title="Want to learn more?"
         subtitle="Book a demo or start your free trial today."

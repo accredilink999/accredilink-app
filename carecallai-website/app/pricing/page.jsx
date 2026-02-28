@@ -1,13 +1,14 @@
 import PricingTable from "@/components/PricingTable";
 import FAQ from "@/components/FAQ";
 import CTABanner from "@/components/CTABanner";
+import BetaPromo from "@/components/BetaPromo";
 import AnimateOnScroll from "@/components/AnimateOnScroll";
 import { BreadcrumbJsonLd, FAQJsonLd } from "@/components/SEO/JsonLd";
 
 export const metadata = {
   title: "Pricing",
   description:
-    "CareCallAI pricing plans from £49/month. 40% cheaper than Connecteam. Free 14-day trial. Plans for care agencies of every size.",
+    "CareCallAI pricing plans from £99/month. Up to 50% cheaper than competitors. 7-day free trial. Plans for care agencies of every size.",
   keywords: [
     "care management software pricing",
     "home care software cost",
@@ -19,11 +20,11 @@ export const metadata = {
 const faqs = [
   {
     question: "Is there a free trial?",
-    answer: "Yes. Every plan comes with a free 14-day trial. No credit card required — just sign up and start using CareCallAI immediately.",
+    answer: "Yes. Every plan comes with a 7-day free trial. You'll need to add a card at signup, but you won't be charged until the trial ends. Cancel anytime within the 7 days — no charge.",
   },
   {
     question: "What happens after the trial?",
-    answer: "At the end of your trial, you can choose a plan and add your payment details. If you decide not to continue, your account is simply paused — no charges, no hassle.",
+    answer: "If you don't cancel within the 7-day trial, your chosen plan will automatically start billing. If you cancel before the trial ends, you won't be charged at all.",
   },
   {
     question: "Can I change plans later?",
@@ -31,15 +32,15 @@ const faqs = [
   },
   {
     question: "How does annual billing work?",
-    answer: "Annual billing gives you a 20% discount — effectively 2 months free. You pay upfront for 12 months at the discounted rate.",
+    answer: "Annual billing gives you 2 months free. You pay upfront for 12 months at the discounted rate.",
   },
   {
-    question: "What counts as a 'user'?",
-    answer: "A user is anyone with login access to CareCallAI — carers, managers, coordinators, admins. Service users (clients) are not counted.",
+    question: "What counts as a 'staff member'?",
+    answer: "A staff member is anyone with login access to CareCallAI — carers, managers, coordinators, admins. Service users (clients) are not counted towards your staff limit.",
   },
   {
     question: "Do you offer discounts for larger agencies?",
-    answer: "Yes. If you have more than 150 staff, contact us for a custom Enterprise or Compliance+ quote. We'll build a package that fits your needs and budget.",
+    answer: "Our Enterprise plan includes unlimited staff. If you have specific requirements, contact us and we'll build a package that fits your needs.",
   },
 ];
 
@@ -62,7 +63,7 @@ export default function PricingPage() {
                 Simple, transparent pricing
               </h1>
               <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-                40% cheaper than Connecteam. No hidden fees. Every plan includes a free 14-day trial.
+                Up to 50% cheaper than leading competitors. No hidden fees. Every plan includes a 7-day free trial.
               </p>
             </div>
           </AnimateOnScroll>
@@ -81,13 +82,14 @@ export default function PricingPage() {
         </div>
       </section>
 
+      <BetaPromo />
       <CTABanner
         title="Not sure which plan is right for you?"
         subtitle="Book a demo and we'll help you choose the best plan for your agency."
         primaryText="Book a Demo"
         primaryHref="/contact"
         secondaryText="Start Free Trial"
-        secondaryHref="/demo"
+        secondaryHref="/signup"
       />
     </>
   );

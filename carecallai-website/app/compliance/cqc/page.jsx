@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ShieldCheck, Check, Heart, Zap, Users, Eye, HandHeart } from "lucide-react";
 import AnimateOnScroll from "@/components/AnimateOnScroll";
 import CTABanner from "@/components/CTABanner";
+import BetaPromo from "@/components/BetaPromo";
 import FAQ from "@/components/FAQ";
 import { BreadcrumbJsonLd, FAQJsonLd } from "@/components/SEO/JsonLd";
 
@@ -117,7 +118,7 @@ export default function CQCCompliancePage() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link
-                href="/demo"
+                href="/signup"
                 className="px-8 py-3 bg-teal-600 text-white font-semibold rounded-lg hover:bg-teal-700 transition-colors"
               >
                 Start Free Trial
@@ -183,6 +184,7 @@ export default function CQCCompliancePage() {
         </div>
       </section>
 
+      <BetaPromo />
       <CTABanner
         title="Prepare for your next CQC inspection with confidence"
         subtitle="Start your free trial and see how CareCallAI makes compliance effortless."
