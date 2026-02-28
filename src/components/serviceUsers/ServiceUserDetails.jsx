@@ -24,6 +24,7 @@ import { ShiftCallApi } from '@/api/rotaApi';
 import { supabase } from '@/api/supabaseClient';
 import CallTypeManager from '../rota/CallTypeManager';
 import SafeguardingReports from './SafeguardingReports';
+import ClinicalPanel from '../clinical/ClinicalPanel';
 import {
   Phone,
   MapPin,
@@ -40,8 +41,62 @@ import {
   Plus,
   Clock,
   ListChecks,
-  Shield
+  Shield,
+  Languages,
+  Activity
 } from 'lucide-react';
+import { useLanguage } from '@/lib/LanguageContext';
+
+function DownloadCarePlanButton({ downloadMutation }) {
+  const { language, t } = useLanguage();
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => downloadMutation.mutate(language)}
+      disabled={downloadMutation.isPending}
+      className="flex-shrink-0"
+    >
+      {downloadMutation.isPending ? (
+        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+      ) : (
+        <Download className="w-3 h-3 mr-1" />
+      )}
+      {t('downloadPdf')}
+    </Button>
+  );
+}
+
+function LanguageToggle() {
+  const { language, setLanguage } = useLanguage();
+  return (
+    <div className="flex items-center gap-2">
+      <Languages className="w-4 h-4 text-slate-400 flex-shrink-0" />
+      <div className="flex rounded-md overflow-hidden border border-slate-300">
+        <button
+          onClick={() => setLanguage('en')}
+          className={`px-2 py-1 text-xs font-medium transition-colors ${
+            language === 'en'
+              ? 'bg-teal-600 text-white'
+              : 'bg-white text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          EN
+        </button>
+        <button
+          onClick={() => setLanguage('cy')}
+          className={`px-2 py-1 text-xs font-medium transition-colors border-l border-slate-300 ${
+            language === 'cy'
+              ? 'bg-red-600 text-white'
+              : 'bg-white text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          CY
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit, onEditDisabled = false, careLogs = [] }) {
    const queryClient = useQueryClient();
@@ -353,9 +408,10 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
   });
 
   const downloadMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (language) => {
       const response = await base44.functions.invoke('downloadCarePlanPDF', {
-        serviceUserId: serviceUser.id
+        serviceUserId: serviceUser.id,
+        language: language || 'en'
       });
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
@@ -485,7 +541,7 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
 
         <div className="pt-4">
         <Tabs defaultValue="info" className="w-full">
-           <TabsList className="grid w-full grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-8 gap-1 h-auto bg-transparent p-0 mb-6">
+           <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 md:grid-cols-5 lg:grid-cols-9 gap-1 h-auto bg-transparent p-0 mb-6">
              <TabsTrigger value="info" className="text-xs sm:text-sm font-bold rounded-lg py-2 px-2 sm:px-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-50 data-[state=active]:to-teal-100 data-[state=active]:border data-[state=active]:border-teal-300 data-[state=active]:text-teal-900 data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:bg-slate-50 transition-all">Info</TabsTrigger>
              <TabsTrigger value="care" className="text-xs sm:text-sm font-bold rounded-lg py-2 px-2 sm:px-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-50 data-[state=active]:to-teal-100 data-[state=active]:border data-[state=active]:border-teal-300 data-[state=active]:text-teal-900 data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:bg-slate-50 transition-all">Plan</TabsTrigger>
              <TabsTrigger value="medications" className="text-xs sm:text-sm font-bold rounded-lg py-2 px-2 sm:px-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-50 data-[state=active]:to-teal-100 data-[state=active]:border data-[state=active]:border-teal-300 data-[state=active]:text-teal-900 data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:bg-slate-50 transition-all">Meds</TabsTrigger>
@@ -502,6 +558,10 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
              <TabsTrigger value="safeguarding" className="text-xs sm:text-sm font-bold rounded-lg py-2 px-2 sm:px-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-50 data-[state=active]:to-purple-100 data-[state=active]:border data-[state=active]:border-purple-300 data-[state=active]:text-purple-900 data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:bg-slate-50 transition-all">
                <Shield className="w-3 h-3 mr-1 inline" />
                Safe
+             </TabsTrigger>
+             <TabsTrigger value="clinical" className="text-xs sm:text-sm font-bold rounded-lg py-2 px-2 sm:px-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-rose-50 data-[state=active]:to-rose-100 data-[state=active]:border data-[state=active]:border-rose-300 data-[state=active]:text-rose-900 data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:bg-slate-50 transition-all">
+               <Activity className="w-3 h-3 mr-1 inline" />
+               Clinical
              </TabsTrigger>
            </TabsList>
 
@@ -607,6 +667,10 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
           </TabsContent>
 
           <TabsContent value="care" className="space-y-4 mt-4">
+            <div className="flex items-center justify-between gap-2 p-2 bg-slate-50 rounded-lg border border-slate-200">
+              <LanguageToggle />
+              <DownloadCarePlanButton downloadMutation={downloadMutation} />
+            </div>
             <CarePlanViewer serviceUser={serviceUser} />
           </TabsContent>
 
@@ -1074,6 +1138,9 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
 
            <TabsContent value="safeguarding" className="space-y-3 mt-4">
              <SafeguardingReports serviceUser={serviceUser} />
+           </TabsContent>
+           <TabsContent value="clinical" className="space-y-3 mt-4">
+             <ClinicalPanel serviceUser={serviceUser} />
            </TabsContent>
            </Tabs>
            </div>

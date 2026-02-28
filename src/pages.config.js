@@ -42,6 +42,7 @@ import StaffManagement from './pages/StaffManagement';
 import Training from './pages/Training';
 import TrainingMatrix from './pages/TrainingMatrix';
 import WorkCalendar from './pages/WorkCalendar';
+import ClinicalDashboard from './pages/ClinicalDashboard';
 import ControlRoom from './pages/ControlRoom';
 import CourseSeeder from './pages/CourseSeeder';
 import __Layout from './Layout.jsx';
@@ -89,6 +90,7 @@ export const PAGES = {
     "Training": Training,
     "TrainingMatrix": TrainingMatrix,
     "WorkCalendar": WorkCalendar,
+    "ClinicalDashboard": ClinicalDashboard,
     "ControlRoom": ControlRoom,
     "CourseSeeder": CourseSeeder,
 }

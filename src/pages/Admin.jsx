@@ -28,7 +28,8 @@ import {
         Download,
         Bug,
         FileSpreadsheet,
-        Video
+        Video,
+        Activity
       } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -77,6 +78,17 @@ export default function AdminDashboard() {
             <Link to={createPageUrl('StaffManagement')} className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-bold text-base py-2">
               <Users className="w-5 h-5 text-blue-600 fill-blue-600" />
               Staff Management
+            </Link>
+          </div>
+        </div>
+
+        {/* Clinical */}
+        <div>
+          <h2 className="text-xl font-bold text-slate-900 mb-3">Clinical</h2>
+          <div className="space-y-2">
+            <Link to={createPageUrl('ClinicalDashboard')} className="flex items-center gap-2 text-rose-600 hover:text-rose-700 font-bold text-base py-2">
+              <Activity className="w-5 h-5 text-rose-600 fill-rose-600" />
+              Clinical Dashboard
             </Link>
           </div>
         </div>

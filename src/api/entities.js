@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient'
 import { enqueueAction } from '@/lib/offlineQueue'
+import { getCurrentOrgId } from '@/lib/orgContext'
 
 // ────────────────────────────────────────────────────────────────────────────
 // Tables where offline writes are supported.
@@ -190,6 +191,12 @@ function buildEntity(tableName) {
     async create(data) {
       const mappedData = mapKeys(data, tableName)
 
+      // Auto-inject organization_id if the table supports it and it's not already set
+      const orgId = getCurrentOrgId()
+      if (orgId && !mappedData.organization_id) {
+        mappedData.organization_id = orgId
+      }
+
       if (!navigator.onLine && OFFLINE_ENABLED_TABLES.has(tableName)) {
         await enqueueAction('create', tableName, mappedData)
         // Return a temporary object so the calling code doesn't break
@@ -345,6 +352,13 @@ export const entities = {
   Assessment:                  buildEntity('assessments'),
   SicknessRecord:              buildEntity('sickness_records'),
 
+  // Clinical
+  ClinicalObservation:         buildEntity('clinical_observations'),
+  WoundRecord:                 buildEntity('wound_records'),
+  FallsRecord:                 buildEntity('falls_records'),
+  RepositioningRecord:         buildEntity('repositioning_records'),
+  ContinenceRecord:            buildEntity('continence_records'),
+
   // Admin
   Incident:                    buildEntity('incidents'),
   AuditLog:                    buildEntity('audit_logs'),
@@ -360,6 +374,7 @@ export const entities = {
   WorkCalendarEvent:           buildEntity('work_calendar_events'),
   SharedFile:                  buildEntity('shared_files'),
   Payment:                     buildEntity('payments'),
+  Client:                      buildEntity('clients'),
   HolidayAllowance:            buildEntity('holiday_allowances'),
 
   // Compliance & Safeguarding
