@@ -105,6 +105,78 @@ export function PhoneScreenMAR() {
   );
 }
 
+export function PhoneScreenCareLog() {
+  return (
+    <div className="p-3 space-y-2">
+      <div className="mb-2">
+        <h3 className="text-xs font-bold text-slate-900">Care Log</h3>
+        <p className="text-[9px] text-slate-500">Margaret Jones &middot; Morning Call</p>
+      </div>
+      <div className="p-2 rounded-lg bg-green-50 border border-green-200 mb-2">
+        <div className="flex items-center gap-1.5 mb-1">
+          <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+          <span className="text-[9px] font-semibold text-green-800">Checked in at 08:02</span>
+        </div>
+        <p className="text-[8px] text-green-600">GPS verified &middot; 8m from address</p>
+      </div>
+      {[
+        { label: "Personal Care", checked: true },
+        { label: "Medication Given", checked: true },
+        { label: "Breakfast Prepared", checked: true },
+        { label: "Fluid Intake Recorded", checked: false },
+        { label: "Mood & Wellbeing", checked: false },
+      ].map((task, i) => (
+        <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-100">
+          <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${task.checked ? "bg-teal-600 border-teal-600" : "border-slate-300"}`}>
+            {task.checked && <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
+          </div>
+          <span className={`text-[10px] ${task.checked ? "text-slate-900 font-medium" : "text-slate-500"}`}>{task.label}</span>
+        </div>
+      ))}
+      <div className="p-2 rounded-lg bg-slate-50 border border-slate-100">
+        <p className="text-[8px] text-slate-400 mb-1">Notes</p>
+        <p className="text-[9px] text-slate-700">Margaret in good spirits. Ate full breakfast. Reminded about afternoon medication.</p>
+      </div>
+    </div>
+  );
+}
+
+export function PhoneScreenIncident() {
+  return (
+    <div className="p-3 space-y-2">
+      <div className="mb-2">
+        <h3 className="text-xs font-bold text-slate-900">Incident Report</h3>
+        <p className="text-[9px] text-slate-500">Quick report from mobile</p>
+      </div>
+      <div className="p-2 rounded-lg bg-red-50 border border-red-200">
+        <div className="flex items-center gap-1.5 mb-1">
+          <svg className="w-3 h-3 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
+          <span className="text-[9px] font-semibold text-red-800">Near Miss</span>
+        </div>
+      </div>
+      {[
+        { label: "Type", value: "Slip / Trip" },
+        { label: "Location", value: "Client&apos;s bathroom" },
+        { label: "Severity", value: "Low" },
+        { label: "Witness", value: "Sarah Thomas" },
+      ].map((field, i) => (
+        <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-100">
+          <span className="text-[9px] text-slate-500">{field.label}</span>
+          <span className="text-[9px] font-medium text-slate-900">{field.value}</span>
+        </div>
+      ))}
+      <div className="p-2 rounded-lg bg-slate-50 border border-slate-100">
+        <p className="text-[8px] text-slate-400 mb-1">Description</p>
+        <p className="text-[9px] text-slate-700">Client almost slipped on wet bathroom floor. Carer caught them. No injury. Floor mat repositioned.</p>
+      </div>
+      <button className="w-full py-2.5 bg-red-600 text-white text-xs font-bold rounded-xl">
+        Submit Report
+      </button>
+      <p className="text-[8px] text-center text-slate-400">Manager will be notified immediately</p>
+    </div>
+  );
+}
+
 export function PhoneScreenCheckIn() {
   return (
     <div className="p-3 space-y-3">

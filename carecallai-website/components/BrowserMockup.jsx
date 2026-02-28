@@ -142,6 +142,100 @@ export function InvoicingScreen() {
   );
 }
 
+export function StaffManagementScreen() {
+  return (
+    <div className="p-4">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-xs font-bold text-slate-900">Staff Management</h3>
+        <span className="text-[8px] bg-teal-600 text-white px-2 py-1 rounded font-medium">Add Staff</span>
+      </div>
+      <div className="grid grid-cols-4 gap-2 mb-4">
+        {[
+          { label: "Total Staff", value: "24", color: "text-blue-600", bg: "bg-blue-50" },
+          { label: "On Shift", value: "8", color: "text-green-600", bg: "bg-green-50" },
+          { label: "DBS Due", value: "2", color: "text-amber-600", bg: "bg-amber-50" },
+          { label: "Training Due", value: "3", color: "text-red-600", bg: "bg-red-50" },
+        ].map((s) => (
+          <div key={s.label} className={`${s.bg} rounded-lg p-2 text-center`}>
+            <p className={`text-sm font-bold ${s.color}`}>{s.value}</p>
+            <p className="text-[7px] text-slate-500">{s.label}</p>
+          </div>
+        ))}
+      </div>
+      <div className="border border-slate-200 rounded-lg overflow-hidden">
+        <div className="bg-slate-50 px-3 py-1.5 border-b border-slate-200">
+          <span className="text-[9px] font-semibold text-slate-700">Staff Overview</span>
+        </div>
+        {[
+          { name: "Sarah Thomas", role: "Senior Carer", dbs: "Valid", training: "100%", statusColor: "bg-green-100 text-green-700" },
+          { name: "James Morgan", role: "Carer", dbs: "Valid", training: "87%", statusColor: "bg-green-100 text-green-700" },
+          { name: "Lisa Roberts", role: "Carer", dbs: "Expiring", training: "92%", statusColor: "bg-amber-100 text-amber-700" },
+          { name: "Mark Davies", role: "Night Carer", dbs: "Valid", training: "75%", statusColor: "bg-green-100 text-green-700" },
+        ].map((s, i) => (
+          <div key={i} className="flex items-center justify-between px-3 py-2 border-b border-slate-100 last:border-0">
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded-full bg-teal-100 flex items-center justify-center">
+                <span className="text-[7px] font-bold text-teal-700">{s.name.split(" ").map(n => n[0]).join("")}</span>
+              </div>
+              <div>
+                <p className="text-[9px] font-medium text-slate-900">{s.name}</p>
+                <p className="text-[7px] text-slate-400">{s.role}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`text-[7px] px-1.5 py-0.5 rounded-full font-medium ${s.statusColor}`}>DBS: {s.dbs}</span>
+              <span className="text-[8px] font-semibold text-slate-700">{s.training}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function TrainingScreen() {
+  return (
+    <div className="p-4">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-xs font-bold text-slate-900">Training & Certificates</h3>
+        <span className="text-[8px] bg-teal-600 text-white px-2 py-1 rounded font-medium">Upload Certificate</span>
+      </div>
+      <div className="grid grid-cols-3 gap-2 mb-4">
+        {[
+          { label: "Completed", value: "156", color: "text-green-600" },
+          { label: "In Progress", value: "12", color: "text-blue-600" },
+          { label: "Overdue", value: "3", color: "text-red-600" },
+        ].map((s) => (
+          <div key={s.label} className="bg-slate-50 rounded-lg p-2 text-center">
+            <p className={`text-sm font-bold ${s.color}`}>{s.value}</p>
+            <p className="text-[7px] text-slate-500">{s.label}</p>
+          </div>
+        ))}
+      </div>
+      <div className="border border-slate-200 rounded-lg overflow-hidden">
+        <div className="bg-slate-50 px-3 py-1.5 border-b border-slate-200">
+          <span className="text-[9px] font-semibold text-slate-700">Training Matrix</span>
+        </div>
+        {[
+          { course: "Safeguarding Adults L2", staff: "24/24", status: "Complete", statusColor: "bg-green-100 text-green-700" },
+          { course: "Manual Handling", staff: "22/24", status: "2 due", statusColor: "bg-amber-100 text-amber-700" },
+          { course: "Medication Admin", staff: "24/24", status: "Complete", statusColor: "bg-green-100 text-green-700" },
+          { course: "First Aid at Work", staff: "21/24", status: "3 overdue", statusColor: "bg-red-100 text-red-700" },
+          { course: "Fire Safety", staff: "23/24", status: "1 due", statusColor: "bg-amber-100 text-amber-700" },
+        ].map((t, i) => (
+          <div key={i} className="flex items-center justify-between px-3 py-2 border-b border-slate-100 last:border-0">
+            <div>
+              <p className="text-[9px] font-medium text-slate-900">{t.course}</p>
+              <p className="text-[7px] text-slate-400">{t.staff} staff completed</p>
+            </div>
+            <span className={`text-[7px] px-1.5 py-0.5 rounded-full font-medium ${t.statusColor}`}>{t.status}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function ComplianceScreen() {
   return (
     <div className="p-4">
