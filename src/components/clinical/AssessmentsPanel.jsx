@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { toast } from 'sonner';
 import {
   ClipboardList, Plus, ChevronDown, ChevronUp, Calendar, AlertTriangle,
-  Activity, Scale, Footprints, Frown, Accessibility
+  Activity, Scale, Footprints, Frown, Accessibility, MessageCircle, Thermometer
 } from 'lucide-react';
 
 import WaterlowAssessment from './assessments/WaterlowAssessment';
@@ -16,6 +16,8 @@ import MUSTAssessment from './assessments/MUSTAssessment';
 import FallsRiskAssessment from './assessments/FallsRiskAssessment';
 import AbbeyPainScale from './assessments/AbbeyPainScale';
 import BarthelIndex from './assessments/BarthelIndex';
+import SALTAssessment from './assessments/SALTAssessment';
+import NEWS2Assessment from './assessments/NEWS2Assessment';
 
 const ASSESSMENT_TYPES = [
   { key: 'waterlow', label: 'Waterlow Pressure Sore', icon: AlertTriangle, description: 'Pressure sore risk assessment', component: WaterlowAssessment },
@@ -23,6 +25,8 @@ const ASSESSMENT_TYPES = [
   { key: 'falls_risk', label: 'Falls Risk', icon: Footprints, description: 'Multifactorial falls risk assessment', component: FallsRiskAssessment },
   { key: 'abbey_pain', label: 'Abbey Pain Scale', icon: Frown, description: 'Pain assessment for non-verbal clients', component: AbbeyPainScale },
   { key: 'barthel', label: 'Barthel Index', icon: Accessibility, description: 'Activities of daily living assessment', component: BarthelIndex },
+  { key: 'salt', label: 'SALT', icon: MessageCircle, description: 'Speech & Language Therapy — swallowing & communication', component: SALTAssessment },
+  { key: 'news2', label: 'NEWS2', icon: Thermometer, description: 'National Early Warning Score — acute illness detection', component: NEWS2Assessment },
 ];
 
 const RISK_STYLES = {
