@@ -34,7 +34,7 @@ export default function LiveChat() {
       ...prev,
       {
         from: "agent",
-        text: "Thanks for your message! One of our team will respond shortly. In the meantime, you can start a free trial at carecallai.com/demo or call us on 01234 567 890.",
+        text: "Thanks for your message! One of our team will respond shortly. In the meantime, you can start a free trial at carecallai.co.uk/signup or call us on 01824 538 688.",
         time: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
       },
     ]);

@@ -40,18 +40,32 @@ export default function ContactPage() {
                   <h3 className="font-semibold text-slate-900 mb-4">Contact Details</h3>
                   <div className="space-y-4">
                     <a
-                      href="tel:+441234567890"
+                      href="tel:+441824538688"
                       className="flex items-center gap-3 text-sm text-slate-600 hover:text-teal-600 transition-colors"
                     >
                       <Phone className="w-5 h-5 text-teal-600" />
-                      01234 567 890
+                      01824 538 688
                     </a>
                     <a
-                      href="mailto:hello@carecallai.com"
+                      href="mailto:hello@carecallai.co.uk"
                       className="flex items-center gap-3 text-sm text-slate-600 hover:text-teal-600 transition-colors"
                     >
                       <Mail className="w-5 h-5 text-teal-600" />
-                      hello@carecallai.com
+                      hello@carecallai.co.uk
+                    </a>
+                    <a
+                      href="mailto:support@carecallai.co.uk"
+                      className="flex items-center gap-3 text-sm text-slate-600 hover:text-teal-600 transition-colors"
+                    >
+                      <Mail className="w-5 h-5 text-teal-600" />
+                      support@carecallai.co.uk
+                    </a>
+                    <a
+                      href="mailto:billing@carecallai.co.uk"
+                      className="flex items-center gap-3 text-sm text-slate-600 hover:text-teal-600 transition-colors"
+                    >
+                      <Mail className="w-5 h-5 text-teal-600" />
+                      billing@carecallai.co.uk
                     </a>
                     <p className="flex items-center gap-3 text-sm text-slate-600">
                       <MapPin className="w-5 h-5 text-teal-600" />

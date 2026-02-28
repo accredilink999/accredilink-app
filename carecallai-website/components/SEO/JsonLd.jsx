@@ -4,11 +4,11 @@ export function OrganizationJsonLd() {
     "@type": "Organization",
     name: "CareCallAI",
     description: "All-in-one home care management software for UK domiciliary care agencies.",
-    url: "https://carecallai.com",
-    logo: "https://carecallai.com/logo.png",
+    url: "https://carecallai.co.uk",
+    logo: "https://carecallai.co.uk/logo.png",
     contactPoint: {
       "@type": "ContactPoint",
-      telephone: "+44-1234-567890",
+      telephone: "+44-1824-538688",
       contactType: "sales",
       areaServed: "GB",
       availableLanguage: ["English", "Welsh"],
@@ -29,9 +29,9 @@ export function SoftwareApplicationJsonLd() {
     offers: {
       "@type": "AggregateOffer",
       priceCurrency: "GBP",
-      lowPrice: "49",
-      highPrice: "299",
-      offerCount: "4",
+      lowPrice: "99",
+      highPrice: "349",
+      offerCount: "3",
     },
     aggregateRating: {
       "@type": "AggregateRating",
@@ -66,7 +66,7 @@ export function BreadcrumbJsonLd({ items }) {
       "@type": "ListItem",
       position: i + 1,
       name: item.name,
-      item: item.href ? `https://carecallai.com${item.href}` : undefined,
+      item: item.href ? `https://carecallai.co.uk${item.href}` : undefined,
     })),
   };
   return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }} />;
@@ -83,9 +83,9 @@ export function BlogPostJsonLd({ title, description, date, slug }) {
     publisher: {
       "@type": "Organization",
       name: "CareCallAI",
-      logo: { "@type": "ImageObject", url: "https://carecallai.com/logo.png" },
+      logo: { "@type": "ImageObject", url: "https://carecallai.co.uk/logo.png" },
     },
-    url: `https://carecallai.com/blog/${slug}`,
+    url: `https://carecallai.co.uk/blog/${slug}`,
   };
   return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }} />;
 }

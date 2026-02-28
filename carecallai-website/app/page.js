@@ -52,7 +52,7 @@ const faqs = [
   { question: "How long does it take to set up?", answer: "Most agencies are fully set up within a day. You can import your existing staff and client data, and our team is available to help with onboarding if needed." },
   { question: "Can my carers use it on their phones?", answer: "Yes. CareCallAI has native iOS and Android apps that carers use to view their rota, log care visits, complete MAR charts and report incidents — all from their phone." },
   { question: "Is there a free trial?", answer: "Yes. We offer a free 14-day trial on all plans with no credit card required. You get full access to every feature during the trial." },
-  { question: "How does pricing work?", answer: "CareCallAI is priced per month based on your team size. Plans start from £49/month for up to 15 users. Annual billing saves 20%. See our pricing page for full details." },
+  { question: "How does pricing work?", answer: "CareCallAI is priced per month based on your team size. Plans start from £79/month for up to 15 users. Annual billing saves 20%. See our pricing page for full details." },
   { question: "Does it connect to my accounting software?", answer: "Yes. CareCallAI integrates with QuickBooks, Sage and Xero for seamless invoice and payroll export. You can also invoice councils and private clients directly from the platform." },
 ];
 
@@ -94,12 +94,12 @@ export default function HomePage() {
               <AnimateOnScroll animation="slide-left" delay={200}>
                 <p className="text-lg text-slate-300 max-w-lg mb-8">
                   All-in-one software for scheduling, care logging, MAR charts, GPS tracking,
-                  compliance and invoicing. CIW & CQC ready. From £49/month.
+                  compliance and invoicing. CIW & CQC ready. From £79/month.
                 </p>
               </AnimateOnScroll>
               <AnimateOnScroll animation="fade-up" delay={300}>
                 <div className="flex flex-col sm:flex-row gap-4 mb-6">
-                  <Link href="/demo" className="px-8 py-3.5 bg-teal-500 text-white font-semibold rounded-xl hover:bg-teal-400 transition-all shadow-lg shadow-teal-500/30 text-lg animate-pulse-glow">
+                  <Link href="/signup" className="px-8 py-3.5 bg-teal-500 text-white font-semibold rounded-xl hover:bg-teal-400 transition-all shadow-lg shadow-teal-500/30 text-lg animate-pulse-glow">
                     Start Free 14-Day Trial
                   </Link>
                   <Link href="/features" className="px-8 py-3.5 border border-white/20 text-white font-semibold rounded-xl hover:bg-white/10 transition-all flex items-center gap-2 text-lg backdrop-blur">
@@ -252,22 +252,20 @@ export default function HomePage() {
             </AnimateOnScroll>
             <AnimateOnScroll animation="slide-right" delay={200}>
               <div>
-                <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur text-teal-300 text-sm font-medium px-4 py-1.5 rounded-full mb-4 border border-white/10">
-                  <FileSearch className="w-4 h-4" />
-                  Coming Soon
+                <div className="inline-flex items-center gap-2 bg-emerald-500/20 backdrop-blur text-emerald-300 text-sm font-medium px-4 py-1.5 rounded-full mb-4 border border-emerald-400/30">
+                  <ShieldCheck className="w-4 h-4" />
+                  Live Feature
                 </div>
                 <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">Virtual Care Inspector</h2>
                 <p className="text-slate-300 mb-6">
-                  An AI-powered audit tool that continuously inspects your records — care logs,
-                  MAR charts, staff training, incident reports and care plans — and flags
-                  shortfalls before a real inspector finds them.
+                  One click runs a full compliance audit across every record in your system — staff DBS checks, supervision cycles, training certificates, care plans, MAR charts, incident reports and governance filings. The same checks CIW and CQC inspectors perform, automated and instant.
                 </p>
                 <div className="space-y-3">
                   {[
-                    { icon: ShieldCheck, title: "Weekly automated audits", desc: "Runs a full compliance check across all records every week" },
-                    { icon: FileSearch, title: "Gap detection", desc: "Spots missing signatures, overdue training, incomplete care plans and unsigned MAR entries" },
-                    { icon: BarChart3, title: "Compliance scoring", desc: "Get a real-time compliance score by category — know your weakest areas instantly" },
-                    { icon: Lock, title: "Inspection readiness", desc: "Generates a pre-inspection report showing exactly what needs fixing before CIW or CQC arrive" },
+                    { icon: ShieldCheck, title: "50+ automated checks", desc: "Covers 8 inspection categories: staff compliance, supervisions, training, service users, medication, care delivery, incidents and governance" },
+                    { icon: FileSearch, title: "Instant gap detection", desc: "Flags missing DBS checks, expired training, overdue care plan reviews, MAR chart gaps, unresolved incidents and unfiled governance reports" },
+                    { icon: BarChart3, title: "Live compliance scoring", desc: "Real-time score per category with overall CIW/CQC rating — Excellent, Good, Adequate or Poor — so you always know where you stand" },
+                    { icon: Lock, title: "Inspection-ready reports", desc: "Every finding mapped to its regulation (CIW RISCA / CQC HSCA) with severity level and detail — fix issues before an inspector finds them" },
                   ].map((item, i) => (
                     <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-white/5 backdrop-blur border border-white/10">
                       <div className="w-10 h-10 bg-teal-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -280,8 +278,8 @@ export default function HomePage() {
                     </div>
                   ))}
                 </div>
-                <Link href="/contact" className="inline-flex items-center gap-2 mt-6 px-6 py-3 bg-teal-500 text-white font-semibold rounded-xl hover:bg-teal-400 transition-colors">
-                  Register Interest <ArrowRight className="w-4 h-4" />
+                <Link href="/signup" className="inline-flex items-center gap-2 mt-6 px-6 py-3 bg-teal-500 text-white font-semibold rounded-xl hover:bg-teal-400 transition-colors">
+                  Start Free Trial <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
             </AnimateOnScroll>

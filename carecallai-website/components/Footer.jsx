@@ -40,9 +40,7 @@ export default function Footer() {
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
             <Link href="/" className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 bg-teal-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">CC</span>
-              </div>
+              <img src="/logo-icon.png" alt="CareCall AI" className="w-9 h-9 rounded-lg" />
               <span className="text-lg font-bold text-white">
                 CareCall<span className="text-teal-400">AI</span>
               </span>
@@ -51,11 +49,14 @@ export default function Footer() {
               All-in-one home care management software for UK domiciliary care agencies.
             </p>
             <div className="space-y-2 text-sm">
-              <a href="tel:+441234567890" className="flex items-center gap-2 hover:text-teal-400 transition-colors">
-                <Phone className="w-4 h-4" /> 01234 567 890
+              <a href="tel:+441824538688" className="flex items-center gap-2 hover:text-teal-400 transition-colors">
+                <Phone className="w-4 h-4" /> 01824 538 688
               </a>
-              <a href="mailto:hello@carecallai.com" className="flex items-center gap-2 hover:text-teal-400 transition-colors">
-                <Mail className="w-4 h-4" /> hello@carecallai.com
+              <a href="mailto:hello@carecallai.co.uk" className="flex items-center gap-2 hover:text-teal-400 transition-colors">
+                <Mail className="w-4 h-4" /> hello@carecallai.co.uk
+              </a>
+              <a href="mailto:support@carecallai.co.uk" className="flex items-center gap-2 hover:text-teal-400 transition-colors">
+                <Mail className="w-4 h-4" /> support@carecallai.co.uk
               </a>
               <p className="flex items-center gap-2">
                 <MapPin className="w-4 h-4" /> Wales, United Kingdom
@@ -93,6 +94,9 @@ export default function Footer() {
             </Link>
             <Link href="/terms" className="hover:text-teal-400 transition-colors">
               Terms
+            </Link>
+            <Link href="/admin" className="hover:text-teal-400 transition-colors">
+              Admin
             </Link>
           </div>
         </div>

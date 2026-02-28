@@ -37,6 +37,12 @@ import {
   User,
   HelpCircle,
   Info,
+  Activity,
+  Heart,
+  GraduationCap,
+  Pill,
+  RefreshCw,
+  Download,
 } from 'lucide-react';
 import {
   format,
@@ -59,6 +65,13 @@ import {
   CATEGORY_LABELS,
   FRAMEWORK_LABELS,
 } from '@/config/complianceRegulations';
+import {
+  runVirtualInspection,
+  INSPECTION_CATEGORIES,
+  SEVERITY,
+  SEVERITY_LABELS,
+  SEVERITY_COLORS,
+} from '@/utils/virtualInspection';
 
 // ── Regulation Filing Form (dynamic from config) ────────────────────────────
 
@@ -338,6 +351,11 @@ export default function ComplianceManagement() {
   // Help/guidance dialog
   const [helpRegulation, setHelpRegulation] = useState(null);
 
+  // Virtual Inspection state
+  const [inspectionReport, setInspectionReport] = useState(null);
+  const [inspectionRunning, setInspectionRunning] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState(new Set());
+
   // Load framework setting
   const { data: frameworkSettings = [] } = useQuery({
     queryKey: ['complianceFramework'],
@@ -393,6 +411,57 @@ export default function ComplianceManagement() {
         return profiles.map(p => ({ id: p.id, name: p.staff_full_name || p.full_name || p.email, job_title: p.job_title, is_active: p.is_active }));
       }
     },
+  });
+
+  // Virtual Inspection data (lazy-loaded when inspection tab is active)
+  const { data: trainingCertificates = [] } = useQuery({
+    queryKey: ['trainingCertificates'],
+    queryFn: () => base44.entities.TrainingCertificate.list('-expiry_date'),
+  });
+
+  const { data: trainingMatrixRecords = [] } = useQuery({
+    queryKey: ['trainingMatrixRecords'],
+    queryFn: () => base44.entities.TrainingMatrixRecord.list(),
+  });
+
+  const { data: assessments = [] } = useQuery({
+    queryKey: ['assessments'],
+    queryFn: () => base44.entities.Assessment.list('-created_at'),
+  });
+
+  const { data: medicationRecords = [] } = useQuery({
+    queryKey: ['medicationRecords'],
+    queryFn: () => base44.entities.MedicationRecord.list(),
+  });
+
+  const { data: medicationAdministrations = [] } = useQuery({
+    queryKey: ['medicationAdministrations'],
+    queryFn: () => base44.entities.MedicationAdministration.list('-created_at', 500),
+  });
+
+  const { data: careLogs = [] } = useQuery({
+    queryKey: ['careLogsInspection'],
+    queryFn: () => base44.entities.CareLog.list('-visit_date', 500),
+  });
+
+  const { data: shifts = [] } = useQuery({
+    queryKey: ['shiftsInspection'],
+    queryFn: () => base44.entities.Shift.list('-date', 1000),
+  });
+
+  const { data: incidents = [] } = useQuery({
+    queryKey: ['incidents'],
+    queryFn: () => base44.entities.Incident.list('-created_at'),
+  });
+
+  const { data: safeguardingReports = [] } = useQuery({
+    queryKey: ['safeguardingReports'],
+    queryFn: () => base44.entities.SafeguardingReport.list('-created_at'),
+  });
+
+  const { data: formSubmissions = [] } = useQuery({
+    queryKey: ['formSubmissions'],
+    queryFn: () => base44.entities.FormSubmission.list('-created_at'),
   });
 
   // ── Mutations ──
@@ -696,6 +765,57 @@ export default function ComplianceManagement() {
     return matchesSearch && matchesStatus && matchesFramework;
   });
 
+  // ── Virtual Inspection runner ──
+  const handleRunInspection = () => {
+    setInspectionRunning(true);
+    setExpandedCategories(new Set());
+    // Slight delay so the spinner shows
+    setTimeout(() => {
+      const report = runVirtualInspection(
+        {
+          staff: staffList,
+          hrDocuments,
+          supervisions: allSupervisions,
+          trainingCertificates,
+          trainingMatrixRecords,
+          serviceUsers,
+          assessments,
+          medicationRecords,
+          medicationAdministrations,
+          careLogs,
+          shifts,
+          incidents,
+          safeguardingReports,
+          complianceReports,
+          formSubmissions,
+        },
+        framework
+      );
+      setInspectionReport(report);
+      setInspectionRunning(false);
+    }, 800);
+  };
+
+  const toggleCategoryExpanded = (cat) => {
+    setExpandedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+  };
+
+  const CATEGORY_ICONS = {
+    staff_compliance: Users,
+    supervision: ClipboardCheck,
+    training: GraduationCap,
+    service_users: Heart,
+    medication: Pill,
+    care_delivery: FileText,
+    incidents: AlertTriangle,
+    governance: Shield,
+  };
+
   // ── Category colors ──
   const categoryColors = {
     governance: 'border-l-blue-500',
@@ -739,14 +859,28 @@ export default function ComplianceManagement() {
         </div>
       </PageHeader>
 
-      <Tabs defaultValue="regulations" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 h-auto bg-transparent p-0 mb-4">
+      <Tabs defaultValue="inspection" className="w-full">
+        <TabsList className="grid w-full grid-cols-5 h-auto bg-transparent p-0 mb-4">
+          <TabsTrigger
+            value="inspection"
+            className="text-xs sm:text-sm font-bold rounded-lg py-2 px-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-50 data-[state=active]:to-teal-100 data-[state=active]:border data-[state=active]:border-emerald-300 data-[state=active]:text-emerald-900 data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:bg-slate-50 transition-all"
+          >
+            <Activity className="w-4 h-4 mr-1.5" />
+            <span className="hidden sm:inline">Inspection</span>
+            <span className="sm:hidden">Inspect</span>
+            {inspectionReport && (
+              <Badge className={`ml-1.5 text-xs ${inspectionReport.totalFindings > 0 ? 'bg-red-600 text-white' : 'bg-green-600 text-white'}`}>
+                {inspectionReport.totalFindings}
+              </Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger
             value="regulations"
             className="text-xs sm:text-sm font-bold rounded-lg py-2 px-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-50 data-[state=active]:to-teal-100 data-[state=active]:border data-[state=active]:border-teal-300 data-[state=active]:text-teal-900 data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:bg-slate-50 transition-all"
           >
             <BookOpen className="w-4 h-4 mr-1.5" />
-            Regulations
+            <span className="hidden sm:inline">Regulations</span>
+            <span className="sm:hidden">Regs</span>
           </TabsTrigger>
           <TabsTrigger
             value="supervisions"
@@ -780,6 +914,199 @@ export default function ComplianceManagement() {
             Calendar
           </TabsTrigger>
         </TabsList>
+
+        {/* ── TAB: Virtual Inspection ── */}
+        <TabsContent value="inspection" className="space-y-6 mt-4">
+          {/* Banner + Run button */}
+          <div className="p-4 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="font-bold text-emerald-900 flex items-center gap-2">
+                  <Activity className="w-5 h-5" />
+                  Virtual Care Inspection
+                </h3>
+                <p className="text-sm text-emerald-700 mt-1">
+                  Runs {Object.keys(INSPECTION_CATEGORIES).length} categories of automated checks against your live data — mirroring what {framework === 'ciw' ? 'CIW' : 'CQC'} inspectors look for.
+                </p>
+              </div>
+              <Button
+                onClick={handleRunInspection}
+                disabled={inspectionRunning}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 shrink-0"
+              >
+                {inspectionRunning ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Running...
+                  </>
+                ) : (
+                  <>
+                    <Activity className="w-4 h-4 mr-2" />
+                    {inspectionReport ? 'Run Again' : 'Run Inspection'}
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {!inspectionReport && !inspectionRunning && (
+            <Card className="p-12 text-center">
+              <Activity className="w-16 h-16 mx-auto mb-4 text-slate-300" />
+              <h3 className="text-lg font-semibold text-slate-700 mb-2">Ready to inspect</h3>
+              <p className="text-sm text-slate-500 max-w-md mx-auto mb-6">
+                Click &quot;Run Inspection&quot; to perform a full compliance audit across all your records.
+                The system will check staff DBS, supervisions, training, care plans, medication records, incidents, and governance filings.
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-2xl mx-auto">
+                {Object.values(INSPECTION_CATEGORIES).map(cat => {
+                  const Icon = CATEGORY_ICONS[cat.key] || Shield;
+                  return (
+                    <div key={cat.key} className="p-3 bg-slate-50 rounded-lg text-center">
+                      <Icon className="w-5 h-5 mx-auto mb-1 text-slate-500" />
+                      <p className="text-xs font-medium text-slate-600">{cat.label}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+
+          {inspectionRunning && (
+            <Card className="p-12 text-center">
+              <RefreshCw className="w-12 h-12 mx-auto mb-4 text-emerald-500 animate-spin" />
+              <h3 className="text-lg font-semibold text-slate-700 mb-2">Running inspection...</h3>
+              <p className="text-sm text-slate-500">Checking all records against {framework === 'ciw' ? 'CIW' : 'CQC'} requirements</p>
+            </Card>
+          )}
+
+          {inspectionReport && !inspectionRunning && (
+            <>
+              {/* Overall Score */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <Card className={`p-6 text-center col-span-1 ${inspectionReport.rating.bg} border-2`}>
+                  <p className="text-5xl font-black mb-1">{inspectionReport.overallScore}%</p>
+                  <p className={`text-lg font-bold ${inspectionReport.rating.color}`}>
+                    {inspectionReport.rating.label}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-2">
+                    {framework === 'ciw' ? 'CIW' : 'CQC'} Inspection Readiness
+                  </p>
+                  {inspectionReport.hasCritical && (
+                    <div className="mt-3 p-2 bg-red-100 border border-red-300 rounded-lg">
+                      <p className="text-xs text-red-700 font-semibold">
+                        Critical issues found — max rating capped at {framework === 'ciw' ? 'Adequate' : 'Requires Improvement'}
+                      </p>
+                    </div>
+                  )}
+                </Card>
+
+                <Card className="p-4 col-span-1 lg:col-span-2">
+                  <h4 className="text-sm font-semibold text-slate-700 mb-3">Findings Summary</h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[
+                      { key: 'critical', label: 'Critical', color: 'bg-red-100 text-red-700 border-red-300' },
+                      { key: 'high', label: 'High', color: 'bg-orange-100 text-orange-700 border-orange-300' },
+                      { key: 'medium', label: 'Medium', color: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
+                      { key: 'warning', label: 'Warning', color: 'bg-blue-100 text-blue-700 border-blue-300' },
+                    ].map(s => (
+                      <div key={s.key} className={`p-3 rounded-lg border text-center ${s.color}`}>
+                        <p className="text-2xl font-bold">{inspectionReport.severityCounts[s.key]}</p>
+                        <p className="text-xs font-medium">{s.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-3">
+                    {inspectionReport.totalFindings} total finding{inspectionReport.totalFindings !== 1 ? 's' : ''} &middot; Inspected {format(new Date(inspectionReport.timestamp), 'dd MMM yyyy HH:mm')}
+                  </p>
+                </Card>
+              </div>
+
+              {/* Category breakdown */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Category Breakdown</h3>
+                {Object.entries(INSPECTION_CATEGORIES).map(([catKey, catDef]) => {
+                  const catFindings = inspectionReport.byCategory[catKey] || [];
+                  const score = inspectionReport.categoryScores[catKey] ?? 100;
+                  const Icon = CATEGORY_ICONS[catKey] || Shield;
+                  const isExpanded = expandedCategories.has(catKey);
+                  const scoreColor = score >= 90 ? 'text-green-600' : score >= 75 ? 'text-blue-600' : score >= 50 ? 'text-orange-600' : 'text-red-600';
+                  const barColor = score >= 90 ? 'bg-green-500' : score >= 75 ? 'bg-blue-500' : score >= 50 ? 'bg-orange-500' : 'bg-red-500';
+
+                  return (
+                    <Card key={catKey} className="overflow-hidden">
+                      <div
+                        className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors"
+                        onClick={() => toggleCategoryExpanded(catKey)}
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${score >= 75 ? 'bg-emerald-100' : score >= 50 ? 'bg-orange-100' : 'bg-red-100'}`}>
+                            <Icon className={`w-5 h-5 ${score >= 75 ? 'text-emerald-600' : score >= 50 ? 'text-orange-600' : 'text-red-600'}`} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-semibold text-sm text-slate-900">{catDef.label}</h4>
+                              {catFindings.length > 0 && (
+                                <Badge className="text-xs bg-slate-100 text-slate-600">
+                                  {catFindings.length} finding{catFindings.length !== 1 ? 's' : ''}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-500 truncate">{catDef.description}</p>
+                            <div className="mt-2 w-full bg-slate-200 rounded-full h-2">
+                              <div
+                                className={`h-2 rounded-full transition-all duration-700 ${barColor}`}
+                                style={{ width: `${score}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0 ml-3">
+                          <span className={`text-lg font-bold ${scoreColor}`}>{score}%</span>
+                          {catFindings.length > 0 ? (
+                            isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />
+                          ) : (
+                            <CheckCircle className="w-5 h-5 text-green-500" />
+                          )}
+                        </div>
+                      </div>
+
+                      {isExpanded && catFindings.length > 0 && (
+                        <div className="px-4 pb-4 border-t border-slate-100 pt-3 space-y-2">
+                          {catFindings.map((finding, idx) => {
+                            const sev = SEVERITY_COLORS[finding.severity];
+                            return (
+                              <div
+                                key={idx}
+                                className={`flex items-start gap-3 p-3 rounded-lg border ${sev.bg} ${sev.border}`}
+                              >
+                                <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${sev.dot}`} />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className={`text-xs font-bold ${sev.text}`}>
+                                      {SEVERITY_LABELS[finding.severity]}
+                                    </span>
+                                    <span className="text-xs font-mono text-slate-500">{finding.checkId}</span>
+                                    {finding.regulation && (
+                                      <Badge className="text-xs bg-white/60 text-slate-600 font-normal">
+                                        {finding.regulation}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-sm font-medium text-slate-800 mt-0.5">{finding.title}</p>
+                                  <p className="text-xs text-slate-600 mt-0.5">{finding.detail}</p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </Card>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </TabsContent>
 
         {/* ── TAB: Regulations ── */}
         <TabsContent value="regulations" className="space-y-6 mt-4">
