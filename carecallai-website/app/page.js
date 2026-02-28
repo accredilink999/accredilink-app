@@ -116,7 +116,7 @@ export default function HomePage() {
               </AnimateOnScroll>
               <AnimateOnScroll animation="slide-left" delay={100}>
                 <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight mb-6">
-                  Home Care<br />Management<br />
+                  Care Management<br />
                   <span className="text-gradient">Made Simple</span>
                 </h1>
               </AnimateOnScroll>

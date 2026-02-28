@@ -11,37 +11,130 @@ import {
   Pill,
   ClipboardList,
   Calendar,
-  MapPin,
   Bot,
-  Receipt,
-  Smartphone,
   Send,
   Loader2,
   Star,
   Gift,
   Heart,
+  Moon,
+  Droplets,
+  PersonStanding,
+  Activity,
+  Wrench,
+  BedDouble,
+  UserCheck,
+  Flame,
+  Brain,
 } from "lucide-react";
 import AnimateOnScroll from "@/components/AnimateOnScroll";
 
-const comingFeatures = [
-  { icon: Building2, title: "Resident Management", desc: "Room assignments, bed tracking, occupancy dashboards and resident profiles tailored for care homes" },
-  { icon: ClipboardList, title: "Shift Handovers", desc: "Digital handover notes between shifts — no more lost information when teams change over" },
-  { icon: ShieldCheck, title: "Facility Compliance", desc: "CIW and CQC compliance checks built specifically for residential settings, including fire safety and building audits" },
-  { icon: Pill, title: "Medication Rounds", desc: "eMAR charts optimised for medication rounds across an entire home, with room-by-room administration" },
-  { icon: Users, title: "Visitor & Family Management", desc: "Visitor sign-in, family portal access and relative communication tools" },
-  { icon: Calendar, title: "Activity Planning", desc: "Plan and log resident activities, social events and outings with attendance tracking" },
+const coreFeatures = [
+  {
+    icon: ClipboardList,
+    title: "Digital Care Planning",
+    desc: "Person-centred care plans with clinical assessments — Waterlow, MUST, Abbey Pain Scale, falls risk and mental capacity assessments. Review scheduling and version history.",
+    tag: "Clinical",
+  },
+  {
+    icon: Pill,
+    title: "eMAR & Controlled Drugs",
+    desc: "Full electronic MAR with controlled drugs register, witness signatures, running balance, PRN protocols, covert medication records and stock management.",
+    tag: "Medication",
+  },
+  {
+    icon: Bot,
+    title: "AI Shift Handover",
+    desc: "Auto-generated handover summaries from each shift's care logs, incidents and medication changes. Staff see flagged events when they start their shift.",
+    tag: "Handover",
+  },
+  {
+    icon: Droplets,
+    title: "Fluid, Food & Nutrition",
+    desc: "Record every drink and meal offered, accepted or refused. Auto-calculate daily intake totals. Flag residents below hydration thresholds. IDDSI-compliant texture tracking.",
+    tag: "Monitoring",
+  },
+  {
+    icon: Moon,
+    title: "Night Checks & Welfare Rounds",
+    desc: "Configurable check intervals (1-4 hours). Record sleep quality, continence, repositioning and position. Ultra-simple dark-mode interface for minimal disruption.",
+    tag: "Overnight",
+  },
+  {
+    icon: Activity,
+    title: "Body Maps & Wound Tracking",
+    desc: "Digital body maps to mark, photograph and monitor wounds, pressure sores and bruises. Photo timeline to track healing progress over time.",
+    tag: "Clinical",
+  },
+  {
+    icon: BedDouble,
+    title: "Room & Occupancy Management",
+    desc: "Real-time room/bed dashboard showing occupied, vacant and reserved beds. Pre-admission assessments, admissions, transfers and discharge planning.",
+    tag: "Operations",
+  },
+  {
+    icon: PersonStanding,
+    title: "Falls Monitoring & Trends",
+    desc: "Multifactorial falls risk assessments. AI pattern detection showing time-of-day, location hotspots and contributing factors. Evidence of interventions for inspectors.",
+    tag: "Safety",
+  },
+  {
+    icon: UserCheck,
+    title: "Visitor Management",
+    desc: "Digital sign-in/sign-out for visitors, contractors and professionals. Safeguarding alerts for restricted visitors. Real-time fire register of everyone in the building.",
+    tag: "Security",
+  },
+  {
+    icon: Calendar,
+    title: "Activities & Wellbeing",
+    desc: "Plan group and 1:1 activities with attendance tracking. Mood and engagement logging. Life history and 'This is Me' documents for person-centred dementia care.",
+    tag: "Wellbeing",
+  },
+  {
+    icon: Wrench,
+    title: "Environment & Maintenance",
+    desc: "Maintenance request tracking, fire door checks, fire drill records, COSHH register, housekeeping schedules, temperature monitoring and equipment service dates.",
+    tag: "Premises",
+  },
+  {
+    icon: Heart,
+    title: "Family Portal",
+    desc: "Real-time portal showing actual care data — not just photos. Families see care logs, activities, meals and wellbeing updates. Reduces phone calls by hours per week.",
+    tag: "Families",
+  },
+  {
+    icon: Flame,
+    title: "Fire Safety & IPC",
+    desc: "Daily and weekly fire safety checks, fire alarm tests, fire risk assessments and drill records. Infection prevention and control audits with outbreak management protocols.",
+    tag: "Compliance",
+  },
+  {
+    icon: ShieldCheck,
+    title: "CIW & CQC Inspection Ready",
+    desc: "Pre-populated CIW annual return and statement of purpose. CQC KLOE-aligned evidence reports. Audit trails for every action. Pull any resident's complete history in seconds.",
+    tag: "Compliance",
+  },
+  {
+    icon: Users,
+    title: "Staff Rota, Training & Supervision",
+    desc: "Shift scheduling with dependency-based staffing levels. Training matrix with mandatory modules. 12-weekly supervision tracking. DBS monitoring with expiry alerts.",
+    tag: "Staffing",
+  },
+  {
+    icon: Brain,
+    title: "Clinical Assessments Suite",
+    desc: "Waterlow (pressure sore risk), MUST (malnutrition), Abbey Pain Scale, Barthel Index, NEWS2 scoring, DoLS records, DNACPR and advance care planning.",
+    tag: "Clinical",
+  },
 ];
 
-const includedFeatures = [
-  { icon: Calendar, title: "Full Scheduling & Rota" },
-  { icon: ClipboardList, title: "Digital Care Logging" },
-  { icon: Pill, title: "eMAR Charts" },
-  { icon: Users, title: "Staff Management & HR" },
-  { icon: ShieldCheck, title: "Virtual Care Inspector" },
-  { icon: MapPin, title: "GPS Check-In" },
-  { icon: Bot, title: "AI Assistant" },
-  { icon: Receipt, title: "Invoicing & Payroll" },
-  { icon: Smartphone, title: "Mobile App (iOS & Android)" },
+const painPoints = [
+  { problem: "Juggling 3-4 separate systems", solution: "One platform for clinical care, operations, environment and compliance" },
+  { problem: "Paper MAR charts and fluid charts", solution: "Digital records with full audit trail — no more lost paperwork" },
+  { problem: "Night staff don't use the software", solution: "Ultra-simple dark-mode interface designed for minimal taps" },
+  { problem: "Scrambling before CIW/CQC inspections", solution: "Inspection-ready reports generated instantly, any time" },
+  { problem: "Families phoning constantly for updates", solution: "Real-time family portal showing actual care data" },
+  { problem: "Verbal handovers losing critical information", solution: "AI-generated handover with auto-flagged events" },
 ];
 
 export default function BetaProgrammePage() {
@@ -103,12 +196,13 @@ export default function BetaProgrammePage() {
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight mb-6">
                 CareCallAI <span className="text-blue-400">Home</span>
               </h1>
+              <p className="text-lg text-blue-200 mb-2">Residential Care Home Management Software</p>
             </AnimateOnScroll>
             <AnimateOnScroll animation="fade-up" delay={200}>
               <p className="text-xl text-slate-300 max-w-3xl mx-auto mb-8">
-                Everything in CareCallAI, purpose-built for residential care homes. Join our Beta programme
-                to get full access, shape the product and receive <strong className="text-white">6 months free</strong> when
-                we launch.
+                Purpose-built for residential care homes, nursing homes and supported living.
+                Not a bolt-on to domiciliary care — a dedicated platform designed around how care homes actually work.
+                Join the Beta to shape the product and receive <strong className="text-white">6 months free</strong> on launch.
               </p>
             </AnimateOnScroll>
             <AnimateOnScroll animation="fade-up" delay={300}>
@@ -117,7 +211,7 @@ export default function BetaProgrammePage() {
                   Register Interest
                 </a>
                 <a href="#features" className="px-8 py-3.5 border border-white/20 text-white font-semibold rounded-xl hover:bg-white/10 transition-all flex items-center gap-2 text-lg backdrop-blur">
-                  See What&apos;s Coming <ArrowRight className="w-5 h-5" />
+                  See All Features <ArrowRight className="w-5 h-5" />
                 </a>
               </div>
             </AnimateOnScroll>
@@ -130,7 +224,7 @@ export default function BetaProgrammePage() {
         <div className="max-w-5xl mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
             {[
-              { icon: Gift, value: "6 Months Free", label: "On completion of the beta programme", color: "text-blue-600", bg: "bg-blue-100" },
+              { icon: Gift, value: "6 Months Free", label: "On launch after completing the beta programme", color: "text-blue-600", bg: "bg-blue-100" },
               { icon: CheckCircle, value: "Full Access", label: "Use every feature throughout development", color: "text-teal-600", bg: "bg-teal-100" },
               { icon: Heart, value: "Shape the Product", label: "Your feedback directly influences the final product", color: "text-rose-600", bg: "bg-rose-100" },
             ].map((item, i) => (
@@ -148,28 +242,60 @@ export default function BetaProgrammePage() {
         </div>
       </section>
 
-      {/* Coming features for care homes */}
+      {/* Pain points */}
+      <section className="py-16 bg-slate-50">
+        <div className="max-w-5xl mx-auto px-4">
+          <AnimateOnScroll>
+            <div className="text-center mb-12">
+              <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">Sound familiar?</h2>
+              <p className="text-slate-600 max-w-2xl mx-auto">Care home managers tell us the same things. CareCallAI Home is built to solve them.</p>
+            </div>
+          </AnimateOnScroll>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {painPoints.map((item, i) => (
+              <AnimateOnScroll key={i} delay={i * 60} animation="fade-up">
+                <div className="bg-white rounded-xl p-5 border border-slate-200 h-full">
+                  <p className="text-sm text-red-600 font-medium mb-1 line-through decoration-red-300">{item.problem}</p>
+                  <p className="text-sm text-slate-800 font-semibold flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 text-teal-600 mt-0.5 flex-shrink-0" />
+                    {item.solution}
+                  </p>
+                </div>
+              </AnimateOnScroll>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* All features */}
       <section id="features" className="py-16 sm:py-24 bg-gradient-to-b from-white to-blue-50">
         <div className="max-w-6xl mx-auto px-4">
           <AnimateOnScroll>
             <div className="text-center mb-12">
               <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-700 text-sm font-medium px-4 py-1.5 rounded-full mb-4">
                 <Building2 className="w-4 h-4" />
-                New for Residential Care
+                Built for Residential Care
               </div>
-              <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">What&apos;s coming in CareCallAI Home</h2>
-              <p className="text-slate-600 max-w-2xl mx-auto">Purpose-built features for residential care homes, nursing homes and supported living — designed with input from beta testers like you.</p>
+              <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">Everything a care home needs in one platform</h2>
+              <p className="text-slate-600 max-w-2xl mx-auto">
+                Clinical care, operations, environment, compliance and family communication — no more juggling separate systems.
+              </p>
             </div>
           </AnimateOnScroll>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {comingFeatures.map((feature, i) => (
-              <AnimateOnScroll key={i} delay={i * 80} animation="scale">
-                <div className="bg-white rounded-2xl p-6 border border-blue-200 shadow-sm hover:shadow-lg hover:border-blue-300 transition-all h-full">
-                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4">
-                    <feature.icon className="w-6 h-6 text-blue-600" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {coreFeatures.map((feature, i) => (
+              <AnimateOnScroll key={i} delay={i * 50} animation="scale">
+                <div className="bg-white rounded-2xl p-5 border border-blue-200 shadow-sm hover:shadow-lg hover:border-blue-300 transition-all h-full">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <feature.icon className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-base font-bold text-slate-900 leading-tight">{feature.title}</h3>
+                    </div>
+                    <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-medium flex-shrink-0">{feature.tag}</span>
                   </div>
-                  <h3 className="text-lg font-bold text-slate-900 mb-2">{feature.title}</h3>
-                  <p className="text-sm text-slate-600">{feature.desc}</p>
+                  <p className="text-sm text-slate-600 leading-relaxed">{feature.desc}</p>
                 </div>
               </AnimateOnScroll>
             ))}
@@ -177,32 +303,46 @@ export default function BetaProgrammePage() {
         </div>
       </section>
 
-      {/* Already included */}
-      <section className="py-16 sm:py-24 bg-blue-50">
-        <div className="max-w-5xl mx-auto px-4">
+      {/* How it differs */}
+      <section className="py-16 bg-white">
+        <div className="max-w-4xl mx-auto px-4">
           <AnimateOnScroll>
-            <div className="text-center mb-12">
-              <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">Plus everything already in CareCallAI</h2>
-              <p className="text-slate-600 max-w-2xl mx-auto">Beta testers get full access to every existing feature from day one — scheduling, care logging, eMAR, compliance, invoicing and more.</p>
+            <div className="bg-gradient-to-br from-blue-50 to-teal-50 rounded-2xl p-8 border border-blue-200">
+              <h2 className="text-2xl font-bold text-slate-900 mb-4 text-center">
+                Not a domiciliary care app with a new label
+              </h2>
+              <p className="text-slate-600 text-center mb-6">
+                CareCallAI Home is built from the ground up for residential settings. Here&apos;s what makes it different.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                {[
+                  { dom: "GPS check-in for home visits", home: "On-site welfare rounds and night checks" },
+                  { dom: "Visit-based care logging", home: "24/7 continuous care monitoring" },
+                  { dom: "Client invoicing for councils", home: "Room occupancy and bed management" },
+                  { dom: "Mileage and travel tracking", home: "Environment, fire safety and COSHH" },
+                  { dom: "One-off calls and scheduling", home: "Shift handovers with AI summaries" },
+                  { dom: "Individual medication visits", home: "Medication rounds across entire home" },
+                ].map((row, i) => (
+                  <div key={i} className="flex gap-3 bg-white rounded-lg p-3 border border-slate-200">
+                    <div className="flex-1">
+                      <p className="text-slate-400 text-xs font-medium mb-0.5">Dom Care</p>
+                      <p className="text-slate-500 line-through decoration-slate-300">{row.dom}</p>
+                    </div>
+                    <div className="w-px bg-slate-200" />
+                    <div className="flex-1">
+                      <p className="text-blue-600 text-xs font-medium mb-0.5">CareCallAI Home</p>
+                      <p className="text-slate-900 font-medium">{row.home}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </AnimateOnScroll>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            {includedFeatures.map((feature, i) => (
-              <AnimateOnScroll key={i} delay={i * 60} animation="fade-up">
-                <div className="flex items-center gap-3 bg-white rounded-xl p-4 border border-slate-200">
-                  <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <feature.icon className="w-5 h-5 text-teal-600" />
-                  </div>
-                  <span className="text-sm font-semibold text-slate-900">{feature.title}</span>
-                </div>
-              </AnimateOnScroll>
-            ))}
-          </div>
         </div>
       </section>
 
       {/* Registration Form */}
-      <section id="register" className="py-16 sm:py-24 bg-white">
+      <section id="register" className="py-16 sm:py-24 bg-slate-50">
         <div className="max-w-3xl mx-auto px-4">
           <AnimateOnScroll>
             <div className="text-center mb-10">
@@ -225,7 +365,7 @@ export default function BetaProgrammePage() {
             </AnimateOnScroll>
           ) : (
             <AnimateOnScroll animation="fade-up" delay={200}>
-              <form onSubmit={handleSubmit} className="bg-slate-50 rounded-2xl border border-slate-200 p-6 sm:p-8 space-y-5">
+              <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 space-y-5 shadow-sm">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Your Name *</label>
@@ -304,13 +444,13 @@ export default function BetaProgrammePage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">
-                    What are you looking for in care home software? (optional)
+                    What are your biggest challenges with current software? (optional)
                   </label>
                   <textarea
                     rows={4}
                     value={form.message}
                     onChange={(e) => setForm({ ...form, message: e.target.value })}
-                    placeholder="Tell us about your current challenges, what software you use, or what features matter most to you..."
+                    placeholder="Tell us about your current systems, what's not working, or what features matter most to your care home..."
                     className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors resize-none bg-white"
                   />
                 </div>
