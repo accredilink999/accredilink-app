@@ -19,7 +19,6 @@ import {
   BarChart3,
   Zap,
   Globe,
-  Lock,
   CheckCircle,
   AlertTriangle,
   Heart,
@@ -29,6 +28,13 @@ import {
   BadgeCheck,
   CircleDollarSign,
   X,
+  Stethoscope,
+  Scale,
+  Thermometer,
+  MessageCircle,
+  Footprints,
+  Bandage,
+  RotateCcw,
 } from "lucide-react";
 import AnimateOnScroll from "@/components/AnimateOnScroll";
 import FeatureCard from "@/components/FeatureCard";
@@ -90,6 +96,7 @@ const comparisonFeatures = [
   { feature: "AI Care Plan Drafting", us: true, typical: false, basic: false },
   { feature: "Training Matrix & Certificates", us: true, typical: "addon", basic: false },
   { feature: "Family Portal", us: true, typical: false, basic: false },
+  { feature: "Clinical Suite (NEWS2, SALT, Waterlow)", us: true, typical: false, basic: false },
 ];
 
 export default function HomePage() {
@@ -437,6 +444,67 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ─── CLINICAL SUITE — Enterprise Feature ─── */}
+      <section className="py-16 sm:py-24 bg-gradient-to-b from-white to-rose-50 overflow-hidden">
+        <div className="max-w-6xl mx-auto px-4">
+          <AnimateOnScroll>
+            <div className="text-center mb-16">
+              <div className="inline-flex items-center gap-2 bg-rose-100 text-rose-700 text-sm font-medium px-6 py-2 rounded-full mb-6 border border-rose-200">
+                <Stethoscope className="w-5 h-5" />
+                Enterprise Feature — Clinical Suite
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">
+                Clinical Assessments &<br />Monitoring Built In
+              </h2>
+              <p className="text-slate-600 max-w-3xl mx-auto">
+                NHS-standard clinical tools integrated directly into your care management platform.
+                No separate clinical system needed — assessments, observations and monitoring all in one place,
+                linked to every service user.
+              </p>
+            </div>
+          </AnimateOnScroll>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-12">
+            {[
+              { icon: Thermometer, title: "NEWS2", desc: "National Early Warning Score 2 — detect acute illness deterioration with all 7 physiological parameters and automated clinical escalation guidance", color: "bg-red-100", iconColor: "text-red-600" },
+              { icon: MessageCircle, title: "SALT Assessment", desc: "Speech & Language Therapy screening with full IDDSI framework (food levels 3-7, drink levels 0-4), swallowing signs and communication assessment", color: "bg-blue-100", iconColor: "text-blue-600" },
+              { icon: AlertTriangle, title: "Waterlow Score", desc: "Pressure sore risk assessment across 9 categories — age, build, skin type, mobility, appetite, continence, tissue malnutrition, neurological, surgery", color: "bg-amber-100", iconColor: "text-amber-600" },
+              { icon: Scale, title: "MUST Screening", desc: "Malnutrition Universal Screening Tool — BMI scoring, weight loss tracking and acute disease effect for nutritional risk assessment", color: "bg-green-100", iconColor: "text-green-600" },
+              { icon: Footprints, title: "Falls Risk & Monitoring", desc: "Multifactorial falls risk assessment plus falls log with contributing factors analysis, pattern detection and trend reporting", color: "bg-orange-100", iconColor: "text-orange-600" },
+              { icon: Bandage, title: "Wound Management", desc: "Active wound tracking with grading, measurements, dressing schedules, wound bed assessment and status progression (active → healing → healed)", color: "bg-purple-100", iconColor: "text-purple-600" },
+              { icon: Activity, title: "Vital Signs & Observations", desc: "Weight, blood pressure, temperature, pulse, O₂ sats and blood sugar — with trend tracking, normal range alerts and history charts", color: "bg-teal-100", iconColor: "text-teal-600" },
+              { icon: RotateCcw, title: "Repositioning Charts", desc: "Turning schedule compliance with 4-hour gap detection, position tracking and skin integrity checks for pressure sore prevention", color: "bg-indigo-100", iconColor: "text-indigo-600" },
+              { icon: ClipboardList, title: "Barthel & Abbey Pain", desc: "Barthel Index for ADL independence scoring and Abbey Pain Scale for non-verbal clients — complete with risk-level badges and review scheduling", color: "bg-rose-100", iconColor: "text-rose-600" },
+            ].map((item, i) => (
+              <AnimateOnScroll key={i} delay={i * 80} animation="scale">
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 h-full card-hover shadow-sm">
+                  <div className={`w-11 h-11 ${item.color} rounded-xl flex items-center justify-center mb-3`}>
+                    <item.icon className={`w-5 h-5 ${item.iconColor}`} />
+                  </div>
+                  <h4 className="font-bold text-slate-900 mb-1">{item.title}</h4>
+                  <p className="text-xs text-slate-500 leading-relaxed">{item.desc}</p>
+                </div>
+              </AnimateOnScroll>
+            ))}
+          </div>
+
+          <AnimateOnScroll animation="fade-up" delay={400}>
+            <div className="bg-gradient-to-r from-rose-50 to-white rounded-2xl p-8 border border-rose-200 text-center">
+              <p className="text-slate-700 max-w-2xl mx-auto mb-4">
+                Every clinical assessment saves directly to the service user&apos;s record with scored risk levels,
+                automated recommendations and review date tracking. The <strong>Clinical Dashboard</strong> gives
+                managers a single view of overdue assessments, active wounds, falls trends and weight loss alerts
+                across all clients.
+              </p>
+              <p className="text-sm text-slate-500 mb-4">Available on the Enterprise plan &middot; CIW &amp; CQC inspection-ready clinical records</p>
+              <Link href="/signup" className="inline-flex items-center gap-2 px-6 py-3 bg-rose-600 text-white font-semibold rounded-xl hover:bg-rose-700 transition-colors shadow-lg shadow-rose-600/20">
+                Start Free Trial <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </AnimateOnScroll>
+        </div>
+      </section>
+
       {/* ─── Bilingual Compliance — Welsh & English ─── */}
       <section className="py-16 sm:py-24 bg-gradient-to-b from-white to-slate-50 overflow-hidden">
         <div className="max-w-6xl mx-auto px-4">
@@ -619,7 +687,7 @@ export default function HomePage() {
             {[
               { name: "Starter", price: "99", users: "Up to 15 staff", highlight: false, features: ["Scheduling & Rota", "Care Logging", "Staff Management", "GPS Check-In", "Mobile App"] },
               { name: "Professional", price: "199", users: "Up to 30 staff", highlight: true, features: ["Everything in Starter", "eMAR Charts", "Invoicing & Payroll", "Training Matrix", "AI Assistant"] },
-              { name: "Enterprise", price: "349", users: "Unlimited staff", highlight: false, features: ["Everything in Professional", "Virtual Care Inspector", "CIW/CQC Compliance Suite", "Bilingual Compliance", "Priority Support"] },
+              { name: "Enterprise", price: "349", users: "Unlimited staff", highlight: false, features: ["Everything in Professional", "Virtual Care Inspector", "Clinical Suite (NEWS2, SALT, Waterlow)", "CIW/CQC Compliance Suite", "Priority Support"] },
             ].map((tier, i) => (
               <AnimateOnScroll key={tier.name} delay={i * 120} animation="scale">
                 <div className={`bg-white rounded-2xl p-6 border text-center card-hover ${tier.highlight ? "border-teal-500 shadow-xl ring-2 ring-teal-500" : "border-slate-200 shadow-sm"}`}>
