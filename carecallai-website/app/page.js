@@ -662,8 +662,8 @@ export default function HomePage() {
               full access to the entire platform throughout development — help shape the final product and
               receive <strong className="text-blue-700">6 months free</strong> once completed.
             </p>
-            <Link href="/signup" className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20">
-              Join the Beta Programme <ArrowRight className="w-4 h-4" />
+            <Link href="/beta" className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20">
+              Register Interest <ArrowRight className="w-4 h-4" />
             </Link>
             <p className="text-xs text-slate-500 mt-3">Full access &middot; Shape the product &middot; 6 months free on completion</p>
           </AnimateOnScroll>
