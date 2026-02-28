@@ -25,7 +25,7 @@ const features = [
   { feature: "Multi-area management", carecall: true, competitor: true },
   { feature: "Leave management", carecall: true, competitor: "Basic" },
   { feature: "Training tracking", carecall: true, competitor: "Basic" },
-  { feature: "Starting price", carecall: "£49/mo", competitor: "~£99/mo" },
+  { feature: "Starting price", carecall: "£99/mo", competitor: "~£99/mo" },
 ];
 
 export default function VsCarePlannerPage() {
@@ -73,7 +73,7 @@ export default function VsCarePlannerPage() {
                 CareCallAI extends beyond scheduling with full electronic MAR charts, native iOS and Android apps (not just web-based), push notifications for real-time alerts, and an AI assistant that helps draft care plans.
               </p>
               <p>
-                At <strong className="text-teal-600">£49/month</strong> versus CarePlanner&apos;s ~£99/month starting price, CareCallAI delivers more features at a lower cost.
+                At <strong className="text-teal-600">£99/month</strong> versus CarePlanner&apos;s ~£99/month starting price, CareCallAI delivers more features at a lower cost.
               </p>
             </div>
           </AnimateOnScroll>

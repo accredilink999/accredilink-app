@@ -147,10 +147,10 @@ export default async function BlogPostPage({ params }) {
           <div className="mt-12 p-6 bg-teal-50 rounded-2xl border border-teal-200">
             <h3 className="font-semibold text-slate-900 mb-2">Try CareCallAI for your agency</h3>
             <p className="text-sm text-slate-600 mb-4">
-              Start your free 14-day trial today. No credit card required.
+              Start your free 7-day trial today. No credit card required.
             </p>
             <Link
-              href="/demo"
+              href="/signup"
               className="inline-block px-6 py-2.5 bg-teal-600 text-white font-semibold rounded-lg hover:bg-teal-700 transition-colors text-sm"
             >
               Start Free Trial

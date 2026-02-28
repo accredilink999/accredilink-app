@@ -26,7 +26,7 @@ const features = [
   { feature: "Push notifications", carecall: true, competitor: true },
   { feature: "Leave management", carecall: true, competitor: "Basic" },
   { feature: "Training tracking", carecall: true, competitor: true },
-  { feature: "Starting price", carecall: "£49/mo", competitor: "~£200/mo" },
+  { feature: "Starting price", carecall: "£99/mo", competitor: "~£200/mo" },
 ];
 
 export default function VsBirdiePage() {
@@ -48,7 +48,7 @@ export default function VsBirdiePage() {
             </h1>
             <p className="text-lg text-slate-600 max-w-2xl mx-auto mb-8">
               Birdie is a well-known care platform — but it starts from £200/month. CareCallAI
-              delivers the same core features from just £49/month, with deeper Welsh compliance support.
+              delivers the same core features from just £99/month, with deeper Welsh compliance support.
             </p>
           </AnimateOnScroll>
         </div>
@@ -71,7 +71,7 @@ export default function VsBirdiePage() {
                 Birdie is a strong platform used by many care agencies in England. However, its pricing (from around £200/month) puts it out of reach for smaller agencies.
               </p>
               <p>
-                CareCallAI offers comparable core features — care logging, MAR charts, scheduling, incident reporting — starting from <strong className="text-teal-600">£49/month</strong>. For agencies in Wales, CareCallAI also provides deeper CIW compliance support, built by a team that understands Welsh care regulation.
+                CareCallAI offers comparable core features — care logging, MAR charts, scheduling, incident reporting — starting from <strong className="text-teal-600">£99/month</strong>. For agencies in Wales, CareCallAI also provides deeper CIW compliance support, built by a team that understands Welsh care regulation.
               </p>
               <p>
                 Additionally, CareCallAI includes invoicing and payroll features that Birdie doesn&apos;t offer, plus an AI assistant for care plan drafting.

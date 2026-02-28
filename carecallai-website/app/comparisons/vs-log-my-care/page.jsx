@@ -27,8 +27,8 @@ const features = [
   { feature: "AI assistant", carecall: true, competitor: false },
   { feature: "Leave management", carecall: true, competitor: false },
   { feature: "Training tracking", carecall: true, competitor: "Basic" },
-  { feature: "Free tier", carecall: "14-day trial", competitor: "Up to 10 users" },
-  { feature: "Starting paid price", carecall: "£49/mo", competitor: "Contact sales" },
+  { feature: "Free tier", carecall: "7-day trial", competitor: "Up to 10 users" },
+  { feature: "Starting paid price", carecall: "£99/mo", competitor: "Contact sales" },
 ];
 
 export default function VsLogMyCarePage() {
@@ -76,7 +76,7 @@ export default function VsLogMyCarePage() {
                 However, once your agency grows beyond a handful of staff, you need more: proper rota management with shift patterns, multi-area scheduling, invoicing, payroll, push notifications and AI assistance. That&apos;s where CareCallAI steps in.
               </p>
               <p>
-                CareCallAI&apos;s <strong className="text-teal-600">£49/month Starter plan</strong> covers up to 15 users and includes features that Log my Care doesn&apos;t offer at any tier — like automated shift patterns, base templates and integrated invoicing.
+                CareCallAI&apos;s <strong className="text-teal-600">£99/month Starter plan</strong> covers up to 15 users and includes features that Log my Care doesn&apos;t offer at any tier — like automated shift patterns, base templates and integrated invoicing.
               </p>
             </div>
           </AnimateOnScroll>

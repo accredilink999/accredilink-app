@@ -61,8 +61,8 @@ const faqs = [
   { question: "What does the Virtual Care Inspector do?", answer: "The Virtual Care Inspector runs a full automated inspection across 8 categories: staff compliance (DBS, ID, references), supervisions, training certificates, service users (care plans, assessments), medication (MAR charts), care delivery, incidents and governance. It gives you a live compliance score and flags every gap before a real inspector finds it." },
   { question: "How long does it take to set up?", answer: "Most agencies are fully set up within a day. You can import your existing staff and client data, and our team is available to help with onboarding if needed." },
   { question: "Can my carers use it on their phones?", answer: "Yes. CareCallAI has native iOS and Android apps that carers use to view their rota, log care visits, complete MAR charts and report incidents — all from their phone." },
-  { question: "Is there a free trial?", answer: "Yes. We offer a free 14-day trial on all plans with no credit card required. You get full access to every feature during the trial." },
-  { question: "How does pricing work?", answer: "CareCallAI is priced per month based on your team size. Plans start from £49/month for up to 15 users. Annual billing saves 20%. See our pricing page for full details." },
+  { question: "Is there a free trial?", answer: "Yes. We offer a free 7-day trial on all plans with no credit card required. You get full access to every feature during the trial." },
+  { question: "How does pricing work?", answer: "CareCallAI is priced per month based on your team size. Plans start from £99/month for up to 15 staff. Annual billing saves 20%. See our pricing page for full details." },
   { question: "Does it support Welsh language?", answer: "Yes. CareCallAI is built in Wales and includes full bilingual Welsh/English compliance support. All CIW regulations, guidance and forms are available in both languages — essential for Welsh-registered care providers." },
   { question: "Does it connect to my accounting software?", answer: "Yes. CareCallAI integrates with QuickBooks, Sage and Xero for seamless invoice and payroll export. You can also invoice councils and private clients directly from the platform." },
 ];
@@ -123,19 +123,19 @@ export default function HomePage() {
               <AnimateOnScroll animation="slide-left" delay={200}>
                 <p className="text-lg text-slate-300 max-w-lg mb-8">
                   All-in-one software for scheduling, care logging, MAR charts, GPS tracking,
-                  compliance and invoicing — with a built-in Virtual Care Inspector. CIW &amp; CQC ready. From £49/month.
+                  compliance and invoicing — with a built-in Virtual Care Inspector. CIW &amp; CQC ready. From £99/month.
                 </p>
               </AnimateOnScroll>
               <AnimateOnScroll animation="fade-up" delay={300}>
                 <div className="flex flex-col sm:flex-row gap-4 mb-6">
                   <Link href="/signup" className="px-8 py-3.5 bg-teal-500 text-white font-semibold rounded-xl hover:bg-teal-400 transition-all shadow-lg shadow-teal-500/30 text-lg animate-pulse-glow">
-                    Start Free 14-Day Trial
+                    Start Free 7-Day Trial
                   </Link>
                   <Link href="/features" className="px-8 py-3.5 border border-white/20 text-white font-semibold rounded-xl hover:bg-white/10 transition-all flex items-center gap-2 text-lg backdrop-blur">
                     See All Features <ArrowRight className="w-5 h-5" />
                   </Link>
                 </div>
-                <p className="text-sm text-slate-500">No credit card required &middot; Free 14-day trial &middot; Cancel anytime</p>
+                <p className="text-sm text-slate-500">No credit card required &middot; Free 7-day trial &middot; Cancel anytime</p>
               </AnimateOnScroll>
             </div>
 
@@ -431,7 +431,7 @@ export default function HomePage() {
               <Link href="/signup" className="inline-flex items-center gap-2 px-8 py-4 bg-teal-500 text-white font-bold text-lg rounded-xl hover:bg-teal-400 transition-all shadow-lg shadow-teal-500/30 animate-pulse-glow">
                 Start Free Trial — See Your Compliance Score <ArrowRight className="w-5 h-5" />
               </Link>
-              <p className="text-sm text-slate-500 mt-3">No credit card required &middot; Full access for 14 days</p>
+              <p className="text-sm text-slate-500 mt-3">No credit card required &middot; Full access for 7 days</p>
             </div>
           </AnimateOnScroll>
         </div>
@@ -536,7 +536,7 @@ export default function HomePage() {
                 <div className="p-4 font-semibold text-slate-700 text-sm">Feature</div>
                 <div className="p-4 text-center">
                   <p className="font-bold text-teal-600 text-sm">CareCallAI</p>
-                  <p className="text-[10px] text-slate-500">From £49/mo</p>
+                  <p className="text-[10px] text-slate-500">From £99/mo</p>
                 </div>
                 <div className="p-4 text-center">
                   <p className="font-semibold text-slate-600 text-sm">Typical Care Software</p>
@@ -617,9 +617,9 @@ export default function HomePage() {
           </AnimateOnScroll>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
-              { name: "Starter", price: "49", users: "Up to 15 users", highlight: false, features: ["Scheduling & Rota", "Care Logging", "MAR Charts", "GPS Check-In", "Mobile App"] },
-              { name: "Professional", price: "99", users: "Up to 50 users", highlight: true, features: ["Everything in Starter", "Virtual Care Inspector", "Invoicing & Payroll", "Training Matrix", "AI Assistant"] },
-              { name: "Enterprise", price: "199", users: "Up to 150 users", highlight: false, features: ["Everything in Professional", "Bilingual Compliance", "Priority Support", "Custom Integrations", "Dedicated Account Manager"] },
+              { name: "Starter", price: "99", users: "Up to 15 staff", highlight: false, features: ["Scheduling & Rota", "Care Logging", "Staff Management", "GPS Check-In", "Mobile App"] },
+              { name: "Professional", price: "199", users: "Up to 30 staff", highlight: true, features: ["Everything in Starter", "eMAR Charts", "Invoicing & Payroll", "Training Matrix", "AI Assistant"] },
+              { name: "Enterprise", price: "349", users: "Unlimited staff", highlight: false, features: ["Everything in Professional", "Virtual Care Inspector", "CIW/CQC Compliance Suite", "Bilingual Compliance", "Priority Support"] },
             ].map((tier, i) => (
               <AnimateOnScroll key={tier.name} delay={i * 120} animation="scale">
                 <div className={`bg-white rounded-2xl p-6 border text-center card-hover ${tier.highlight ? "border-teal-500 shadow-xl ring-2 ring-teal-500" : "border-slate-200 shadow-sm"}`}>
@@ -648,19 +648,24 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ─── CareCallAI Home — Care Homes ─── */}
+      {/* ─── CareCallAI Home — Beta Programme ─── */}
       <section className="py-16 bg-gradient-to-r from-blue-50 to-teal-50 overflow-hidden">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <AnimateOnScroll animation="zoom">
-            <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-700 text-sm font-medium px-4 py-1.5 rounded-full mb-4">
+            <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-700 text-sm font-medium px-4 py-1.5 rounded-full mb-4 animate-bounce-gentle">
               <Building2 className="w-4 h-4" />
-              Expanding to Residential Care
+              Beta Programme — Limited Places
             </div>
             <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">CareCallAI <span className="text-blue-600">Home</span></h2>
-            <p className="text-slate-600 max-w-2xl mx-auto mb-6">Everything in CareCallAI, tailored for residential care homes and on-site care providers. Shift handovers, resident management, room tracking and facility compliance — all in one platform.</p>
-            <Link href="/contact" className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20">
-              Register Interest <ArrowRight className="w-4 h-4" />
+            <p className="text-slate-600 max-w-2xl mx-auto mb-6">
+              Everything in CareCallAI, tailored for residential care homes. Join our Beta programme and get
+              full access to the entire platform throughout development — help shape the final product and
+              receive <strong className="text-blue-700">6 months free</strong> once completed.
+            </p>
+            <Link href="/signup" className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20">
+              Join the Beta Programme <ArrowRight className="w-4 h-4" />
             </Link>
+            <p className="text-xs text-slate-500 mt-3">Full access &middot; Shape the product &middot; 6 months free on completion</p>
           </AnimateOnScroll>
         </div>
       </section>

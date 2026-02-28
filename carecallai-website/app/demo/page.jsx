@@ -7,11 +7,11 @@ import { BreadcrumbJsonLd } from "@/components/SEO/JsonLd";
 export const metadata = {
   title: "Start Free Trial",
   description:
-    "Start your free 14-day CareCallAI trial. No credit card required. Full access to scheduling, care logging, MAR charts and compliance features.",
+    "Start your free 7-day CareCallAI trial. No credit card required. Full access to scheduling, care logging, MAR charts and compliance features.",
 };
 
 const trialBenefits = [
-  "Full access to all features for 14 days",
+  "Full access to all features for 7 days",
   "No credit card required",
   "Import your existing staff and client data",
   "Mobile app access for your whole team",
@@ -36,7 +36,7 @@ export default function DemoPage() {
             <AnimateOnScroll>
               <div>
                 <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">
-                  Try CareCallAI free for 14 days
+                  Try CareCallAI free for 7 days
                 </h1>
                 <p className="text-lg text-slate-600 mb-8">
                   See how CareCallAI can simplify your scheduling, care logging and compliance — with

@@ -48,7 +48,7 @@ export default function BlogPage() {
 
       <CTABanner
         title="Ready to simplify your care agency?"
-        subtitle="Start your free 14-day trial today."
+        subtitle="Start your free 7-day trial today."
       />
     </>
   );

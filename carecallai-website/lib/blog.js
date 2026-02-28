@@ -149,7 +149,7 @@ Modern care scheduling software like CareCallAI lets you:
 - Push changes to carers' phones in real time
 - Create a permanent audit trail of all scheduling decisions
 
-At £49/month, it pays for itself in the first week of coordinator time saved.
+At £99/month, it pays for itself in the first week of coordinator time saved.
     `,
   },
   {
