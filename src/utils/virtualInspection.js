@@ -204,6 +204,63 @@ function staffComplianceChecks(data, framework) {
         regulation: framework === 'ciw' ? 'CIW Reg 57' : 'CQC Reg 17',
       });
     }
+
+    // No ID on file (passport, driving licence, photo ID)
+    const hasId = staffDocs.some(d => {
+      const t = (d.document_type || d.title || d.category || '').toLowerCase();
+      return t.includes('id') || t.includes('passport') || t.includes('driv') ||
+             t.includes('licence') || t.includes('license') || t.includes('photo id') ||
+             t.includes('identification');
+    });
+    if (!hasId) {
+      findings.push({
+        category: 'staff_compliance',
+        severity: SEVERITY.HIGH,
+        checkId: 'STAFF_011',
+        title: 'No ID document on file',
+        detail: `${name} has no photo ID, passport or driving licence uploaded`,
+        staffId: s.id,
+        staffName: name,
+        regulation: framework === 'ciw' ? 'CIW Reg 29' : 'CQC Reg 19',
+      });
+    }
+
+    // No proof of address / residence
+    const hasAddress = staffDocs.some(d => {
+      const t = (d.document_type || d.title || d.category || '').toLowerCase();
+      return t.includes('address') || t.includes('residence') || t.includes('proof of address') ||
+             t.includes('utility') || t.includes('bank statement') || t.includes('council tax');
+    });
+    if (!hasAddress) {
+      findings.push({
+        category: 'staff_compliance',
+        severity: SEVERITY.MEDIUM,
+        checkId: 'STAFF_012',
+        title: 'No proof of address on file',
+        detail: `${name} has no proof of address or residence document uploaded`,
+        staffId: s.id,
+        staffName: name,
+        regulation: framework === 'ciw' ? 'CIW Reg 29' : 'CQC Reg 19',
+      });
+    }
+
+    // No references on file
+    const hasRef = staffDocs.some(d => {
+      const t = (d.document_type || d.title || d.category || '').toLowerCase();
+      return t.includes('reference') || t.includes('referee');
+    });
+    if (!hasRef) {
+      findings.push({
+        category: 'staff_compliance',
+        severity: SEVERITY.HIGH,
+        checkId: 'STAFF_013',
+        title: 'No references on file',
+        detail: `${name} has no employment references uploaded (minimum 2 required)`,
+        staffId: s.id,
+        staffName: name,
+        regulation: framework === 'ciw' ? 'CIW Reg 29' : 'CQC Reg 19',
+      });
+    }
   }
 
   return findings;
@@ -369,6 +426,20 @@ function serviceUserChecks(data, framework) {
 
   for (const su of activeUsers) {
     const name = su.full_name || su.first_name + ' ' + su.last_name || 'Unknown';
+
+    // No care plan at all
+    if (!su.care_plan && !su.care_plan_date) {
+      findings.push({
+        category: 'service_users',
+        severity: SEVERITY.CRITICAL,
+        checkId: 'SU_001',
+        title: 'No care plan',
+        detail: `${name} has no care plan on record — every service user must have a written personal plan`,
+        serviceUserId: su.id,
+        serviceUserName: name,
+        regulation: framework === 'ciw' ? 'CIW Reg 21' : 'CQC Reg 9',
+      });
+    }
 
     // Care plan review overdue
     if (su.plan_review_date) {
