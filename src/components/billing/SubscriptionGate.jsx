@@ -1,0 +1,64 @@
+import { checkOrgAccess, getCurrentOrg } from '@/lib/orgContext';
+import { useNavigate } from 'react-router-dom';
+import { AlertTriangle, CreditCard, Clock } from 'lucide-react';
+
+export default function SubscriptionGate() {
+  const navigate = useNavigate();
+  const access = checkOrgAccess();
+  const org = getCurrentOrg();
+
+  if (access.active) return null;
+
+  const isExpiredTrial = access.reason === 'trial_expired';
+  const isCancelled = access.reason === 'cancelled';
+
+  return (
+    <div className="fixed inset-0 z-[99999] bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center">
+        <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 ${
+          isExpiredTrial ? 'bg-amber-100' : 'bg-red-100'
+        }`}>
+          {isExpiredTrial ? (
+            <Clock className="w-8 h-8 text-amber-600" />
+          ) : (
+            <AlertTriangle className="w-8 h-8 text-red-600" />
+          )}
+        </div>
+
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">
+          {isExpiredTrial ? 'Your Trial Has Ended' : 'Subscription Inactive'}
+        </h2>
+
+        <p className="text-slate-600 mb-6">
+          {isExpiredTrial
+            ? 'Your 7-day free trial has expired. Subscribe to continue using CareCall AI with all features.'
+            : 'Your subscription has been cancelled or payment failed. Reactivate to regain access.'
+          }
+        </p>
+
+        {org?.name && (
+          <p className="text-sm text-slate-500 mb-6">
+            Organisation: <span className="font-medium">{org.name}</span>
+          </p>
+        )}
+
+        <button
+          onClick={() => navigate('/Settings', { state: { openBilling: true } })}
+          className="w-full py-3 bg-teal-600 text-white font-semibold rounded-lg hover:bg-teal-700 transition-colors flex items-center justify-center gap-2 mb-3"
+        >
+          <CreditCard className="w-5 h-5" />
+          {isExpiredTrial ? 'Subscribe Now' : 'Reactivate Subscription'}
+        </button>
+
+        <a
+          href="https://carecallai.co.uk/pricing"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm text-teal-600 hover:text-teal-700 underline"
+        >
+          View pricing plans
+        </a>
+      </div>
+    </div>
+  );
+}
