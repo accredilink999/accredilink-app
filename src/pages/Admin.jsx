@@ -28,8 +28,7 @@ import {
         Download,
         Bug,
         FileSpreadsheet,
-        Video,
-        Zap
+        Video
       } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -49,24 +48,6 @@ export default function AdminDashboard() {
           <h1 className="text-2xl font-bold text-slate-900">Admin Panel</h1>
         </div>
       </div>
-
-      {/* Platform Admin — only for platform owner */}
-      {isSuperAdmin && (
-        <div className="mb-6">
-          <Link
-            to={createPageUrl('PlatformAdmin')}
-            className="flex items-center gap-3 bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 rounded-lg p-4 hover:from-red-100 hover:to-orange-100 transition-colors"
-          >
-            <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
-              <Zap className="w-5 h-5 text-red-600" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-red-900">Platform Admin</h3>
-              <p className="text-xs text-red-600">Manage all CareCall AI customer organisations, plans & access</p>
-            </div>
-          </Link>
-        </div>
-      )}
 
       {/* Menu Sections */}
       <div className="space-y-4 mb-6">

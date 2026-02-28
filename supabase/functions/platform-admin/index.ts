@@ -4,9 +4,11 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const platformAdminEmails = (Deno.env.get('PLATFORM_ADMIN_EMAILS') || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
 
+const platformAdminSecret = Deno.env.get('PLATFORM_ADMIN_SECRET') || '';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-admin-secret',
 };
 
 function json(body: unknown, status = 200) {
@@ -21,20 +23,26 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Authenticate user
-  const authHeader = req.headers.get('Authorization') || '';
-  const token = authHeader.replace('Bearer ', '');
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
-  const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
 
-  if (authErr || !user) {
-    return json({ error: 'Unauthorized' }, 401);
-  }
+  // Auth method 1: Shared secret from website proxy
+  const adminSecret = req.headers.get('x-admin-secret') || '';
+  const isSecretAuth = platformAdminSecret && adminSecret === platformAdminSecret;
 
-  // Check platform admin access
-  const email = user.email?.toLowerCase() || '';
-  if (!platformAdminEmails.includes(email)) {
-    return json({ error: 'Forbidden — not a platform admin' }, 403);
+  // Auth method 2: Supabase user token + email check
+  if (!isSecretAuth) {
+    const authHeader = req.headers.get('Authorization') || '';
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
+
+    if (authErr || !user) {
+      return json({ error: 'Unauthorized' }, 401);
+    }
+
+    const email = user.email?.toLowerCase() || '';
+    if (!platformAdminEmails.includes(email)) {
+      return json({ error: 'Forbidden — not a platform admin' }, 403);
+    }
   }
 
   const { action, ...params } = await req.json();
