@@ -6,6 +6,15 @@ export const metadata = {
   description:
     "CareCallAI scheduling software for domiciliary care. Multi-area rotas, shift patterns, one-off calls, drag-and-drop scheduling and base templates.",
   keywords: ["care rostering software UK", "home care scheduling", "care staff rota software", "domiciliary care scheduling"],
+  openGraph: {
+    title: "Scheduling & Rota Management — CareCallAI",
+    description: "Multi-area rotas, shift patterns, drag-and-drop scheduling. Built for UK domiciliary care agencies.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Scheduling & Rota Management — CareCallAI",
+    description: "Multi-area rotas, shift patterns, drag-and-drop scheduling. Built for UK domiciliary care agencies.",
+  },
 };
 
 export default function SchedulingPage() {

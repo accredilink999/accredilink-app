@@ -8,6 +8,15 @@ export const metadata = {
   description:
     "Compare CareCallAI and CarePlanner for home care agencies. More features, better mobile experience, competitive pricing.",
   keywords: ["careplanner alternative", "careplanner vs carecallai", "care planner software comparison"],
+  openGraph: {
+    title: "CareCallAI vs CarePlanner — Feature Comparison",
+    description: "More features, better mobile experience, competitive pricing. See how CareCallAI compares to CarePlanner.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "CareCallAI vs CarePlanner — Feature Comparison",
+    description: "More features, better mobile experience, competitive pricing. See how CareCallAI compares to CarePlanner.",
+  },
 };
 
 const features = [

@@ -26,6 +26,15 @@ export const metadata = {
     "home care management features",
     "domiciliary care software features",
   ],
+  openGraph: {
+    title: "Features — CareCallAI",
+    description: "Scheduling, care logging, MAR charts, compliance, invoicing, mobile app & AI — all in one platform from £99/mo.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Features — CareCallAI",
+    description: "Scheduling, care logging, MAR charts, compliance, invoicing, mobile app & AI — all in one platform from £99/mo.",
+  },
 };
 
 const allFeatures = [

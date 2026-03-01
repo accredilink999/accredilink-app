@@ -6,6 +6,15 @@ export const metadata = {
   description:
     "Staff management software for care agencies. Leave requests, training tracking, DBS alerts, expenses, emergency contacts and editable profiles.",
   keywords: ["care staff management", "care worker HR software", "domiciliary care staff software"],
+  openGraph: {
+    title: "Staff Management — CareCallAI",
+    description: "Leave requests, training tracking, DBS alerts, expenses and profiles. Complete HR for care agencies.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Staff Management — CareCallAI",
+    description: "Leave requests, training tracking, DBS alerts, expenses and profiles. Complete HR for care agencies.",
+  },
 };
 
 export default function StaffManagementPage() {

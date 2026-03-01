@@ -7,6 +7,15 @@ export const metadata = {
   title: "Contact Us",
   description:
     "Get in touch with CareCallAI. Book a demo, ask about pricing, or get support. We're based in Wales and available Monday to Friday.",
+  openGraph: {
+    title: "Contact Us — CareCallAI",
+    description: "Book a demo, ask about pricing, or get support. Based in Wales, available Monday to Friday.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Contact Us — CareCallAI",
+    description: "Book a demo, ask about pricing, or get support. Based in Wales, available Monday to Friday.",
+  },
 };
 
 export default function ContactPage() {

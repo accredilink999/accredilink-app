@@ -6,6 +6,15 @@ export const metadata = {
   description:
     "Digital care logging for home care agencies. Real-time care logs with timestamps, evidence, medication prompts and full audit trails. CIW & CQC compliant.",
   keywords: ["digital care logging", "home care logs", "care visit recording", "domiciliary care records"],
+  openGraph: {
+    title: "Digital Care Logging — CareCallAI",
+    description: "Real-time care logs with timestamps, evidence and full audit trails. CIW & CQC compliant.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Digital Care Logging — CareCallAI",
+    description: "Real-time care logs with timestamps, evidence and full audit trails. CIW & CQC compliant.",
+  },
 };
 
 export default function CareLoggingPage() {

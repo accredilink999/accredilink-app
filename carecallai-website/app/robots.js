@@ -4,9 +4,9 @@ export default function robots() {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/api/", "/login"],
+        disallow: ["/api/", "/login", "/forgot-password", "/onboarding", "/admin"],
       },
     ],
-    sitemap: "https://carecallai.com/sitemap.xml",
+    sitemap: "https://carecallai.co.uk/sitemap.xml",
   };
 }

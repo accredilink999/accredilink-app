@@ -15,6 +15,15 @@ export const metadata = {
     "cheapest care software UK",
     "domiciliary care software pricing",
   ],
+  openGraph: {
+    title: "Pricing — From £99/mo | CareCallAI",
+    description: "Care management software from £99/mo. Up to 50% cheaper than competitors. 7-day free trial, no credit card required.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Pricing — From £99/mo | CareCallAI",
+    description: "Care management software from £99/mo. Up to 50% cheaper than competitors. 7-day free trial, no credit card required.",
+  },
 };
 
 const faqs = [

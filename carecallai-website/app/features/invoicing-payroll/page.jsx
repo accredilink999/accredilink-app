@@ -6,6 +6,15 @@ export const metadata = {
   description:
     "Care agency invoicing for councils and private clients. Payroll from logged shifts. Connects to QuickBooks, Sage and Xero. Automatic mileage expenses.",
   keywords: ["care agency invoicing", "care payroll software", "home care billing software", "council care invoicing", "quickbooks care software", "sage care integration", "xero care software"],
+  openGraph: {
+    title: "Invoicing & Payroll — CareCallAI",
+    description: "Council and private invoicing, payroll from logged shifts, QuickBooks/Sage/Xero integration and automatic mileage.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Invoicing & Payroll — CareCallAI",
+    description: "Council and private invoicing, payroll from logged shifts, QuickBooks/Sage/Xero integration and automatic mileage.",
+  },
 };
 
 export default function InvoicingPayrollPage() {

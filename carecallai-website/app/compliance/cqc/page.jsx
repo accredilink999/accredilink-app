@@ -11,6 +11,15 @@ export const metadata = {
   description:
     "How CareCallAI meets CQC requirements across all five key lines of enquiry. Safe, Effective, Caring, Responsive, Well-led.",
   keywords: ["CQC compliant care software", "Care Quality Commission software", "CQC key lines of enquiry software"],
+  openGraph: {
+    title: "CQC Compliance — CareCallAI",
+    description: "Covers all five CQC key lines of enquiry: Safe, Effective, Caring, Responsive, Well-led. Built-in compliance from £99/mo.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "CQC Compliance — CareCallAI",
+    description: "Covers all five CQC key lines of enquiry: Safe, Effective, Caring, Responsive, Well-led. Built-in compliance from £99/mo.",
+  },
 };
 
 const kloes = [

@@ -6,6 +6,15 @@ export const metadata = {
   description:
     "CIW and CQC compliant care software with built-in Virtual Care Inspector. 50+ automated compliance checks, real-time scoring, gap detection and inspection-ready reports.",
   keywords: ["CIW compliant care software", "CQC compliant care software", "care compliance software UK", "care audit trail software", "virtual care inspection", "care home compliance checker"],
+  openGraph: {
+    title: "Compliance & Virtual Care Inspector — CareCallAI",
+    description: "50+ automated compliance checks, real-time scoring, gap detection. The only platform with a Virtual Care Inspector.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Compliance & Virtual Care Inspector — CareCallAI",
+    description: "50+ automated compliance checks, real-time scoring, gap detection. The only platform with a Virtual Care Inspector.",
+  },
 };
 
 export default function CompliancePage() {

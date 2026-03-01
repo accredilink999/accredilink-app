@@ -11,6 +11,15 @@ export const metadata = {
   description:
     "How CareCallAI meets CIW (Care Inspectorate Wales) requirements for domiciliary care agencies. Automated audit trails, care logging, medication records and incident reporting.",
   keywords: ["CIW compliant care software", "Care Inspectorate Wales software", "CIW domiciliary care requirements"],
+  openGraph: {
+    title: "CIW Compliance — CareCallAI",
+    description: "Purpose-built for CIW compliance. Automated audit trails, care logging, MAR charts, incident reporting — inspection-ready from day one.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "CIW Compliance — CareCallAI",
+    description: "Purpose-built for CIW compliance. Automated audit trails, care logging, MAR charts, incident reporting — inspection-ready from day one.",
+  },
 };
 
 const requirements = [

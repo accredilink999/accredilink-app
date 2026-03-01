@@ -6,6 +6,15 @@ export const metadata = {
   description:
     "GPS-verified call check-in and check-out, QR code scanning, live staff tracking and automatic mileage logging for fuel expenses. Built for UK domiciliary care.",
   keywords: ["care worker GPS tracking", "home care check in check out", "care worker live tracking", "QR code care check in", "care mileage tracker"],
+  openGraph: {
+    title: "GPS Tracking & QR Check-In — CareCallAI",
+    description: "GPS-verified check-in/out, QR scanning, live tracking and automatic mileage logging for care workers.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "GPS Tracking & QR Check-In — CareCallAI",
+    description: "GPS-verified check-in/out, QR scanning, live tracking and automatic mileage logging for care workers.",
+  },
 };
 
 export default function GPSTrackingPage() {

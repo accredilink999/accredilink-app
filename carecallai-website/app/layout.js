@@ -10,7 +10,7 @@ const inter = Inter({
 });
 
 export const metadata = {
-  metadataBase: new URL("https://carecallai.com"),
+  metadataBase: new URL("https://carecallai.co.uk"),
   title: {
     default: "CareCallAI — Home Care Management Software UK",
     template: "%s | CareCallAI",
@@ -45,6 +45,13 @@ export const metadata = {
       "All-in-one home care management software for UK domiciliary care agencies.",
   },
   robots: { index: true, follow: true },
+  alternates: {
+    canonical: "https://carecallai.co.uk",
+  },
+  verification: {
+    // Add Google Search Console verification code here when available
+    // google: "your-verification-code",
+  },
 };
 
 export default function RootLayout({ children }) {
