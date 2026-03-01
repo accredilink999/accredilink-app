@@ -2,6 +2,8 @@
 
 > Ready-to-use ad copy for Google Ads, Facebook/Instagram, LinkedIn, and care industry directories.
 > All URLs point to **https://carecallai.co.uk**
+>
+> **Key proof point:** Our agency achieved **Good, Good, Good** at CIW inspection using CareCallAI.
 
 ---
 
@@ -22,6 +24,7 @@
 | CareCallAI — From £99/mo | All-in-one care management software. Scheduling, MAR charts, compliance & more. Try 7 days free. |
 | Home Care Software UK | Staff rota, care logging, eMAR, GPS tracking, invoicing. CIW & CQC compliant. From £99/mo. |
 | Care Software Made Simple | Everything your care agency needs in one app. 7-day free trial, no credit card required. |
+| Good, Good, Good at CIW | We use CareCallAI ourselves — and scored Good across the board. See what it can do for your agency. |
 
 **Sitelink extensions:**
 - Pricing — carecallai.co.uk/pricing
@@ -48,6 +51,7 @@
 | Pass Your CIW Inspection | Virtual Care Inspector runs 50+ compliance checks automatically. See gaps before the inspector does. |
 | CIW Compliant Care Software | Built for Welsh care agencies. Pre-populated CIW forms, audit trails, supervision tracking. £99/mo. |
 | CIW Inspection Ready? | CareCallAI checks your compliance in real time. 50+ automated checks. Start your free trial today. |
+| We Scored Good Good Good | Built by a care agency that just passed CIW with flying colours. The same tools, available to you. |
 
 **Ad Group B — CQC**
 
@@ -142,7 +146,9 @@
 **Primary text:**
 > Would your agency pass a CIW or CQC inspection today?
 >
-> CareCallAI's Virtual Care Inspector runs 50+ automated compliance checks — so you can find and fix gaps before the inspector arrives.
+> We just passed ours — Good, Good, Good — using CareCallAI.
+>
+> Our Virtual Care Inspector runs 50+ automated compliance checks so you can find and fix gaps before the inspector arrives.
 >
 > Pre-populated CIW forms. Complete audit trails. Real-time compliance scoring.
 >
@@ -198,14 +204,16 @@ Description: NEWS2, SALT, Waterlow, MUST, wound tracking
 **Budget:** £8–12/day
 
 **Primary text:**
-> "We tried three different care software systems before finding CareCallAI. It's the only one that actually understands what Welsh care agencies need — the CIW forms, the compliance tracking, everything. And it's half the price."
+> We built CareCallAI because we run a care agency ourselves — and we just scored **Good, Good, Good** at our CIW inspection.
 >
-> — Care Agency Manager, North Wales
+> Every feature in CareCallAI is something we use daily: scheduling, care logging, MAR charts, compliance tracking, GPS check-in, invoicing.
 >
-> Join hundreds of care professionals who've made the switch.
+> We didn't build this in a tech lab. We built it on the care floor.
+>
+> Now it's available to your agency too. From £99/mo. 7-day free trial.
 
-**Headline:** Trusted by UK Care Agencies
-**Description:** From £99/mo. 7-day free trial. No credit card required.
+**Headline:** Built by a Care Agency. Proven at CIW Inspection.
+**Description:** Good, Good, Good at CIW. The same tools, available to you. Try free for 7 days.
 **CTA button:** Start Free Trial
 **URL:** https://carecallai.co.uk/signup
 
@@ -293,7 +301,7 @@ CareCallAI is a comprehensive care management platform built specifically for UK
 - Wound tracking, body maps, fluid charts, repositioning logs
 
 **Why CareCallAI?**
-- Built by care professionals, for care professionals
+- Built by a care agency that scored Good, Good, Good at CIW inspection
 - The only platform with a Virtual Care Inspector
 - CIW & CQC compliant from day one
 - Up to 50% cheaper than competitors like Birdie
@@ -317,13 +325,13 @@ Use this for posting on care sector forums, Facebook groups (Care Managers UK, D
 
 ---
 
-**Subject: New care management software — built by a Welsh care professional**
+**Subject: We scored Good Good Good at CIW — here's the software we built to do it**
 
 Hi everyone,
 
-I wanted to share a care management platform I've been building called **CareCallAI**. I work in the care sector myself and was frustrated that none of the existing software really understood what Welsh agencies need for CIW compliance.
+I run a domiciliary care agency in North Wales and we've just had our CIW inspection — **Good, Good, Good** across the board.
 
-So I built one that does.
+A big part of that was the care management software I've been building called **CareCallAI**. I was frustrated that none of the existing software really understood what Welsh agencies need for CIW compliance, so I built one that does.
 
 **What it does:**
 - Staff scheduling with multi-area rotas and shift patterns
@@ -369,17 +377,54 @@ Cloud-based care management platform for domiciliary care agencies and residenti
 
 ## 5. Budget Summary & Recommendations
 
-### Monthly Ad Budget (Recommended Starting Budget)
+### Tier 1: Getting Started — £300/mo
+**Best for:** Testing the water, proving it works before scaling
 
-| Platform | Daily | Monthly | Focus |
+| Platform | Daily | Monthly | What to run |
 |---|---|---|---|
-| Google Ads — Brand + Product | £20 | £600 | High-intent searches |
-| Google Ads — Compliance | £15 | £450 | CIW/CQC worried managers |
-| Google Ads — Features | £20 | £600 | Feature-specific searches |
-| Google Ads — Competitor | £12 | £360 | Users comparing software |
-| Facebook/Instagram | £40 | £1,200 | Awareness + retargeting |
-| LinkedIn | £25 | £750 | Decision makers |
-| **Total** | **£132** | **£3,960** | |
+| Google Ads — Compliance | £10 | £300 | CIW/CQC compliance searches (highest intent) |
+| Directory listings | FREE | FREE | Capterra, G2, Facebook groups |
+| **Total** | **£10** | **£300** | |
+
+**Why this works:** People searching "CIW compliance software" are ready to buy. This is your cheapest route to paying customers. Directory listings are free and build long-term visibility.
+
+---
+
+### Tier 2: Building Momentum — £500/mo
+**Best for:** Steady growth once you've got your first few signups
+
+| Platform | Daily | Monthly | What to run |
+|---|---|---|---|
+| Google Ads — Compliance | £10 | £300 | CIW/CQC compliance searches |
+| Facebook — Compliance hook | £5 | £150 | "Would you pass a CIW inspection?" ad |
+| Google Ads — Brand + Product | £2 | £50 | Catch "care software" searches |
+| Directory listings | FREE | FREE | Capterra, G2, Facebook groups |
+| **Total** | **£17** | **£500** | |
+
+**Why this works:** Adds cheap Facebook awareness (care managers scroll Facebook daily) and picks up general "care software" searches.
+
+---
+
+### Tier 3: Scaling Up — £1,000/mo
+**Best for:** Once you're converting trials to paid and want to accelerate
+
+| Platform | Daily | Monthly | What to run |
+|---|---|---|---|
+| Google Ads — Compliance | £10 | £300 | CIW/CQC compliance searches |
+| Google Ads — Brand + Product | £10 | £300 | Core "care software" searches |
+| Facebook — Compliance hook + Social proof | £8 | £250 | Two ads rotating |
+| Facebook — Feature carousel | £5 | £150 | Awareness of full feature set |
+| Directory listings | FREE | FREE | All platforms |
+| **Total** | **£33** | **£1,000** | |
+
+---
+
+### Tier 4: Full Campaign — £2,000+/mo
+**Best for:** Aggressive growth, multiple channels
+
+Add LinkedIn (£15/day), Google competitor campaigns (£10/day), and retargeting.
+
+---
 
 ### Key Metrics to Track
 - **Cost per signup** (target: £15–25)
@@ -387,22 +432,17 @@ Cloud-based care management platform for domiciliary care agencies and residenti
 - **Trial-to-paid conversion rate** (target: 15–25%)
 - **Cost per paying customer** (target: £80–150)
 
-### Priority Order (if budget is limited)
-1. Google Ads — Compliance campaign (highest intent, lowest competition)
-2. Google Ads — Brand + Product (core searches)
-3. Facebook — Compliance hook ad (cheap awareness)
-4. Care directory listings (free/low cost)
-5. LinkedIn — Decision maker ad
-6. Google Ads — Competitor campaign
-7. Facebook — Feature carousel
+### Recommended Starting Point
+**Start with Tier 1 (£300/mo) for the first month.** If you're getting signups at under £25 each, move to Tier 2. Scale up as conversion data proves the spend is working.
 
-### Quick Wins (Free)
-- Submit to Digital Social Care catalogue
-- Post in care sector Facebook groups (with permission)
-- List on Capterra / G2 / Software Advice (free tiers)
-- Add to Welsh business directories (Business Wales, etc.)
-- Submit sitemap to Google Search Console
-- Set up Google Business Profile
+### Quick Wins (Free — Do These First)
+1. Post in care sector Facebook groups using the forum post template above
+2. Submit to Digital Social Care catalogue
+3. List on Capterra / G2 / Software Advice (free tiers)
+4. Add to Welsh business directories (Business Wales, etc.)
+5. Submit sitemap to Google Search Console
+6. Set up Google Business Profile
+7. Share the CIW Good Good Good result on social media
 
 ---
 
