@@ -1,7 +1,14 @@
 import { supabase } from '@/api/supabaseClient';
 import { ShiftCallApi, applyAreaFilter } from '@/api/rotaApi';
 import { base44 } from '@/api/base44Client';
+import { getCurrentOrgId } from '@/lib/orgContext';
 import { toast } from 'sonner';
+
+/** Add organization_id filter for defense-in-depth */
+function withOrgFilter(query) {
+  const orgId = getCurrentOrgId();
+  return orgId ? query.eq('organization_id', orgId) : query;
+}
 
 const VER = 'v5';
 const BATCH = 50;
@@ -111,7 +118,7 @@ export async function deployPatternShifts({
 
     if (noNameShifts && noNameShifts.length > 0) {
       // Fetch shift types to match by times
-      const { data: stTypes } = await supabase.from('shift_types').select('name, start_time, end_time');
+      const { data: stTypes } = await withOrgFilter(supabase.from('shift_types').select('name, start_time, end_time'));
       if (stTypes && stTypes.length > 0) {
         const typeMap = {};
         for (const st of stTypes) {
@@ -237,7 +244,7 @@ export async function deployPatternShifts({
             const shiftStartMins = sh * 60 + sm;
             const shiftEndMins = eh * 60 + em;
             const dur = parseInt(ct.duration) || 60;
-            if (callMins >= shiftStartMins && callMins + dur <= shiftEndMins) {
+            if (callMins >= shiftStartMins && callMins < shiftEndMins) {
               callsToCreate.push({
                 shift_id: shift.id,
                 service_user_id: su.id,
@@ -381,7 +388,7 @@ export async function clearPatternShifts({ patternId, staffId, areaId }) {
 
   // 2. Fallback: by staff_id + area (ALWAYS scoped to area to prevent cross-area clearing)
   if (staffId && areaId) {
-    let q = supabase.from('shifts').select('id, shift_name, paired_shift_id').eq('staff_id', staffId).gte('date', today);
+    let q = withOrgFilter(supabase.from('shifts').select('id, shift_name, paired_shift_id')).eq('staff_id', staffId).gte('date', today);
     q = applyAreaFilter(q, areaId);
     const { data } = await q;
 

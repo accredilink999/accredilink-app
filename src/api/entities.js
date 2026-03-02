@@ -43,6 +43,41 @@ const TABLE_DEFAULT_SORT = {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Tables that have organization_id — app-level defense-in-depth filtering.
+// Even though RLS enforces org isolation at the DB level, we also filter
+// in the app to prevent any possible data leakage if RLS is misconfigured.
+// ────────────────────────────────────────────────────────────────────────────
+const ORG_FILTERED_TABLES = new Set([
+  'users', 'rota_areas', 'rota_permissions', 'service_users', 'shifts',
+  'shift_calls', 'shift_types', 'shift_patterns', 'client_calls', 'care_logs',
+  'healthcare_logs', 'sitting_logs', 'notifications', 'notification_settings',
+  'messages', 'conversations', 'chat_messages', 'invoices', 'invoicing_settings',
+  'leave_requests', 'expenses', 'pay_periods', 'payroll_records',
+  'shift_swap_requests', 'shift_claim_requests', 'base_shift_templates',
+  'trainings', 'courses', 'modules', 'lessons', 'course_assignments',
+  'course_completions', 'training_certificates', 'training_matrix_records',
+  'training_matrix_items', 'documents', 'document_requirements', 'hr_documents',
+  'medication_administrations', 'medication_records', 'assessments',
+  'sickness_records', 'incidents', 'audit_logs', 'system_settings',
+  'care_log_form_configs', 'locations', 'assets', 'care_teams', 'forms',
+  'form_submissions', 'archives', 'work_calendar_events', 'shared_files',
+  'payments', 'clients', 'holiday_allowances', 'recurring_invoices',
+  'call_types', 'announcement_acknowledgements', 'compliance_reports',
+  'safeguarding_reports', 'supervision_records', 'meetings',
+  'meeting_participants', 'clinical_observations', 'wound_records',
+  'falls_records', 'repositioning_records', 'continence_records',
+])
+
+/** Add org filter to a query if the table supports it */
+function applyOrgFilter(query, tableName) {
+  const orgId = getCurrentOrgId()
+  if (orgId && ORG_FILTERED_TABLES.has(tableName)) {
+    return query.eq('organization_id', orgId)
+  }
+  return query
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Sort string parser
 // Base44 uses "-field_name" for DESC, "field_name" for ASC
 // e.g. "-created_date" → { column: 'created_at', ascending: false }
@@ -121,6 +156,7 @@ function buildEntity(tableName) {
      */
     async filter(criteria = {}, sort = null, limit = 1000) {
       let query = supabase.from(tableName).select('*')
+      query = applyOrgFilter(query, tableName) // defense-in-depth
       const mappedCriteria = mapKeys(criteria, tableName)
 
       Object.entries(mappedCriteria).forEach(([key, value]) => {
@@ -153,6 +189,7 @@ function buildEntity(tableName) {
      */
     async list(sort = null, limit = 1000) {
       let query = supabase.from(tableName).select('*')
+      query = applyOrgFilter(query, tableName) // defense-in-depth
 
       const sortOpts = parseSort(sort, tableName)
       if (sortOpts) {

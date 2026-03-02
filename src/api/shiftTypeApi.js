@@ -8,11 +8,18 @@
  * base44.entities.ShiftType directly.
  */
 import { supabase } from '@/api/supabaseClient'
+import { getCurrentOrgId } from '@/lib/orgContext'
+
+/** Add organization_id filter for defense-in-depth */
+function withOrgFilter(query) {
+  const orgId = getCurrentOrgId()
+  return orgId ? query.eq('organization_id', orgId) : query
+}
 
 // Direct Supabase implementation (always works, no cache dependency)
 const directApi = {
   async filter(criteria = {}) {
-    let q = supabase.from('shift_types').select('*')
+    let q = withOrgFilter(supabase.from('shift_types').select('*'))
     for (const [k, v] of Object.entries(criteria)) {
       if (v === null || v === undefined) {
         q = q.is(k, null)
@@ -26,10 +33,8 @@ const directApi = {
   },
 
   async list() {
-    const { data, error } = await supabase
-      .from('shift_types')
-      .select('*')
-      .order('name')
+    let q = withOrgFilter(supabase.from('shift_types').select('*'))
+    const { data, error } = await q.order('name')
     if (error) throw error
     return data || []
   },
@@ -57,7 +62,7 @@ const directApi = {
 
   /** Fetch active shift types for an area, including legacy types with no area set */
   async filterByArea(areaId) {
-    let q = supabase.from('shift_types').select('*').eq('is_active', true)
+    let q = withOrgFilter(supabase.from('shift_types').select('*')).eq('is_active', true)
     if (areaId) q = q.or(`area_id.eq.${areaId},area_id.is.null`)
     const { data, error } = await q.order('name')
     if (error) throw error

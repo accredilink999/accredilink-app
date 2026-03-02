@@ -5,6 +5,13 @@
  * import from here instead of using base44.entities.Shift / ShiftCall.
  */
 import { supabase } from '@/api/supabaseClient'
+import { getCurrentOrgId } from '@/lib/orgContext'
+
+/** Add organization_id filter for defense-in-depth */
+function withOrgFilter(query) {
+  const orgId = getCurrentOrgId()
+  return orgId ? query.eq('organization_id', orgId) : query
+}
 
 /**
  * Parse a base44-style order string like '-created_date' into
@@ -38,7 +45,7 @@ export function withBothAreaColumns(record) {
 
 export const ShiftApi = {
   async list(orderBy, limit = 500) {
-    let q = supabase.from('shifts').select('*')
+    let q = withOrgFilter(supabase.from('shifts').select('*'))
     const ord = parseOrder(orderBy)
     if (ord) q = q.order(ord.column, { ascending: ord.ascending })
     if (limit) q = q.limit(limit)
@@ -48,7 +55,7 @@ export const ShiftApi = {
   },
 
   async filter(criteria = {}, orderBy, limit) {
-    let q = supabase.from('shifts').select('*')
+    let q = withOrgFilter(supabase.from('shifts').select('*'))
     for (const [k, v] of Object.entries(criteria)) {
       if (v === null || v === undefined) {
         q = q.is(k, null)
@@ -125,7 +132,7 @@ export const ShiftApi = {
 
 export const ShiftCallApi = {
   async list(orderBy, limit = 500) {
-    let q = supabase.from('shift_calls').select('*')
+    let q = withOrgFilter(supabase.from('shift_calls').select('*'))
     const ord = parseOrder(orderBy)
     if (ord) q = q.order(ord.column, { ascending: ord.ascending })
     if (limit) q = q.limit(limit)
@@ -135,7 +142,7 @@ export const ShiftCallApi = {
   },
 
   async filter(criteria = {}, orderBy, limit) {
-    let q = supabase.from('shift_calls').select('*')
+    let q = withOrgFilter(supabase.from('shift_calls').select('*'))
     for (const [k, v] of Object.entries(criteria)) {
       if (v === null || v === undefined) {
         q = q.is(k, null)
@@ -211,7 +218,7 @@ export const ShiftCallApi = {
 
 export const ShiftPatternApi = {
   async list(orderBy, limit = 100) {
-    let q = supabase.from('shift_patterns').select('*')
+    let q = withOrgFilter(supabase.from('shift_patterns').select('*'))
     const ord = parseOrder(orderBy)
     if (ord) q = q.order(ord.column, { ascending: ord.ascending })
     if (limit) q = q.limit(limit)
@@ -221,7 +228,7 @@ export const ShiftPatternApi = {
   },
 
   async filter(criteria = {}, orderBy) {
-    let q = supabase.from('shift_patterns').select('*')
+    let q = withOrgFilter(supabase.from('shift_patterns').select('*'))
     for (const [k, v] of Object.entries(criteria)) {
       if (v === null || v === undefined) {
         q = q.is(k, null)
