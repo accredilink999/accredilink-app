@@ -1,16 +1,49 @@
-import { checkOrgAccess, getCurrentOrg } from '@/lib/orgContext';
+import { checkOrgAccess, getCurrentOrg, getCurrentOrgRole } from '@/lib/orgContext';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, CreditCard, Clock } from 'lucide-react';
+import { AlertTriangle, CreditCard, Clock, Sparkles } from 'lucide-react';
+import PlanSelector from './PlanSelector';
 
 export default function SubscriptionGate() {
   const navigate = useNavigate();
   const access = checkOrgAccess();
   const org = getCurrentOrg();
+  const role = getCurrentOrgRole();
 
   if (access.active) return null;
 
+  const isNewUser = access.reason === 'no_subscription';
   const isExpiredTrial = access.reason === 'trial_expired';
-  const isCancelled = access.reason === 'cancelled';
+
+  // New user who hasn't picked a plan yet — show full-screen plan selector
+  if (isNewUser && role === 'owner') {
+    return (
+      <div className="fixed inset-0 z-[99999] bg-gradient-to-b from-slate-50 to-white overflow-auto">
+        <PlanSelector />
+      </div>
+    );
+  }
+
+  // Staff member whose org owner hasn't set up billing
+  if (isNewUser && role !== 'owner') {
+    return (
+      <div className="fixed inset-0 z-[99999] bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center">
+          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 bg-amber-100">
+            <Clock className="w-8 h-8 text-amber-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">Account Setup in Progress</h2>
+          <p className="text-slate-600 mb-6">
+            Your organisation&apos;s owner needs to select a plan before you can access the app. Please contact your manager.
+          </p>
+          {org?.name && (
+            <p className="text-sm text-slate-500">
+              Organisation: <span className="font-medium">{org.name}</span>
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[99999] bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">

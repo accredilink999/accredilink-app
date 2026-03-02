@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react'
 import { supabase } from '@/api/supabaseClient'
 import { isBiometricEnabled } from '@/utils/biometric'
 import { clearAllDrafts } from '@/hooks/useFormPersistence'
+import { initOrg, resetOrg } from '@/lib/orgContext'
 
 const AuthContext = createContext()
 
@@ -74,6 +75,9 @@ export const AuthProvider = ({ children }) => {
         console.error('Profile load error:', error)
       }
 
+      // Initialize org context (fire-and-forget, non-blocking)
+      initOrg().catch(() => {})
+
       setUser({
         id: authUser.id,
         email: authUser.email,
@@ -95,6 +99,8 @@ export const AuthProvider = ({ children }) => {
     } catch (e) {
       console.error('signOut error (continuing):', e)
     }
+    // Clear org context
+    resetOrg()
     // Clear any saved form drafts
     clearAllDrafts()
     // Clear any cached Supabase tokens from localStorage

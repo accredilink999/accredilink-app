@@ -65,6 +65,7 @@ import { initFirebaseMessaging, requestFCMToken } from '@/lib/firebaseMessaging'
 import { toast } from 'sonner';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 import { useAuth } from '@/lib/AuthContext';
+import BillingSection from '@/components/billing/BillingSection';
 
 // Error boundary wrapper to prevent one section from crashing the entire page
 class SettingsErrorBoundary extends React.Component {
@@ -1334,6 +1335,12 @@ export default function Settings() {
         <BiometricSection user={user} />
       </SettingsErrorBoundary>
 
+      {/* Billing & Subscription — admin only */}
+      {isAdmin && (
+        <SettingsErrorBoundary>
+          <BillingSection />
+        </SettingsErrorBoundary>
+      )}
 
       {/* App Permissions — visible to all users */}
       <SettingsErrorBoundary>

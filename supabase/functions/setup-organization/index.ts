@@ -125,6 +125,7 @@ Deno.serve(async (req) => {
         full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
         role: 'super_admin',
         job_title: 'admin',
+        onboarding_complete: true,
       }, { onConflict: 'id' });
 
     // Ensure user record has org_id
