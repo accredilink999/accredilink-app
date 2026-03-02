@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Loader2, ChevronRight, ChevronLeft, Play, FileText, BookOpen, Menu, CheckCircle2 } from 'lucide-react';
+import { Loader2, ChevronRight, ChevronLeft, Play, FileText, BookOpen, Menu, CheckCircle2, ExternalLink, Info } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { toast } from 'sonner';
 
@@ -299,13 +299,26 @@ export default function CoursePlayer({ isOpen, onClose, courseId }) {
 
                   {/* Content */}
                   {currentLesson.video_url && (
-                    <div className="bg-black rounded-lg overflow-hidden aspect-video">
-                      <iframe
-                        src={currentLesson.video_url.includes('youtube.com') ? currentLesson.video_url.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/') : currentLesson.video_url}
-                        title={currentLesson.title}
-                        className="w-full h-full"
-                        allowFullScreen
-                      />
+                    <div className="rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                      <a
+                        href={currentLesson.video_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 p-4 hover:bg-slate-100 transition-colors"
+                      >
+                        <div className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center flex-shrink-0">
+                          <Play className="w-6 h-6 text-white fill-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-slate-900 truncate">{currentLesson.title}</p>
+                          <p className="text-xs text-slate-500">Watch on YouTube</p>
+                        </div>
+                        <ExternalLink className="w-5 h-5 text-slate-400 flex-shrink-0" />
+                      </a>
+                      <div className="px-4 py-2 bg-slate-100 border-t border-slate-200 flex items-start gap-2">
+                        <Info className="w-3.5 h-3.5 text-slate-400 mt-0.5 flex-shrink-0" />
+                        <p className="text-xs text-slate-500">This video is hosted externally by its creator. CareCall AI does not own or control external content.</p>
+                      </div>
                     </div>
                   )}
 

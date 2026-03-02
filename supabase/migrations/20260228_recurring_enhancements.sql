@@ -1,0 +1,11 @@
+ALTER TABLE recurring_invoices ADD COLUMN IF NOT EXISTS service_user_id uuid;
+ALTER TABLE recurring_invoices ADD COLUMN IF NOT EXISTS repeating_days integer[];
+ALTER TABLE recurring_invoices ADD COLUMN IF NOT EXISTS day_items jsonb;
+ALTER TABLE recurring_invoices ADD COLUMN IF NOT EXISTS original_invoice_id uuid;
+ALTER TABLE recurring_invoices ADD COLUMN IF NOT EXISTS last_generated_date date;
+ALTER TABLE recurring_invoices ADD COLUMN IF NOT EXISTS discount_type text DEFAULT 'fixed';
+ALTER TABLE recurring_invoices ADD COLUMN IF NOT EXISTS discount_value numeric DEFAULT 0;
+ALTER TABLE recurring_invoices ADD COLUMN IF NOT EXISTS client_email text;
+ALTER TABLE recurring_invoices ADD COLUMN IF NOT EXISTS is_batch boolean DEFAULT false;
+ALTER TABLE recurring_invoices ADD COLUMN IF NOT EXISTS batch_invoice_ids uuid[];
+ALTER TABLE recurring_invoices ADD COLUMN IF NOT EXISTS generation_count integer DEFAULT 0;

@@ -100,7 +100,7 @@ export default function TermsPage() {
           <h2>12. Contact</h2>
           <p>
             For questions about these terms, contact us at{" "}
-            <a href="mailto:legal@carecallai.com">legal@carecallai.com</a>.
+            <a href="mailto:hello@carecallai.co.uk">hello@carecallai.co.uk</a>.
           </p>
         </div>
       </section>

@@ -11,17 +11,31 @@ export default function ContactForm() {
     phone: "",
     message: "",
     agencySize: "",
+    department: "general",
   });
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
-    // Future: POST to API route
-    await new Promise((r) => setTimeout(r, 1000));
-    setSubmitted(true);
-    setSubmitting(false);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to send message.");
+      setSubmitted(true);
+    } catch (err) {
+      setError(err.message || "Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (submitted) {
@@ -82,20 +96,34 @@ export default function ContactForm() {
           />
         </div>
       </div>
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">Agency Size</label>
-        <select
-          value={form.agencySize}
-          onChange={(e) => setForm({ ...form, agencySize: e.target.value })}
-          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-colors"
-        >
-          <option value="">Select...</option>
-          <option value="1-10">1-10 staff</option>
-          <option value="11-25">11-25 staff</option>
-          <option value="26-50">26-50 staff</option>
-          <option value="51-100">51-100 staff</option>
-          <option value="100+">100+ staff</option>
-        </select>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Department</label>
+          <select
+            value={form.department}
+            onChange={(e) => setForm({ ...form, department: e.target.value })}
+            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-colors"
+          >
+            <option value="general">General Enquiry</option>
+            <option value="support">Technical Support</option>
+            <option value="billing">Billing</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Agency Size</label>
+          <select
+            value={form.agencySize}
+            onChange={(e) => setForm({ ...form, agencySize: e.target.value })}
+            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-colors"
+          >
+            <option value="">Select...</option>
+            <option value="1-10">1-10 staff</option>
+            <option value="11-25">11-25 staff</option>
+            <option value="26-50">26-50 staff</option>
+            <option value="51-100">51-100 staff</option>
+            <option value="100+">100+ staff</option>
+          </select>
+        </div>
       </div>
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1">Message *</label>
@@ -107,6 +135,12 @@ export default function ContactForm() {
           className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-colors resize-none"
         />
       </div>
+      {error && (
+        <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+          {error}
+        </div>
+      )}
+
       <button
         type="submit"
         disabled={submitting}

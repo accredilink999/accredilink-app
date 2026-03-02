@@ -5,19 +5,45 @@ import { useState } from 'react';
 export default function CallbackForm({ className = '' }) {
   const [formData, setFormData] = useState({ name: '', phone: '', bestTime: 'anytime' });
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const mailtoBody = `Callback Request%0A%0AName: ${formData.name}%0APhone: ${formData.phone}%0ABest Time: ${formData.bestTime}`;
-    window.location.href = `mailto:info@accredilinkcare.co.uk?subject=${encodeURIComponent('Callback Request')}&body=${mailtoBody}`;
-    setSubmitted(true);
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name,
+          phone: formData.phone,
+          best_time: formData.bestTime,
+          form_type: 'callback',
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to submit request.');
+      }
+
+      setSubmitted(true);
+    } catch (err) {
+      setError(err.message || 'Something went wrong. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (submitted) {
     return (
       <div className={`p-6 bg-green-50 rounded-2xl border border-green-200 text-center ${className}`}>
         <p className="font-semibold text-slate-900">Thank you!</p>
-        <p className="text-sm text-slate-600 mt-1">Your email client should have opened with the callback request.</p>
+        <p className="text-sm text-slate-600 mt-1">We'll call you back shortly.</p>
       </div>
     );
   }
@@ -53,11 +79,17 @@ export default function CallbackForm({ className = '' }) {
           <option value="afternoon">Afternoon (12pm - 5pm)</option>
           <option value="evening">Evening (5pm - 7pm)</option>
         </select>
+
+        {error && (
+          <p className="text-xs text-red-600">{error}</p>
+        )}
+
         <button
           type="submit"
-          className="w-full px-4 py-2.5 bg-[#B91C1C] text-white font-semibold rounded-lg hover:bg-[#DC2626] transition-colors text-sm"
+          disabled={submitting}
+          className="w-full px-4 py-2.5 bg-[#B91C1C] text-white font-semibold rounded-lg hover:bg-[#DC2626] transition-colors text-sm disabled:opacity-50"
         >
-          Request Callback
+          {submitting ? 'Submitting...' : 'Request Callback'}
         </button>
       </div>
     </form>

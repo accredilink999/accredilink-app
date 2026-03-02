@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Accredilink",
-  "short_name": "Accredilink",
-  "description": "Accredilink - Community Response Taskforce",
+  "name": "CareCall AI",
+  "short_name": "CareCall AI",
+  "description": "CareCall AI - Intelligent Care Management",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

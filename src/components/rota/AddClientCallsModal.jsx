@@ -97,14 +97,15 @@ export default function AddClientCallsModal({ shift, open, onClose }) {
         const callDuration = parseInt(ct.duration) || 30;
         const callEnd = callStart + callDuration;
 
-        // Check if call fits within shift window
-        if (callStart >= shiftStart && callEnd <= shiftEnd) {
+        // Check if call starts within the shift window (call can run up to/past shift end)
+        if (callStart >= shiftStart && callStart < shiftEnd) {
           const types = (ct.types && Array.isArray(ct.types)) ? ct.types : (ct.type ? [ct.type] : ['Visit']);
 
           // Check if this visit is already on the shift (one call per time slot per service user)
+          const hhmm = (t) => (t || '').slice(0, 5);
           const alreadyAdded = existingShiftCalls.some(sc =>
             sc.service_user_id === su.id &&
-            (sc.scheduled_time === ct.time || sc.call_time === ct.time)
+            (hhmm(sc.scheduled_time) === hhmm(ct.time) || hhmm(sc.call_time) === hhmm(ct.time))
           );
           if (alreadyAdded) {
             skippedAlready++;

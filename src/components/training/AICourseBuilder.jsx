@@ -100,7 +100,10 @@ ${questions.courseContent}
 CRITICAL: Extensively search the internet for additional content to enrich this course:
 - Research latest industry standards, best practices, and regulations
 - Find authoritative articles, guides, and case studies
-- Locate relevant YouTube training videos (use full URLs)
+- Locate relevant YouTube training videos from OFFICIAL UK care sector channels only:
+  * Skills for Care, NHS England, CQC, Social Care Institute for Excellence (SCIE)
+  * Health Education England, Royal College of Nursing, Care Forum Wales
+  * Other verified official/educational channels
 - Include real-world examples and scenarios from trusted sources
 - Add expert tips and professional insights from healthcare/care industry
 - Include downloadable resources and reference materials
@@ -109,7 +112,8 @@ Your task:
 - Parse the content and organize it into 8-15 logical modules
 - Create 3-5 lessons per module, enriched with internet research
 - Each lesson should have substantial content (300-500 words minimum)
-- Include multiple YouTube video URLs per module where relevant
+- Include YouTube video URLs from official/reputable channels where relevant (these will open externally, not embed)
+- Always include the channel name in the lesson description for attribution
 - Generate 15-20 practical assessment questions based on real scenarios
 - Add references to authoritative sources and materials
 
@@ -163,7 +167,10 @@ Difficulty Level: ${questions.difficulty}
 CRITICAL: Extensively research the internet to create rich, professional training content:
 - Search for the latest industry standards, regulations, and best practices
 - Find authoritative training materials, guides, and resources
-- Locate relevant YouTube training videos from reputable sources (use full URLs)
+- Locate relevant YouTube training videos from OFFICIAL UK care sector channels only:
+  * Skills for Care, NHS England, CQC, Social Care Institute for Excellence (SCIE)
+  * Health Education England, Royal College of Nursing, Care Forum Wales
+  * Other verified official/educational channels
 - Research real-world case studies and practical examples
 - Include expert insights from healthcare/care professionals
 - Find downloadable resources, templates, and reference materials
@@ -171,7 +178,7 @@ CRITICAL: Extensively research the internet to create rich, professional trainin
 Generate a complete course with:
 - 8-15 modules covering all key topics comprehensively
 - 3-5 lessons per module with detailed, research-backed content (300-500 words each)
-- Multiple video resources per module (YouTube URLs)
+- Video resources from official/reputable channels (these will open externally, not embed) — include channel name for attribution
 - Mix of text, video, and document resources
 - 15-20 practical assessment questions based on real scenarios
 - References to authoritative sources throughout

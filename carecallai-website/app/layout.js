@@ -1,4 +1,5 @@
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -49,14 +50,26 @@ export const metadata = {
     canonical: "https://carecallai.co.uk",
   },
   verification: {
-    // Add Google Search Console verification code here when available
-    // google: "your-verification-code",
+    google: "crtZqqM3R8KGjNm6I63eRwiQptRqQIe6gUwj7hWHqa8",
   },
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={inter.variable}>
+      <head>
+        <Script
+          async
+          src="https://www.googletagmanager.com/gtag/js?id=AW-17986058717"
+          strategy="afterInteractive"
+        />
+        <Script id="google-ads" strategy="afterInteractive">
+          {`window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'AW-17986058717');`}
+        </Script>
+      </head>
       <body className="antialiased">
         <Header />
         <main>{children}</main>

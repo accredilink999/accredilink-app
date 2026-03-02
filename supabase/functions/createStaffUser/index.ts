@@ -193,7 +193,42 @@ Deno.serve(async (req) => {
       steps.push('12-users-upserted');
     }
 
-    steps.push('13-done');
+    // Auto-add to admin's organization
+    steps.push('13-org-membership');
+    const { data: adminOrg } = await supabaseAdmin
+      .from('organization_members')
+      .select('organization_id')
+      .eq('user_id', currentUser.id)
+      .limit(1)
+      .single();
+
+    if (adminOrg?.organization_id) {
+      const { error: orgMemErr } = await supabaseAdmin
+        .from('organization_members')
+        .upsert({
+          organization_id: adminOrg.organization_id,
+          user_id: newUserId,
+          role: 'member',
+        }, { onConflict: 'organization_id,user_id' });
+
+      if (orgMemErr) {
+        warnings.push('org_member: ' + orgMemErr.message);
+        steps.push('14-org-member-FAILED:' + orgMemErr.message);
+      } else {
+        steps.push('14-org-member-added:' + adminOrg.organization_id);
+      }
+
+      // Also set organization_id on users row
+      await supabaseAdmin
+        .from('users')
+        .update({ organization_id: adminOrg.organization_id })
+        .eq('id', newUserId);
+    } else {
+      warnings.push('Admin has no organization — staff not added to any org');
+      steps.push('14-no-admin-org');
+    }
+
+    steps.push('15-done');
 
     return jsonResponse({
       success: true,

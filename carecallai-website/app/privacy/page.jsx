@@ -84,7 +84,7 @@ export default function PrivacyPage() {
           <h2>9. Contact</h2>
           <p>
             For privacy enquiries, contact us at{" "}
-            <a href="mailto:privacy@carecallai.com">privacy@carecallai.com</a>.
+            <a href="mailto:hello@carecallai.co.uk">hello@carecallai.co.uk</a>.
           </p>
         </div>
       </section>

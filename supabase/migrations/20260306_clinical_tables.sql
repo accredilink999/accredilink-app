@@ -117,10 +117,15 @@ ALTER TABLE falls_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE repositioning_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE continence_records ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "clinical_observations_auth" ON clinical_observations;
 CREATE POLICY "clinical_observations_auth" ON clinical_observations FOR ALL USING (auth.uid() IS NOT NULL);
+DROP POLICY IF EXISTS "wound_records_auth" ON wound_records;
 CREATE POLICY "wound_records_auth" ON wound_records FOR ALL USING (auth.uid() IS NOT NULL);
+DROP POLICY IF EXISTS "falls_records_auth" ON falls_records;
 CREATE POLICY "falls_records_auth" ON falls_records FOR ALL USING (auth.uid() IS NOT NULL);
+DROP POLICY IF EXISTS "repositioning_records_auth" ON repositioning_records;
 CREATE POLICY "repositioning_records_auth" ON repositioning_records FOR ALL USING (auth.uid() IS NOT NULL);
+DROP POLICY IF EXISTS "continence_records_auth" ON continence_records;
 CREATE POLICY "continence_records_auth" ON continence_records FOR ALL USING (auth.uid() IS NOT NULL);
 
 -- Indexes

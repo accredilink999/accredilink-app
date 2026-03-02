@@ -16,6 +16,7 @@ const navLinks = [
   { href: '/careers', label: 'Careers' },
   { href: '/contact', label: 'Contact' },
   { href: '/compliance', label: 'Compliance' },
+  { href: '/pricing', label: 'Pricing' },
 ];
 
 export default function Header() {
@@ -162,7 +163,7 @@ export default function Header() {
                 </Link>
               );
             })}
-            <div className="pt-1.5 border-t border-slate-100 mt-1.5">
+            <div className="pt-1.5 border-t border-slate-100 mt-1.5 space-y-0.5">
               <Link
                 href="/contact"
                 onClick={() => setMobileOpen(false)}

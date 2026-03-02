@@ -143,12 +143,18 @@ Deno.serve(async (req) => {
         return json({ success: true });
       }
 
-      // ─── Delete organization (nuclear option) ───
+      // ─── Delete organization and all its users ───
       case 'delete-org': {
         const { organizationId } = params;
         if (!organizationId) return json({ error: 'Missing organizationId' }, 400);
 
-        // Remove members first, then org (CASCADE should handle this but be explicit)
+        // Get all member user_ids before deleting
+        const { data: members } = await supabase
+          .from('organization_members')
+          .select('user_id')
+          .eq('organization_id', organizationId);
+
+        // Remove members, then org
         await supabase
           .from('organization_members')
           .delete()
@@ -160,6 +166,41 @@ Deno.serve(async (req) => {
           .eq('id', organizationId);
 
         if (error) throw error;
+
+        // Delete auth users for this org
+        const deleted: string[] = [];
+        for (const m of (members || [])) {
+          // Check if user is in any other org
+          const { data: otherOrgs } = await supabase
+            .from('organization_members')
+            .select('id')
+            .eq('user_id', m.user_id)
+            .limit(1);
+
+          if (!otherOrgs?.length) {
+            const { error: delErr } = await supabase.auth.admin.deleteUser(m.user_id);
+            if (!delErr) deleted.push(m.user_id);
+          }
+        }
+
+        return json({ success: true, deletedUsers: deleted.length });
+      }
+
+      // ─── Delete a single user from auth + org ───
+      case 'delete-user': {
+        const { userId } = params;
+        if (!userId) return json({ error: 'Missing userId' }, 400);
+
+        // Remove from org memberships
+        await supabase
+          .from('organization_members')
+          .delete()
+          .eq('user_id', userId);
+
+        // Delete from auth
+        const { error } = await supabase.auth.admin.deleteUser(userId);
+        if (error) throw error;
+
         return json({ success: true });
       }
 

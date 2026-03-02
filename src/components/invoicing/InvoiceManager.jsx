@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Edit2, Trash2, Download, Send, Check, MoreVertical, FileDown, ArrowRight, CheckCircle2, Eye, Layers } from 'lucide-react';
+import { Plus, Edit2, Trash2, Download, Send, Check, MoreVertical, FileDown, ArrowRight, CheckCircle2, Eye, Layers, RefreshCw, Pause, Play, Calendar, AlertTriangle } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from 'sonner';
 import InvoiceLineItemEditor from './InvoiceLineItemEditor';
@@ -42,6 +42,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
   const [downloadChoiceInvoice, setDownloadChoiceInvoice] = useState(null);
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState(new Set());
   const [combineLoading, setCombineLoading] = useState(false);
+  const [generatingTemplateId, setGeneratingTemplateId] = useState(null);
   const queryClient = useQueryClient();
 
   // Real-time invoice updates via Supabase
@@ -105,6 +106,19 @@ export default function InvoiceManager({ invoices, clients, settings }) {
         .single();
       if (error && error.code !== 'PGRST116') throw error;
       return data || {};
+    },
+  });
+
+  const { data: recurringTemplates = [] } = useQuery({
+    queryKey: ['recurringInvoices'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('recurring_invoices')
+        .select('*')
+        .order('next_invoice_date', { ascending: true })
+        .limit(200);
+      if (error) throw error;
+      return data || [];
     },
   });
 
@@ -198,15 +212,243 @@ export default function InvoiceManager({ invoices, clients, settings }) {
     },
     onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['recurringInvoices'] });
       await queryClient.refetchQueries({ queryKey: ['invoices'] });
       setShowRecurringDialog(false);
       setRecurringInvoiceData(null);
-      toast.success('Recurring invoice created successfully');
+      toast.success('Recurring invoice template created');
     },
     onError: (error) => {
       toast.error('Failed: ' + error.message);
     },
   });
+
+  // Calculate next invoice date based on frequency
+  const calculateNextInvoiceDate = (currentDate, frequency, dayOfMonth, dayOfWeek) => {
+    const d = new Date(currentDate);
+    switch (frequency) {
+      case 'weekly':
+        d.setDate(d.getDate() + 7);
+        break;
+      case 'bi-weekly':
+        d.setDate(d.getDate() + 14);
+        break;
+      case 'monthly':
+        d.setMonth(d.getMonth() + 1);
+        if (dayOfMonth) d.setDate(Math.min(dayOfMonth, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()));
+        break;
+      case 'quarterly':
+        d.setMonth(d.getMonth() + 3);
+        if (dayOfMonth) d.setDate(Math.min(dayOfMonth, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()));
+        break;
+      case 'annually':
+        d.setFullYear(d.getFullYear() + 1);
+        break;
+      default:
+        d.setMonth(d.getMonth() + 1);
+    }
+    return d.toISOString().split('T')[0];
+  };
+
+  // Generate invoice from recurring template
+  const generateFromRecurringMutation = useMutation({
+    mutationFn: async (template) => {
+      // 1. Fetch fresh invoice number
+      const { data: freshSettings } = await supabase
+        .from('invoicing_settings')
+        .select('id, invoice_prefix, next_invoice_number')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      const prefix = freshSettings?.invoice_prefix || invoicingSettings?.invoice_prefix || 'INV';
+      const settingsNum = freshSettings?.next_invoice_number || 2000;
+      const existingNums = invoices
+        .map(i => { const m = (i.invoice_number || '').match(new RegExp(`^${prefix}-(\\d+)$`)); return m ? parseInt(m[1]) : 0; })
+        .filter(n => n > 0);
+      const maxExisting = existingNums.length > 0 ? Math.max(...existingNums) : 0;
+      let nextNumber = Math.max(settingsNum, maxExisting + 1);
+
+      const today = new Date().toISOString().split('T')[0];
+      const periodFrom = template.next_invoice_date || today;
+
+      // Handle batch templates
+      if (template.is_batch) {
+        const batchInvoices = typeof template.line_items === 'string' ? JSON.parse(template.line_items) : (template.line_items || []);
+        const createdIds = [];
+        const batchPeriodFrom = template.period_from || periodFrom;
+        const batchPeriodTo = template.period_to || new Date(new Date(batchPeriodFrom).getTime() + ((template.invoice_period_days || 30) - 1) * 86400000).toISOString().split('T')[0];
+        for (const invData of batchInvoices) {
+          const invNumber = `${prefix}-${nextNumber}`;
+          const payDays = parseInt(invData.payment_terms || template.payment_terms || '30') || 30;
+          const dueDate = new Date(new Date(batchPeriodFrom).getTime() + payDays * 86400000).toISOString().split('T')[0];
+
+          const { data: newInv, error } = await supabase.from('invoices').insert({
+            invoice_number: invNumber,
+            client_id: invData.client_id || template.client_id,
+            client_name: invData.client_name || template.client_name,
+            client_email: invData.client_email || template.client_email,
+            service_user_id: invData.service_user_id || template.service_user_id,
+            invoice_date: today,
+            due_date: dueDate,
+            period_from: batchPeriodFrom,
+            period_to: batchPeriodTo,
+            payment_terms: invData.payment_terms || template.payment_terms,
+            notes: invData.notes || template.notes,
+            line_items: invData.day_items ? null : invData.line_items,
+            day_items: invData.day_items || null,
+            repeating_days: invData.repeating_days || null,
+            discount_type: invData.discount_type || 'fixed',
+            discount_value: invData.discount_value || 0,
+            subtotal: invData.subtotal || invData.total_amount || 0,
+            tax_amount: invData.tax_amount || 0,
+            total_amount: invData.total_amount || 0,
+            amount_due: invData.total_amount || 0,
+            currency: invData.currency || template.currency || 'GBP',
+            status: 'draft',
+          }).select().single();
+          if (error) throw error;
+          createdIds.push(newInv.id);
+          nextNumber++;
+        }
+        // Update settings number
+        if (freshSettings) {
+          await supabase.from('invoicing_settings').update({ next_invoice_number: nextNumber }).eq('id', freshSettings.id);
+        }
+        // Advance batch period dates
+        const batchDays = template.invoice_period_days || 30;
+        const nextBatchFrom = new Date(new Date(batchPeriodFrom).getTime() + batchDays * 86400000).toISOString().split('T')[0];
+        const nextBatchTo = new Date(new Date(batchPeriodTo).getTime() + batchDays * 86400000).toISOString().split('T')[0];
+        const nextDate = calculateNextInvoiceDate(periodFrom, template.frequency, template.day_of_month, template.day_of_week);
+        const isActive = !template.end_date || nextDate <= template.end_date;
+        await supabase.from('recurring_invoices').update({
+          next_invoice_date: nextDate,
+          last_generated_date: today,
+          generation_count: (template.generation_count || 0) + 1,
+          is_active: isActive,
+          period_from: nextBatchFrom,
+          period_to: nextBatchTo,
+        }).eq('id', template.id);
+        return { count: createdIds.length, template };
+      }
+
+      // Single invoice generation
+      const invNumber = `${prefix}-${nextNumber}`;
+      // Use template's explicit period dates if set, otherwise derive from next_invoice_date
+      const usePeriodFrom = template.period_from || periodFrom;
+      const usePeriodTo = template.period_to || new Date(new Date(usePeriodFrom).getTime() + ((template.invoice_period_days || 30) - 1) * 86400000).toISOString().split('T')[0];
+      const payDays = parseInt(template.payment_terms || '30') || 30;
+      const dueDate = new Date(new Date(usePeriodFrom).getTime() + payDays * 86400000).toISOString().split('T')[0];
+
+      const { data: newInv, error: invErr } = await supabase.from('invoices').insert({
+        invoice_number: invNumber,
+        client_id: template.client_id,
+        client_name: template.client_name,
+        client_email: template.client_email,
+        service_user_id: template.service_user_id,
+        invoice_date: today,
+        due_date: dueDate,
+        period_from: usePeriodFrom,
+        period_to: usePeriodTo,
+        payment_terms: template.payment_terms,
+        notes: template.notes,
+        line_items: template.line_items,
+        day_items: template.day_items,
+        repeating_days: template.repeating_days,
+        discount_type: template.discount_type || 'fixed',
+        discount_value: template.discount_value || 0,
+        subtotal: template.subtotal || template.total_amount || 0,
+        tax_amount: template.tax_amount || 0,
+        total_amount: template.total_amount || 0,
+        amount_due: template.total_amount || 0,
+        currency: template.currency || 'GBP',
+        status: 'draft',
+      }).select().single();
+      if (invErr) throw invErr;
+
+      // Increment invoice number
+      if (freshSettings) {
+        await supabase.from('invoicing_settings').update({ next_invoice_number: nextNumber + 1 }).eq('id', freshSettings.id);
+      }
+
+      // Update template: advance next_invoice_date and period dates, update counts
+      const nextDate = calculateNextInvoiceDate(periodFrom, template.frequency, template.day_of_month, template.day_of_week);
+      const periodDays = template.invoice_period_days || 30;
+      const nextPeriodFrom = new Date(new Date(usePeriodFrom).getTime() + periodDays * 86400000).toISOString().split('T')[0];
+      const nextPeriodTo = new Date(new Date(usePeriodTo).getTime() + periodDays * 86400000).toISOString().split('T')[0];
+      // Check if end_date has been reached
+      const isActive = !template.end_date || nextDate <= template.end_date;
+      await supabase.from('recurring_invoices').update({
+        next_invoice_date: nextDate,
+        last_generated_date: today,
+        generation_count: (template.generation_count || 0) + 1,
+        is_active: isActive,
+        period_from: nextPeriodFrom,
+        period_to: nextPeriodTo,
+      }).eq('id', template.id);
+
+      return { count: 1, template, invoice: newInv };
+    },
+    onSuccess: ({ count, template }) => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['recurringInvoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoicingSettings'] });
+      setGeneratingTemplateId(null);
+      toast.success(`${count} draft invoice${count > 1 ? 's' : ''} generated from ${template.client_name || 'template'}`);
+    },
+    onError: (error) => {
+      setGeneratingTemplateId(null);
+      toast.error('Generation failed: ' + error.message);
+    },
+  });
+
+  // Toggle recurring template active/paused
+  const toggleRecurringActiveMutation = useMutation({
+    mutationFn: async (template) => {
+      const { error } = await supabase
+        .from('recurring_invoices')
+        .update({ is_active: !template.is_active })
+        .eq('id', template.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recurringInvoices'] });
+      toast.success('Template updated');
+    },
+    onError: (error) => toast.error('Failed: ' + error.message),
+  });
+
+  // Delete recurring template
+  const deleteRecurringTemplateMutation = useMutation({
+    mutationFn: async (id) => {
+      const { error } = await supabase
+        .from('recurring_invoices')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recurringInvoices'] });
+      toast.success('Recurring template deleted');
+    },
+    onError: (error) => toast.error('Failed: ' + error.message),
+  });
+
+  // Generate all due recurring invoices
+  const handleGenerateAllDue = async () => {
+    const today = new Date().toISOString().split('T')[0];
+    const due = recurringTemplates.filter(t => t.is_active !== false && t.next_invoice_date && t.next_invoice_date <= today);
+    if (due.length === 0) { toast.info('No templates are due'); return; }
+    setGeneratingTemplateId('all');
+    try {
+      for (const template of due) {
+        await generateFromRecurringMutation.mutateAsync(template);
+      }
+      toast.success(`Generated invoices for ${due.length} template${due.length > 1 ? 's' : ''}`);
+    } catch (e) {
+      toast.error('Bulk generation failed: ' + e.message);
+    }
+    setGeneratingTemplateId(null);
+  };
 
   const handleOpenDialog = async (invoice = null) => {
     if (invoice) {
@@ -1037,7 +1279,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
     { key: 'draft', label: 'Draft', count: createdInvoices.length, invoices: createdInvoices },
     { key: 'sent', label: 'Sent', count: sentInvoices.length, invoices: sentInvoices },
     { key: 'paid', label: 'Paid', count: paidInvoices.length, invoices: paidInvoices },
-    { key: 'recurring', label: 'Recurring', count: recurringInvoices.length, invoices: recurringInvoices },
+    { key: 'recurring', label: 'Recurring', count: recurringTemplates.length, invoices: recurringInvoices },
   ];
 
   const getServiceUserName = (invoice) => {
@@ -1148,6 +1390,11 @@ export default function InvoiceManager({ invoices, clients, settings }) {
               <DropdownMenuItem onClick={() => handleOpenDialog(invoice)}>
                 <Edit2 className="w-4 h-4 mr-2" /> Edit
               </DropdownMenuItem>
+              {activeSection !== 'recurring' && (
+                <DropdownMenuItem onClick={() => { setRecurringInvoiceData(invoice); setShowRecurringDialog(true); }}>
+                  <RefreshCw className="w-4 h-4 mr-2" /> Make Recurring
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 className="text-red-600"
                 onClick={() => { setPendingDeleteId(invoice.id); setConfirmOpen(true); }}
@@ -1255,6 +1502,40 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                 </Button>
                 <Button
                   size="sm"
+                  variant="outline"
+                  className="border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+                  disabled={selectedCount < 1}
+                  onClick={() => {
+                    const selected = currentInvoices.filter(i => selectedInvoiceIds.has(i.id));
+                    if (selected.length === 1) {
+                      setRecurringInvoiceData(selected[0]);
+                    } else {
+                      // Batch recurring: create synthetic batch object
+                      setRecurringInvoiceData({
+                        _isBatch: true,
+                        id: 'batch-' + Date.now(),
+                        invoice_number: `Batch (${selected.length} invoices)`,
+                        client_id: selected[0].client_id,
+                        client_name: selected[0].client_name,
+                        client_email: selected[0].client_email,
+                        total_amount: selected.reduce((s, i) => s + (i.total_amount || 0), 0),
+                        currency: selected[0].currency || 'GBP',
+                        payment_terms: selected[0].payment_terms || '30',
+                        notes: '',
+                        line_items: selected.map(inv => ({
+                          ...inv,
+                          _original_id: inv.id,
+                        })),
+                      });
+                    }
+                    setShowRecurringDialog(true);
+                  }}
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Make Recurring
+                </Button>
+                <Button
+                  size="sm"
                   variant="ghost"
                   onClick={() => setSelectedInvoiceIds(new Set())}
                   className="text-xs"
@@ -1269,12 +1550,133 @@ export default function InvoiceManager({ invoices, clients, settings }) {
 
       {/* Active Section Invoice List */}
       <div className="space-y-3">
-        {sections.find(s => s.key === activeSection)?.invoices.length === 0 ? (
-          <Card className="p-8 text-center bg-slate-50">
-            <p className="text-slate-500">No {activeSection} invoices</p>
-          </Card>
+        {activeSection === 'recurring' ? (
+          <>
+            {/* Generate All Due Banner */}
+            {(() => {
+              const today = new Date().toISOString().split('T')[0];
+              const dueTemplates = recurringTemplates.filter(t => t.is_active !== false && t.next_invoice_date && t.next_invoice_date <= today);
+              if (dueTemplates.length === 0) return null;
+              return (
+                <Card className="p-4 bg-amber-50 border-amber-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-5 h-5 text-amber-600" />
+                      <span className="text-sm font-medium text-amber-800">
+                        {dueTemplates.length} recurring template{dueTemplates.length > 1 ? 's' : ''} overdue
+                      </span>
+                    </div>
+                    <Button
+                      size="sm"
+                      className="bg-amber-600 hover:bg-amber-700"
+                      disabled={generatingTemplateId === 'all'}
+                      onClick={handleGenerateAllDue}
+                    >
+                      <RefreshCw className={`w-4 h-4 mr-2 ${generatingTemplateId === 'all' ? 'animate-spin' : ''}`} />
+                      {generatingTemplateId === 'all' ? 'Generating...' : `Generate All Due (${dueTemplates.length})`}
+                    </Button>
+                  </div>
+                </Card>
+              );
+            })()}
+
+            {/* Recurring Template Cards */}
+            {recurringTemplates.length === 0 ? (
+              <Card className="p-8 text-center bg-slate-50">
+                <p className="text-slate-500">No recurring templates</p>
+                <p className="text-xs text-slate-400 mt-1">Use "Make Recurring" on any invoice to create a template</p>
+              </Card>
+            ) : (
+              recurringTemplates.map(template => {
+                const today = new Date().toISOString().split('T')[0];
+                const isDue = template.next_invoice_date && template.next_invoice_date <= today;
+                const isPaused = template.is_active === false;
+                const freqLabels = { weekly: 'Weekly', 'bi-weekly': 'Bi-Weekly', monthly: 'Monthly', quarterly: 'Quarterly', annually: 'Annually' };
+                const suName = template.service_user_id ? (serviceUsers.find(u => u.id === template.service_user_id)?.full_name || null) : null;
+
+                return (
+                  <Card key={template.id} className={`p-4 hover:shadow-md transition-shadow ${isPaused ? 'opacity-60 bg-slate-50' : ''}`}>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <h3 className="font-semibold text-slate-900">
+                            {suName ? suName + ' — ' : ''}{template.client_name || 'Unnamed'}
+                          </h3>
+                          <span className="text-xs font-medium px-2 py-0.5 rounded bg-indigo-100 text-indigo-700">
+                            {freqLabels[template.frequency] || template.frequency}
+                          </span>
+                          {template.is_batch && (
+                            <span className="text-xs font-medium px-2 py-0.5 rounded bg-purple-100 text-purple-700">
+                              Batch
+                            </span>
+                          )}
+                          {isPaused && (
+                            <span className="text-xs font-medium px-2 py-0.5 rounded bg-slate-200 text-slate-600">
+                              Paused
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex gap-4 text-xs text-slate-500 flex-wrap mt-1">
+                          <span>{template.invoice_period_days || 30} day period</span>
+                          {template.last_generated_date && (
+                            <span>Last: {new Date(template.last_generated_date).toLocaleDateString('en-GB')}</span>
+                          )}
+                          {template.generation_count > 0 && (
+                            <span>Generated: {template.generation_count}x</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right mr-4 shrink-0">
+                        <p className="text-lg font-bold text-slate-900">
+                          £{(template.total_amount || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                        </p>
+                        <p className={`text-xs font-medium mt-1 ${isDue && !isPaused ? 'text-red-600' : 'text-slate-500'}`}>
+                          {isPaused ? 'Paused' : isDue ? 'Overdue' : `Next: ${template.next_invoice_date ? new Date(template.next_invoice_date).toLocaleDateString('en-GB') : 'N/A'}`}
+                        </p>
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        <Button
+                          size="sm"
+                          className="bg-teal-600 hover:bg-teal-700"
+                          disabled={isPaused || generatingTemplateId === template.id}
+                          onClick={() => {
+                            setGeneratingTemplateId(template.id);
+                            generateFromRecurringMutation.mutate(template);
+                          }}
+                        >
+                          <RefreshCw className={`w-4 h-4 mr-1 ${generatingTemplateId === template.id ? 'animate-spin' : ''}`} />
+                          {generatingTemplateId === template.id ? '...' : 'Generate'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => toggleRecurringActiveMutation.mutate(template)}
+                        >
+                          {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-600 hover:bg-red-50"
+                          onClick={() => deleteRecurringTemplateMutation.mutate(template.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })
+            )}
+          </>
         ) : (
-          sections.find(s => s.key === activeSection)?.invoices.map(renderInvoiceCard)
+          sections.find(s => s.key === activeSection)?.invoices.length === 0 ? (
+            <Card className="p-8 text-center bg-slate-50">
+              <p className="text-slate-500">No {activeSection} invoices</p>
+            </Card>
+          ) : (
+            sections.find(s => s.key === activeSection)?.invoices.map(renderInvoiceCard)
+          )
         )}
       </div>
 
@@ -2003,6 +2405,9 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                   <Button variant="outline" onClick={() => { updateStatusMutation.mutate({ id: inv.id, status: 'sent', is_recurring: inv.is_recurring }); setViewingInvoice(null); }}>
                     <Send className="w-4 h-4 mr-2" /> Mark as Sent
                   </Button>
+                  <Button variant="outline" onClick={() => { setViewingInvoice(null); setRecurringInvoiceData(inv); setShowRecurringDialog(true); }}>
+                    <RefreshCw className="w-4 h-4 mr-2" /> Make Recurring
+                  </Button>
                 </div>
               </div>
             );
@@ -2064,14 +2469,19 @@ export default function InvoiceManager({ invoices, clients, settings }) {
 }
 
 function RecurringInvoiceForm({ invoice, onSubmit, onCancel, isLoading }) {
+  const defaultStart = invoice.invoice_date || new Date().toISOString().split('T')[0];
+  const defaultPeriodFrom = invoice.period_from || defaultStart;
+  const defaultPeriodTo = invoice.period_to || new Date(new Date(defaultPeriodFrom).getTime() + 6 * 86400000).toISOString().split('T')[0];
   const [formData, setFormData] = useState({
     frequency: 'monthly',
     day_of_month: 1,
     day_of_week: 1,
     invoice_period_days: 30,
-    start_date: invoice.invoice_date || new Date().toISOString().split('T')[0],
+    start_date: defaultStart,
     end_date: '',
     auto_send: true,
+    period_from: defaultPeriodFrom,
+    period_to: defaultPeriodTo,
   });
   const [neverEnd, setNeverEnd] = useState(true);
 
@@ -2082,7 +2492,14 @@ function RecurringInvoiceForm({ invoice, onSubmit, onCancel, isLoading }) {
     else if (formData.frequency === 'monthly') days = 30;
     else if (formData.frequency === 'quarterly') days = 90;
     else if (formData.frequency === 'annually') days = 365;
-    setFormData(prev => ({ ...prev, invoice_period_days: days }));
+    setFormData(prev => {
+      const updated = { ...prev, invoice_period_days: days };
+      // Auto-calculate period_to from period_from + days
+      if (prev.period_from) {
+        updated.period_to = new Date(new Date(prev.period_from).getTime() + (days - 1) * 86400000).toISOString().split('T')[0];
+      }
+      return updated;
+    });
   }, [formData.frequency]);
 
   const handleSubmit = () => {
@@ -2101,6 +2518,14 @@ function RecurringInvoiceForm({ invoice, onSubmit, onCancel, isLoading }) {
       currency: invoice.currency,
       payment_terms: invoice.payment_terms,
       notes: invoice.notes,
+      service_user_id: invoice.service_user_id || null,
+      repeating_days: invoice.repeating_days || null,
+      day_items: invoice.day_items || null,
+      original_invoice_id: invoice._isBatch ? null : (invoice.id || null),
+      discount_type: invoice.discount_type || 'fixed',
+      discount_value: invoice.discount_value || 0,
+      client_email: invoice.client_email || '',
+      is_batch: invoice._isBatch || false,
       ...formData,
       next_invoice_date: formData.start_date,
     });
@@ -2200,6 +2625,34 @@ function RecurringInvoiceForm({ invoice, onSubmit, onCancel, isLoading }) {
             value={formData.start_date}
             onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
           />
+          <p className="text-xs text-slate-500 mt-1">When the first invoice becomes due to generate</p>
+        </div>
+
+        <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
+          <label className="block text-sm font-medium text-slate-900">Pay Period Dates</label>
+          <p className="text-xs text-slate-500">These dates will appear on each generated invoice and auto-advance by {formData.invoice_period_days} days each time</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Period From</label>
+              <Input
+                type="date"
+                value={formData.period_from}
+                onChange={(e) => {
+                  const from = e.target.value;
+                  const to = new Date(new Date(from).getTime() + (formData.invoice_period_days - 1) * 86400000).toISOString().split('T')[0];
+                  setFormData({ ...formData, period_from: from, period_to: to });
+                }}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Period To</label>
+              <Input
+                type="date"
+                value={formData.period_to}
+                onChange={(e) => setFormData({ ...formData, period_to: e.target.value })}
+              />
+            </div>
+          </div>
         </div>
 
         <div>
@@ -2241,6 +2694,7 @@ function RecurringInvoiceForm({ invoice, onSubmit, onCancel, isLoading }) {
                'every year'}
               {!neverEnd && formData.end_date ? ` until ${new Date(formData.end_date).toLocaleDateString()}` : ' indefinitely'}.
               {' '}Each invoice will cover a {formData.invoice_period_days}-day period.
+              {formData.period_from && ` First period: ${new Date(formData.period_from).toLocaleDateString('en-GB')} — ${formData.period_to ? new Date(formData.period_to).toLocaleDateString('en-GB') : '?'}.`}
             </p>
           </CardContent>
         </Card>
