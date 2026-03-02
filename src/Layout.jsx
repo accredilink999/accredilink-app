@@ -77,6 +77,7 @@ export default function Layout({ children, currentPageName }) {
   const navigate = useNavigate();
   const visitedPagesRef = useRef(new Set());
   const [ownerWelcomeDismissed, setOwnerWelcomeDismissed] = useState(false);
+  const [showAdminPointer, setShowAdminPointer] = useState(false);
 
 
   
@@ -371,6 +372,11 @@ export default function Layout({ children, currentPageName }) {
 
     // Add styles for alternating flash animation and disable pull-to-refresh
     const flashStyles = `
+      @keyframes bounce-slow {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(6px); }
+      }
+      .animate-bounce-slow { animation: bounce-slow 1.5s ease-in-out infinite; }
       @keyframes flash-red {
         0%, 100% { opacity: 1; }
         50% { opacity: 0.2; }
@@ -586,7 +592,7 @@ export default function Layout({ children, currentPageName }) {
   const currentOrg = getCurrentOrg();
   const showOwnerWelcome = orgRole === 'owner' && currentOrg && !currentOrg.owner_onboarded && !ownerWelcomeDismissed;
   if (showOwnerWelcome) {
-    return <OwnerWelcomeModal onComplete={() => setOwnerWelcomeDismissed(true)} />;
+    return <OwnerWelcomeModal onComplete={() => { setOwnerWelcomeDismissed(true); setShowAdminPointer(true); }} />;
   }
 
   // Show unacknowledged announcement modal (non-admin staff only — admins must not be locked out)
@@ -700,14 +706,31 @@ export default function Layout({ children, currentPageName }) {
               )}
             </Link>
             {isAdmin && (
-              <Link to={createPageUrl('Admin')} className="relative touch-manipulation p-1">
-                <Shield className="w-5 h-5 text-blue-600 fill-blue-600" />
-                {totalAdminTasks > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                    {totalAdminTasks}
-                  </span>
+              <div className="relative">
+                <Link to={createPageUrl('Admin')} className="relative touch-manipulation p-1" onClick={() => setShowAdminPointer(false)}>
+                  <Shield className={`w-5 h-5 text-blue-600 fill-blue-600 ${showAdminPointer ? 'animate-pulse' : ''}`} />
+                  {totalAdminTasks > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                      {totalAdminTasks}
+                    </span>
+                  )}
+                </Link>
+                {showAdminPointer && (
+                  <div className="absolute top-full right-0 mt-2 z-[9999] animate-bounce-slow" style={{ width: 260 }}>
+                    <div className="relative bg-teal-600 text-white rounded-lg shadow-xl p-3">
+                      <div className="absolute -top-2 right-3 w-4 h-4 bg-teal-600 rotate-45" />
+                      <p className="text-sm font-semibold mb-1">Admin Panel</p>
+                      <p className="text-xs opacity-90">Tap here to manage your organisation, staff, billing & setup.</p>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setShowAdminPointer(false); }}
+                        className="mt-2 text-xs underline opacity-75 hover:opacity-100"
+                      >
+                        Got it
+                      </button>
+                    </div>
+                  </div>
                 )}
-              </Link>
+              </div>
             )}
             <Link to={createPageUrl('HowToUseApp')} className="touch-manipulation p-1">
               <HelpCircle className="w-5 h-5 text-slate-600" />
