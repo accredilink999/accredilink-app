@@ -8,6 +8,7 @@ import { pagesConfig } from './pages.config'
 import { BrowserRouter as Router, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { LanguageProvider } from '@/lib/LanguageContext';
+import { HelpModeProvider } from '@/lib/HelpModeContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import Login from './pages/Login';
 import DevicePreview from '@/components/DevicePreview';
@@ -15,6 +16,7 @@ import ErrorCatcher from '@/components/ErrorCatcher';
 import HelpButton from '@/components/HelpButton';
 import AutoPushRegistration from '@/components/notifications/AutoPushRegistration';
 import AppUpdateChecker from '@/components/AppUpdateChecker';
+import HelpNudge from '@/components/HelpNudge';
 import { initOrg, resetOrg, checkOrgAccess } from '@/lib/orgContext';
 import SubscriptionGate from '@/components/billing/SubscriptionGate';
 import { supabase } from '@/api/supabaseClient';
@@ -146,6 +148,7 @@ const AppShell = () => {
     <>
       <AutoPushRegistration />
       <AppUpdateChecker />
+      <HelpNudge />
       <Layout currentPageName={currentPageName} />
     </>
   );
@@ -156,6 +159,7 @@ function App() {
   return (
     <AuthProvider>
       <LanguageProvider>
+      <HelpModeProvider>
       <QueryClientProvider client={queryClientInstance}>
         <DevicePreview>
           <Router>
@@ -168,6 +172,7 @@ function App() {
           <ErrorCatcher />
         </DevicePreview>
       </QueryClientProvider>
+      </HelpModeProvider>
       </LanguageProvider>
     </AuthProvider>
   )

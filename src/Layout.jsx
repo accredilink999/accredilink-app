@@ -11,6 +11,7 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import OnboardingModal from '@/components/OnboardingModal';
 import OwnerWelcomeModal from '@/components/OwnerWelcomeModal';
 import { getCurrentOrgRole, getCurrentOrg } from '@/lib/orgContext';
+import { useHelpMode } from '@/lib/HelpModeContext';
 import AppDownloadPrompt from '@/components/AppDownloadPrompt';
 import PWAInstallButton from '@/components/PWAInstallButton';
 import PWAInstallPrompt from '@/components/PWAInstallPrompt';
@@ -78,6 +79,7 @@ export default function Layout({ children, currentPageName }) {
   const visitedPagesRef = useRef(new Set());
   const [ownerWelcomeDismissed, setOwnerWelcomeDismissed] = useState(false);
   const [showAdminPointer, setShowAdminPointer] = useState(false);
+  const { helpMode, setHelpMode } = useHelpMode();
 
 
   
@@ -732,9 +734,13 @@ export default function Layout({ children, currentPageName }) {
                 )}
               </div>
             )}
-            <Link to={createPageUrl('HowToUseApp')} className="touch-manipulation p-1">
-              <HelpCircle className="w-5 h-5 text-slate-600" />
-            </Link>
+            <button
+              onClick={() => setHelpMode(!helpMode)}
+              className={`touch-manipulation p-1 rounded-full transition-colors ${helpMode ? 'bg-teal-100' : ''}`}
+              title={helpMode ? 'Help tips ON — tap to turn off' : 'Turn on help tips'}
+            >
+              <HelpCircle className={`w-5 h-5 ${helpMode ? 'text-teal-600' : 'text-slate-600'}`} />
+            </button>
           </div>
         </div>
       </div>

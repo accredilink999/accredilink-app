@@ -21,6 +21,7 @@ import {
   Settings
 } from 'lucide-react';
 import CareLogFormBuilder from '@/components/admin/CareLogFormBuilder';
+import HelpTip from '@/components/ui/HelpTip';
 
 export default function ClientManagement() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -155,6 +156,7 @@ export default function ClientManagement() {
               <Plus className="w-4 h-4 mr-2" />
               Add Service User
             </Button>
+            <HelpTip tip="Add a new service user to the system with their care needs and preferences." inline />
           </div>
         )}
       </PageHeader>
@@ -201,14 +203,17 @@ export default function ClientManagement() {
 
       {/* Filters */}
        <div className="flex flex-col gap-3 sm:gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4 sm:w-5 sm:h-5" />
-            <Input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search clients..."
-              className="pl-10 text-xs sm:text-sm py-2 sm:py-3"
-            />
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4 sm:w-5 sm:h-5" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search clients..."
+                className="pl-10 text-xs sm:text-sm py-2 sm:py-3"
+              />
+            </div>
+            <HelpTip tip="Search clients by name or filter by area and status. Tap a client card to view their full profile and care plan." inline />
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {isAdmin && (

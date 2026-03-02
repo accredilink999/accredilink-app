@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import PageHeader from '@/components/ui/PageHeader';
+import HelpTip from '@/components/ui/HelpTip';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import {
@@ -47,7 +48,9 @@ export default function AdminDashboard() {
       <div className="mb-6">
         <div className="flex items-center gap-3">
           <Shield className="w-8 h-8 fill-blue-600 text-blue-600" />
-          <h1 className="text-2xl font-bold text-slate-900">Admin Panel</h1>
+          <HelpTip tip="Central hub for all admin tools. Only visible to admins and managers.">
+            <h1 className="text-2xl font-bold text-slate-900">Admin Panel</h1>
+          </HelpTip>
         </div>
       </div>
 
@@ -55,7 +58,9 @@ export default function AdminDashboard() {
       <div className="space-y-4 mb-6">
         {/* Core Management */}
         <div>
-          <h2 className="text-xl font-bold text-slate-900 mb-3">Core Management</h2>
+          <HelpTip tip="Organisation setup, AI assistant, and control room.">
+            <h2 className="text-xl font-bold text-slate-900 mb-3">Core Management</h2>
+          </HelpTip>
           <div className="space-y-2">
             <Link to={createPageUrl('OrgAdmin')} className="flex items-center gap-2 text-teal-600 hover:text-teal-700 font-bold text-base py-2">
               <Building2 className="w-5 h-5 text-teal-600" />
@@ -74,7 +79,9 @@ export default function AdminDashboard() {
 
         {/* Client & Care Management */}
         <div>
-          <h2 className="text-xl font-bold text-slate-900 mb-3">Client & Care Management</h2>
+          <HelpTip tip="Manage service users, care logs, and clinical records.">
+            <h2 className="text-xl font-bold text-slate-900 mb-3">Client & Care Management</h2>
+          </HelpTip>
           <div className="space-y-2">
             <Link to={createPageUrl('ClientManagement')} className="flex items-center gap-2 text-teal-500 hover:text-teal-600 font-bold text-base py-2">
               <Heart className="w-5 h-5 text-teal-500 fill-teal-500" />
@@ -89,7 +96,9 @@ export default function AdminDashboard() {
 
         {/* Clinical */}
         <div>
-          <h2 className="text-xl font-bold text-slate-900 mb-3">Clinical</h2>
+          <HelpTip tip="Manage service users, care logs, and clinical records.">
+            <h2 className="text-xl font-bold text-slate-900 mb-3">Clinical</h2>
+          </HelpTip>
           <div className="space-y-2">
             <Link to={createPageUrl('ClinicalDashboard')} className="flex items-center gap-2 text-rose-600 hover:text-rose-700 font-bold text-base py-2">
               <Activity className="w-5 h-5 text-rose-600 fill-rose-600" />
@@ -100,7 +109,9 @@ export default function AdminDashboard() {
 
         {/* Scheduling & Requests */}
         <div>
-          <h2 className="text-xl font-bold text-slate-900 mb-3">Scheduling & Requests</h2>
+          <HelpTip tip="Rota management, work calendar, and scheduling tools.">
+            <h2 className="text-xl font-bold text-slate-900 mb-3">Scheduling & Requests</h2>
+          </HelpTip>
           <div className="space-y-2">
             <Link to={createPageUrl('RotaManagement')} className="flex items-center gap-2 text-orange-500 hover:text-orange-600 font-bold text-base py-2">
               <Calendar className="w-5 h-5 text-orange-500 fill-orange-500" />
@@ -115,7 +126,9 @@ export default function AdminDashboard() {
 
         {/* HR & Payroll */}
         <div>
-          <h2 className="text-xl font-bold text-slate-900 mb-3">HR & Payroll</h2>
+          <HelpTip tip="Invoicing, expenses, payroll, and financial approvals.">
+            <h2 className="text-xl font-bold text-slate-900 mb-3">HR & Payroll</h2>
+          </HelpTip>
           <div className="space-y-2">
             <Link to={createPageUrl('AdminApprovalsFinancials')} className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-bold text-base py-2">
               <CheckSquare className="w-5 h-5 text-indigo-600 fill-indigo-600" />
@@ -140,7 +153,9 @@ export default function AdminDashboard() {
 
         {/* Training & Documents */}
         <div>
-          <h2 className="text-xl font-bold text-slate-900 mb-3">Training & Documents</h2>
+          <HelpTip tip="Staff profiles, training, documents, and leave management.">
+            <h2 className="text-xl font-bold text-slate-900 mb-3">Training & Documents</h2>
+          </HelpTip>
           <div className="space-y-2">
             <Link to={createPageUrl('Training')} className="flex items-center gap-2 text-cyan-600 hover:text-cyan-700 font-bold text-base py-2">
               <GraduationCap className="w-5 h-5 text-cyan-600 fill-cyan-600" />
@@ -163,7 +178,9 @@ export default function AdminDashboard() {
 
         {/* Communication & Reports */}
         <div>
-          <h2 className="text-xl font-bold text-slate-900 mb-3">Communication & Reports</h2>
+          <HelpTip tip="Messages, announcements, and notification settings.">
+            <h2 className="text-xl font-bold text-slate-900 mb-3">Communication & Reports</h2>
+          </HelpTip>
           <div className="space-y-2">
             <Link to={createPageUrl('Messages')} className="flex items-center gap-2 text-pink-600 hover:text-pink-700 font-bold text-base py-2">
               <MessageCircle className="w-5 h-5 text-pink-600 fill-pink-600" />

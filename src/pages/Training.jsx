@@ -38,6 +38,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import HelpTip from '@/components/ui/HelpTip';
 
 export default function Training() {
   const queryClient = useQueryClient();
@@ -386,6 +387,7 @@ Return ONLY valid JSON (no markdown) with this COMPLETE structure:
             <BookOpen className="w-3 h-3 sm:w-4 sm:h-4" />
             <span className="hidden sm:inline">My Courses</span>
             <span className="sm:hidden">Courses</span>
+            <HelpTip tip="Your assigned training with completion progress. Tap to start or continue." inline />
           </TabsTrigger>
           {isAdmin && (
             <>
@@ -393,6 +395,7 @@ Return ONLY valid JSON (no markdown) with this COMPLETE structure:
                 <GraduationCap className="w-3 h-3 sm:w-4 sm:h-4" />
                 <span className="hidden sm:inline">Course Library</span>
                 <span className="sm:hidden">Library</span>
+                <HelpTip tip="Browse and assign training courses. Mandatory courses are highlighted in red." inline />
               </TabsTrigger>
               <TabsTrigger value="assignments" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm whitespace-nowrap">
                 <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -403,6 +406,7 @@ Return ONLY valid JSON (no markdown) with this COMPLETE structure:
                 <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4" />
                 <span className="hidden sm:inline">Analytics</span>
                 <span className="sm:hidden">Stats</span>
+                <HelpTip tip="Overview of training compliance across all staff — spot gaps quickly." inline />
               </TabsTrigger>
             </>
           )}

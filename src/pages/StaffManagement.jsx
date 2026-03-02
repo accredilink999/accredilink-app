@@ -8,6 +8,7 @@ import StaffProfile from '@/components/staff/StaffProfile';
 import TeamsManager from '@/components/staff/TeamsManager';
 import BulkOnboardPanel from '@/components/staff/BulkOnboardPanel';
 import { Users } from 'lucide-react';
+import HelpTip from '@/components/ui/HelpTip';
 
 export default function StaffManagement() {
   const [selectedStaffId, setSelectedStaffId] = useState(null);
@@ -41,9 +42,9 @@ export default function StaffManagement() {
 
       <Tabs defaultValue="staff" className="w-full">
         <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-3' : 'grid-cols-2'}`}>
-          <TabsTrigger value="staff">Staff</TabsTrigger>
-          <TabsTrigger value="teams">Teams</TabsTrigger>
-          {isAdmin && <TabsTrigger value="onboard">Onboard</TabsTrigger>}
+          <TabsTrigger value="staff">Staff<HelpTip tip="Browse all staff members. Tap a name to view their full profile, contracts, and training." inline /></TabsTrigger>
+          <TabsTrigger value="teams">Teams<HelpTip tip="Organise staff into teams for easier rota and communication management." inline /></TabsTrigger>
+          {isAdmin && <TabsTrigger value="onboard">Onboard<HelpTip tip="Quickly add multiple new staff members at once with bulk onboarding." inline /></TabsTrigger>}
         </TabsList>
 
         <TabsContent value="staff" className="mt-6">

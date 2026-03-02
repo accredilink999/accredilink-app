@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import PageHeader from '@/components/ui/PageHeader';
+import HelpTip from '@/components/ui/HelpTip';
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -921,10 +922,12 @@ export default function ComplianceManagement() {
           <div className="p-4 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
-                <h3 className="font-bold text-emerald-900 flex items-center gap-2">
-                  <Activity className="w-5 h-5" />
-                  Virtual Care Inspection
-                </h3>
+                <HelpTip tip="Run automated compliance checks against your live data — mirroring what CIW/CQC inspectors look for. Identifies gaps before a real inspection.">
+                  <h3 className="font-bold text-emerald-900 flex items-center gap-2">
+                    <Activity className="w-5 h-5" />
+                    Virtual Care Inspection
+                  </h3>
+                </HelpTip>
                 <p className="text-sm text-emerald-700 mt-1">
                   Runs {Object.keys(INSPECTION_CATEGORIES).length} categories of automated checks against your live data — mirroring what {framework === 'ciw' ? 'CIW' : 'CQC'} inspectors look for.
                 </p>
@@ -1111,9 +1114,12 @@ export default function ComplianceManagement() {
         {/* ── TAB: Regulations ── */}
         <TabsContent value="regulations" className="space-y-6 mt-4">
           <div className="p-3 bg-gradient-to-r from-slate-50 to-teal-50 border border-slate-200 rounded-lg">
-            <p className="text-sm text-slate-600">
-              <strong>{FRAMEWORK_LABELS[framework]}</strong> — Browse regulations below, click to file a compliance report.
-            </p>
+            <div className="flex items-center gap-1">
+              <p className="text-sm text-slate-600">
+                <strong>{FRAMEWORK_LABELS[framework]}</strong> — Browse regulations below, click to file a compliance report.
+              </p>
+              <HelpTip tip="CIW and CQC regulations for your service type. Each shows requirements, guidance, and your compliance status." inline />
+            </div>
           </div>
 
           {Object.entries(regulationsByCategory).map(([category, regs]) => (
@@ -1221,9 +1227,12 @@ export default function ComplianceManagement() {
           </div>
 
           <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg flex items-start justify-between gap-2">
-            <p className="text-sm text-amber-800">
-              <strong>12-Weekly Staff Supervisions</strong> — Required under CIW Regulation 36 / CQC Regulation 18. Click on a staff member to expand, or start a new supervision.
-            </p>
+            <div className="flex items-center gap-1">
+              <p className="text-sm text-amber-800">
+                <strong>12-Weekly Staff Supervisions</strong> — Required under CIW Regulation 36 / CQC Regulation 18. Click on a staff member to expand, or start a new supervision.
+              </p>
+              <HelpTip tip="Track 12-weekly staff supervisions as required by RISCA Reg 36 / CQC Reg 18." inline />
+            </div>
             <button
               type="button"
               onClick={() => setHelpRegulation({
@@ -1373,6 +1382,10 @@ export default function ComplianceManagement() {
 
         {/* ── TAB: Filed Reports ── */}
         <TabsContent value="reports" className="space-y-4 mt-4">
+          <div className="flex items-center gap-1 mb-2">
+            <p className="text-sm font-medium text-slate-700">Filed Evidence Reports</p>
+            <HelpTip tip="Upload documents to prove compliance. Build your inspection-ready evidence portfolio." inline />
+          </div>
           <Card className="p-3 bg-gradient-to-br from-teal-50 to-blue-50 border-teal-200">
             <div className="flex flex-col gap-2 sm:flex-row">
               <div className="relative flex-1">
@@ -1462,6 +1475,10 @@ export default function ComplianceManagement() {
 
         {/* ── TAB: Calendar (preserved from original) ── */}
         <TabsContent value="calendar" className="space-y-6 mt-4">
+          <div className="flex items-center gap-1 mb-2">
+            <p className="text-sm font-medium text-slate-700">Compliance Calendar</p>
+            <HelpTip tip="Schedule and track upcoming inspections, audits, and compliance deadlines." inline />
+          </div>
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="p-4 border-red-200">

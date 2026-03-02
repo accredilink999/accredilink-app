@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 
 
 import PageHeader from '@/components/ui/PageHeader';
+import HelpTip from '@/components/ui/HelpTip';
 import MonthView from '@/components/rota/MonthView';
 import WeekView from '@/components/rota/WeekView';
 import DayView from '@/components/rota/DayView';
@@ -263,6 +264,7 @@ export default function Rota() {
             createOpen={isCreateAreaOpen}
             onCreateOpenChange={setIsCreateAreaOpen}
           />
+          <HelpTip tip="Filter shifts by care area. Each area has its own team and shift schedule." inline />
           <Button
             variant="outline"
             onClick={handlePrevious}
@@ -297,6 +299,7 @@ export default function Rota() {
                 <Settings className="w-3 sm:w-4 h-3 sm:h-4 mr-1 sm:mr-2" />
                 <span className="hidden sm:inline">Patterns</span>
               </Button>
+              <HelpTip tip="Set up recurring shift patterns and deploy them to auto-fill the rota." inline />
             </>
           )}
           {isAdmin && (
@@ -324,6 +327,7 @@ export default function Rota() {
             <TabsTrigger value="week" className="text-xs sm:text-sm py-2">Week</TabsTrigger>
             <TabsTrigger value="month" className="text-xs sm:text-sm py-2">Month</TabsTrigger>
           </TabsList>
+          <HelpTip tip="Switch between Day, Week, and Month views to see the rota from different angles." inline />
           <Button
             variant={showMyShiftsOnly ? "default" : "outline"}
             size="sm"

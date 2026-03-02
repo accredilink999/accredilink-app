@@ -40,6 +40,7 @@ import {
   Hand } from
 'lucide-react';
 import ShiftSwapResponseModal from '@/components/rota/ShiftSwapResponseModal';
+import HelpTip from '@/components/ui/HelpTip';
 
 export default function Dashboard() {
   const today = format(new Date(), 'yyyy-MM-dd');
@@ -297,10 +298,12 @@ export default function Dashboard() {
       {/* Unread Notifications & Announcements Banner */}
       {(unreadNotifications.length > 0 || unacknowledgedAnnouncements.length > 0) && (
         <Card className="p-4 sm:p-5 bg-gradient-to-br from-teal-50 to-cyan-50 border-0 shadow-sm">
-          <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2 text-sm sm:text-base">
-            <Bell className="w-4 h-4 text-teal-600 flex-shrink-0" />
-            You Have Updates
-          </h3>
+          <HelpTip tip="Important alerts and announcements that need your attention.">
+            <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2 text-sm sm:text-base">
+              <Bell className="w-4 h-4 text-teal-600 flex-shrink-0" />
+              You Have Updates
+            </h3>
+          </HelpTip>
           <div className="space-y-2">
             {unreadNotifications.length > 0 && (
               <Link to={createPageUrl('Messages')}>
@@ -373,11 +376,13 @@ export default function Dashboard() {
       {/* Alerts Banner */}
       {totalAdminTasks > 0 &&
       <Card className="bg-gradient-to-br text-card-foreground p-4 rounded-md sm:p-5 from-amber-50 to-orange-50 border-0 shadow-sm">
-          <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2 text-sm sm:text-base">
-            <Bell className="w-4 h-4 text-amber-600 flex-shrink-0" />
-            Attention Required
-            <Badge variant="secondary" className="bg-red-500 text-white text-xs ml-auto">{totalAdminTasks}</Badge>
-          </h3>
+          <HelpTip tip="Important alerts and announcements that need your attention.">
+            <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2 text-sm sm:text-base">
+              <Bell className="w-4 h-4 text-amber-600 flex-shrink-0" />
+              Attention Required
+              <Badge variant="secondary" className="bg-red-500 text-white text-xs ml-auto">{totalAdminTasks}</Badge>
+            </h3>
+          </HelpTip>
           <div className="space-y-2">
             {openIncidents.length > 0 &&
           <Link to={createPageUrl('Incidents')}>
@@ -544,7 +549,9 @@ export default function Dashboard() {
 
       {/* Quick Actions */}
       <Card className="bg-orange-200 text-card-foreground p-3 rounded-xl border sm:p-5 from-indigo-50 to-purple-50 border-indigo-200 shadow-sm hover:shadow-md transition-shadow">
-        <h3 className="font-semibold text-slate-900 mb-4 text-sm sm:text-base">Quick Actions</h3>
+        <HelpTip tip="Shortcuts to your most common tasks. These update based on your role and today's schedule.">
+          <h3 className="font-semibold text-slate-900 mb-4 text-sm sm:text-base">Quick Actions</h3>
+        </HelpTip>
         <div className="grid grid-cols-2 gap-2 sm:gap-3">
           <Link to={createPageUrl('Rota')} className="w-full">
             <Button
@@ -579,6 +586,9 @@ export default function Dashboard() {
       </Card>
 
       {/* Quick Stats */}
+      <HelpTip tip="Quick overview of today's key numbers — shifts scheduled, completed, care logs, and alerts.">
+        <h3 className="font-semibold text-slate-900 text-sm sm:text-base">Today's Overview</h3>
+      </HelpTip>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
         <StatsCard
           title="Today's Visits"

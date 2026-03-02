@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import PageHeader from '@/components/ui/PageHeader';
+import HelpTip from '@/components/ui/HelpTip';
 
 import {
   AlertDialog,
@@ -1196,10 +1197,12 @@ export default function Settings() {
 
       {/* Personal Information */}
       <Card className="p-5 bg-white border-0 shadow-sm">
-        <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-          <User className="w-5 h-5 text-slate-500" />
-          Personal Information
-        </h3>
+        <HelpTip tip="Manage your personal details, profile photo, and contact information.">
+          <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <User className="w-5 h-5 text-slate-500" />
+            Personal Information
+          </h3>
+        </HelpTip>
         <div className="space-y-4">
           <div>
             <Label className="text-slate-700 mb-2 block">Full Name</Label>
@@ -1235,10 +1238,12 @@ export default function Settings() {
 
       {/* Change Password */}
       <Card className={`p-5 bg-white border-0 shadow-sm ${isPasswordRecovery ? 'ring-2 ring-teal-500' : ''}`}>
-        <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-          <KeyRound className="w-5 h-5 text-slate-500" />
-          {isPasswordRecovery ? 'Set Your Password' : 'Change Password'}
-        </h3>
+        <HelpTip tip="Set up or change your password to keep your account secure.">
+          <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <KeyRound className="w-5 h-5 text-slate-500" />
+            {isPasswordRecovery ? 'Set Your Password' : 'Change Password'}
+          </h3>
+        </HelpTip>
         {isPasswordRecovery && (
           <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 mb-4 text-sm text-teal-800">
             Please set your new password below to complete your account setup.
@@ -1290,10 +1295,12 @@ export default function Settings() {
       {/* Admin: Shift Activity Notifications Toggle */}
       {isAdmin && (
         <Card className="p-5 bg-white border-0 shadow-sm border-l-4 border-l-indigo-500">
-          <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-            <Bell className="w-5 h-5 text-indigo-600" />
-            Shift Activity Notifications
-          </h3>
+          <HelpTip tip="Choose which alerts you receive — push notifications, email, or in-app.">
+            <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+              <Bell className="w-5 h-5 text-indigo-600" />
+              Shift Activity Notifications
+            </h3>
+          </HelpTip>
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium text-slate-900">Receive shift updates</p>
@@ -1351,10 +1358,12 @@ export default function Settings() {
       {isAdmin && (
         <SettingsErrorBoundary>
           <Card className="p-5 bg-white border-0 shadow-sm border-l-4 border-l-teal-500">
-            <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-              <Bell className="w-5 h-5 text-teal-600" />
-              Global Notification Settings
-            </h3>
+            <HelpTip tip="Configure notification rules for the entire organisation — who gets notified, and when.">
+              <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                <Bell className="w-5 h-5 text-teal-600" />
+                Global Notification Settings
+              </h3>
+            </HelpTip>
             <GlobalNotificationSettings />
           </Card>
         </SettingsErrorBoundary>
@@ -1363,10 +1372,12 @@ export default function Settings() {
       {/* Push Notification Device Setup (all users) */}
       <SettingsErrorBoundary>
         <Card className="p-5 bg-white border-0 shadow-sm">
-          <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-            <Bell className="w-5 h-5 text-slate-500" />
-            Push Notifications
-          </h3>
+          <HelpTip tip="Register this device for push notifications so you receive real-time alerts.">
+            <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+              <Bell className="w-5 h-5 text-slate-500" />
+              Push Notifications
+            </h3>
+          </HelpTip>
           <PushNotificationSetup />
         </Card>
       </SettingsErrorBoundary>
@@ -1375,10 +1386,12 @@ export default function Settings() {
       {isAdmin && (
         <SettingsErrorBoundary>
           <Card className="p-5 bg-white border-0 shadow-sm border-l-4 border-l-orange-500">
-            <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-              <Flame className="w-5 h-5 text-orange-600" />
-              Push Notification Credentials
-            </h3>
+            <HelpTip tip="Firebase and APNS keys required for sending push notifications to staff devices.">
+              <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                <Flame className="w-5 h-5 text-orange-600" />
+                Push Notification Credentials
+              </h3>
+            </HelpTip>
             <PushCredentialsManager />
           </Card>
         </SettingsErrorBoundary>
@@ -1386,10 +1399,12 @@ export default function Settings() {
 
       {/* Appearance */}
       <Card className="p-5 bg-white border-0 shadow-sm">
-        <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-          <Moon className="w-5 h-5 text-slate-500" />
-          Appearance
-        </h3>
+        <HelpTip tip="Customise the look and feel of the app — dark mode and compact view.">
+          <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <Moon className="w-5 h-5 text-slate-500" />
+            Appearance
+          </h3>
+        </HelpTip>
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -1411,10 +1426,12 @@ export default function Settings() {
       {/* Admin: Company Settings */}
       {isAdmin && (
         <Card className="p-5 bg-white border-0 shadow-sm border-l-4 border-l-blue-500">
-          <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-blue-600" />
-            Company Settings
-          </h3>
+          <HelpTip tip="Set your company name and logo — these appear on reports and the login screen.">
+            <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-blue-600" />
+              Company Settings
+            </h3>
+          </HelpTip>
           <div className="space-y-4">
             <div>
               <Label className="text-slate-700 mb-2 block">Company Name</Label>
@@ -1480,10 +1497,12 @@ export default function Settings() {
 
       {/* Privacy & Security */}
       <Card className="p-5 bg-white border-0 shadow-sm">
-        <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-          <Shield className="w-5 h-5 text-slate-500" />
-          Privacy & Security
-        </h3>
+        <HelpTip tip="Set up biometric login, manage location sharing, and control session security.">
+          <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <Shield className="w-5 h-5 text-slate-500" />
+            Privacy & Security
+          </h3>
+        </HelpTip>
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
