@@ -9,6 +9,8 @@ import BottomNavigation from '@/components/ui/BottomNavigation';
 import { cn } from "@/lib/utils";
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import OnboardingModal from '@/components/OnboardingModal';
+import OwnerWelcomeModal from '@/components/OwnerWelcomeModal';
+import { getCurrentOrgRole, getCurrentOrg } from '@/lib/orgContext';
 import AppDownloadPrompt from '@/components/AppDownloadPrompt';
 import PWAInstallButton from '@/components/PWAInstallButton';
 import PWAInstallPrompt from '@/components/PWAInstallPrompt';
@@ -74,6 +76,7 @@ const ROOT_PAGES = ['Dashboard'];
 export default function Layout({ children, currentPageName }) {
   const navigate = useNavigate();
   const visitedPagesRef = useRef(new Set());
+  const [ownerWelcomeDismissed, setOwnerWelcomeDismissed] = useState(false);
 
 
   
@@ -576,6 +579,14 @@ export default function Layout({ children, currentPageName }) {
   const needsOnboarding = user && (!user.full_name || user.full_name.includes('@') || looksLikeEmailPrefix || !user.onboarding_complete);
   if (needsOnboarding) {
     return <OnboardingModal user={user} open={true} />;
+  }
+
+  // Show owner welcome modal for new org owners who haven't completed setup
+  const orgRole = getCurrentOrgRole();
+  const currentOrg = getCurrentOrg();
+  const showOwnerWelcome = orgRole === 'owner' && currentOrg && !currentOrg.owner_onboarded && !ownerWelcomeDismissed;
+  if (showOwnerWelcome) {
+    return <OwnerWelcomeModal onComplete={() => setOwnerWelcomeDismissed(true)} />;
   }
 
   // Show unacknowledged announcement modal (non-admin staff only — admins must not be locked out)

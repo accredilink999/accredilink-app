@@ -116,13 +116,15 @@ Deno.serve(async (req) => {
       return json({ error: `Failed to create membership: ${memErr.message}` }, 500);
     }
 
-    // Also ensure profile exists
+    // Ensure profile exists with admin role for org owner
     await admin
       .from('profiles')
       .upsert({
         id: user.id,
         email: user.email,
         full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+        role: 'super_admin',
+        job_title: 'admin',
       }, { onConflict: 'id' });
 
     // Ensure user record has org_id

@@ -41,7 +41,7 @@ export async function initOrg() {
       // Fetch org details for subscription gating
       const { data: org } = await supabase
         .from('organizations')
-        .select('id, name, plan, is_active, trial_ends_at, stripe_subscription_id')
+        .select('id, name, slug, plan, is_active, trial_ends_at, stripe_subscription_id, stripe_customer_id, invite_code, owner_onboarded')
         .eq('id', data.organization_id)
         .single()
       _currentOrg = org || null
@@ -81,24 +81,27 @@ export function hasOrg() {
 export function checkOrgAccess() {
   if (!_currentOrg) return { active: true } // no org = legacy user, let through
 
-  const { plan, is_active, trial_ends_at } = _currentOrg
+  const { plan, is_active, trial_ends_at, stripe_subscription_id } = _currentOrg
 
   // Active paid subscription
   if (is_active && plan && !['trial', 'cancelled'].includes(plan)) {
     return { active: true }
   }
 
-  // Active trial — check if still within trial period
-  if (plan === 'trial' && trial_ends_at) {
-    const trialEnd = new Date(trial_ends_at)
-    if (trialEnd > new Date()) {
-      return { active: true, trial: true, trialEndsAt: trialEnd }
+  // Trial user — must have completed Stripe checkout (card on file) to access
+  if (plan === 'trial') {
+    if (!stripe_subscription_id) {
+      return { active: false, reason: 'no_subscription' }
     }
-    return { active: false, reason: 'trial_expired' }
-  }
-
-  // Trial with no end date = just signed up, hasn't started checkout yet — allow access
-  if (plan === 'trial' && !trial_ends_at) {
+    // Has subscription — check if trial still active
+    if (trial_ends_at) {
+      const trialEnd = new Date(trial_ends_at)
+      if (trialEnd > new Date()) {
+        return { active: true, trial: true, trialEndsAt: trialEnd }
+      }
+      return { active: false, reason: 'trial_expired' }
+    }
+    // Has subscription but no trial end date — allow
     return { active: true, trial: true }
   }
 
