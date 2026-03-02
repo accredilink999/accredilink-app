@@ -45,6 +45,7 @@ import WorkCalendar from './pages/WorkCalendar';
 import ClinicalDashboard from './pages/ClinicalDashboard';
 import ControlRoom from './pages/ControlRoom';
 import CourseSeeder from './pages/CourseSeeder';
+import OrgAdmin from './pages/OrgAdmin';
 import __Layout from './Layout.jsx';
 
 
@@ -93,6 +94,7 @@ export const PAGES = {
     "ClinicalDashboard": ClinicalDashboard,
     "ControlRoom": ControlRoom,
     "CourseSeeder": CourseSeeder,
+    "OrgAdmin": OrgAdmin,
 }
 
 export const pagesConfig = {

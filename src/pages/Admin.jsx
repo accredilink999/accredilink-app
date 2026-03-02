@@ -4,7 +4,7 @@ import { createPageUrl } from '../utils';
 import PageHeader from '@/components/ui/PageHeader';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { 
+import {
         Heart,
         UserCog,
         ClipboardCheck,
@@ -29,7 +29,8 @@ import {
         Bug,
         FileSpreadsheet,
         Video,
-        Activity
+        Activity,
+        Building2
       } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -56,6 +57,10 @@ export default function AdminDashboard() {
         <div>
           <h2 className="text-xl font-bold text-slate-900 mb-3">Core Management</h2>
           <div className="space-y-2">
+            <Link to={createPageUrl('OrgAdmin')} className="flex items-center gap-2 text-teal-600 hover:text-teal-700 font-bold text-base py-2">
+              <Building2 className="w-5 h-5 text-teal-600" />
+              Organisation Admin
+            </Link>
             <Link to={createPageUrl('ControlRoom')} className="flex items-center gap-2 text-slate-700 hover:text-slate-800 font-bold text-base py-2">
               <Shield className="w-5 h-5 text-slate-700 fill-slate-700" />
               Control Room
