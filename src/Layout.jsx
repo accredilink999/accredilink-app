@@ -736,10 +736,15 @@ export default function Layout({ children, currentPageName }) {
             )}
             <button
               onClick={() => setHelpMode(!helpMode)}
-              className={`touch-manipulation p-1 rounded-full transition-colors ${helpMode ? 'bg-teal-100' : ''}`}
+              className={`touch-manipulation flex items-center gap-1 px-2 py-1 rounded-full transition-all text-xs font-medium ${
+                helpMode
+                  ? 'bg-teal-600 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+              }`}
               title={helpMode ? 'Help tips ON — tap to turn off' : 'Turn on help tips'}
             >
-              <HelpCircle className={`w-5 h-5 ${helpMode ? 'text-teal-600' : 'text-slate-600'}`} />
+              <HelpCircle className="w-4 h-4" />
+              <span className="hidden sm:inline">{helpMode ? 'Help ON' : 'Help'}</span>
             </button>
           </div>
         </div>
