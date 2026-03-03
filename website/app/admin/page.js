@@ -398,6 +398,27 @@ export default function AdminPortal() {
           <p className="text-xs text-slate-400 mt-3">All email links open Ionos Webmail. Log in with the relevant email address and password.</p>
         </div>
 
+        {/* Social Media Hub */}
+        <div className="mb-8">
+          <a
+            href="/admin/social"
+            className="group block bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl border border-purple-200 p-6 hover:shadow-lg hover:border-purple-300 transition-all"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center text-2xl group-hover:bg-purple-200 transition-colors">
+                📱
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-slate-900 text-lg">Social Media Hub</h3>
+                <p className="text-sm text-slate-500">AI content generator, post scheduling & management for both brands</p>
+              </div>
+              <svg className="w-5 h-5 text-slate-400 group-hover:text-purple-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </a>
+        </div>
+
         {/* Admin Tools */}
         <div className="mb-8">
           <h2 className="text-lg font-semibold text-slate-900 mb-4">Admin Tools</h2>
