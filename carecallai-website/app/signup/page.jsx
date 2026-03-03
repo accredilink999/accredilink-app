@@ -62,17 +62,20 @@ export default function SignupPage() {
 
       if (data.user && !data.session) {
         // Email confirmation required — show "check email" screen
+        if (typeof fbq !== 'undefined') fbq('track', 'Lead');
         setSuccess(true);
         return;
       }
 
       if (data.session) {
         // Auto-confirmed — go straight to onboarding (plan selection)
+        if (typeof fbq !== 'undefined') fbq('track', 'Lead');
         const { access_token, refresh_token } = data.session;
         window.location.href = `${SITE_URL}/onboarding#access_token=${access_token}&refresh_token=${refresh_token}`;
         return;
       }
 
+      if (typeof fbq !== 'undefined') fbq('track', 'Lead');
       setSuccess(true);
     } catch (err) {
       if (err.message?.includes('already registered')) {
