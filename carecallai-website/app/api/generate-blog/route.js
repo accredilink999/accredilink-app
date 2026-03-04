@@ -188,7 +188,7 @@ async function generatePost(specificSlug) {
     },
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 2000,
+      max_tokens: 4000,
       system: SYSTEM_PROMPT,
       messages: [{
         role: 'user',
@@ -198,7 +198,7 @@ Target SEO keywords: ${topic.keywords.join(', ')}
 Category: ${topic.category}
 Context: ${topic.descriptionHint}
 
-Return ONLY a valid JSON object (no markdown code fences) with these keys:
+You MUST return ONLY raw JSON with NO markdown code fences (no \`\`\`json). Return a valid JSON object with these keys:
 - "title": the blog post title (can refine the suggested one)
 - "description": SEO meta description, under 160 characters
 - "content": the full blog post body using ## headings, **bold**, - bullet lists, numbered lists
