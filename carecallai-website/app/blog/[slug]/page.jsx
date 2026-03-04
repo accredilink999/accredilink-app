@@ -5,18 +5,21 @@ import { getAllSlugs, getPostBySlug } from "@/lib/blog";
 import CTABanner from "@/components/CTABanner";
 import { BreadcrumbJsonLd, BlogPostJsonLd } from "@/components/SEO/JsonLd";
 
+export const revalidate = 3600; // Revalidate every hour
+
 export async function generateStaticParams() {
-  return getAllSlugs().map((slug) => ({ slug }));
+  const slugs = await getAllSlugs();
+  return slugs.map((slug) => ({ slug }));
 }
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
-  const post = getPostBySlug(slug);
+  const post = await getPostBySlug(slug);
   if (!post) return {};
   return {
-    title: post.title,
-    description: post.description,
-    keywords: [post.category.toLowerCase(), "care software", "home care UK"],
+    title: post.metaTitle || post.title,
+    description: post.metaDescription || post.description,
+    keywords: [post.category.toLowerCase(), "care software", "home care UK", ...(post.seoKeywords || [])],
     openGraph: {
       type: "article",
       title: post.title,
@@ -28,14 +31,51 @@ export async function generateMetadata({ params }) {
 
 export default async function BlogPostPage({ params }) {
   const { slug } = await params;
-  const post = getPostBySlug(slug);
+  const post = await getPostBySlug(slug);
   if (!post) notFound();
 
-  // Simple markdown-like rendering: split by ## for headings, paragraphs for text
+  // Enhanced markdown renderer
   const renderContent = (content) => {
     const lines = content.trim().split("\n");
     const elements = [];
     let currentParagraph = [];
+    let inList = false;
+    let listItems = [];
+    let listType = 'ul'; // 'ul' or 'ol'
+
+    const renderInline = (text) => {
+      // Handle **bold**, [links](url), and plain text
+      return text.split(/(\*\*.*?\*\*|\[.*?\]\(.*?\))/).map((part, i) => {
+        if (part.startsWith("**") && part.endsWith("**")) {
+          return <strong key={i} className="text-slate-900">{part.slice(2, -2)}</strong>;
+        }
+        const linkMatch = part.match(/^\[(.*?)\]\((.*?)\)$/);
+        if (linkMatch) {
+          return (
+            <a key={i} href={linkMatch[2]} className="text-teal-600 hover:text-teal-700 underline" target={linkMatch[2].startsWith('http') ? '_blank' : undefined} rel={linkMatch[2].startsWith('http') ? 'noopener noreferrer' : undefined}>
+              {linkMatch[1]}
+            </a>
+          );
+        }
+        return part;
+      });
+    };
+
+    const flushList = () => {
+      if (listItems.length > 0) {
+        const ListTag = listType === 'ol' ? 'ol' : 'ul';
+        const listClass = listType === 'ol' ? 'list-decimal' : 'list-disc';
+        elements.push(
+          <ListTag key={elements.length} className={`${listClass} ml-6 mb-4 space-y-2`}>
+            {listItems.map((item, i) => (
+              <li key={i} className="text-slate-600">{renderInline(item)}</li>
+            ))}
+          </ListTag>
+        );
+        listItems = [];
+        inList = false;
+      }
+    };
 
     const flushParagraph = () => {
       if (currentParagraph.length > 0) {
@@ -43,12 +83,7 @@ export default async function BlogPostPage({ params }) {
         if (text) {
           elements.push(
             <p key={elements.length} className="text-slate-600 leading-relaxed mb-4">
-              {text.split(/(\*\*.*?\*\*)/).map((part, i) => {
-                if (part.startsWith("**") && part.endsWith("**")) {
-                  return <strong key={i} className="text-slate-900">{part.slice(2, -2)}</strong>;
-                }
-                return part;
-              })}
+              {renderInline(text)}
             </p>
           );
         }
@@ -61,33 +96,57 @@ export default async function BlogPostPage({ params }) {
 
       if (trimmed.startsWith("## ")) {
         flushParagraph();
+        flushList();
         elements.push(
           <h2 key={elements.length} className="text-xl font-bold text-slate-900 mt-8 mb-4">
             {trimmed.slice(3)}
           </h2>
         );
-      } else if (trimmed.startsWith("- ")) {
+      } else if (trimmed.startsWith("### ")) {
         flushParagraph();
+        flushList();
         elements.push(
-          <li key={elements.length} className="text-slate-600 ml-4 mb-2 list-disc">
-            {trimmed.slice(2).split(/(\*\*.*?\*\*)/).map((part, i) => {
-              if (part.startsWith("**") && part.endsWith("**")) {
-                return <strong key={i} className="text-slate-900">{part.slice(2, -2)}</strong>;
-              }
-              return part;
-            })}
-          </li>
+          <h3 key={elements.length} className="text-lg font-semibold text-slate-900 mt-6 mb-3">
+            {trimmed.slice(4)}
+          </h3>
         );
+      } else if (trimmed.startsWith("> ")) {
+        flushParagraph();
+        flushList();
+        elements.push(
+          <blockquote key={elements.length} className="border-l-4 border-teal-400 pl-4 py-2 my-4 text-slate-600 italic bg-teal-50/50 rounded-r">
+            {renderInline(trimmed.slice(2))}
+          </blockquote>
+        );
+      } else if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+        flushParagraph();
+        if (!inList || listType !== 'ul') {
+          flushList();
+          inList = true;
+          listType = 'ul';
+        }
+        listItems.push(trimmed.slice(2));
+      } else if (/^\d+\.\s/.test(trimmed)) {
+        flushParagraph();
+        if (!inList || listType !== 'ol') {
+          flushList();
+          inList = true;
+          listType = 'ol';
+        }
+        listItems.push(trimmed.replace(/^\d+\.\s/, ''));
       } else if (trimmed.startsWith("| ")) {
         // Skip table rows in simple renderer
         flushParagraph();
+        flushList();
       } else if (trimmed === "") {
         flushParagraph();
+        flushList();
       } else {
         currentParagraph.push(trimmed);
       }
     }
     flushParagraph();
+    flushList();
     return elements;
   };
 

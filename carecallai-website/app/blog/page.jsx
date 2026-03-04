@@ -4,6 +4,8 @@ import AnimateOnScroll from "@/components/AnimateOnScroll";
 import CTABanner from "@/components/CTABanner";
 import { BreadcrumbJsonLd } from "@/components/SEO/JsonLd";
 
+export const revalidate = 3600; // Revalidate every hour
+
 export const metadata = {
   title: "Blog",
   description:
@@ -11,8 +13,8 @@ export const metadata = {
   keywords: ["care management blog", "home care tips UK", "domiciliary care guides"],
 };
 
-export default function BlogPage() {
-  const posts = getAllPosts();
+export default async function BlogPage() {
+  const posts = await getAllPosts();
 
   return (
     <>

@@ -2,8 +2,8 @@ import { getAllSlugs } from "@/lib/blog";
 
 const BASE_URL = "https://carecallai.co.uk";
 
-export default function sitemap() {
-  const blogSlugs = getAllSlugs();
+export default async function sitemap() {
+  const blogSlugs = await getAllSlugs();
 
   const staticPages = [
     { url: BASE_URL, changeFrequency: "weekly", priority: 1.0 },
