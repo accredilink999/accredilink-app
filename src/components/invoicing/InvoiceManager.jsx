@@ -36,6 +36,8 @@ export default function InvoiceManager({ invoices, clients, settings }) {
   const [showRecurringDialog, setShowRecurringDialog] = useState(false);
   const [recurringInvoiceData, setRecurringInvoiceData] = useState(null);
   const [lastRecurringFormData, setLastRecurringFormData] = useState(null);
+  const [viewingRecurringTemplate, setViewingRecurringTemplate] = useState(null);
+  const [editingRecurringTemplate, setEditingRecurringTemplate] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [showImportAllDropdown, setShowImportAllDropdown] = useState(false);
@@ -486,6 +488,23 @@ export default function InvoiceManager({ invoices, clients, settings }) {
       toast.success('Recurring template deleted');
     },
     onError: (error) => toast.error('Failed: ' + error.message),
+  });
+
+  // Update recurring template
+  const updateRecurringMutation = useMutation({
+    mutationFn: async ({ id, updates }) => {
+      const { error } = await supabase
+        .from('recurring_invoices')
+        .update(updates)
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recurringInvoices'] });
+      setEditingRecurringTemplate(null);
+      toast.success('Recurring template updated');
+    },
+    onError: (error) => toast.error('Update failed: ' + error.message),
   });
 
   // Generate all due recurring invoices
@@ -1690,7 +1709,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                           {isPaused ? 'Paused' : isDue ? 'Overdue' : `Next: ${template.next_invoice_date ? new Date(template.next_invoice_date).toLocaleDateString('en-GB') : 'N/A'}`}
                         </p>
                       </div>
-                      <div className="flex gap-1 shrink-0">
+                      <div className="flex gap-1 shrink-0 flex-wrap">
                         <Button
                           size="sm"
                           className="bg-teal-600 hover:bg-teal-700"
@@ -1702,6 +1721,20 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                         >
                           <RefreshCw className={`w-4 h-4 mr-1 ${generatingTemplateId === template.id ? 'animate-spin' : ''}`} />
                           {generatingTemplateId === template.id ? '...' : 'Generate'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setViewingRecurringTemplate(template)}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setEditingRecurringTemplate(template)}
+                        >
+                          <Edit2 className="w-4 h-4" />
                         </Button>
                         <Button
                           size="sm"
@@ -2527,7 +2560,297 @@ export default function InvoiceManager({ invoices, clients, settings }) {
         </DialogContent>
       </Dialog>
 
+      {/* View Recurring Template Dialog */}
+      <Dialog open={!!viewingRecurringTemplate} onOpenChange={(open) => !open && setViewingRecurringTemplate(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          {viewingRecurringTemplate && (() => {
+            const t = viewingRecurringTemplate;
+            const freqLabels = { weekly: 'Weekly', 'bi-weekly': 'Bi-Weekly', monthly: 'Monthly', quarterly: 'Quarterly', annually: 'Annually' };
+            const lineItems = typeof t.line_items === 'string' ? JSON.parse(t.line_items) : (t.line_items || []);
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle>Recurring Template Details</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <Card className="bg-teal-50 border-teal-200">
+                    <CardContent className="pt-6 space-y-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="text-lg font-bold text-slate-900">{t.client_name || 'Unnamed'}</h3>
+                          {t.client_email && <p className="text-sm text-slate-500">{t.client_email}</p>}
+                        </div>
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-teal-700">£{(t.total_amount || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded ${t.is_active !== false ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'}`}>
+                            {t.is_active !== false ? 'Active' : 'Paused'}
+                          </span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div><span className="text-slate-500">Frequency:</span> <strong>{freqLabels[t.frequency] || t.frequency}</strong></div>
+                    <div><span className="text-slate-500">Period Days:</span> <strong>{t.invoice_period_days || 30}</strong></div>
+                    <div><span className="text-slate-500">Next Invoice:</span> <strong>{t.next_invoice_date ? new Date(t.next_invoice_date).toLocaleDateString('en-GB') : 'N/A'}</strong></div>
+                    <div><span className="text-slate-500">Start Date:</span> <strong>{t.start_date ? new Date(t.start_date).toLocaleDateString('en-GB') : 'N/A'}</strong></div>
+                    {t.end_date && <div><span className="text-slate-500">End Date:</span> <strong>{new Date(t.end_date).toLocaleDateString('en-GB')}</strong></div>}
+                    <div><span className="text-slate-500">Payment Terms:</span> <strong>{t.payment_terms || 'Net 30'}</strong></div>
+                    {t.period_from && <div><span className="text-slate-500">Period From:</span> <strong>{new Date(t.period_from).toLocaleDateString('en-GB')}</strong></div>}
+                    {t.period_to && <div><span className="text-slate-500">Period To:</span> <strong>{new Date(t.period_to).toLocaleDateString('en-GB')}</strong></div>}
+                    <div><span className="text-slate-500">Auto Send:</span> <strong>{t.auto_send ? 'Yes' : 'No'}</strong></div>
+                    <div><span className="text-slate-500">Generated:</span> <strong>{t.generation_count || 0} times</strong></div>
+                    {t.last_generated_date && <div><span className="text-slate-500">Last Generated:</span> <strong>{new Date(t.last_generated_date).toLocaleDateString('en-GB')}</strong></div>}
+                    {t.is_batch && <div><span className="text-slate-500">Type:</span> <strong className="text-purple-700">Batch</strong></div>}
+                  </div>
+
+                  {lineItems.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold text-slate-900 mb-2">Line Items</h4>
+                      <div className="border rounded overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead className="bg-slate-50">
+                            <tr>
+                              <th className="text-left p-2">Description</th>
+                              <th className="text-right p-2">Qty</th>
+                              <th className="text-right p-2">Rate</th>
+                              <th className="text-right p-2">Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {lineItems.map((item, idx) => (
+                              <tr key={idx} className="border-t">
+                                <td className="p-2">{item.description || item.client_name || item.invoice_number || `Item ${idx + 1}`}</td>
+                                <td className="text-right p-2">{item.quantity || item.qty || 1}</td>
+                                <td className="text-right p-2">£{(item.rate || item.unit_price || item.total_amount || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</td>
+                                <td className="text-right p-2">£{(item.amount || item.total || item.total_amount || ((item.quantity || 1) * (item.rate || 0))).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {t.notes && (
+                    <div>
+                      <h4 className="font-semibold text-slate-900 mb-1">Notes</h4>
+                      <p className="text-sm text-slate-600 whitespace-pre-wrap">{t.notes}</p>
+                    </div>
+                  )}
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setViewingRecurringTemplate(null)}>Close</Button>
+                  <Button className="bg-teal-600 hover:bg-teal-700" onClick={() => { setViewingRecurringTemplate(null); setEditingRecurringTemplate(t); }}>
+                    <Edit2 className="w-4 h-4 mr-2" /> Edit Template
+                  </Button>
+                </DialogFooter>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Recurring Template Dialog */}
+      <Dialog open={!!editingRecurringTemplate} onOpenChange={(open) => !open && setEditingRecurringTemplate(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          {editingRecurringTemplate && (
+            <EditRecurringTemplateForm
+              template={editingRecurringTemplate}
+              onSave={(updates) => updateRecurringMutation.mutate({ id: editingRecurringTemplate.id, updates })}
+              onCancel={() => setEditingRecurringTemplate(null)}
+              isLoading={updateRecurringMutation.isPending}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
     </div>
+  );
+}
+
+function EditRecurringTemplateForm({ template, onSave, onCancel, isLoading }) {
+  const freqOptions = [
+    { value: 'weekly', label: 'Weekly' },
+    { value: 'bi-weekly', label: 'Bi-Weekly' },
+    { value: 'monthly', label: 'Monthly' },
+    { value: 'quarterly', label: 'Quarterly' },
+    { value: 'annually', label: 'Annually' },
+  ];
+
+  const [formData, setFormData] = useState({
+    client_name: template.client_name || '',
+    client_email: template.client_email || '',
+    frequency: template.frequency || 'monthly',
+    day_of_month: template.day_of_month || 1,
+    day_of_week: template.day_of_week || 1,
+    invoice_period_days: template.invoice_period_days || 30,
+    total_amount: template.total_amount || 0,
+    subtotal: template.subtotal || 0,
+    tax_amount: template.tax_amount || 0,
+    payment_terms: template.payment_terms || 'Net 30',
+    notes: template.notes || '',
+    next_invoice_date: template.next_invoice_date || '',
+    start_date: template.start_date || '',
+    end_date: template.end_date || '',
+    auto_send: template.auto_send || false,
+    period_from: template.period_from || '',
+    period_to: template.period_to || '',
+    currency: template.currency || 'GBP',
+  });
+
+  const handleSave = () => {
+    onSave({
+      client_name: formData.client_name,
+      client_email: formData.client_email,
+      frequency: formData.frequency,
+      day_of_month: formData.day_of_month,
+      day_of_week: formData.day_of_week,
+      invoice_period_days: parseInt(formData.invoice_period_days) || 30,
+      total_amount: parseFloat(formData.total_amount) || 0,
+      subtotal: parseFloat(formData.subtotal) || 0,
+      tax_amount: parseFloat(formData.tax_amount) || 0,
+      payment_terms: formData.payment_terms,
+      notes: formData.notes,
+      next_invoice_date: formData.next_invoice_date || null,
+      start_date: formData.start_date || null,
+      end_date: formData.end_date || null,
+      auto_send: formData.auto_send,
+      period_from: formData.period_from || null,
+      period_to: formData.period_to || null,
+      currency: formData.currency,
+    });
+  };
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>Edit Recurring Template</DialogTitle>
+      </DialogHeader>
+      <div className="space-y-4 py-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Client Name</label>
+            <Input value={formData.client_name} onChange={(e) => setFormData({ ...formData, client_name: e.target.value })} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Client Email</label>
+            <Input value={formData.client_email} onChange={(e) => setFormData({ ...formData, client_email: e.target.value })} />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Frequency</label>
+            <Select value={formData.frequency} onValueChange={(v) => setFormData({ ...formData, frequency: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {freqOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Period Days</label>
+            <Input type="number" min="1" value={formData.invoice_period_days} onChange={(e) => setFormData({ ...formData, invoice_period_days: e.target.value })} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Payment Terms</label>
+            <Input value={formData.payment_terms} onChange={(e) => setFormData({ ...formData, payment_terms: e.target.value })} />
+          </div>
+        </div>
+
+        {formData.frequency === 'monthly' && (
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Day of Month</label>
+            <Select value={formData.day_of_month.toString()} onValueChange={(v) => setFormData({ ...formData, day_of_month: parseInt(v) })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 28 }, (_, i) => i + 1).map(d => (
+                  <SelectItem key={d} value={d.toString()}>{d}{d === 1 ? 'st' : d === 2 ? 'nd' : d === 3 ? 'rd' : 'th'}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {(formData.frequency === 'weekly' || formData.frequency === 'bi-weekly') && (
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Day of Week</label>
+            <Select value={formData.day_of_week.toString()} onValueChange={(v) => setFormData({ ...formData, day_of_week: parseInt(v) })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">Monday</SelectItem>
+                <SelectItem value="2">Tuesday</SelectItem>
+                <SelectItem value="3">Wednesday</SelectItem>
+                <SelectItem value="4">Thursday</SelectItem>
+                <SelectItem value="5">Friday</SelectItem>
+                <SelectItem value="6">Saturday</SelectItem>
+                <SelectItem value="0">Sunday</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Total Amount (£)</label>
+            <Input type="number" step="0.01" value={formData.total_amount} onChange={(e) => setFormData({ ...formData, total_amount: e.target.value, subtotal: e.target.value })} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Tax Amount (£)</label>
+            <Input type="number" step="0.01" value={formData.tax_amount} onChange={(e) => setFormData({ ...formData, tax_amount: e.target.value })} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Currency</label>
+            <Input value={formData.currency} onChange={(e) => setFormData({ ...formData, currency: e.target.value })} />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Period From</label>
+            <Input type="date" value={formData.period_from} onChange={(e) => setFormData({ ...formData, period_from: e.target.value })} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Period To</label>
+            <Input type="date" value={formData.period_to} onChange={(e) => setFormData({ ...formData, period_to: e.target.value })} />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Next Invoice Date</label>
+            <Input type="date" value={formData.next_invoice_date} onChange={(e) => setFormData({ ...formData, next_invoice_date: e.target.value })} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">End Date (optional)</label>
+            <Input type="date" value={formData.end_date} onChange={(e) => setFormData({ ...formData, end_date: e.target.value })} />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <input type="checkbox" id="auto_send_edit" checked={formData.auto_send} onChange={(e) => setFormData({ ...formData, auto_send: e.target.checked })} className="rounded" />
+          <label htmlFor="auto_send_edit" className="text-sm text-slate-700">Auto-send when generated</label>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
+          <textarea
+            className="w-full border rounded-md p-2 text-sm min-h-[80px]"
+            value={formData.notes}
+            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+          />
+        </div>
+      </div>
+
+      <DialogFooter>
+        <Button variant="outline" onClick={onCancel} disabled={isLoading}>Cancel</Button>
+        <Button onClick={handleSave} disabled={isLoading} className="bg-teal-600 hover:bg-teal-700">
+          {isLoading ? 'Saving...' : 'Save Changes'}
+        </Button>
+      </DialogFooter>
+    </>
   );
 }
 
