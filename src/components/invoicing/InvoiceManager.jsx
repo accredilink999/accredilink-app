@@ -1538,8 +1538,8 @@ export default function InvoiceManager({ invoices, clients, settings }) {
             </span>
           </div>
           <div className="flex gap-4 text-xs text-slate-500 flex-wrap">
-            <span>Issued: {new Date(invoice.invoice_date).toLocaleDateString('en-GB')}</span>
-            <span>Due: {new Date(invoice.due_date).toLocaleDateString('en-GB')}</span>
+            {invoice.period_from && <span>Period: {new Date(invoice.period_from).toLocaleDateString('en-GB')} — {invoice.period_to ? new Date(invoice.period_to).toLocaleDateString('en-GB') : ''}</span>}
+            {!invoice.period_from && <span>Issued: {new Date(invoice.invoice_date).toLocaleDateString('en-GB')}</span>}
           </div>
         </div>
         <div className="text-right mr-4 shrink-0">
@@ -2490,8 +2490,6 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                     <div className="mt-2 text-sm space-y-0.5">
                       <p><span className="text-slate-500">No:</span> <span className="font-bold">{inv.invoice_number}</span></p>
                       {inv.period_from && <p><span className="text-slate-500">Period:</span> {new Date(inv.period_from).toLocaleDateString('en-GB')} — {inv.period_to ? new Date(inv.period_to).toLocaleDateString('en-GB') : ''}</p>}
-                      <p><span className="text-slate-500">Date:</span> {new Date(inv.invoice_date).toLocaleDateString('en-GB')}</p>
-                      <p><span className="text-slate-500">Due:</span> {new Date(inv.due_date).toLocaleDateString('en-GB')}</p>
                       <p><span className="text-slate-500">Terms:</span> {termsLabel}</p>
                     </div>
                   </div>
