@@ -760,7 +760,6 @@ export default function HomePage() {
               </AnimateOnScroll>
             ))}
           </div>
-        </div>
 
           {/* Trustpilot CTA */}
           <AnimateOnScroll animation="fade-in-up" delay={400}>
