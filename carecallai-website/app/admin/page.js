@@ -268,7 +268,20 @@ export default function PlatformAdminPage() {
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Quick Links */}
-        <div className="mb-6">
+        <div className="mb-6 flex flex-wrap gap-3">
+          <a
+            href="/admin/customers"
+            className="inline-flex items-center gap-3 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl px-5 py-3 hover:shadow-md hover:border-green-300 transition-all group"
+          >
+            <span className="text-xl">👥</span>
+            <div>
+              <p className="font-semibold text-slate-900 text-sm group-hover:text-green-700 transition-colors">Customer Management</p>
+              <p className="text-xs text-slate-500">Manage signups, send welcome & update emails</p>
+            </div>
+            <svg className="w-4 h-4 text-slate-400 group-hover:text-green-600 transition-colors ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </a>
           <a
             href="/admin/campaigns"
             className="inline-flex items-center gap-3 bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-xl px-5 py-3 hover:shadow-md hover:border-teal-300 transition-all group"

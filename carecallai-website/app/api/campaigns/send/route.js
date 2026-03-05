@@ -36,8 +36,26 @@ export async function POST(request) {
   const admin = verifyAdmin(request);
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { campaign_id, test_email } = await request.json();
+  const { campaign_id, test_email, subject, html: directHtml } = await request.json();
   if (!campaign_id) return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 });
+
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://carecallai.co.uk';
+
+  // Direct send — send custom HTML to a single email (used by customer management)
+  if (campaign_id === 'direct_send' && test_email && directHtml) {
+    try {
+      await sendEmail({
+        to: test_email,
+        from: 'CareCallAI <hello@carecallai.co.uk>',
+        subject: subject || 'Message from CareCallAI',
+        html: directHtml,
+        replyTo: 'hello@carecallai.co.uk',
+      });
+      return NextResponse.json({ success: true, message: `Email sent to ${test_email}` });
+    } catch (err) {
+      return NextResponse.json({ error: err.message }, { status: 500 });
+    }
+  }
 
   // Load campaign
   const { data: campaign, error: campErr } = await supabase
@@ -48,8 +66,6 @@ export async function POST(request) {
 
   if (campErr || !campaign) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
   if (campaign.status === 'sending') return NextResponse.json({ error: 'Campaign is already sending' }, { status: 400 });
-
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://carecallai.co.uk';
 
   // Test send — send to a single test email
   if (test_email) {

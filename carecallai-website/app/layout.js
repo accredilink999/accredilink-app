@@ -4,6 +4,7 @@ import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import LiveChat from "@/components/LiveChat";
+import WhatsAppButton from "@/components/WhatsAppButton";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -93,6 +94,7 @@ fbq('track', 'PageView');`}
         <main>{children}</main>
         <Footer />
         <LiveChat />
+        <WhatsAppButton />
       </body>
     </html>
   );
