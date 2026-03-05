@@ -331,27 +331,29 @@ export default function InvoiceManager({ invoices, clients, settings }) {
       // Handle batch templates
       if (template.is_batch) {
         const batchInvoices = typeof template.line_items === 'string' ? JSON.parse(template.line_items) : (template.line_items || []);
+        if (batchInvoices.length === 0) throw new Error('No invoices in batch template');
         const createdIds = [];
         const batchPeriodFrom = template.period_from || periodFrom;
         const batchPeriodTo = template.period_to || new Date(new Date(batchPeriodFrom).getTime() + ((template.invoice_period_days || 30) - 1) * 86400000).toISOString().split('T')[0];
+        console.log(`Generating batch: ${batchInvoices.length} invoices, period ${batchPeriodFrom} to ${batchPeriodTo}`);
         for (const invData of batchInvoices) {
           const invNumber = `${prefix}-${nextNumber}`;
           const payDays = parseInt(invData.payment_terms || template.payment_terms || '30') || 30;
           const dueDate = new Date(new Date(batchPeriodFrom).getTime() + payDays * 86400000).toISOString().split('T')[0];
 
-          const { data: newInv, error } = await supabase.from('invoices').insert({
+          // Build clean insert — exclude any fields that aren't invoice columns
+          const insertData = {
             invoice_number: invNumber,
             client_id: invData.client_id || template.client_id,
             client_name: invData.client_name || template.client_name,
             client_email: invData.client_email || template.client_email,
-            service_user_id: invData.service_user_id || template.service_user_id,
+            service_user_id: invData.service_user_id || template.service_user_id || null,
             invoice_date: today,
             due_date: dueDate,
             period_from: batchPeriodFrom,
             period_to: batchPeriodTo,
             payment_terms: invData.payment_terms || template.payment_terms,
-            notes: invData.notes || template.notes,
-            line_items: invData.day_items ? null : invData.line_items,
+            notes: invData.notes || template.notes || '',
             day_items: invData.day_items || null,
             repeating_days: invData.repeating_days || null,
             discount_type: invData.discount_type || 'fixed',
@@ -362,8 +364,26 @@ export default function InvoiceManager({ invoices, clients, settings }) {
             amount_due: invData.total_amount || 0,
             currency: invData.currency || template.currency || 'GBP',
             status: 'draft',
-          }).select().single();
-          if (error) throw error;
+          };
+          // Only include line_items if not using day_items
+          if (!invData.day_items) {
+            // For batch items, line_items might be the original invoice's line_items (nested)
+            // or the invData itself might BE the line item — handle both
+            const originalLineItems = invData.line_items;
+            if (originalLineItems && Array.isArray(originalLineItems)) {
+              insertData.line_items = originalLineItems;
+            } else if (invData.description || invData.quantity) {
+              // invData is itself a line item
+              insertData.line_items = [{ description: invData.description, quantity: invData.quantity || 1, unit_price: invData.unit_price || invData.rate || 0 }];
+            }
+          }
+
+          console.log(`Creating invoice ${invNumber} for ${insertData.client_name}`);
+          const { data: newInv, error } = await supabase.from('invoices').insert(insertData).select().single();
+          if (error) {
+            console.error(`Failed to create ${invNumber}:`, error);
+            throw error;
+          }
           createdIds.push(newInv.id);
           nextNumber++;
         }
