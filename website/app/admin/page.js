@@ -479,6 +479,25 @@ export default function AdminPortal() {
                 </div>
               </div>
             </a>
+
+            <a
+              href="https://businessapp.b2b.trustpilot.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group bg-white rounded-xl border border-slate-200 p-5 hover:shadow-md hover:border-slate-400 transition-all"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-[#00B67A] flex items-center justify-center">
+                  <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+                  </svg>
+                </div>
+                <div>
+                  <p className="font-medium text-slate-900 text-sm">Trustpilot Business</p>
+                  <p className="text-xs text-slate-500">Reviews & reputation</p>
+                </div>
+              </div>
+            </a>
           </div>
         </div>
 
