@@ -1213,6 +1213,34 @@ export default function InvoiceManager({ invoices, clients, settings }) {
     }
   };
 
+  // Download batch recurring template as combined PDF with cover sheet & optionally mark sent
+  const handleDownloadRecurringBatch = async (template, markAsSent = false) => {
+    const lineItems = typeof template.line_items === 'string' ? JSON.parse(template.line_items) : (template.line_items || []);
+    if (lineItems.length === 0) { toast.error('No invoices in template'); return; }
+
+    // Use the existing combine function (it handles its own loading state)
+    // It needs at least 2 invoices for the cover sheet logic
+    if (lineItems.length >= 2) {
+      await handleCombineInvoices(lineItems);
+    } else {
+      // Single invoice — just download it directly
+      await handleDownloadInvoice(lineItems[0]);
+    }
+
+    if (markAsSent) {
+      // Mark all original invoices as sent
+      const invoiceIds = lineItems.map(i => i.id || i._original_id).filter(Boolean);
+      if (invoiceIds.length > 0) {
+        const today = new Date().toISOString().split('T')[0];
+        for (const invId of invoiceIds) {
+          await supabase.from('invoices').update({ status: 'sent', sent_date: today }).eq('id', invId);
+        }
+        queryClient.invalidateQueries({ queryKey: ['invoices'] });
+        toast.success(`${invoiceIds.length} invoices marked as sent`);
+      }
+    }
+  };
+
   const handleSubmit = async () => {
     if (!formData.invoice_number) {
       toast.error('Please enter an invoice number');
@@ -2678,6 +2706,26 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                 </div>
                 <DialogFooter className="flex-wrap gap-2">
                   <Button variant="outline" onClick={() => setViewingRecurringTemplate(null)}>Close</Button>
+                  {t.is_batch && (
+                    <>
+                      <Button
+                        variant="outline"
+                        disabled={combineLoading}
+                        onClick={() => handleDownloadRecurringBatch(t, false)}
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        {combineLoading ? 'Generating...' : 'Download Batch PDF'}
+                      </Button>
+                      <Button
+                        className="bg-indigo-600 hover:bg-indigo-700"
+                        disabled={combineLoading}
+                        onClick={() => handleDownloadRecurringBatch(t, true)}
+                      >
+                        <Send className="w-4 h-4 mr-2" />
+                        {combineLoading ? 'Generating...' : 'Download & Mark Sent'}
+                      </Button>
+                    </>
+                  )}
                   <Button className="bg-teal-600 hover:bg-teal-700" onClick={() => { setViewingRecurringTemplate(null); setEditingRecurringTemplate(t); }}>
                     <Edit2 className="w-4 h-4 mr-2" /> Edit Template
                   </Button>
