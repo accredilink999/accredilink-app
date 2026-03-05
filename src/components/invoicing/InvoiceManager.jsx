@@ -35,6 +35,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
   const [activeSection, setActiveSection] = useState('draft');
   const [showRecurringDialog, setShowRecurringDialog] = useState(false);
   const [recurringInvoiceData, setRecurringInvoiceData] = useState(null);
+  const [lastRecurringFormData, setLastRecurringFormData] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [showImportAllDropdown, setShowImportAllDropdown] = useState(false);
@@ -193,18 +194,63 @@ export default function InvoiceManager({ invoices, clients, settings }) {
   });
 
   const createRecurringMutation = useMutation({
-    mutationFn: async ({ recurringData, originalInvoiceId }) => {
-      // Update the original invoice status to recurring
-      const { error: updateErr } = await supabase
-        .from('invoices')
-        .update({ status: 'recurring', is_recurring: true })
-        .eq('id', originalInvoiceId);
-      if (updateErr) throw updateErr;
+    mutationFn: async ({ recurringData, originalInvoiceId, batchInvoiceIds }) => {
+      const isBatch = !!(batchInvoiceIds && batchInvoiceIds.length > 0);
+
+      // Update the original invoice(s) status to recurring — skip for batch to avoid UUID issues
+      if (isBatch) {
+        // Update each real invoice in the batch
+        for (const invId of batchInvoiceIds) {
+          await supabase.from('invoices').update({ status: 'recurring', is_recurring: true }).eq('id', invId);
+        }
+      } else if (originalInvoiceId && !String(originalInvoiceId).startsWith('batch-')) {
+        const { error: updateErr } = await supabase
+          .from('invoices')
+          .update({ status: 'recurring', is_recurring: true })
+          .eq('id', originalInvoiceId);
+        if (updateErr) throw updateErr;
+      }
+
+      // Build clean insert — ONLY known recurring_invoices columns, nothing else
+      const cleanData = {};
+      cleanData.client_id = recurringData.client_id || null;
+      cleanData.client_name = recurringData.client_name || null;
+      cleanData.client_email = recurringData.client_email || '';
+      cleanData.frequency = recurringData.frequency || 'monthly';
+      cleanData.line_items = recurringData.line_items || [];
+      cleanData.subtotal = recurringData.subtotal || 0;
+      cleanData.tax_amount = recurringData.tax_amount || 0;
+      cleanData.total_amount = recurringData.total_amount || 0;
+      cleanData.currency = recurringData.currency || 'GBP';
+      cleanData.payment_terms = recurringData.payment_terms || 'Net 30';
+      cleanData.notes = recurringData.notes || '';
+      cleanData.service_user_id = recurringData.service_user_id || null;
+      cleanData.repeating_days = recurringData.repeating_days || null;
+      cleanData.day_items = recurringData.day_items || null;
+      cleanData.original_invoice_id = isBatch ? null : (recurringData.original_invoice_id || null);
+      cleanData.discount_type = recurringData.discount_type || 'fixed';
+      cleanData.discount_value = recurringData.discount_value || 0;
+      cleanData.is_batch = isBatch;
+      cleanData.is_active = true;
+      cleanData.day_of_month = recurringData.day_of_month || null;
+      cleanData.day_of_week = recurringData.day_of_week || null;
+      cleanData.invoice_period_days = recurringData.invoice_period_days || 30;
+      cleanData.start_date = recurringData.start_date || null;
+      cleanData.end_date = recurringData.end_date || null;
+      cleanData.auto_send = recurringData.auto_send || false;
+      cleanData.next_invoice_date = recurringData.next_invoice_date || recurringData.start_date || null;
+      cleanData.period_from = recurringData.period_from || null;
+      cleanData.period_to = recurringData.period_to || null;
+      cleanData.generation_count = 0;
+      if (isBatch) cleanData.batch_invoice_ids = batchInvoiceIds;
+
+      // DEBUG: alert so we can see exactly what's being sent
+      console.log('RECURRING INSERT cleanData:', JSON.stringify(cleanData, null, 2));
 
       // Create the recurring invoice record
       const { data: result, error } = await supabase
         .from('recurring_invoices')
-        .insert(recurringData)
+        .insert(cleanData)
         .select()
         .single();
       if (error) throw error;
@@ -216,9 +262,11 @@ export default function InvoiceManager({ invoices, clients, settings }) {
       await queryClient.refetchQueries({ queryKey: ['invoices'] });
       setShowRecurringDialog(false);
       setRecurringInvoiceData(null);
+      setLastRecurringFormData(null);
       toast.success('Recurring invoice template created');
     },
     onError: (error) => {
+      // Keep dialog open, form data is preserved via lastRecurringFormData
       toast.error('Failed: ' + error.message);
     },
   });
@@ -262,7 +310,14 @@ export default function InvoiceManager({ invoices, clients, settings }) {
         .single();
       const prefix = freshSettings?.invoice_prefix || invoicingSettings?.invoice_prefix || 'INV';
       const settingsNum = freshSettings?.next_invoice_number || 2000;
-      const existingNums = invoices
+      // Fetch the highest invoice number from ALL invoices in the database (not just loaded ones)
+      const { data: allInvNums } = await supabase
+        .from('invoices')
+        .select('invoice_number')
+        .like('invoice_number', `${prefix}-%`)
+        .order('created_at', { ascending: false })
+        .limit(500);
+      const existingNums = (allInvNums || [])
         .map(i => { const m = (i.invoice_number || '').match(new RegExp(`^${prefix}-(\\d+)$`)); return m ? parseInt(m[1]) : 0; })
         .filter(n => n > 0);
       const maxExisting = existingNums.length > 0 ? Math.max(...existingNums) : 0;
@@ -1513,6 +1568,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                       // Batch recurring: create synthetic batch object
                       setRecurringInvoiceData({
                         _isBatch: true,
+                        _batchInvoiceIds: selected.map(i => i.id),
                         id: 'batch-' + Date.now(),
                         invoice_number: `Batch (${selected.length} invoices)`,
                         client_id: selected[0].client_id,
@@ -2220,20 +2276,27 @@ export default function InvoiceManager({ invoices, clients, settings }) {
           </Dialog>
 
       {/* Recurring Invoice Setup Dialog */}
-      <Dialog open={showRecurringDialog} onOpenChange={setShowRecurringDialog}>
+      <Dialog open={showRecurringDialog} onOpenChange={(open) => { if (!open && !createRecurringMutation.isPending) { setShowRecurringDialog(false); } }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Set Up Recurring Invoice</DialogTitle>
           </DialogHeader>
           {recurringInvoiceData && (
             <RecurringInvoiceForm
+              key="recurring-form-stable"
               invoice={recurringInvoiceData}
-              onSubmit={(data) => createRecurringMutation.mutate({
-                recurringData: data,
-                originalInvoiceId: recurringInvoiceData.id
-              })}
-              onCancel={() => setShowRecurringDialog(false)}
+              savedFormData={lastRecurringFormData}
+              onSubmit={(data) => {
+                setLastRecurringFormData(data);
+                createRecurringMutation.mutate({
+                  recurringData: data,
+                  originalInvoiceId: recurringInvoiceData._isBatch ? null : recurringInvoiceData.id,
+                  batchInvoiceIds: recurringInvoiceData._batchInvoiceIds || null
+                });
+              }}
+              onCancel={() => { setShowRecurringDialog(false); setRecurringInvoiceData(null); setLastRecurringFormData(null); }}
               isLoading={createRecurringMutation.isPending}
+              error={createRecurringMutation.isError ? createRecurringMutation.error?.message : null}
             />
           )}
         </DialogContent>
@@ -2468,11 +2531,21 @@ export default function InvoiceManager({ invoices, clients, settings }) {
   );
 }
 
-function RecurringInvoiceForm({ invoice, onSubmit, onCancel, isLoading }) {
+function RecurringInvoiceForm({ invoice, onSubmit, onCancel, isLoading, error, savedFormData }) {
   const defaultStart = invoice.invoice_date || new Date().toISOString().split('T')[0];
   const defaultPeriodFrom = invoice.period_from || defaultStart;
   const defaultPeriodTo = invoice.period_to || new Date(new Date(defaultPeriodFrom).getTime() + 6 * 86400000).toISOString().split('T')[0];
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(savedFormData ? {
+    frequency: savedFormData.frequency || 'monthly',
+    day_of_month: savedFormData.day_of_month || 1,
+    day_of_week: savedFormData.day_of_week || 1,
+    invoice_period_days: savedFormData.invoice_period_days || 30,
+    start_date: savedFormData.start_date || defaultStart,
+    end_date: savedFormData.end_date || '',
+    auto_send: savedFormData.auto_send !== undefined ? savedFormData.auto_send : true,
+    period_from: savedFormData.period_from || defaultPeriodFrom,
+    period_to: savedFormData.period_to || defaultPeriodTo,
+  } : {
     frequency: 'monthly',
     day_of_month: 1,
     day_of_week: 1,
@@ -2700,6 +2773,12 @@ function RecurringInvoiceForm({ invoice, onSubmit, onCancel, isLoading }) {
         </Card>
       </div>
 
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">
+          Last attempt failed: {error}
+        </div>
+      )}
+
       <DialogFooter>
         <Button variant="outline" onClick={onCancel} disabled={isLoading}>Cancel</Button>
         <Button
@@ -2707,7 +2786,7 @@ function RecurringInvoiceForm({ invoice, onSubmit, onCancel, isLoading }) {
           disabled={isLoading}
           className="bg-teal-600 hover:bg-teal-700"
         >
-          {isLoading ? 'Creating...' : 'Create Recurring Invoice'}
+          {isLoading ? 'Creating...' : error ? 'Retry' : 'Create Recurring Invoice'}
         </Button>
       </DialogFooter>
     </div>
