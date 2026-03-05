@@ -2607,27 +2607,63 @@ export default function InvoiceManager({ invoices, clients, settings }) {
 
                   {lineItems.length > 0 && (
                     <div>
-                      <h4 className="font-semibold text-slate-900 mb-2">Line Items</h4>
+                      <h4 className="font-semibold text-slate-900 mb-2">
+                        {t.is_batch ? `Invoices in Batch (${lineItems.length})` : 'Line Items'}
+                      </h4>
                       <div className="border rounded overflow-hidden">
                         <table className="w-full text-sm">
                           <thead className="bg-slate-50">
                             <tr>
-                              <th className="text-left p-2">Description</th>
-                              <th className="text-right p-2">Qty</th>
-                              <th className="text-right p-2">Rate</th>
+                              {t.is_batch && <th className="text-left p-2">Invoice #</th>}
+                              <th className="text-left p-2">{t.is_batch ? 'Client / Service User' : 'Description'}</th>
+                              {!t.is_batch && <th className="text-right p-2">Qty</th>}
+                              {!t.is_batch && <th className="text-right p-2">Rate</th>}
                               <th className="text-right p-2">Amount</th>
+                              {t.is_batch && <th className="text-right p-2">Actions</th>}
                             </tr>
                           </thead>
                           <tbody>
-                            {lineItems.map((item, idx) => (
-                              <tr key={idx} className="border-t">
-                                <td className="p-2">{item.description || item.client_name || item.invoice_number || `Item ${idx + 1}`}</td>
-                                <td className="text-right p-2">{item.quantity || item.qty || 1}</td>
-                                <td className="text-right p-2">£{(item.rate || item.unit_price || item.total_amount || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</td>
-                                <td className="text-right p-2">£{(item.amount || item.total || item.total_amount || ((item.quantity || 1) * (item.rate || 0))).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</td>
-                              </tr>
-                            ))}
+                            {lineItems.map((item, idx) => {
+                              const suName = item.service_user_id ? (serviceUsers.find(u => u.id === item.service_user_id)?.full_name || null) : null;
+                              return (
+                                <tr key={idx} className="border-t">
+                                  {t.is_batch && (
+                                    <td className="p-2 font-medium text-slate-900">{item.invoice_number || `INV-${idx + 1}`}</td>
+                                  )}
+                                  <td className="p-2">
+                                    {t.is_batch
+                                      ? (suName ? `${suName} — ${item.client_name || ''}` : item.client_name || item.description || `Item ${idx + 1}`)
+                                      : (item.description || item.client_name || item.invoice_number || `Item ${idx + 1}`)}
+                                  </td>
+                                  {!t.is_batch && <td className="text-right p-2">{item.quantity || item.qty || 1}</td>}
+                                  {!t.is_batch && <td className="text-right p-2">£{(item.rate || item.unit_price || item.total_amount || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</td>}
+                                  <td className="text-right p-2 font-medium">£{(item.amount || item.total || item.total_amount || ((item.quantity || 1) * (item.rate || 0))).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</td>
+                                  {t.is_batch && (
+                                    <td className="text-right p-2">
+                                      <div className="flex gap-1 justify-end">
+                                        <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => { setViewingRecurringTemplate(null); setViewingInvoice(item); }}>
+                                          <Eye className="w-3 h-3" />
+                                        </Button>
+                                        <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => { setViewingRecurringTemplate(null); handleDownloadInvoice(item); }}>
+                                          <Download className="w-3 h-3" />
+                                        </Button>
+                                      </div>
+                                    </td>
+                                  )}
+                                </tr>
+                              );
+                            })}
                           </tbody>
+                          <tfoot className="bg-slate-50 font-semibold">
+                            <tr>
+                              {t.is_batch && <td className="p-2"></td>}
+                              <td className="p-2">Total</td>
+                              {!t.is_batch && <td></td>}
+                              {!t.is_batch && <td></td>}
+                              <td className="text-right p-2">£{(t.total_amount || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</td>
+                              {t.is_batch && <td></td>}
+                            </tr>
+                          </tfoot>
                         </table>
                       </div>
                     </div>
@@ -2640,7 +2676,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                     </div>
                   )}
                 </div>
-                <DialogFooter>
+                <DialogFooter className="flex-wrap gap-2">
                   <Button variant="outline" onClick={() => setViewingRecurringTemplate(null)}>Close</Button>
                   <Button className="bg-teal-600 hover:bg-teal-700" onClick={() => { setViewingRecurringTemplate(null); setEditingRecurringTemplate(t); }}>
                     <Edit2 className="w-4 h-4 mr-2" /> Edit Template
