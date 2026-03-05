@@ -966,7 +966,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                 <div style="font-size:28px;font-weight:900;color:${bc};letter-spacing:2px;margin-bottom:6px;">COMPOSITE<br/>INVOICE</div>
                 <table style="margin-left:auto;font-size:11px;">
                   <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Reference:</td><td style="padding:3px 0;font-weight:700;font-size:13px;">${batchRef}</td></tr>
-                  <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Date:</td><td style="padding:3px 0;">${new Date().toLocaleDateString('en-GB')}</td></tr>
+                  ${sorted[0]?.period_from ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Period:</td><td style="padding:3px 0;font-weight:600;">${new Date(sorted[0].period_from).toLocaleDateString('en-GB')} — ${sorted[0].period_to ? new Date(sorted[0].period_to).toLocaleDateString('en-GB') : ''}</td></tr>` : ''}
                   <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Invoices:</td><td style="padding:3px 0;">${sorted.length}</td></tr>
                 </table>
               </td>
@@ -1150,7 +1150,6 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                     <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Invoice No:</td><td style="padding:3px 0;font-weight:700;">${inv.invoice_number}</td></tr>
                     <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Batch Ref:</td><td style="padding:3px 0;color:${bc};font-weight:700;">${batchRef}</td></tr>
                     ${inv.period_from ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Period:</td><td style="padding:3px 0;">${new Date(inv.period_from).toLocaleDateString('en-GB')} — ${inv.period_to ? new Date(inv.period_to).toLocaleDateString('en-GB') : ''}</td></tr>` : ''}
-                    <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Date:</td><td style="padding:3px 0;">${new Date(inv.invoice_date).toLocaleDateString('en-GB')}</td></tr>
                     <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Due Date:</td><td style="padding:3px 0;">${new Date(inv.due_date).toLocaleDateString('en-GB')}</td></tr>
                   </table>
                 </td>
@@ -1238,27 +1237,107 @@ export default function InvoiceManager({ invoices, clients, settings }) {
     const lineItems = typeof template.line_items === 'string' ? JSON.parse(template.line_items) : (template.line_items || []);
     if (lineItems.length === 0) { toast.error('No invoices in template'); return; }
 
-    // Use the existing combine function (it handles its own loading state)
-    // It needs at least 2 invoices for the cover sheet logic
-    if (lineItems.length >= 2) {
-      await handleCombineInvoices(lineItems);
-    } else {
-      // Single invoice — just download it directly
-      await handleDownloadInvoice(lineItems[0]);
+    // Fetch the next invoice number so PDFs get fresh incrementing numbers
+    const { data: freshSettings } = await supabase
+      .from('invoicing_settings')
+      .select('id, invoice_prefix, next_invoice_number')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    const prefix = freshSettings?.invoice_prefix || invoicingSettings?.invoice_prefix || 'INV';
+    const settingsNum = freshSettings?.next_invoice_number || 2000;
+    const { data: allInvNums } = await supabase
+      .from('invoices')
+      .select('invoice_number')
+      .like('invoice_number', `${prefix}-%`)
+      .order('created_at', { ascending: false })
+      .limit(500);
+    const existingNums = (allInvNums || [])
+      .map(i => { const m = (i.invoice_number || '').match(new RegExp(`^${prefix}-(\\d+)$`)); return m ? parseInt(m[1]) : 0; })
+      .filter(n => n > 0);
+    const maxExisting = existingNums.length > 0 ? Math.max(...existingNums) : 0;
+    let nextNumber = Math.max(settingsNum, maxExisting + 1);
+
+    const today = new Date().toISOString().split('T')[0];
+    const payDays = parseInt(template.payment_terms || '30') || 30;
+    const dueDate = new Date(new Date(template.period_from || today).getTime() + payDays * 86400000).toISOString().split('T')[0];
+
+    // Override dates AND assign new invoice numbers, then create real invoices in DB
+    const createdInvoices = [];
+    for (const inv of lineItems) {
+      const invNumber = `${prefix}-${nextNumber}`;
+      const insertData = {
+        invoice_number: invNumber,
+        client_id: inv.client_id || template.client_id,
+        client_name: inv.client_name || template.client_name,
+        client_email: inv.client_email || template.client_email,
+        service_user_id: inv.service_user_id || template.service_user_id || null,
+        invoice_date: today,
+        due_date: dueDate,
+        period_from: template.period_from || inv.period_from,
+        period_to: template.period_to || inv.period_to,
+        payment_terms: inv.payment_terms || template.payment_terms,
+        notes: inv.notes || template.notes || '',
+        day_items: inv.day_items || null,
+        repeating_days: inv.repeating_days || null,
+        discount_type: inv.discount_type || 'fixed',
+        discount_value: inv.discount_value || 0,
+        subtotal: inv.subtotal || inv.total_amount || 0,
+        tax_amount: inv.tax_amount || 0,
+        total_amount: inv.total_amount || 0,
+        amount_due: inv.total_amount || 0,
+        currency: inv.currency || template.currency || 'GBP',
+        status: markAsSent ? 'sent' : 'draft',
+        sent_date: markAsSent ? today : null,
+      };
+      if (!inv.day_items) {
+        const origItems = inv.line_items;
+        if (origItems && Array.isArray(origItems)) {
+          insertData.line_items = origItems;
+        } else if (inv.description || inv.quantity) {
+          insertData.line_items = [{ description: inv.description, quantity: inv.quantity || 1, unit_price: inv.unit_price || inv.rate || 0 }];
+        }
+      }
+
+      const { data: newInv, error } = await supabase.from('invoices').insert(insertData).select().single();
+      if (error) {
+        console.error(`Failed to create ${invNumber}:`, error);
+        toast.error(`Failed to create ${invNumber}: ${error.message}`);
+        return;
+      }
+      createdInvoices.push(newInv);
+      nextNumber++;
     }
 
-    if (markAsSent) {
-      // Mark all original invoices as sent
-      const invoiceIds = lineItems.map(i => i.id || i._original_id).filter(Boolean);
-      if (invoiceIds.length > 0) {
-        const today = new Date().toISOString().split('T')[0];
-        for (const invId of invoiceIds) {
-          await supabase.from('invoices').update({ status: 'sent', sent_date: today }).eq('id', invId);
-        }
-        queryClient.invalidateQueries({ queryKey: ['invoices'] });
-        toast.success(`${invoiceIds.length} invoices marked as sent`);
-      }
+    // Update next_invoice_number in settings
+    if (freshSettings) {
+      await supabase.from('invoicing_settings').update({ next_invoice_number: nextNumber }).eq('id', freshSettings.id);
+      queryClient.invalidateQueries({ queryKey: ['invoicingSettings'] });
     }
+
+    // Update recurring template: advance period dates and generation count
+    const batchDays = template.invoice_period_days || 30;
+    const nextPeriodFrom = template.period_from ? new Date(new Date(template.period_from).getTime() + batchDays * 86400000).toISOString().split('T')[0] : null;
+    const nextPeriodTo = template.period_to ? new Date(new Date(template.period_to).getTime() + batchDays * 86400000).toISOString().split('T')[0] : null;
+    const nextInvDate = calculateNextInvoiceDate(template.next_invoice_date || today, template.frequency, template.day_of_month, template.day_of_week);
+    await supabase.from('recurring_invoices').update({
+      next_invoice_date: nextInvDate,
+      last_generated_date: today,
+      generation_count: (template.generation_count || 0) + 1,
+      period_from: nextPeriodFrom,
+      period_to: nextPeriodTo,
+    }).eq('id', template.id);
+
+    // Now download the combined PDF using the newly created invoices
+    if (createdInvoices.length >= 2) {
+      await handleCombineInvoices(createdInvoices);
+    } else if (createdInvoices.length === 1) {
+      await handleDownloadInvoice(createdInvoices[0]);
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    queryClient.invalidateQueries({ queryKey: ['recurringInvoices'] });
+    toast.success(`${createdInvoices.length} invoices created${markAsSent ? ' and marked as sent' : ''}`);
   };
 
   const handleSubmit = async () => {
