@@ -267,6 +267,23 @@ export default function PlatformAdminPage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Quick Links */}
+        <div className="mb-6">
+          <a
+            href="/admin/campaigns"
+            className="inline-flex items-center gap-3 bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-xl px-5 py-3 hover:shadow-md hover:border-teal-300 transition-all group"
+          >
+            <span className="text-xl">📧</span>
+            <div>
+              <p className="font-semibold text-slate-900 text-sm group-hover:text-teal-700 transition-colors">Email Campaigns</p>
+              <p className="text-xs text-slate-500">AI-powered marketing to CIW & CQC providers</p>
+            </div>
+            <svg className="w-4 h-4 text-slate-400 group-hover:text-teal-600 transition-colors ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </a>
+        </div>
+
         {/* Stats */}
         {stats && (
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
