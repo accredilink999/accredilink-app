@@ -762,8 +762,6 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                 <table style="margin-left:auto;font-size:11px;">
                   <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Invoice No:</td><td style="padding:3px 0;font-weight:700;">${invoice.invoice_number}</td></tr>
                   ${invoice.period_from ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Period:</td><td style="padding:3px 0;">${new Date(invoice.period_from).toLocaleDateString('en-GB')} — ${invoice.period_to ? new Date(invoice.period_to).toLocaleDateString('en-GB') : ''}</td></tr>` : ''}
-                  <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Date:</td><td style="padding:3px 0;">${new Date(invoice.invoice_date).toLocaleDateString('en-GB')}</td></tr>
-                  <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Due Date:</td><td style="padding:3px 0;">${new Date(invoice.due_date).toLocaleDateString('en-GB')}</td></tr>
                   <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Terms:</td><td style="padding:3px 0;">${invoice.payment_terms === '0' ? 'On Receipt' : invoice.payment_terms === 'custom' ? 'Custom' : (invoice.payment_terms || '30') + ' Days'}</td></tr>
                 </table>
               </td>
@@ -1150,7 +1148,6 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                     <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Invoice No:</td><td style="padding:3px 0;font-weight:700;">${inv.invoice_number}</td></tr>
                     <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Batch Ref:</td><td style="padding:3px 0;color:${bc};font-weight:700;">${batchRef}</td></tr>
                     ${inv.period_from ? `<tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Period:</td><td style="padding:3px 0;">${new Date(inv.period_from).toLocaleDateString('en-GB')} — ${inv.period_to ? new Date(inv.period_to).toLocaleDateString('en-GB') : ''}</td></tr>` : ''}
-                    <tr><td style="padding:3px 12px 3px 0;color:#6b7280;font-weight:600;text-align:right;">Due Date:</td><td style="padding:3px 0;">${new Date(inv.due_date).toLocaleDateString('en-GB')}</td></tr>
                   </table>
                 </td>
               </tr>
