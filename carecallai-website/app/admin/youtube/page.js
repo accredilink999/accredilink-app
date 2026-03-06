@@ -1192,7 +1192,7 @@ export default function YouTubeScriptsPage() {
     return slides;
   }
 
-  // ---- Cartoon Avatar Presenter ----
+  // ---- "Guru" Mascot — CareCallAI care worker in scrubs ----
   function drawAvatar(ctx, x, y, scale, talking) {
     ctx.save();
     ctx.translate(x, y);
@@ -1200,119 +1200,291 @@ export default function YouTubeScriptsPage() {
 
     // Shadow
     ctx.beginPath();
-    ctx.ellipse(0, 95, 35, 8, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 105, 38, 9, 0, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(0,0,0,0.15)';
     ctx.fill();
 
-    // Body (rounded rectangle - shirt)
+    // === SCRUBS BODY ===
+    // Scrub top — teal medical scrubs
     ctx.beginPath();
     ctx.fillStyle = '#0d9488';
-    roundRect(ctx, -30, 30, 60, 65, 15);
+    roundRect(ctx, -34, 28, 68, 72, 12);
     ctx.fill();
-    // Collar
+    // Scrub top shadow/fold lines
+    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(-12, 30);
-    ctx.lineTo(0, 48);
-    ctx.lineTo(12, 30);
-    ctx.fillStyle = '#f8fafc';
+    ctx.moveTo(-10, 55);
+    ctx.quadraticCurveTo(-5, 60, -10, 70);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(10, 55);
+    ctx.quadraticCurveTo(15, 60, 10, 70);
+    ctx.stroke();
+
+    // V-neck collar
+    ctx.beginPath();
+    ctx.moveTo(-16, 28);
+    ctx.lineTo(0, 50);
+    ctx.lineTo(16, 28);
+    ctx.strokeStyle = '#0a7c72';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // Inner V-neck skin
+    ctx.beginPath();
+    ctx.moveTo(-13, 28);
+    ctx.lineTo(0, 46);
+    ctx.lineTo(13, 28);
+    ctx.fillStyle = '#fcd088';
     ctx.fill();
 
-    // Neck
+    // Sleeves (short scrub sleeves)
+    // Left sleeve
     ctx.beginPath();
+    ctx.fillStyle = '#0d9488';
+    ctx.moveTo(-34, 32);
+    ctx.lineTo(-48, 42);
+    ctx.lineTo(-44, 58);
+    ctx.lineTo(-34, 52);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#0a7c72';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    // Right sleeve
+    ctx.beginPath();
+    ctx.moveTo(34, 32);
+    ctx.lineTo(48, 42);
+    ctx.lineTo(44, 58);
+    ctx.lineTo(34, 52);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Arms (skin)
+    ctx.fillStyle = '#fcd088';
+    // Left arm
+    ctx.beginPath();
+    ctx.ellipse(-46, 62, 7, 10, 0.1, 0, Math.PI * 2);
+    ctx.fill();
+    // Right arm
+    ctx.beginPath();
+    ctx.ellipse(46, 62, 7, 10, -0.1, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Scrub pocket (left chest)
+    ctx.strokeStyle = '#0a7c72';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    roundRect(ctx, -28, 52, 20, 16, 3);
+    ctx.stroke();
+    // Pen in pocket
+    ctx.strokeStyle = '#2563eb';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-22, 50);
+    ctx.lineTo(-22, 42);
+    ctx.stroke();
+    ctx.fillStyle = '#2563eb';
+    ctx.beginPath();
+    ctx.arc(-22, 41, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // "CareCallAI" text on scrub top (right side)
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.font = 'bold 8px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('CareCall', 14, 60);
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.font = 'bold 9px sans-serif';
+    ctx.fillText('AI', 14, 70);
+    ctx.restore();
+
+    // Stethoscope
+    ctx.strokeStyle = '#64748b';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-8, 35);
+    ctx.quadraticCurveTo(-25, 30, -28, 15);
+    ctx.quadraticCurveTo(-30, 5, -20, -5);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(8, 35);
+    ctx.quadraticCurveTo(25, 30, 28, 15);
+    ctx.quadraticCurveTo(30, 5, 20, -5);
+    ctx.stroke();
+    // Earpieces
+    ctx.fillStyle = '#94a3b8';
+    ctx.beginPath();
+    ctx.arc(-20, -6, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(20, -6, 3, 0, Math.PI * 2);
+    ctx.fill();
+    // Chest piece
+    ctx.fillStyle = '#64748b';
+    ctx.beginPath();
+    ctx.arc(0, 38, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#94a3b8';
+    ctx.beginPath();
+    ctx.arc(0, 38, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // === NECK ===
     ctx.fillStyle = '#fbbf6a';
-    ctx.fillRect(-8, 20, 16, 15);
+    ctx.fillRect(-9, 18, 18, 14);
 
-    // Head
+    // === HEAD ===
     ctx.beginPath();
-    ctx.arc(0, -5, 32, 0, Math.PI * 2);
+    ctx.arc(0, -5, 34, 0, Math.PI * 2);
     ctx.fillStyle = '#fcd088';
     ctx.fill();
     ctx.strokeStyle = '#e5a84b';
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    // Hair
+    // Hair (neat, professional)
     ctx.beginPath();
-    ctx.ellipse(0, -28, 34, 16, 0, Math.PI, Math.PI * 2);
+    ctx.ellipse(0, -30, 36, 18, 0, Math.PI, Math.PI * 2);
     ctx.fillStyle = '#4a3728';
     ctx.fill();
     // Side hair
     ctx.beginPath();
-    ctx.ellipse(-30, -8, 8, 18, 0.2, 0, Math.PI * 2);
+    ctx.ellipse(-32, -10, 7, 16, 0.2, 0, Math.PI * 2);
     ctx.fillStyle = '#4a3728';
     ctx.fill();
     ctx.beginPath();
-    ctx.ellipse(30, -8, 8, 18, -0.2, 0, Math.PI * 2);
+    ctx.ellipse(32, -10, 7, 16, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+    // Fringe
+    ctx.beginPath();
+    ctx.moveTo(-20, -30);
+    ctx.quadraticCurveTo(-10, -38, 0, -34);
+    ctx.quadraticCurveTo(10, -38, 20, -30);
+    ctx.fillStyle = '#4a3728';
     ctx.fill();
 
-    // Eyes
-    ctx.fillStyle = '#1e293b';
+    // Eyes (friendly, slightly larger)
+    ctx.fillStyle = '#ffffff';
     ctx.beginPath();
-    ctx.ellipse(-11, -8, 4, 5, 0, 0, Math.PI * 2);
+    ctx.ellipse(-12, -8, 7, 8, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
-    ctx.ellipse(11, -8, 4, 5, 0, 0, Math.PI * 2);
+    ctx.ellipse(12, -8, 7, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Iris
+    ctx.fillStyle = '#2563eb';
+    ctx.beginPath();
+    ctx.ellipse(-12, -7, 4.5, 5.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(12, -7, 4.5, 5.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Pupils
+    ctx.fillStyle = '#1e293b';
+    ctx.beginPath();
+    ctx.arc(-12, -7, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(12, -7, 2.5, 0, Math.PI * 2);
     ctx.fill();
     // Eye shine
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
-    ctx.arc(-9, -10, 1.8, 0, Math.PI * 2);
+    ctx.arc(-10, -9, 2, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(13, -10, 1.8, 0, Math.PI * 2);
+    ctx.arc(14, -9, 2, 0, Math.PI * 2);
     ctx.fill();
 
-    // Eyebrows
+    // Eyebrows (friendly, slightly raised)
     ctx.strokeStyle = '#4a3728';
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 2.8;
     ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(-17, -18);
-    ctx.quadraticCurveTo(-11, -22, -5, -18);
+    ctx.moveTo(-19, -20);
+    ctx.quadraticCurveTo(-12, -25, -5, -20);
     ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(5, -18);
-    ctx.quadraticCurveTo(11, -22, 17, -18);
+    ctx.moveTo(5, -20);
+    ctx.quadraticCurveTo(12, -25, 19, -20);
     ctx.stroke();
 
     // Mouth
     if (talking) {
-      // Open mouth (talking)
+      // Open mouth (talking animation)
       ctx.beginPath();
-      ctx.ellipse(0, 10, 8, 6, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 10, 9, 7, 0, 0, Math.PI * 2);
       ctx.fillStyle = '#c0392b';
       ctx.fill();
+      // Teeth
       ctx.beginPath();
-      ctx.ellipse(0, 8, 6, 3, 0, 0, Math.PI);
+      ctx.ellipse(0, 8, 7, 3.5, 0, 0, Math.PI);
       ctx.fillStyle = '#ffffff';
       ctx.fill();
-    } else {
-      // Friendly smile
+      // Tongue
       ctx.beginPath();
-      ctx.arc(0, 5, 12, 0.15, Math.PI - 0.15);
+      ctx.ellipse(0, 14, 4, 3, 0, Math.PI, Math.PI * 2);
+      ctx.fillStyle = '#e74c3c';
+      ctx.fill();
+    } else {
+      // Friendly warm smile
+      ctx.beginPath();
+      ctx.arc(0, 6, 13, 0.2, Math.PI - 0.2);
       ctx.strokeStyle = '#c0392b';
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = 2.8;
       ctx.lineCap = 'round';
       ctx.stroke();
+      // Dimples
+      ctx.beginPath();
+      ctx.arc(-14, 10, 2, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(251,146,60,0.2)';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(14, 10, 2, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     // Blush cheeks
     ctx.beginPath();
-    ctx.ellipse(-20, 4, 7, 4, 0, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(251,146,60,0.25)';
+    ctx.ellipse(-22, 4, 8, 4, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(251,146,60,0.2)';
     ctx.fill();
     ctx.beginPath();
-    ctx.ellipse(20, 4, 7, 4, 0, 0, Math.PI * 2);
+    ctx.ellipse(22, 4, 8, 4, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Name badge
-    ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    roundRect(ctx, -22, 55, 44, 16, 4);
+    // ID Badge (lanyard + badge)
+    // Lanyard
+    ctx.strokeStyle = '#0d9488';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-5, 20);
+    ctx.quadraticCurveTo(0, 35, 18, 75);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(5, 20);
+    ctx.quadraticCurveTo(8, 40, 18, 75);
+    ctx.stroke();
+    // Badge
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = 'rgba(0,0,0,0.15)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetY = 2;
+    roundRect(ctx, 8, 72, 30, 22, 4);
     ctx.fill();
+    ctx.shadowColor = 'transparent';
+    // Badge text
     ctx.fillStyle = '#0d9488';
-    ctx.font = 'bold 9px sans-serif';
+    ctx.font = 'bold 8px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('CareCallAI', 0, 66);
+    ctx.fillText('GURU', 23, 84);
+    ctx.fillStyle = '#64748b';
+    ctx.font = '5px sans-serif';
+    ctx.fillText('CareCallAI', 23, 91);
 
     ctx.restore();
   }
