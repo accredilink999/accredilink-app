@@ -1192,8 +1192,153 @@ export default function YouTubeScriptsPage() {
     return slides;
   }
 
+  // ---- Cartoon Avatar Presenter ----
+  function drawAvatar(ctx, x, y, scale, talking) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+
+    // Shadow
+    ctx.beginPath();
+    ctx.ellipse(0, 95, 35, 8, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.fill();
+
+    // Body (rounded rectangle - shirt)
+    ctx.beginPath();
+    ctx.fillStyle = '#0d9488';
+    roundRect(ctx, -30, 30, 60, 65, 15);
+    ctx.fill();
+    // Collar
+    ctx.beginPath();
+    ctx.moveTo(-12, 30);
+    ctx.lineTo(0, 48);
+    ctx.lineTo(12, 30);
+    ctx.fillStyle = '#f8fafc';
+    ctx.fill();
+
+    // Neck
+    ctx.beginPath();
+    ctx.fillStyle = '#fbbf6a';
+    ctx.fillRect(-8, 20, 16, 15);
+
+    // Head
+    ctx.beginPath();
+    ctx.arc(0, -5, 32, 0, Math.PI * 2);
+    ctx.fillStyle = '#fcd088';
+    ctx.fill();
+    ctx.strokeStyle = '#e5a84b';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Hair
+    ctx.beginPath();
+    ctx.ellipse(0, -28, 34, 16, 0, Math.PI, Math.PI * 2);
+    ctx.fillStyle = '#4a3728';
+    ctx.fill();
+    // Side hair
+    ctx.beginPath();
+    ctx.ellipse(-30, -8, 8, 18, 0.2, 0, Math.PI * 2);
+    ctx.fillStyle = '#4a3728';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(30, -8, 8, 18, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Eyes
+    ctx.fillStyle = '#1e293b';
+    ctx.beginPath();
+    ctx.ellipse(-11, -8, 4, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(11, -8, 4, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Eye shine
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(-9, -10, 1.8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(13, -10, 1.8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Eyebrows
+    ctx.strokeStyle = '#4a3728';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-17, -18);
+    ctx.quadraticCurveTo(-11, -22, -5, -18);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(5, -18);
+    ctx.quadraticCurveTo(11, -22, 17, -18);
+    ctx.stroke();
+
+    // Mouth
+    if (talking) {
+      // Open mouth (talking)
+      ctx.beginPath();
+      ctx.ellipse(0, 10, 8, 6, 0, 0, Math.PI * 2);
+      ctx.fillStyle = '#c0392b';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(0, 8, 6, 3, 0, 0, Math.PI);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+    } else {
+      // Friendly smile
+      ctx.beginPath();
+      ctx.arc(0, 5, 12, 0.15, Math.PI - 0.15);
+      ctx.strokeStyle = '#c0392b';
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+    }
+
+    // Blush cheeks
+    ctx.beginPath();
+    ctx.ellipse(-20, 4, 7, 4, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(251,146,60,0.25)';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(20, 4, 7, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Name badge
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    roundRect(ctx, -22, 55, 44, 16, 4);
+    ctx.fill();
+    ctx.fillStyle = '#0d9488';
+    ctx.font = 'bold 9px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('CareCallAI', 0, 66);
+
+    ctx.restore();
+  }
+
+  // ---- Speech Bubble ----
+  function drawSpeechBubble(ctx, x, y, w, h, tailX, tailY) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.shadowColor = 'rgba(0,0,0,0.1)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 3;
+    // Bubble
+    ctx.beginPath();
+    roundRect(ctx, x, y, w, h, 16);
+    ctx.fill();
+    // Tail
+    ctx.shadowColor = 'transparent';
+    ctx.beginPath();
+    ctx.moveTo(tailX - 10, y + h);
+    ctx.lineTo(tailX, tailY);
+    ctx.lineTo(tailX + 10, y + h);
+    ctx.fill();
+    ctx.restore();
+  }
+
   function renderSlideToCanvas(ctx, slide, w, h) {
-    // Clear
     ctx.clearRect(0, 0, w, h);
 
     if (slide.type === 'title') {
@@ -1203,21 +1348,31 @@ export default function YouTubeScriptsPage() {
       grad.addColorStop(1, '#2563eb');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, w, h);
+      // Subtle pattern circles
+      for (let i = 0; i < 8; i++) {
+        ctx.beginPath();
+        ctx.arc(Math.random() * w, Math.random() * h, 30 + Math.random() * 80, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.03)';
+        ctx.fill();
+      }
       // Title
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 48px sans-serif';
       ctx.textAlign = 'center';
-      wrapText(ctx, slide.text, w / 2, h / 2 - 40, w - 120, 58);
+      wrapText(ctx, slide.text, w / 2, h / 2 - 60, w - 200, 58);
       // Subtitle
       if (slide.subtitle) {
         ctx.font = '24px sans-serif';
         ctx.fillStyle = 'rgba(255,255,255,0.8)';
-        ctx.fillText(slide.subtitle, w / 2, h / 2 + 60);
+        ctx.fillText(slide.subtitle, w / 2, h / 2 + 40);
       }
+      // Avatar in bottom right
+      drawAvatar(ctx, w - 100, h - 130, 0.9, false);
       // Branding
-      ctx.font = 'bold 20px sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.5)';
-      ctx.fillText('CareCallAI', w / 2, h - 40);
+      ctx.font = 'bold 18px sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.textAlign = 'left';
+      ctx.fillText('CareCallAI Guru', 30, h - 25);
 
     } else if (slide.type === 'section') {
       // Dark background
@@ -1229,38 +1384,58 @@ export default function YouTubeScriptsPage() {
       barGrad.addColorStop(1, '#2563eb');
       ctx.fillStyle = barGrad;
       ctx.fillRect(0, 0, w, 6);
+      // Section number pill
+      ctx.fillStyle = '#0d9488';
+      roundRect(ctx, 50, 30, 50, 28, 14);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(slide.title ? 'TIP' : 'INFO', 75, 49);
       // Section title
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 40px sans-serif';
+      ctx.font = 'bold 36px sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(slide.title, 60, 80);
-      // Bullets
-      ctx.font = '26px sans-serif';
-      ctx.fillStyle = '#e2e8f0';
+      ctx.fillText(slide.title, 115, 55);
+      // Divider line
+      ctx.strokeStyle = 'rgba(13,148,136,0.4)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(50, 75);
+      ctx.lineTo(w - 200, 75);
+      ctx.stroke();
+      // Bullets with better styling
       slide.bullets.forEach((bullet, i) => {
-        const y = 150 + i * 55;
-        // Teal dot
+        const y = 120 + i * 55;
+        // Numbered circle
         ctx.beginPath();
-        ctx.arc(70, y - 8, 6, 0, Math.PI * 2);
-        ctx.fillStyle = '#0d9488';
+        ctx.arc(70, y - 5, 14, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(13,148,136,0.3)';
         ctx.fill();
+        ctx.fillStyle = '#0d9488';
+        ctx.font = 'bold 14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(String(i + 1), 70, y);
         // Text
         ctx.fillStyle = '#e2e8f0';
-        ctx.font = '24px sans-serif';
-        wrapText(ctx, bullet, 95, y, w - 160, 32);
+        ctx.font = '22px sans-serif';
+        ctx.textAlign = 'left';
+        wrapText(ctx, bullet, 95, y, w - 280, 30);
       });
+      // Avatar on right side (talking)
+      drawAvatar(ctx, w - 90, h - 140, 0.85, true);
       // Visual note
       if (slide.visualNote) {
-        ctx.font = 'italic 18px sans-serif';
+        ctx.font = 'italic 16px sans-serif';
         ctx.fillStyle = '#94a3b8';
-        ctx.textAlign = 'center';
-        ctx.fillText(slide.visualNote, w / 2, h - 40);
+        ctx.textAlign = 'left';
+        ctx.fillText(slide.visualNote, 50, h - 25);
       }
       // Branding
-      ctx.font = '16px sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.font = '14px sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.2)';
       ctx.textAlign = 'right';
-      ctx.fillText('CareCallAI', w - 30, h - 20);
+      ctx.fillText('CareCallAI Guru', w - 30, h - 10);
 
     } else if (slide.type === 'cta') {
       // Emerald gradient
@@ -1269,18 +1444,37 @@ export default function YouTubeScriptsPage() {
       grad.addColorStop(1, '#0d9488');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, w, h);
-      // CTA text
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 36px sans-serif';
+      // Decorative circles
+      ctx.beginPath();
+      ctx.arc(w * 0.8, h * 0.2, 150, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.05)';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(w * 0.15, h * 0.8, 100, 0, Math.PI * 2);
+      ctx.fill();
+      // Avatar with speech bubble
+      drawAvatar(ctx, 180, h / 2 - 20, 1.1, true);
+      drawSpeechBubble(ctx, 260, h / 2 - 120, w - 340, 100, 280, h / 2 - 10);
+      // CTA text inside bubble
+      ctx.fillStyle = '#1e293b';
+      ctx.font = 'bold 26px sans-serif';
       ctx.textAlign = 'center';
-      wrapText(ctx, slide.text, w / 2, h / 2 - 30, w - 120, 46);
+      wrapText(ctx, slide.text, 260 + (w - 340) / 2, h / 2 - 80, w - 400, 34);
       // Button mockup
-      ctx.fillStyle = 'rgba(255,255,255,0.2)';
-      roundRect(ctx, w / 2 - 150, h / 2 + 60, 300, 50, 25);
+      ctx.fillStyle = '#ffffff';
+      roundRect(ctx, w / 2 - 120, h / 2 + 60, 280, 55, 28);
+      ctx.fill();
+      ctx.fillStyle = '#0d9488';
+      ctx.font = 'bold 22px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Visit carecallai.co.uk', w / 2 + 20, h / 2 + 94);
+      // Subscribe button
+      ctx.fillStyle = '#ef4444';
+      roundRect(ctx, w / 2 - 80, h / 2 + 135, 200, 45, 22);
       ctx.fill();
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 22px sans-serif';
-      ctx.fillText('Visit carecallai.co.uk', w / 2, h / 2 + 92);
+      ctx.font = 'bold 18px sans-serif';
+      ctx.fillText('SUBSCRIBE', w / 2 + 20, h / 2 + 163);
 
     } else if (slide.type === 'outro') {
       // Teal gradient
@@ -1289,16 +1483,32 @@ export default function YouTubeScriptsPage() {
       grad.addColorStop(1, '#0f766e');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, w, h);
+      // Decorative circles
+      for (let i = 0; i < 5; i++) {
+        ctx.beginPath();
+        ctx.arc(w * (0.2 + i * 0.15), h * 0.3, 40 + i * 20, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.03)';
+        ctx.fill();
+      }
+      // Thanks text
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 48px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(slide.text, w / 2, h / 2 - 20);
+      ctx.fillText(slide.text, w / 2, h / 2 - 50);
+      // Subtitle
       ctx.font = '28px sans-serif';
       ctx.fillStyle = 'rgba(255,255,255,0.8)';
-      ctx.fillText(slide.subtitle || '', w / 2, h / 2 + 40);
-      ctx.font = 'bold 20px sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.5)';
-      ctx.fillText('CareCallAI', w / 2, h - 40);
+      ctx.fillText(slide.subtitle || '', w / 2, h / 2 + 10);
+      // Social row
+      ctx.font = '18px sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.fillText('Like | Subscribe | Share', w / 2, h / 2 + 60);
+      // Avatar waving (smiling)
+      drawAvatar(ctx, w / 2, h - 130, 1.0, false);
+      // Branding
+      ctx.font = 'bold 18px sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.fillText('CareCallAI Guru', w / 2, h - 20);
     }
   }
 
@@ -1334,21 +1544,23 @@ export default function YouTubeScriptsPage() {
     ctx.closePath();
   }
 
-  function speakText(text, voice, rate) {
-    return new Promise(resolve => {
-      if (!text || !window.speechSynthesis) { resolve(); return; }
-      speechSynthesis.cancel();
-      const utter = new SpeechSynthesisUtterance(text);
-      if (voice) utter.voice = voice;
-      utter.rate = rate || 1.0;
-      utter.onend = resolve;
-      utter.onerror = resolve;
-      speechSynthesis.speak(utter);
-    });
-  }
-
   function waitMs(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // Fetch TTS audio from our API (Google TTS with proper pronunciation)
+  async function fetchTTSAudio(text) {
+    const token = getToken();
+    const res = await fetch('/api/youtube/tts', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+      body: JSON.stringify({ text, lang: 'en-GB' }),
+    });
+    if (!res.ok) throw new Error('TTS generation failed');
+    return await res.arrayBuffer();
   }
 
   async function generateBrowserVideo() {
@@ -1368,38 +1580,95 @@ export default function YouTubeScriptsPage() {
       canvas.height = H;
       const ctx = canvas.getContext('2d');
 
-      // Capture stream
-      const stream = canvas.captureStream(30);
-      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-        ? 'video/webm;codecs=vp9'
-        : 'video/webm';
-      const recorder = new MediaRecorder(stream, { mimeType });
+      // Audio context for mixing TTS audio into recording
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const audioDest = audioCtx.createMediaStreamDestination();
+
+      // Combine canvas video + audio streams
+      const canvasStream = canvas.captureStream(30);
+      const combinedStream = new MediaStream([
+        ...canvasStream.getVideoTracks(),
+        ...audioDest.stream.getAudioTracks(),
+      ]);
+
+      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+        ? 'video/webm;codecs=vp9,opus'
+        : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
+          ? 'video/webm;codecs=vp8,opus'
+          : 'video/webm';
+      const recorder = new MediaRecorder(combinedStream, { mimeType });
       const chunks = [];
       recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
 
-      const voice = bvVoices.find(v => v.name === bvSelectedVoice) || bvVoices[0] || null;
-      recorder.start();
+      // Pre-fetch all TTS audio
+      setBvProgressLabel('Generating narration audio...');
+      const audioBuffers = [];
+      for (let i = 0; i < slides.length; i++) {
+        if (slides[i].narration && slides[i].narration.trim().length > 2) {
+          try {
+            const arrayBuf = await fetchTTSAudio(slides[i].narration);
+            const audioBuf = await audioCtx.decodeAudioData(arrayBuf);
+            audioBuffers.push(audioBuf);
+          } catch (err) {
+            console.warn(`TTS failed for slide ${i}:`, err.message);
+            audioBuffers.push(null);
+          }
+        } else {
+          audioBuffers.push(null);
+        }
+        setBvProgress(Math.round(((i + 1) / slides.length) * 25));
+      }
 
+      recorder.start(100); // collect data every 100ms
+      await waitMs(300); // let recorder stabilize
+
+      // Render each slide with audio
       for (let i = 0; i < slides.length; i++) {
         const slide = slides[i];
-        setBvProgress(Math.round(((i) / slides.length) * 100));
+        const pct = 25 + Math.round(((i) / slides.length) * 70);
+        setBvProgress(pct);
         setBvProgressLabel(`Slide ${i + 1}/${slides.length}: ${slide.type === 'section' ? slide.title : slide.type}`);
 
-        // Render slide
+        // Render slide (with avatar in non-talking state)
         renderSlideToCanvas(ctx, slide, W, H);
 
-        // Narrate or wait
-        if (bvNarrate && slide.narration && voice) {
-          await speakText(slide.narration, voice, bvRate);
-          // Small pause between slides
-          await waitMs(800);
+        if (audioBuffers[i]) {
+          // Play TTS audio through AudioContext → captured by MediaRecorder
+          const source = audioCtx.createBufferSource();
+          source.buffer = audioBuffers[i];
+          source.connect(audioDest);
+          source.start();
+
+          // Animate talking avatar while audio plays
+          const audioDuration = audioBuffers[i].duration * 1000;
+          const talkStart = Date.now();
+          let talkFrame;
+          const animateTalk = () => {
+            const elapsed = Date.now() - talkStart;
+            if (elapsed < audioDuration) {
+              // Re-render slide to animate mouth
+              renderSlideToCanvas(ctx, slide, W, H);
+              talkFrame = requestAnimationFrame(animateTalk);
+            }
+          };
+          animateTalk();
+
+          // Wait for audio to finish
+          await new Promise(resolve => {
+            source.onended = resolve;
+            setTimeout(resolve, audioDuration + 500);
+          });
+          if (talkFrame) cancelAnimationFrame(talkFrame);
+
+          // Brief pause between slides
+          await waitMs(600);
         } else {
-          // Silent mode — wait for slide duration
-          await waitMs(slide.duration * 1000);
+          // No audio — hold slide for its duration
+          await waitMs(Math.max(slide.duration * 1000, 3000));
         }
       }
 
-      // Hold final slide for a moment
+      // Hold final slide
       await waitMs(1500);
       setBvProgress(100);
       setBvProgressLabel('Finalising video...');
@@ -1410,6 +1679,8 @@ export default function YouTubeScriptsPage() {
         recorder.stop();
       });
 
+      audioCtx.close();
+
       const blob = new Blob(chunks, { type: mimeType });
       const url = URL.createObjectURL(blob);
       setBvVideoUrl(url);
@@ -1417,6 +1688,7 @@ export default function YouTubeScriptsPage() {
       setToast('Video generated successfully!');
       setTimeout(() => setToast(''), 3000);
     } catch (err) {
+      console.error('Video generation error:', err);
       setBvProgressLabel('Error: ' + err.message);
     }
     setBvGenerating(false);
@@ -1472,51 +1744,18 @@ export default function YouTubeScriptsPage() {
             </select>
           </div>
 
-          {/* Voice & speed */}
+          {/* Options & actions */}
           {bvScriptId && (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Voice</label>
-                  <select
-                    value={bvSelectedVoice}
-                    onChange={(e) => setBvSelectedVoice(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
-                  >
-                    {bvVoices.map(v => (
-                      <option key={v.name} value={v.name}>{v.name} ({v.lang})</option>
-                    ))}
-                    {bvVoices.length === 0 && <option value="">No voices available</option>}
-                  </select>
+              <div className="bg-teal-50 border border-teal-200 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <svg className="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                  </svg>
+                  <span className="text-sm font-medium text-teal-800">Natural UK English voice</span>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Speed: {bvRate}x</label>
-                  <input
-                    type="range"
-                    min="0.5"
-                    max="2.0"
-                    step="0.1"
-                    value={bvRate}
-                    onChange={(e) => setBvRate(parseFloat(e.target.value))}
-                    className="w-full accent-teal-600"
-                  />
-                  <div className="flex justify-between text-xs text-slate-400">
-                    <span>0.5x</span><span>1.0x</span><span>2.0x</span>
-                  </div>
-                </div>
+                <p className="text-xs text-teal-600">Audio generated server-side with natural pronunciation. CareCallAI, CIW, CQC all pronounced correctly.</p>
               </div>
-
-              {/* Narration toggle */}
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={bvNarrate}
-                  onChange={(e) => setBvNarrate(e.target.checked)}
-                  className="w-4 h-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
-                />
-                <span className="text-sm text-slate-700">Narrate aloud during generation</span>
-                <span className="text-xs text-slate-400">(plays through speakers)</span>
-              </label>
 
               {/* Action buttons */}
               <div className="flex gap-3">
@@ -1529,7 +1768,7 @@ export default function YouTubeScriptsPage() {
                 </button>
                 <button
                   onClick={generateBrowserVideo}
-                  disabled={bvGenerating || bvVoices.length === 0}
+                  disabled={bvGenerating}
                   className="flex-1 px-4 py-2.5 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
                 >
                   {bvGenerating ? (
