@@ -1,0 +1,23 @@
+SHORT DESCRIPTION:
+
+CareCallAI is an all-in-one care management platform for domiciliary care agencies in Wales and England, built for CIW and CQC compliance.
+
+
+LONG DESCRIPTION:
+
+CareCallAI is an all-in-one care management platform purpose-built for domiciliary care agencies and care homes in Wales and England. It combines care planning, electronic MAR charts, staff rota management, clinical assessments, compliance tracking, and AI-powered insights in a single platform — replacing the need for multiple disconnected systems.
+
+Key features include:
+
+- Digital care logging with GPS check-in and real-time visit tracking
+- Electronic MAR (eMAR) for safer medication management
+- Staff rota with shift patterns, templates, and automated scheduling
+- Clinical assessments including Waterlow, MUST, NEWS2, Falls Risk, and more
+- CIW and CQC compliance management with pre-populated regulation forms and built-in guidance
+- 12-weekly staff supervision tracking (RISCA Reg 36)
+- Safeguarding incident reporting
+- Family portal for real-time care updates
+- AI-generated care insights and risk alerts
+- Mobile app for carers in the field
+
+CareCallAI is designed by care professionals for care professionals, with CIW compliance as a core focus. Whether you run a small domiciliary care agency or a larger residential care home, CareCallAI helps you stay compliant, reduce paperwork, and deliver better care.

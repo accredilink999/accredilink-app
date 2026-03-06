@@ -2,10 +2,9 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import PageHeader from '@/components/ui/PageHeader';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Settings, BarChart3, Users, Receipt, DollarSign, FileText } from 'lucide-react';
+import { Plus, Settings, BarChart3, Users, Receipt, DollarSign, FileText, ChevronLeft, LayoutDashboard, CreditCard } from 'lucide-react';
 import InvoicingSetupWizard from '@/components/invoicing/InvoicingSetupWizard.jsx';
 import InvoiceDashboard from '@/components/invoicing/InvoiceDashboard.jsx';
 import InvoiceManager from '@/components/invoicing/InvoiceManager.jsx';
@@ -15,7 +14,7 @@ import FinancialReports from '@/components/invoicing/FinancialReports.jsx';
 import InvoicingSettings from '@/components/invoicing/InvoicingSettings.jsx';
 
 export default function Invoicing() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(null);
   const queryClient = useQueryClient();
 
   const { data: settings, isLoading: settingsLoading } = useQuery({
@@ -168,40 +167,54 @@ export default function Invoicing() {
         </Card>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="bg-gradient-to-r from-slate-100 to-slate-200 w-full flex flex-wrap">
-          <TabsTrigger value="dashboard" className="text-sm">Dashboard</TabsTrigger>
-          <TabsTrigger value="invoices" className="text-sm">Invoices</TabsTrigger>
-          <TabsTrigger value="clients" className="text-sm">Clients</TabsTrigger>
-          <TabsTrigger value="payments" className="text-sm">Payments</TabsTrigger>
-          <TabsTrigger value="reports" className="text-sm">Reports</TabsTrigger>
-          <TabsTrigger value="settings" className="text-sm">Settings</TabsTrigger>
-        </TabsList>
+      {activeTab ? (
+        <div>
+          <button
+            onClick={() => setActiveTab(null)}
+            className="flex items-center gap-1.5 text-sm font-medium text-blue-700 hover:text-blue-900 mb-4 transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Back to Invoicing
+          </button>
 
-        <TabsContent value="dashboard" className="space-y-4">
-          <InvoiceDashboard invoices={invoices} clients={clients} payments={payments} settings={settings} />
-        </TabsContent>
-
-        <TabsContent value="invoices" className="space-y-4">
-          <InvoiceManager invoices={invoices} clients={clients} settings={settings} />
-        </TabsContent>
-
-        <TabsContent value="clients" className="space-y-4">
-          <ClientManager clients={clients} invoices={invoices} />
-        </TabsContent>
-
-        <TabsContent value="payments" className="space-y-4">
-          <PaymentTracker payments={payments} invoices={invoices} clients={clients} />
-        </TabsContent>
-
-        <TabsContent value="reports" className="space-y-4">
-          <FinancialReports invoices={invoices} payments={payments} clients={clients} settings={settings} />
-        </TabsContent>
-
-        <TabsContent value="settings" className="space-y-4">
-          <InvoicingSettings settings={settings} />
-        </TabsContent>
-      </Tabs>
+          {activeTab === 'dashboard' && <InvoiceDashboard invoices={invoices} clients={clients} payments={payments} settings={settings} />}
+          {activeTab === 'invoices' && <InvoiceManager invoices={invoices} clients={clients} settings={settings} />}
+          {activeTab === 'clients' && <ClientManager clients={clients} invoices={invoices} />}
+          {activeTab === 'payments' && <PaymentTracker payments={payments} invoices={invoices} clients={clients} />}
+          {activeTab === 'reports' && <FinancialReports invoices={invoices} payments={payments} clients={clients} settings={settings} />}
+          {activeTab === 'settings' && <InvoicingSettings settings={settings} />}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {[
+            { value: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, bg: 'from-blue-400 to-blue-600', desc: 'Revenue overview & KPIs' },
+            { value: 'invoices', label: 'Invoices', icon: FileText, bg: 'from-teal-400 to-teal-600', desc: 'Create & manage invoices' },
+            { value: 'clients', label: 'Clients', icon: Users, bg: 'from-green-400 to-green-600', desc: 'Client billing profiles' },
+            { value: 'payments', label: 'Payments', icon: CreditCard, bg: 'from-purple-400 to-purple-600', desc: 'Track payments received' },
+            { value: 'reports', label: 'Reports', icon: BarChart3, bg: 'from-amber-400 to-amber-600', desc: 'Financial analytics' },
+            { value: 'settings', label: 'Settings', icon: Settings, bg: 'from-slate-400 to-slate-600', desc: 'Invoice templates & config' },
+          ].map(section => {
+            const Icon = section.icon;
+            return (
+              <button
+                key={section.value}
+                onClick={() => setActiveTab(section.value)}
+                className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-4 sm:p-5 min-h-[110px] active:scale-95"
+              >
+                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${section.bg} flex items-center justify-center mb-2 shadow-sm`}>
+                  <Icon className="w-6 h-6 text-white" strokeWidth={1.8} />
+                </div>
+                <span className="text-sm font-semibold text-slate-700 text-center leading-tight">
+                  {section.label}
+                </span>
+                <span className="text-[10px] text-slate-400 text-center mt-1 leading-tight line-clamp-2">
+                  {section.desc}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

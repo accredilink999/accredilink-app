@@ -59,7 +59,8 @@ import {
                                 Home,
                                 ArrowLeft,
                                 Download,
-                                HelpCircle
+                                HelpCircle,
+                                FileText
                               } from 'lucide-react';
 
 

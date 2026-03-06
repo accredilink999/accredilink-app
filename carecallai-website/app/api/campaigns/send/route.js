@@ -101,8 +101,9 @@ export async function POST(request) {
     updated_at: new Date().toISOString(),
   }).eq('id', campaign_id);
 
-  // Create send records
+  // Create send records with pre-generated UUIDs so tracking links work
   const sendRecords = contacts.map(c => ({
+    id: crypto.randomUUID(),
     campaign_id,
     contact_id: c.id,
     email: c.email,
@@ -114,6 +115,9 @@ export async function POST(request) {
     await supabase.from('email_sends').insert(sendRecords.slice(i, i + 500));
   }
 
+  // Build lookup map for send records by contact ID
+  const sendMap = new Map(sendRecords.map(s => [s.contact_id, s]));
+
   // Send in batches
   let totalSent = 0;
   let totalFailed = 0;
@@ -122,8 +126,8 @@ export async function POST(request) {
     const batch = contacts.slice(i, i + BATCH_SIZE);
 
     for (const contact of batch) {
-      const sendRecord = sendRecords.find(s => s.contact_id === contact.id);
-      const html = finaliseHtml(campaign.html_content, sendRecord?.id || contact.id, baseUrl);
+      const sendRecord = sendMap.get(contact.id);
+      const html = finaliseHtml(campaign.html_content, sendRecord.id, baseUrl);
 
       try {
         await sendEmail({
@@ -132,7 +136,7 @@ export async function POST(request) {
           subject: campaign.subject,
           html,
           replyTo: campaign.reply_to || campaign.from_email,
-          listUnsubscribe: `${baseUrl}/api/campaigns/track?type=unsubscribe&sid=${sendRecord?.id || contact.id}`,
+          listUnsubscribe: `${baseUrl}/api/campaigns/track?type=unsubscribe&sid=${sendRecord.id}`,
         });
 
         await supabase.from('email_sends').update({

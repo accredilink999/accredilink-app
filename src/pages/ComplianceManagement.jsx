@@ -327,6 +327,7 @@ export default function ComplianceManagement() {
   const [showItemModal, setShowItemModal] = useState(false);
 
   // Framework toggle
+  const [activeSection, setActiveSection] = useState(null);
   const [framework, setFramework] = useState('ciw');
 
   // Regulation filing
@@ -860,64 +861,54 @@ export default function ComplianceManagement() {
         </div>
       </PageHeader>
 
-      <Tabs defaultValue="inspection" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 h-auto bg-transparent p-0 mb-4">
-          <TabsTrigger
-            value="inspection"
-            className="text-xs sm:text-sm font-bold rounded-lg py-2 px-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-50 data-[state=active]:to-teal-100 data-[state=active]:border data-[state=active]:border-emerald-300 data-[state=active]:text-emerald-900 data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:bg-slate-50 transition-all"
-          >
-            <Activity className="w-4 h-4 mr-1.5" />
-            <span className="hidden sm:inline">Inspection</span>
-            <span className="sm:hidden">Inspect</span>
-            {inspectionReport && (
-              <Badge className={`ml-1.5 text-xs ${inspectionReport.totalFindings > 0 ? 'bg-red-600 text-white' : 'bg-green-600 text-white'}`}>
-                {inspectionReport.totalFindings}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger
-            value="regulations"
-            className="text-xs sm:text-sm font-bold rounded-lg py-2 px-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-50 data-[state=active]:to-teal-100 data-[state=active]:border data-[state=active]:border-teal-300 data-[state=active]:text-teal-900 data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:bg-slate-50 transition-all"
-          >
-            <BookOpen className="w-4 h-4 mr-1.5" />
-            <span className="hidden sm:inline">Regulations</span>
-            <span className="sm:hidden">Regs</span>
-          </TabsTrigger>
-          <TabsTrigger
-            value="supervisions"
-            className="text-xs sm:text-sm font-bold rounded-lg py-2 px-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-50 data-[state=active]:to-amber-100 data-[state=active]:border data-[state=active]:border-amber-300 data-[state=active]:text-amber-900 data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:bg-slate-50 transition-all"
-          >
-            <ClipboardCheck className="w-4 h-4 mr-1.5" />
-            Supervisions
-            {supervisionSummary.overdue > 0 && (
-              <Badge className="ml-1.5 bg-red-600 text-white text-xs">
-                {supervisionSummary.overdue}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger
-            value="reports"
-            className="text-xs sm:text-sm font-bold rounded-lg py-2 px-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-50 data-[state=active]:to-teal-100 data-[state=active]:border data-[state=active]:border-teal-300 data-[state=active]:text-teal-900 data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:bg-slate-50 transition-all"
-          >
-            <FileText className="w-4 h-4 mr-1.5" />
-            Filed Reports
-            {complianceReports.filter((r) => r.framework === framework).length > 0 && (
-              <Badge className="ml-1.5 bg-teal-600 text-white text-xs">
-                {complianceReports.filter((r) => r.framework === framework).length}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger
-            value="calendar"
-            className="text-xs sm:text-sm font-bold rounded-lg py-2 px-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-50 data-[state=active]:to-teal-100 data-[state=active]:border data-[state=active]:border-teal-300 data-[state=active]:text-teal-900 data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:bg-slate-50 transition-all"
-          >
-            <Calendar className="w-4 h-4 mr-1.5" />
-            Calendar
-          </TabsTrigger>
+      {!activeSection && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {[
+            { value: 'inspection', label: 'Virtual\nInspection', icon: Activity, bg: 'from-emerald-400 to-emerald-600', desc: 'Run automated compliance checks', badge: inspectionReport?.totalFindings },
+            { value: 'regulations', label: 'Regulations', icon: BookOpen, bg: 'from-teal-400 to-teal-600', desc: 'CIW & CQC regulation tracking' },
+            { value: 'supervisions', label: 'Supervisions', icon: ClipboardCheck, bg: 'from-amber-400 to-amber-600', desc: '12-weekly staff supervisions', badge: supervisionSummary.overdue > 0 ? supervisionSummary.overdue : null },
+            { value: 'reports', label: 'Filed\nReports', icon: FileText, bg: 'from-indigo-400 to-indigo-600', desc: 'Compliance filings & evidence' },
+            { value: 'calendar', label: 'Calendar', icon: Calendar, bg: 'from-rose-400 to-rose-600', desc: 'Compliance deadlines & events' },
+          ].map(section => {
+            const Icon = section.icon;
+            return (
+              <button
+                key={section.value}
+                onClick={() => setActiveSection(section.value)}
+                className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-4 sm:p-5 min-h-[110px] active:scale-95 relative"
+              >
+                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${section.bg} flex items-center justify-center mb-2 shadow-sm`}>
+                  <Icon className="w-6 h-6 text-white" strokeWidth={1.8} />
+                </div>
+                {section.badge > 0 && (
+                  <span className="absolute top-2 right-2 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">{section.badge}</span>
+                )}
+                <span className="text-sm font-semibold text-slate-700 text-center leading-tight whitespace-pre-line">
+                  {section.label}
+                </span>
+                <span className="text-[10px] text-slate-400 text-center mt-1 leading-tight line-clamp-2">
+                  {section.desc}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <Tabs value={activeSection || 'inspection'} onValueChange={setActiveSection} className={`w-full ${!activeSection ? 'hidden' : ''}`}>
+        <TabsList className="hidden">
+          <TabsTrigger value="inspection">Inspection</TabsTrigger>
+          <TabsTrigger value="regulations">Regulations</TabsTrigger>
+          <TabsTrigger value="supervisions">Supervisions</TabsTrigger>
+          <TabsTrigger value="reports">Reports</TabsTrigger>
+          <TabsTrigger value="calendar">Calendar</TabsTrigger>
         </TabsList>
 
         {/* ── TAB: Virtual Inspection ── */}
         <TabsContent value="inspection" className="space-y-6 mt-4">
+          <button onClick={() => setActiveSection(null)} className="flex items-center gap-1.5 text-sm font-medium text-emerald-700 hover:text-emerald-900 transition-colors">
+            <ChevronLeft className="w-4 h-4" />Back to Compliance
+          </button>
           {/* Banner + Run button */}
           <div className="p-4 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -1113,6 +1104,9 @@ export default function ComplianceManagement() {
 
         {/* ── TAB: Regulations ── */}
         <TabsContent value="regulations" className="space-y-6 mt-4">
+          <button onClick={() => setActiveSection(null)} className="flex items-center gap-1.5 text-sm font-medium text-teal-700 hover:text-teal-900 transition-colors">
+            <ChevronLeft className="w-4 h-4" />Back to Compliance
+          </button>
           <div className="p-3 bg-gradient-to-r from-slate-50 to-teal-50 border border-slate-200 rounded-lg">
             <div className="flex items-center gap-1">
               <p className="text-sm text-slate-600">
@@ -1206,6 +1200,9 @@ export default function ComplianceManagement() {
 
         {/* ── TAB: Supervisions ── */}
         <TabsContent value="supervisions" className="space-y-4 mt-4">
+          <button onClick={() => setActiveSection(null)} className="flex items-center gap-1.5 text-sm font-medium text-amber-700 hover:text-amber-900 transition-colors">
+            <ChevronLeft className="w-4 h-4" />Back to Compliance
+          </button>
           {/* Summary banner */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <Card className="p-3 text-center border-red-200 bg-red-50">
@@ -1382,6 +1379,9 @@ export default function ComplianceManagement() {
 
         {/* ── TAB: Filed Reports ── */}
         <TabsContent value="reports" className="space-y-4 mt-4">
+          <button onClick={() => setActiveSection(null)} className="flex items-center gap-1.5 text-sm font-medium text-indigo-700 hover:text-indigo-900 transition-colors">
+            <ChevronLeft className="w-4 h-4" />Back to Compliance
+          </button>
           <div className="flex items-center gap-1 mb-2">
             <p className="text-sm font-medium text-slate-700">Filed Evidence Reports</p>
             <HelpTip tip="Upload documents to prove compliance. Build your inspection-ready evidence portfolio." inline />
@@ -1475,6 +1475,9 @@ export default function ComplianceManagement() {
 
         {/* ── TAB: Calendar (preserved from original) ── */}
         <TabsContent value="calendar" className="space-y-6 mt-4">
+          <button onClick={() => setActiveSection(null)} className="flex items-center gap-1.5 text-sm font-medium text-rose-700 hover:text-rose-900 transition-colors">
+            <ChevronLeft className="w-4 h-4" />Back to Compliance
+          </button>
           <div className="flex items-center gap-1 mb-2">
             <p className="text-sm font-medium text-slate-700">Compliance Calendar</p>
             <HelpTip tip="Schedule and track upcoming inspections, audits, and compliance deadlines." inline />

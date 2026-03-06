@@ -10,6 +10,7 @@ export async function GET(request) {
   const regulator = searchParams.get('regulator');
   const status = searchParams.get('status');
   const provider_type = searchParams.get('provider_type');
+  const data_source = searchParams.get('data_source');
   const search = searchParams.get('search');
   const count_only = searchParams.get('count_only');
   const page = parseInt(searchParams.get('page') || '0');
@@ -18,9 +19,10 @@ export async function GET(request) {
   let query = supabase.from('email_contacts').select(count_only === 'true' ? 'id' : '*', count_only === 'true' ? { count: 'exact', head: true } : undefined);
 
   if (regulator) query = query.eq('regulator', regulator);
-  if (status) query = query.eq('status', status);
-  else query = query.eq('status', 'active');
+  if (status && status !== 'all') query = query.eq('status', status);
+  else if (!status) query = query.eq('status', 'active');
   if (provider_type) query = query.eq('provider_type', provider_type);
+  if (data_source) query = query.eq('data_source', data_source);
   if (search) query = query.or(`email.ilike.%${search}%,name.ilike.%${search}%,organisation.ilike.%${search}%`);
 
   if (count_only === 'true') {
@@ -55,8 +57,9 @@ export async function POST(request) {
       provider_type: c.provider_type || null,
       region: c.region || null,
       registration_number: c.registration_number || null,
-      data_source: body.data_source || 'csv_import',
+      data_source: c.data_source || body.data_source || 'csv_import',
       tags: c.tags || [],
+      status: c.status || 'active',
     })).filter(c => c.email && c.email.includes('@'));
 
     let imported = 0;

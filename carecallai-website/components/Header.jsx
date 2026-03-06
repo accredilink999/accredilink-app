@@ -101,6 +101,12 @@ export default function Header() {
             >
               Contact
             </Link>
+            <Link
+              href="/training"
+              className="text-sm font-semibold text-teal-600 hover:text-teal-700 transition-colors"
+            >
+              Free Training
+            </Link>
           </nav>
 
           {/* Desktop CTA */}
@@ -193,6 +199,13 @@ export default function Header() {
               onClick={() => setMobileOpen(false)}
             >
               Contact
+            </Link>
+            <Link
+              href="/training"
+              className="block px-3 py-2 text-sm font-semibold text-teal-600 hover:bg-teal-50 rounded-lg"
+              onClick={() => setMobileOpen(false)}
+            >
+              🎓 Free Training
             </Link>
             <div className="pt-3 border-t border-slate-200 flex flex-col gap-2">
               <Link

@@ -6,12 +6,12 @@ import PageHeader from '@/components/ui/PageHeader';
 import PayrollDashboard from '@/components/payroll/PayrollDashboard';
 import PayrollRecords from '@/components/payroll/PayrollRecords';
 import GeneratePayroll from '@/components/payroll/GeneratePayroll';
+import MigratedPayslips from '@/components/payroll/MigratedPayslips';
 import PayPeriodManager from '@/components/approvals/PayPeriodManager';
 import PayrollSettingsManager from '@/components/payroll/PayrollSettingsManager';
 import { DollarSign } from 'lucide-react';
 
 export default function Payroll() {
-  const [activeTab, setActiveTab] = useState('dashboard');
   const queryClient = useQueryClient();
 
   const { data: user } = useQuery({
@@ -25,11 +25,18 @@ export default function Payroll() {
   });
 
   const isSuperAdmin = user?.role === 'super_admin';
+  const [activeTab, setActiveTab] = useState('dashboard');
 
+  // Non-admin staff only see their own migrated payslips
   if (!isSuperAdmin) {
     return (
-      <div className="p-8 text-center">
-        <p className="text-slate-500">Only Super Admins can access payroll</p>
+      <div className="space-y-6">
+        <PageHeader
+          title="My Payslips"
+          subtitle="Download your payslips"
+          icon={DollarSign}
+        />
+        <MigratedPayslips user={user} />
       </div>
     );
   }
@@ -42,7 +49,7 @@ export default function Payroll() {
         icon={DollarSign}
       />
 
-      <PayPeriodManager 
+      <PayPeriodManager
         payPeriod={payPeriod}
         onUpdate={() => queryClient.invalidateQueries({ queryKey: ['payPeriod'] })}
       />
@@ -50,10 +57,11 @@ export default function Payroll() {
       <PayrollSettingsManager />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full max-w-md grid-cols-3">
+        <TabsList className="grid w-full max-w-lg grid-cols-4">
           <TabsTrigger value="dashboard">Overview</TabsTrigger>
           <TabsTrigger value="records">Records</TabsTrigger>
           <TabsTrigger value="generate">Generate</TabsTrigger>
+          <TabsTrigger value="migrated">Migrated</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard" className="mt-6">
@@ -66,6 +74,10 @@ export default function Payroll() {
 
         <TabsContent value="generate" className="mt-6">
           <GeneratePayroll />
+        </TabsContent>
+
+        <TabsContent value="migrated" className="mt-6">
+          <MigratedPayslips user={user} />
         </TabsContent>
       </Tabs>
     </div>

@@ -8,14 +8,14 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+// Tabs removed — icon tile navigation
 import PageHeader from '@/components/ui/PageHeader';
 import StatusBadge from '@/components/ui/StatusBadge';
 import Avatar from '@/components/ui/Avatar';
-import { 
-  User, 
-  Phone, 
-  Mail, 
+import {
+  User,
+  Phone,
+  Mail,
   MapPin,
   Calendar,
   Shield,
@@ -33,7 +33,8 @@ import {
   FileVideo,
   FileArchive,
   LogOut,
-  Settings
+  Settings,
+  ChevronLeft
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -41,6 +42,7 @@ import AppDownloadGuide from '@/components/profile/AppDownloadGuide';
 
 export default function Profile() {
   const queryClient = useQueryClient();
+  const [activeSection, setActiveSection] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
@@ -380,270 +382,301 @@ export default function Profile() {
           </div>
         </Card>
 
-        {/* Details Tabs */}
+        {/* Details Section */}
         <Card className="p-3 sm:p-6 bg-white border-0 shadow-sm lg:col-span-2 overflow-hidden min-w-0">
-          <Tabs defaultValue="details">
-            <TabsList className="grid grid-cols-4 w-full">
-              <TabsTrigger value="details" className="text-[11px] sm:text-sm px-1 sm:px-3">Details</TabsTrigger>
-              <TabsTrigger value="files" className="text-[11px] sm:text-sm px-1 sm:px-3">Files</TabsTrigger>
-              <TabsTrigger value="training" className="text-[11px] sm:text-sm px-1 sm:px-3">Training</TabsTrigger>
-              <TabsTrigger value="activity" className="text-[11px] sm:text-sm px-1 sm:px-3">Activity</TabsTrigger>
-            </TabsList>
+          {activeSection ? (
+            <div>
+              <button
+                onClick={() => { setActiveSection(null); setIsEditing(false); }}
+                className="flex items-center gap-1.5 text-sm font-medium text-blue-700 hover:text-blue-900 mb-4 transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Back to Profile
+              </button>
 
-            <TabsContent value="details" className="mt-4 sm:mt-6">
-              <div className="space-y-4 sm:space-y-6">
-                <div className="flex flex-wrap justify-between items-center gap-2">
-                  <h3 className="font-semibold text-slate-900 text-sm sm:text-base">Personal Information</h3>
-                  {!isEditing ? (
-                    <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
-                      Edit
-                    </Button>
-                  ) : (
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => {
-                        setIsEditing(false);
-                        setFormData({
-                          staff_full_name: user.staff_full_name || '',
-                          phone: user.phone || '',
-                          address: user.address || '',
-                          emergency_contact_name: user.emergency_contact_name || '',
-                          emergency_contact_phone: user.emergency_contact_phone || '',
-                        });
-                      }}>
-                        Cancel
+              {activeSection === 'details' && (
+                <div className="space-y-4 sm:space-y-6">
+                  <div className="flex flex-wrap justify-between items-center gap-2">
+                    <h3 className="font-semibold text-slate-900 text-sm sm:text-base">Personal Information</h3>
+                    {!isEditing ? (
+                      <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+                        Edit
                       </Button>
-                      <Button
-                        size="sm"
-                        onClick={handleSave}
-                        disabled={updateMutation.isPending}
-                        className="bg-teal-600 hover:bg-teal-700"
-                      >
-                        <Save className="w-4 h-4 mr-1" />
-                        Save
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="mb-4 p-3 bg-slate-50 rounded-lg">
-                  <Label>Staff Name</Label>
-                  {isEditing ? (
-                    <Input
-                      value={formData.staff_full_name || ''}
-                      onChange={(e) => setFormData({...formData, staff_full_name: e.target.value})}
-                      placeholder="Your staff name"
-                    />
-                  ) : (
-                    <p className="mt-1 text-slate-600">{user?.staff_full_name || '-'}</p>
-                  )}
-                </div>
-
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div>
-                    <Label>Phone</Label>
-                    {isEditing ? (
-                      <Input
-                        value={formData.phone || ''}
-                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                      />
                     ) : (
-                      <p className="mt-1 text-slate-600">{user?.phone || '-'}</p>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => {
+                          setIsEditing(false);
+                          setFormData({
+                            staff_full_name: user.staff_full_name || '',
+                            phone: user.phone || '',
+                            address: user.address || '',
+                            emergency_contact_name: user.emergency_contact_name || '',
+                            emergency_contact_phone: user.emergency_contact_phone || '',
+                          });
+                        }}>
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={handleSave}
+                          disabled={updateMutation.isPending}
+                          className="bg-teal-600 hover:bg-teal-700"
+                        >
+                          <Save className="w-4 h-4 mr-1" />
+                          Save
+                        </Button>
+                      </div>
                     )}
                   </div>
-                  <div>
-                    <Label>Address</Label>
+
+                  <div className="mb-4 p-3 bg-slate-50 rounded-lg">
+                    <Label>Staff Name</Label>
                     {isEditing ? (
                       <Input
-                        value={formData.address || ''}
-                        onChange={(e) => setFormData({...formData, address: e.target.value})}
+                        value={formData.staff_full_name || ''}
+                        onChange={(e) => setFormData({...formData, staff_full_name: e.target.value})}
+                        placeholder="Your staff name"
                       />
                     ) : (
-                      <p className="mt-1 text-slate-600">{user?.address || '-'}</p>
+                      <p className="mt-1 text-slate-600">{user?.staff_full_name || '-'}</p>
                     )}
                   </div>
-                </div>
 
-                <div className="p-4 bg-amber-50 rounded-lg">
-                  <h4 className="font-medium text-amber-800 mb-3 flex items-center gap-2">
-                    <Shield className="w-4 h-4" />
-                    Emergency Contact
-                  </h4>
                   <div className="grid sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label>Name</Label>
-                      {isEditing ? (
-                        <Input
-                          value={formData.emergency_contact_name || ''}
-                          onChange={(e) => setFormData({...formData, emergency_contact_name: e.target.value})}
-                        />
-                      ) : (
-                        <p className="mt-1 text-slate-600">{user?.emergency_contact_name || '-'}</p>
-                      )}
-                    </div>
                     <div>
                       <Label>Phone</Label>
                       {isEditing ? (
                         <Input
-                          value={formData.emergency_contact_phone || ''}
-                          onChange={(e) => setFormData({...formData, emergency_contact_phone: e.target.value})}
+                          value={formData.phone || ''}
+                          onChange={(e) => setFormData({...formData, phone: e.target.value})}
                         />
                       ) : (
-                        <p className="mt-1 text-slate-600">{user?.emergency_contact_phone || '-'}</p>
+                        <p className="mt-1 text-slate-600">{user?.phone || '-'}</p>
+                      )}
+                    </div>
+                    <div>
+                      <Label>Address</Label>
+                      {isEditing ? (
+                        <Input
+                          value={formData.address || ''}
+                          onChange={(e) => setFormData({...formData, address: e.target.value})}
+                        />
+                      ) : (
+                        <p className="mt-1 text-slate-600">{user?.address || '-'}</p>
                       )}
                     </div>
                   </div>
-                </div>
 
-                <div className="p-4 bg-slate-50 rounded-lg">
-                  <h4 className="font-medium text-slate-700 mb-3">Compliance</h4>
-                  <div className="grid sm:grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-slate-500">DBS Number:</span>
-                      <p className="font-medium">{user?.dbs_number || 'Not recorded'}</p>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">DBS Expiry:</span>
-                      <p className="font-medium">
-                        {user?.dbs_expiry ? format(new Date(user?.dbs_expiry), 'dd MMM yyyy') : 'Not recorded'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="files" className="mt-6">
-              <div className="space-y-4">
-                {/* Upload Section */}
-                <div className="border-2 border-dashed border-slate-300 rounded-lg p-4 sm:p-6 text-center hover:border-teal-400 transition-colors">
-                  <input
-                    type="file"
-                    id="file-upload"
-                    className="hidden"
-                    onChange={handleFileUpload}
-                    disabled={uploadingFile}
-                  />
-                  <label htmlFor="file-upload" className="cursor-pointer">
-                    {uploadingFile ? (
-                      <div className="space-y-3">
-                        <Loader2 className="w-10 h-10 mx-auto text-teal-600 animate-spin" />
-                        <p className="text-sm text-slate-600">Uploading... {uploadProgress}%</p>
-                        <div className="w-full max-w-xs mx-auto bg-slate-200 rounded-full h-2">
-                          <div 
-                            className="bg-teal-600 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${uploadProgress}%` }}
+                  <div className="p-4 bg-amber-50 rounded-lg">
+                    <h4 className="font-medium text-amber-800 mb-3 flex items-center gap-2">
+                      <Shield className="w-4 h-4" />
+                      Emergency Contact
+                    </h4>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <Label>Name</Label>
+                        {isEditing ? (
+                          <Input
+                            value={formData.emergency_contact_name || ''}
+                            onChange={(e) => setFormData({...formData, emergency_contact_name: e.target.value})}
                           />
-                        </div>
+                        ) : (
+                          <p className="mt-1 text-slate-600">{user?.emergency_contact_name || '-'}</p>
+                        )}
                       </div>
-                    ) : (
-                      <>
-                        <Upload className="w-10 h-10 mx-auto text-slate-400 mb-2" />
-                        <p className="text-sm text-slate-600 mb-1">Click to upload a file</p>
-                        <p className="text-xs text-slate-400">Max 50MB per file</p>
-                      </>
-                    )}
-                  </label>
-                </div>
+                      <div>
+                        <Label>Phone</Label>
+                        {isEditing ? (
+                          <Input
+                            value={formData.emergency_contact_phone || ''}
+                            onChange={(e) => setFormData({...formData, emergency_contact_phone: e.target.value})}
+                          />
+                        ) : (
+                          <p className="mt-1 text-slate-600">{user?.emergency_contact_phone || '-'}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
-                {/* Files List */}
-                {sharedFiles.length === 0 ? (
-                  <p className="text-slate-500 text-center py-8">No files uploaded yet</p>
-                ) : (
-                  <div className="space-y-2">
-                    {sharedFiles.map((file) => {
-                      const FileIcon = getFileIcon(file.file_type);
-                      return (
-                        <div key={file.id} className="flex items-center justify-between p-2 sm:p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
-                          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-                            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-teal-100 flex items-center justify-center flex-shrink-0">
-                              <FileIcon className="w-4 h-4 sm:w-5 sm:h-5 text-teal-600" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="font-medium text-slate-900 text-xs sm:text-sm truncate">{file.file_name}</p>
-                              <p className="text-[10px] sm:text-xs text-slate-500">
-                                {formatFileSize(file.file_size)} • {file.created_date ? format(new Date(file.created_date), 'dd MMM yyyy') : ''}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <a
-                              href={file.file_url}
-                              download={file.file_name}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-2 text-teal-600 hover:bg-teal-100 rounded-lg transition-colors"
-                            >
-                              <Download className="w-4 h-4" />
-                            </a>
-                            <button
-                              onClick={() => handleDeleteFile(file.id)}
-                              className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                  <div className="p-4 bg-slate-50 rounded-lg">
+                    <h4 className="font-medium text-slate-700 mb-3">Compliance</h4>
+                    <div className="grid sm:grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-slate-500">DBS Number:</span>
+                        <p className="font-medium">{user?.dbs_number || 'Not recorded'}</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">DBS Expiry:</span>
+                        <p className="font-medium">
+                          {user?.dbs_expiry ? format(new Date(user?.dbs_expiry), 'dd MMM yyyy') : 'Not recorded'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeSection === 'files' && (
+                <div className="space-y-4">
+                  <div className="border-2 border-dashed border-slate-300 rounded-lg p-4 sm:p-6 text-center hover:border-teal-400 transition-colors">
+                    <input
+                      type="file"
+                      id="file-upload"
+                      className="hidden"
+                      onChange={handleFileUpload}
+                      disabled={uploadingFile}
+                    />
+                    <label htmlFor="file-upload" className="cursor-pointer">
+                      {uploadingFile ? (
+                        <div className="space-y-3">
+                          <Loader2 className="w-10 h-10 mx-auto text-teal-600 animate-spin" />
+                          <p className="text-sm text-slate-600">Uploading... {uploadProgress}%</p>
+                          <div className="w-full max-w-xs mx-auto bg-slate-200 rounded-full h-2">
+                            <div
+                              className="bg-teal-600 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${uploadProgress}%` }}
+                            />
                           </div>
                         </div>
-                      );
-                    })}
+                      ) : (
+                        <>
+                          <Upload className="w-10 h-10 mx-auto text-slate-400 mb-2" />
+                          <p className="text-sm text-slate-600 mb-1">Click to upload a file</p>
+                          <p className="text-xs text-slate-400">Max 50MB per file</p>
+                        </>
+                      )}
+                    </label>
                   </div>
-                )}
-              </div>
-            </TabsContent>
 
-            <TabsContent value="training" className="mt-6">
-              {training.length === 0 ? (
-                <p className="text-slate-500 text-center py-8">No training records</p>
-              ) : (
+                  {sharedFiles.length === 0 ? (
+                    <p className="text-slate-500 text-center py-8">No files uploaded yet</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {sharedFiles.map((file) => {
+                        const FileIcon = getFileIcon(file.file_type);
+                        return (
+                          <div key={file.id} className="flex items-center justify-between p-2 sm:p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
+                            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-teal-100 flex items-center justify-center flex-shrink-0">
+                                <FileIcon className="w-4 h-4 sm:w-5 sm:h-5 text-teal-600" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="font-medium text-slate-900 text-xs sm:text-sm truncate">{file.file_name}</p>
+                                <p className="text-[10px] sm:text-xs text-slate-500">
+                                  {formatFileSize(file.file_size)} • {file.created_date ? format(new Date(file.created_date), 'dd MMM yyyy') : ''}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <a
+                                href={file.file_url}
+                                download={file.file_name}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 text-teal-600 hover:bg-teal-100 rounded-lg transition-colors"
+                              >
+                                <Download className="w-4 h-4" />
+                              </a>
+                              <button
+                                onClick={() => handleDeleteFile(file.id)}
+                                className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeSection === 'training' && (
+                <div>
+                  {training.length === 0 ? (
+                    <p className="text-slate-500 text-center py-8">No training records</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {training.map((t) => (
+                        <div key={t.id} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-4 bg-slate-50 rounded-lg">
+                          <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                            t.status === 'valid' ? 'bg-emerald-100' :
+                            t.status === 'expiring_soon' ? 'bg-amber-100' : 'bg-red-100'
+                          }`}>
+                            <Award className={`w-4 h-4 sm:w-5 sm:h-5 ${
+                              t.status === 'valid' ? 'text-emerald-600' :
+                              t.status === 'expiring_soon' ? 'text-amber-600' : 'text-red-600'
+                            }`} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-slate-900 text-xs sm:text-sm truncate">{t.training_name}</p>
+                            <p className="text-[10px] sm:text-xs text-slate-500 truncate">
+                              {t.category} • {t.expiry_date ? format(new Date(t.expiry_date), 'dd MMM yy') : 'N/A'}
+                            </p>
+                          </div>
+                          <StatusBadge status={t.status} className="flex-shrink-0 text-[10px] sm:text-xs" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeSection === 'activity' && (
                 <div className="space-y-3">
-                  {training.map((t) => (
-                    <div key={t.id} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-4 bg-slate-50 rounded-lg">
+                  {shifts.slice(0, 10).map((shift) => (
+                    <div key={shift.id} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-4 bg-slate-50 rounded-lg">
                       <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                        t.status === 'valid' ? 'bg-emerald-100' :
-                        t.status === 'expiring_soon' ? 'bg-amber-100' : 'bg-red-100'
+                        shift.status === 'completed' ? 'bg-emerald-100' :
+                        shift.status === 'in_progress' ? 'bg-teal-100' : 'bg-slate-100'
                       }`}>
-                        <Award className={`w-4 h-4 sm:w-5 sm:h-5 ${
-                          t.status === 'valid' ? 'text-emerald-600' :
-                          t.status === 'expiring_soon' ? 'text-amber-600' : 'text-red-600'
+                        <Clock className={`w-4 h-4 sm:w-5 sm:h-5 ${
+                          shift.status === 'completed' ? 'text-emerald-600' :
+                          shift.status === 'in_progress' ? 'text-teal-600' : 'text-slate-400'
                         }`} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-slate-900 text-xs sm:text-sm truncate">{t.training_name}</p>
+                        <p className="font-medium text-slate-900 text-xs sm:text-sm truncate">{shift.service_user_name}</p>
                         <p className="text-[10px] sm:text-xs text-slate-500 truncate">
-                          {t.category} • {t.expiry_date ? format(new Date(t.expiry_date), 'dd MMM yy') : 'N/A'}
+                          {format(new Date(shift.date), 'dd MMM')} • {shift.start_time} - {shift.end_time}
                         </p>
                       </div>
-                      <StatusBadge status={t.status} className="flex-shrink-0 text-[10px] sm:text-xs" />
+                      <StatusBadge status={shift.status} className="flex-shrink-0 text-[10px] sm:text-xs" />
                     </div>
                   ))}
                 </div>
               )}
-            </TabsContent>
-
-            <TabsContent value="activity" className="mt-6">
-              <div className="space-y-3">
-                {shifts.slice(0, 10).map((shift) => (
-                  <div key={shift.id} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-4 bg-slate-50 rounded-lg">
-                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                      shift.status === 'completed' ? 'bg-emerald-100' :
-                      shift.status === 'in_progress' ? 'bg-teal-100' : 'bg-slate-100'
-                    }`}>
-                      <Clock className={`w-4 h-4 sm:w-5 sm:h-5 ${
-                        shift.status === 'completed' ? 'text-emerald-600' :
-                        shift.status === 'in_progress' ? 'text-teal-600' : 'text-slate-400'
-                      }`} />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { value: 'details', label: 'My Details', icon: User, bg: 'from-blue-400 to-blue-600', desc: 'Personal info & emergency' },
+                { value: 'files', label: 'My Files', icon: Upload, bg: 'from-teal-400 to-teal-600', desc: 'Upload & manage files' },
+                { value: 'training', label: 'Training', icon: Award, bg: 'from-purple-400 to-purple-600', desc: 'Certificates & CPD' },
+                { value: 'activity', label: 'Activity', icon: Clock, bg: 'from-amber-400 to-amber-600', desc: 'Recent shift history' },
+              ].map(section => {
+                const Icon = section.icon;
+                return (
+                  <button
+                    key={section.value}
+                    onClick={() => setActiveSection(section.value)}
+                    className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-4 sm:p-5 min-h-[110px] active:scale-95"
+                  >
+                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${section.bg} flex items-center justify-center mb-2 shadow-sm`}>
+                      <Icon className="w-6 h-6 text-white" strokeWidth={1.8} />
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-slate-900 text-xs sm:text-sm truncate">{shift.service_user_name}</p>
-                      <p className="text-[10px] sm:text-xs text-slate-500 truncate">
-                        {format(new Date(shift.date), 'dd MMM')} • {shift.start_time} - {shift.end_time}
-                      </p>
-                    </div>
-                    <StatusBadge status={shift.status} className="flex-shrink-0 text-[10px] sm:text-xs" />
-                  </div>
-                ))}
-              </div>
-            </TabsContent>
-          </Tabs>
+                    <span className="text-sm font-semibold text-slate-700 text-center leading-tight">
+                      {section.label}
+                    </span>
+                    <span className="text-[10px] text-slate-400 text-center mt-1 leading-tight line-clamp-2">
+                      {section.desc}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </Card>
       </div>
 

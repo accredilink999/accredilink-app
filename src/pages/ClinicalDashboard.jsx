@@ -16,7 +16,9 @@ import {
   TrendingDown,
   Clock,
   ChevronRight,
+  ChevronLeft,
   Loader2,
+  LayoutDashboard,
 } from 'lucide-react';
 
 const riskBadge = (level) => {
@@ -52,7 +54,7 @@ function StatCard({ title, value, subtitle, icon: Icon, color = 'rose', alert = 
 }
 
 export default function ClinicalDashboard() {
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(null);
 
   const { data: serviceUsers = [] } = useQuery({
     queryKey: ['serviceUsers'],
@@ -201,9 +203,38 @@ export default function ClinicalDashboard() {
         />
       </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="bg-gradient-to-r from-slate-100 to-slate-200 w-full justify-start mb-4">
+      {!activeTab && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { value: 'overview', label: 'Overview', icon: LayoutDashboard, bg: 'from-rose-400 to-rose-600', desc: 'Alerts & overdue items' },
+            { value: 'assessments', label: 'Assessments', icon: ClipboardList, bg: 'from-violet-400 to-violet-600', desc: 'Risk scores by client' },
+            { value: 'wounds', label: 'Wounds', icon: Bandage, bg: 'from-amber-400 to-amber-600', desc: 'Active wounds & dressings' },
+            { value: 'falls', label: 'Falls', icon: PersonStanding, bg: 'from-red-400 to-red-600', desc: 'Falls patterns & trends' },
+          ].map(section => {
+            const Icon = section.icon;
+            return (
+              <button
+                key={section.value}
+                onClick={() => setActiveTab(section.value)}
+                className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-4 sm:p-5 min-h-[110px] active:scale-95"
+              >
+                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${section.bg} flex items-center justify-center mb-2 shadow-sm`}>
+                  <Icon className="w-6 h-6 text-white" strokeWidth={1.8} />
+                </div>
+                <span className="text-sm font-semibold text-slate-700 text-center leading-tight">
+                  {section.label}
+                </span>
+                <span className="text-[10px] text-slate-400 text-center mt-1 leading-tight line-clamp-2">
+                  {section.desc}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <Tabs value={activeTab || 'overview'} onValueChange={setActiveTab} className={!activeTab ? 'hidden' : ''}>
+        <TabsList className="hidden">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="assessments">Assessments</TabsTrigger>
           <TabsTrigger value="wounds">Wounds</TabsTrigger>
@@ -212,6 +243,9 @@ export default function ClinicalDashboard() {
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-4">
+          <button onClick={() => setActiveTab(null)} className="flex items-center gap-1.5 text-sm font-medium text-rose-700 hover:text-rose-900 transition-colors">
+            <ChevronLeft className="w-4 h-4" />Back to Clinical Dashboard
+          </button>
           {/* Overdue Assessments */}
           {stats.overdueAssessments.length > 0 && (
             <Card className="p-4 border-red-200 bg-red-50">
@@ -297,6 +331,9 @@ export default function ClinicalDashboard() {
 
         {/* Assessments Tab */}
         <TabsContent value="assessments" className="space-y-3">
+          <button onClick={() => setActiveTab(null)} className="flex items-center gap-1.5 text-sm font-medium text-violet-700 hover:text-violet-900 transition-colors">
+            <ChevronLeft className="w-4 h-4" />Back to Clinical Dashboard
+          </button>
           {assessmentsByClient.length === 0 ? (
             <Card className="p-8 text-center">
               <ClipboardList className="w-10 h-10 text-slate-300 mx-auto mb-3" />
@@ -339,6 +376,9 @@ export default function ClinicalDashboard() {
 
         {/* Wounds Tab */}
         <TabsContent value="wounds" className="space-y-3">
+          <button onClick={() => setActiveTab(null)} className="flex items-center gap-1.5 text-sm font-medium text-amber-700 hover:text-amber-900 transition-colors">
+            <ChevronLeft className="w-4 h-4" />Back to Clinical Dashboard
+          </button>
           {stats.activeWounds.length === 0 ? (
             <Card className="p-8 text-center">
               <Bandage className="w-10 h-10 text-slate-300 mx-auto mb-3" />
@@ -381,6 +421,9 @@ export default function ClinicalDashboard() {
 
         {/* Falls Tab */}
         <TabsContent value="falls" className="space-y-3">
+          <button onClick={() => setActiveTab(null)} className="flex items-center gap-1.5 text-sm font-medium text-red-700 hover:text-red-900 transition-colors">
+            <ChevronLeft className="w-4 h-4" />Back to Clinical Dashboard
+          </button>
           {falls.length === 0 ? (
             <Card className="p-8 text-center">
               <PersonStanding className="w-10 h-10 text-slate-300 mx-auto mb-3" />

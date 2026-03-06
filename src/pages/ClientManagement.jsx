@@ -128,10 +128,41 @@ export default function ClientManagement() {
     );
   }
 
+  // When detail view is shown, render it full-page instead of the list
+  if (showDetails && selectedUser) {
+    return (
+      <>
+        <ServiceUserDetails
+          serviceUser={selectedUser}
+          open={showDetails}
+          onClose={() => {
+            setShowDetails(false);
+            setSelectedUser(null);
+          }}
+          onEdit={() => handleEdit(selectedUser)}
+          onEditDisabled={!isAdmin}
+          careLogs={careLogs}
+        />
+
+        {/* Edit form modal — available from detail view */}
+        {isAdmin && (
+          <ServiceUserForm
+            serviceUser={editingUser}
+            open={showForm}
+            onClose={() => {
+              setShowForm(false);
+              setEditingUser(null);
+            }}
+          />
+        )}
+      </>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <PageHeader 
-        title="Clients" 
+      <PageHeader
+        title="Clients"
         subtitle={isAdmin ? "Manage all service users and their care plans" : "View service user information"}
         icon={Heart}
         className="[&_h1]:text-slate-900 [&_svg]:text-teal-600 [&_svg]:fill-teal-600"
@@ -283,7 +314,7 @@ export default function ClientManagement() {
           title={searchQuery ? 'No results found' : 'No service users yet'}
           description={searchQuery ? 'Try adjusting your search' : (isAdmin ? 'Add your first service user to get started' : 'No service users are assigned to your team yet')}
           action={!searchQuery && isAdmin && (
-            <Button 
+            <Button
               onClick={() => setShowForm(true)}
               className="bg-teal-600 hover:bg-teal-700"
             >
@@ -293,8 +324,8 @@ export default function ClientManagement() {
           )}
         />
       ) : (
-        <ClientCardGrid 
-          filteredUsers={filteredUsers} 
+        <ClientCardGrid
+          filteredUsers={filteredUsers}
           careLogs={careLogs}
           onSelectUser={(user) => {
             setSelectedUser(user);
@@ -315,18 +346,6 @@ export default function ClientManagement() {
         }}
       />
       )}
-
-      <ServiceUserDetails
-        serviceUser={selectedUser}
-        open={showDetails}
-        onClose={() => {
-          setShowDetails(false);
-          setSelectedUser(null);
-        }}
-        onEdit={() => handleEdit(selectedUser)}
-        onEditDisabled={!isAdmin}
-        careLogs={careLogs}
-      />
 
       {isAdmin && (
         <CareLogFormBuilder

@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { CheckCircle2, Clock, XCircle, DollarSign, Plus, Calendar, Car, PoundSterling, TrendingUp } from 'lucide-react';
 import LeaveCalendarPopup from '@/components/leave/LeaveCalendarPopup';
+import MigratedPayslips from '@/components/payroll/MigratedPayslips';
 import { formatDistanceToNow, format, parseISO, isWithinInterval, startOfWeek, endOfWeek } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -666,13 +667,12 @@ export default function ApprovalsAndFinancials() {
         </TabsContent>
 
         {/* Payroll Tab */}
-        <TabsContent value="payroll" className="space-y-4">
-          {payrollRecords.length === 0 ? (
-            <Card className="p-8 text-center bg-slate-50">
-              <p className="text-slate-500">No payroll records available</p>
-            </Card>
-          ) : (
+        <TabsContent value="payroll" className="space-y-6">
+          <MigratedPayslips user={user} />
+
+          {payrollRecords.length > 0 && (
             <div className="space-y-3">
+              <h3 className="text-lg font-bold text-slate-900">Payroll Records</h3>
               {payrollRecords.map(record => (
                 <Card key={record.id} className="p-4 bg-gradient-to-r from-indigo-50 to-blue-50 border-indigo-200">
                   <div className="flex items-start justify-between">

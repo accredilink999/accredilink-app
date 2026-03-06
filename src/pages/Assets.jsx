@@ -224,53 +224,36 @@ export default function Assets() {
         </div>
       </div>
 
-      {/* Menu Headings */}
-      <div className="space-y-4 mb-6">
-        <div>
-          <h2 className="text-xl font-bold text-slate-900 mb-3">Operations</h2>
-          <div className="space-y-2">
-            <Link to={createPageUrl('Incidents')} className="flex items-center gap-2 text-red-500 hover:text-red-600 font-bold text-base py-2">
-              <AlertTriangle className="w-5 h-5 text-red-500 fill-red-500" />
-              Incidents & Reporting
+      {/* Quick Links */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
+        {[
+          { to: 'Incidents', label: 'Incidents', icon: AlertTriangle, bg: 'from-red-400 to-red-600', desc: 'Incidents & reporting' },
+          { to: 'ClientManagement', label: 'Citizens', icon: Users, bg: 'from-orange-400 to-orange-600', desc: 'Supported citizens' },
+          { to: 'Rota', label: 'Rotas', icon: LayoutList, bg: 'from-indigo-400 to-indigo-600', desc: 'Rotas & shifts' },
+          { to: 'Chat', label: 'Chat', icon: MessageCircle, bg: 'from-green-400 to-green-600', desc: 'Private & team chat' },
+          { to: 'ApprovalsAndFinancials', label: 'Approvals', icon: Wallet, bg: 'from-amber-400 to-amber-600', desc: 'Approvals & financials' },
+          { to: 'Training', label: 'Training', icon: GraduationCap, bg: 'from-purple-400 to-purple-600', desc: 'Training & CPD' },
+          { to: 'Documents', label: 'Documents', icon: Folder, bg: 'from-blue-400 to-blue-600', desc: 'My docs & compliance' },
+        ].map(section => {
+          const Icon = section.icon;
+          return (
+            <Link
+              key={section.to}
+              to={createPageUrl(section.to)}
+              className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-4 sm:p-5 min-h-[110px] active:scale-95"
+            >
+              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${section.bg} flex items-center justify-center mb-2 shadow-sm`}>
+                <Icon className="w-6 h-6 text-white" strokeWidth={1.8} />
+              </div>
+              <span className="text-sm font-semibold text-slate-700 text-center leading-tight">
+                {section.label}
+              </span>
+              <span className="text-[10px] text-slate-400 text-center mt-1 leading-tight line-clamp-2">
+                {section.desc}
+              </span>
             </Link>
-            <Link to={createPageUrl('ClientManagement')} className="flex items-center gap-2 text-orange-500 hover:text-orange-600 font-bold text-base py-2">
-              <Users className="w-5 h-5 text-orange-500 fill-orange-500" />
-              Supported Citizens
-            </Link>
-            <Link to={createPageUrl('Rota')} className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-bold text-base py-2">
-              <LayoutList className="w-5 h-5 text-indigo-600 fill-indigo-600" />
-              Rotas & Shifts
-            </Link>
-          </div>
-        </div>
-        
-        <div>
-          <h2 className="text-xl font-bold text-slate-900 mb-3">Communication</h2>
-          <div className="space-y-2">
-            <Link to={createPageUrl('Chat')} className="flex items-center gap-2 text-green-500 hover:text-green-600 font-bold text-base py-2">
-              <MessageCircle className="w-5 h-5 text-green-500 fill-green-500" />
-              Private & Team Chat
-            </Link>
-            <Link to={createPageUrl('ApprovalsAndFinancials')} className="flex items-center gap-2 text-amber-600 hover:text-amber-700 font-bold text-base py-2">
-              <Wallet className="w-5 h-5 text-amber-600 fill-amber-600" />
-              Approvals & Financials
-            </Link>
-          </div>
-        </div>
-        
-        <div>
-          <h2 className="text-xl font-bold text-slate-900 mb-3">HR & Skills</h2>
-          <div className="space-y-2">
-            <Link to={createPageUrl('Training')} className="flex items-center gap-2 text-purple-600 hover:text-purple-700 font-bold text-base py-2">
-              <GraduationCap className="w-5 h-5 text-purple-600 fill-purple-600" />
-              Training & CPD
-            </Link>
-            <Link to={createPageUrl('Documents')} className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-bold text-base py-2">
-              <Folder className="w-5 h-5 text-blue-600 fill-blue-600" />
-              My Documents & Compliance
-            </Link>
-          </div>
-        </div>
+          );
+        })}
       </div>
 
       {/* Assets Grid */}

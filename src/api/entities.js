@@ -422,4 +422,7 @@ export const entities = {
   // Communications / Meetings
   Meeting:                     buildEntity('meetings'),
   MeetingParticipant:          buildEntity('meeting_participants'),
+
+  // Migrated Payslips
+  MigratedPayslip:             buildEntity('migrated_payslips'),
 }

@@ -25,7 +25,7 @@ import {
   ScatterChart,
   Scatter
 } from 'recharts';
-import { 
+import {
   BarChart3,
   Download,
   Calendar,
@@ -40,12 +40,14 @@ import {
   GraduationCap,
   Shield,
   Heart,
-  LineChart as LineChartIcon
+  LineChart as LineChartIcon,
+  ChevronLeft
 } from 'lucide-react';
 
 const COLORS = ['#0d9488', '#7c3aed', '#f59e0b', '#ef4444', '#3b82f6', '#ec4899'];
 
 export default function Reports() {
+  const [activeSection, setActiveSection] = useState(null);
   const [dateRange, setDateRange] = useState('30');
   
   const startDate = subDays(new Date(), parseInt(dateRange));
@@ -320,19 +322,53 @@ export default function Reports() {
         </div>
       </PageHeader>
 
-      {/* Tabbed Interface */}
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-1 h-auto p-2 bg-transparent rounded-lg">
-          <TabsTrigger value="overview" className="text-xs sm:text-sm py-3 rounded-lg font-medium transition-all shadow-md data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-cyan-600 data-[state=active]:text-white data-[state=inactive]:bg-gradient-to-r data-[state=inactive]:from-cyan-100 data-[state=inactive]:to-cyan-200 data-[state=inactive]:text-cyan-700 hover:shadow-lg">Overview</TabsTrigger>
-          <TabsTrigger value="staff" className="text-xs sm:text-sm py-3 rounded-lg font-medium transition-all shadow-md data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=inactive]:bg-gradient-to-r data-[state=inactive]:from-purple-100 data-[state=inactive]:to-purple-200 data-[state=inactive]:text-purple-700 hover:shadow-lg">Staff</TabsTrigger>
-          <TabsTrigger value="clients" className="text-xs sm:text-sm py-3 rounded-lg font-medium transition-all shadow-md data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-green-600 data-[state=active]:text-white data-[state=inactive]:bg-gradient-to-r data-[state=inactive]:from-green-100 data-[state=inactive]:to-green-200 data-[state=inactive]:text-green-700 hover:shadow-lg">Clients</TabsTrigger>
-          <TabsTrigger value="training" className="text-xs sm:text-sm py-3 rounded-lg font-medium transition-all shadow-md data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-orange-600 data-[state=active]:text-white data-[state=inactive]:bg-gradient-to-r data-[state=inactive]:from-orange-100 data-[state=inactive]:to-orange-200 data-[state=inactive]:text-orange-700 hover:shadow-lg">Training</TabsTrigger>
-          <TabsTrigger value="payroll" className="text-xs sm:text-sm py-3 rounded-lg font-medium transition-all shadow-md data-[state=active]:bg-gradient-to-r data-[state=active]:from-pink-500 data-[state=active]:to-pink-600 data-[state=active]:text-white data-[state=inactive]:bg-gradient-to-r data-[state=inactive]:from-pink-100 data-[state=inactive]:to-pink-200 data-[state=inactive]:text-pink-700 hover:shadow-lg">Payroll</TabsTrigger>
-          <TabsTrigger value="compliance" className="text-xs sm:text-sm py-3 rounded-lg font-medium transition-all shadow-md data-[state=active]:bg-gradient-to-r data-[state=active]:from-rose-500 data-[state=active]:to-rose-600 data-[state=active]:text-white data-[state=inactive]:bg-gradient-to-r data-[state=inactive]:from-rose-100 data-[state=inactive]:to-rose-200 data-[state=inactive]:text-rose-700 hover:shadow-lg">Compliance</TabsTrigger>
+      {!activeSection && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {[
+            { value: 'overview', label: 'Overview', icon: BarChart3, bg: 'from-cyan-400 to-cyan-600', desc: 'Key metrics & daily trends' },
+            { value: 'staff', label: 'Staff', icon: Users, bg: 'from-purple-400 to-purple-600', desc: 'Performance & attendance' },
+            { value: 'clients', label: 'Clients', icon: Heart, bg: 'from-green-400 to-green-600', desc: 'Service user analytics' },
+            { value: 'training', label: 'Training', icon: GraduationCap, bg: 'from-orange-400 to-orange-600', desc: 'Compliance & certifications' },
+            { value: 'payroll', label: 'Payroll', icon: DollarSign, bg: 'from-pink-400 to-pink-600', desc: 'Wages, costs & expenses' },
+            { value: 'compliance', label: 'Compliance', icon: Shield, bg: 'from-rose-400 to-rose-600', desc: 'Regulatory & document status' },
+          ].map(section => {
+            const Icon = section.icon;
+            return (
+              <button
+                key={section.value}
+                onClick={() => setActiveSection(section.value)}
+                className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-4 sm:p-5 min-h-[110px] active:scale-95"
+              >
+                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${section.bg} flex items-center justify-center mb-2 shadow-sm`}>
+                  <Icon className="w-6 h-6 text-white" strokeWidth={1.8} />
+                </div>
+                <span className="text-sm font-semibold text-slate-700 text-center leading-tight">
+                  {section.label}
+                </span>
+                <span className="text-[10px] text-slate-400 text-center mt-1 leading-tight line-clamp-2">
+                  {section.desc}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <Tabs value={activeSection || 'overview'} onValueChange={setActiveSection} className={`w-full ${!activeSection ? 'hidden' : ''}`}>
+        <TabsList className="hidden">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="staff">Staff</TabsTrigger>
+          <TabsTrigger value="clients">Clients</TabsTrigger>
+          <TabsTrigger value="training">Training</TabsTrigger>
+          <TabsTrigger value="payroll">Payroll</TabsTrigger>
+          <TabsTrigger value="compliance">Compliance</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6 mt-6">
+          <button onClick={() => setActiveSection(null)} className="flex items-center gap-1.5 text-sm font-medium text-cyan-700 hover:text-cyan-900 transition-colors">
+            <ChevronLeft className="w-4 h-4" />Back to Reports
+          </button>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <Card className="p-4 bg-white border-0 shadow-sm">
               <div className="flex items-center gap-3">
@@ -483,6 +519,9 @@ export default function Reports() {
 
         {/* Staff Tab */}
         <TabsContent value="staff" className="space-y-6 mt-6">
+          <button onClick={() => setActiveSection(null)} className="flex items-center gap-1.5 text-sm font-medium text-purple-700 hover:text-purple-900 transition-colors">
+            <ChevronLeft className="w-4 h-4" />Back to Reports
+          </button>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <Card className="p-4 bg-white border-0 shadow-sm">
               <div className="flex items-center gap-3">
@@ -534,6 +573,9 @@ export default function Reports() {
 
         {/* Clients Tab */}
         <TabsContent value="clients" className="space-y-6 mt-6">
+          <button onClick={() => setActiveSection(null)} className="flex items-center gap-1.5 text-sm font-medium text-green-700 hover:text-green-900 transition-colors">
+            <ChevronLeft className="w-4 h-4" />Back to Reports
+          </button>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card className="p-4 bg-white border-0 shadow-sm">
               <div className="flex items-center gap-3">
@@ -608,6 +650,9 @@ export default function Reports() {
 
         {/* Training Tab */}
         <TabsContent value="training" className="space-y-6 mt-6">
+          <button onClick={() => setActiveSection(null)} className="flex items-center gap-1.5 text-sm font-medium text-orange-700 hover:text-orange-900 transition-colors">
+            <ChevronLeft className="w-4 h-4" />Back to Reports
+          </button>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card className="p-4 bg-white border-0 shadow-sm">
               <div className="flex items-center gap-3">
@@ -691,6 +736,9 @@ export default function Reports() {
 
         {/* Payroll Tab */}
         <TabsContent value="payroll" className="space-y-6 mt-6">
+          <button onClick={() => setActiveSection(null)} className="flex items-center gap-1.5 text-sm font-medium text-pink-700 hover:text-pink-900 transition-colors">
+            <ChevronLeft className="w-4 h-4" />Back to Reports
+          </button>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card className="p-4 bg-white border-0 shadow-sm">
               <div className="flex items-center gap-3">
@@ -749,6 +797,9 @@ export default function Reports() {
 
         {/* Compliance Tab */}
         <TabsContent value="compliance" className="space-y-6 mt-6">
+          <button onClick={() => setActiveSection(null)} className="flex items-center gap-1.5 text-sm font-medium text-rose-700 hover:text-rose-900 transition-colors">
+            <ChevronLeft className="w-4 h-4" />Back to Reports
+          </button>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card className="p-4 bg-white border-0 shadow-sm">
               <div className="flex items-center gap-3">

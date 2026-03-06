@@ -79,7 +79,7 @@ const WELCOME_EMAIL_HTML = `<!DOCTYPE html>
         <td style="padding-right:14px;vertical-align:top;font-size:24px;">&#128172;</td>
         <td>
           <p style="margin:0;color:#0d9488;font-size:14px;font-weight:700;">WhatsApp</p>
-          <p style="margin:4px 0 0;color:#475569;font-size:13px;line-height:1.5;">Need a quick answer? Message us on WhatsApp at <a href="https://wa.me/447762533406" style="color:#0d9488;text-decoration:underline;">07762 533 406</a> for fast, friendly support.</p>
+          <p style="margin:4px 0 0;color:#475569;font-size:13px;line-height:1.5;">Need a quick answer? Message us on WhatsApp at <a href="https://wa.me/447762533406?text=Hi%2C%20I%27ve%20just%20signed%20up%20for%20CareCallAI%20and%20would%20like%20some%20help%20getting%20set%20up" style="color:#0d9488;text-decoration:underline;">07762 533 406</a> for fast, friendly support.</p>
         </td>
       </tr></table>
     </td></tr>
@@ -131,7 +131,7 @@ const WELCOME_EMAIL_HTML = `<!DOCTYPE html>
   <p style="margin:0;color:#94a3b8;font-size:11px;text-align:center;">
     <a href="https://carecallai.co.uk" style="color:#0d9488;text-decoration:none;">carecallai.co.uk</a>&nbsp;&nbsp;|&nbsp;&nbsp;
     <a href="mailto:support@carecallai.co.uk" style="color:#0d9488;text-decoration:none;">support@carecallai.co.uk</a>&nbsp;&nbsp;|&nbsp;&nbsp;
-    <a href="https://wa.me/447762533406" style="color:#0d9488;text-decoration:none;">WhatsApp</a>
+    <a href="https://wa.me/447762533406?text=Hi%2C%20I%27ve%20just%20signed%20up%20for%20CareCallAI%20and%20would%20like%20some%20help%20getting%20set%20up" style="color:#0d9488;text-decoration:none;">WhatsApp</a>
   </p>
   <p style="margin:8px 0 0;color:#94a3b8;font-size:11px;text-align:center;">
     <a href="{{UNSUBSCRIBE_LINK}}" style="color:#94a3b8;text-decoration:underline;">Unsubscribe</a>

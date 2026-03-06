@@ -1796,6 +1796,180 @@ export default function CareCallAIPage() {
               </div>
             </AnimateOnScroll>
 
+            {/* Admin Panel — Tile Navigation Mockup */}
+            <AnimateOnScroll animation="fade-up">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <div className="order-2 lg:order-1">
+                  <h3 className="text-2xl font-bold text-slate-900 mb-3">Modern Tile Navigation</h3>
+                  <p className="text-slate-600 leading-relaxed mb-4">Forget cluttered menus. CareCall AI organises every feature into clean, colour-coded icon tiles — grouped by function so admins, managers, and carers find what they need instantly, on any device.</p>
+                  <ul className="space-y-2">
+                    {['Colour-coded tiles grouped by function', 'One-tap access to every feature', 'Mobile-first responsive design', 'Role-based visibility (admin, manager, carer)', 'Intuitive icons — no training needed', 'Consistent design across all pages'].map((item) => (
+                      <li key={item} className="flex items-center gap-2 text-sm text-slate-600">
+                        <svg className="w-4 h-4 text-welsh-green flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="order-1 lg:order-2 bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-700">
+                  <div className="flex items-center gap-2 mb-3 px-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                    <span className="text-[10px] text-slate-500 ml-2">Admin Panel — CareCall AI</span>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-5 h-5 rounded bg-blue-600 flex items-center justify-center">
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                      </div>
+                      <p className="text-xs font-bold text-slate-900">Admin Panel</p>
+                    </div>
+                    {/* Core section */}
+                    <p className="text-[9px] font-bold text-slate-600">Core</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { label: 'Organisation', gradient: 'from-teal-400 to-teal-600', icon: '🏢' },
+                        { label: 'Control Room', gradient: 'from-slate-500 to-slate-700', icon: '🛡' },
+                        { label: 'AI Assistant', gradient: 'from-purple-400 to-purple-600', icon: '🤖' },
+                      ].map((t) => (
+                        <div key={t.label} className="flex flex-col items-center bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
+                          <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${t.gradient} flex items-center justify-center mb-1 shadow-sm`}>
+                            <span className="text-[11px]">{t.icon}</span>
+                          </div>
+                          <span className="text-[8px] font-semibold text-slate-700 text-center leading-tight">{t.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {/* People & Clinical */}
+                    <p className="text-[9px] font-bold text-slate-600">People & Clinical</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { label: 'Clients', gradient: 'from-teal-400 to-teal-600', icon: '💚' },
+                        { label: 'Staff', gradient: 'from-blue-400 to-blue-600', icon: '👥' },
+                        { label: 'Clinical', gradient: 'from-rose-400 to-rose-600', icon: '🩺' },
+                      ].map((t) => (
+                        <div key={t.label} className="flex flex-col items-center bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
+                          <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${t.gradient} flex items-center justify-center mb-1 shadow-sm`}>
+                            <span className="text-[11px]">{t.icon}</span>
+                          </div>
+                          <span className="text-[8px] font-semibold text-slate-700 text-center leading-tight">{t.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {/* HR & Finance */}
+                    <p className="text-[9px] font-bold text-slate-600">HR & Finance</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { label: 'Approvals', gradient: 'from-indigo-400 to-indigo-600', icon: '✅' },
+                        { label: 'Invoicing', gradient: 'from-teal-400 to-teal-600', icon: '🧾' },
+                        { label: 'Compliance', gradient: 'from-red-400 to-red-600', icon: '🛡' },
+                      ].map((t) => (
+                        <div key={t.label} className="flex flex-col items-center bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
+                          <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${t.gradient} flex items-center justify-center mb-1 shadow-sm`}>
+                            <span className="text-[11px]">{t.icon}</span>
+                          </div>
+                          <span className="text-[8px] font-semibold text-slate-700 text-center leading-tight">{t.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Scheduling */}
+                    <p className="text-[9px] font-bold text-slate-600">Scheduling & Training</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { label: 'Rota', gradient: 'from-orange-400 to-orange-600', icon: '📅' },
+                        { label: 'Training', gradient: 'from-cyan-400 to-cyan-600', icon: '🎓' },
+                        { label: 'Documents', gradient: 'from-indigo-400 to-indigo-600', icon: '📂' },
+                      ].map((t) => (
+                        <div key={t.label} className="flex flex-col items-center bg-white rounded-xl border border-slate-200 p-2.5 shadow-sm">
+                          <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${t.gradient} flex items-center justify-center mb-1 shadow-sm`}>
+                            <span className="text-[11px]">{t.icon}</span>
+                          </div>
+                          <span className="text-[8px] font-semibold text-slate-700 text-center leading-tight">{t.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </AnimateOnScroll>
+
+            {/* Profile & Quick Access Mockup */}
+            <AnimateOnScroll animation="fade-up">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <div className="bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-700">
+                  <div className="flex items-center gap-2 mb-3 px-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                    <span className="text-[10px] text-slate-500 ml-2">My Profile — CareCall AI</span>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-4 space-y-3">
+                    {/* Profile header */}
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-md">SJ</div>
+                      <div>
+                        <p className="text-[11px] font-bold text-slate-900">Sarah Jones</p>
+                        <p className="text-[9px] text-slate-500">Senior Carer — Denbigh</p>
+                        <div className="flex gap-1 mt-0.5">
+                          <span className="text-[7px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">On Shift</span>
+                          <span className="text-[7px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">DBS Valid</span>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Stats row */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="bg-white rounded-lg border border-slate-200 p-2 text-center">
+                        <p className="text-sm font-bold text-blue-600">147</p>
+                        <p className="text-[8px] text-slate-500">Visits</p>
+                      </div>
+                      <div className="bg-white rounded-lg border border-slate-200 p-2 text-center">
+                        <p className="text-sm font-bold text-green-600">98%</p>
+                        <p className="text-[8px] text-slate-500">On Time</p>
+                      </div>
+                      <div className="bg-white rounded-lg border border-slate-200 p-2 text-center">
+                        <p className="text-sm font-bold text-purple-600">12</p>
+                        <p className="text-[8px] text-slate-500">Courses</p>
+                      </div>
+                    </div>
+                    {/* Quick access tiles */}
+                    <p className="text-[9px] font-bold text-slate-600">Quick Access</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { label: 'My Details', gradient: 'from-blue-400 to-blue-600', icon: '👤' },
+                        { label: 'My Files', gradient: 'from-teal-400 to-teal-600', icon: '📤' },
+                        { label: 'Training', gradient: 'from-purple-400 to-purple-600', icon: '🏆' },
+                        { label: 'Activity', gradient: 'from-amber-400 to-amber-600', icon: '🕐' },
+                      ].map((t) => (
+                        <div key={t.label} className="flex flex-col items-center bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
+                          <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${t.gradient} flex items-center justify-center mb-1.5 shadow-sm`}>
+                            <span className="text-[12px]">{t.icon}</span>
+                          </div>
+                          <span className="text-[9px] font-semibold text-slate-700 text-center">{t.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-slate-900 mb-3">Staff Profiles & Quick Access</h3>
+                  <p className="text-slate-600 leading-relaxed mb-4">Every staff member has a rich profile with one-tap access to their details, documents, training records, and activity history. Clean tile navigation means carers spend less time navigating and more time caring.</p>
+                  <ul className="space-y-2">
+                    {['Photo, role, area, and status at a glance', 'Visit stats — total visits, punctuality, and courses', 'Quick-access tiles for files, training, and activity', 'DBS, supervision, and compliance tracking', 'Works beautifully on mobile devices', 'Same tile design across Profile, Assets, and Admin'].map((item) => (
+                      <li key={item} className="flex items-center gap-2 text-sm text-slate-600">
+                        <svg className="w-4 h-4 text-welsh-green flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </AnimateOnScroll>
+
             {/* Automatic Invoicing System Mockup */}
             <AnimateOnScroll animation="fade-up">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">

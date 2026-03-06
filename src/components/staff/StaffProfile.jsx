@@ -4,7 +4,6 @@ import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import Avatar from '@/components/ui/Avatar';
@@ -18,11 +17,11 @@ import StaffLeaveBalance from '@/components/staff/StaffLeaveBalance';
 import StaffSupervisions from '@/components/staff/StaffSupervisions';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from 'sonner';
-import { ArrowLeft, Edit, Shield, MapPin, UserX, UserCheck, Trash2, Mail, Loader2 } from 'lucide-react';
+import { ArrowLeft, Edit, Shield, MapPin, UserX, UserCheck, Trash2, Mail, Loader2, User, Briefcase, Calendar, FileText, ClipboardList, ChevronLeft, Palmtree } from 'lucide-react';
 
 export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }) {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(null);
   const [showRoleDialog, setShowRoleDialog] = useState(false);
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -320,45 +319,56 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
         </AlertDialogContent>
       </AlertDialog>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5 sm:grid-cols-7 h-auto gap-1">
-          <TabsTrigger value="overview" className="text-xs sm:text-sm p-1 sm:p-2 h-8 sm:h-10">Overview</TabsTrigger>
-          <TabsTrigger value="employment" className="text-xs sm:text-sm p-1 sm:p-2 h-8 sm:h-10">Employment</TabsTrigger>
-          <TabsTrigger value="permissions" className="text-xs sm:text-sm p-1 sm:p-2 h-8 sm:h-10">Perms</TabsTrigger>
-          <TabsTrigger value="rota" className="text-xs sm:text-sm p-1 sm:p-2 h-8 sm:h-10">Rota</TabsTrigger>
-          <TabsTrigger value="leave" className="text-xs sm:text-sm p-1 sm:p-2 h-8 sm:h-10">Leave</TabsTrigger>
-          <TabsTrigger value="hr" className="text-xs sm:text-sm p-1 sm:p-2 h-8 sm:h-10">HR</TabsTrigger>
-          <TabsTrigger value="supervision" className="text-xs sm:text-sm p-1 sm:p-2 h-8 sm:h-10">Supv</TabsTrigger>
-        </TabsList>
+      {activeTab ? (
+        <div>
+          <button
+            onClick={() => setActiveTab(null)}
+            className="flex items-center gap-1.5 text-sm font-medium text-blue-700 hover:text-blue-900 mb-4 transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Back to Profile
+          </button>
 
-        <TabsContent value="overview" className="mt-6">
-          <StaffBasicInfo staff={staff} isAdmin={isAdmin} isOwnProfile={isOwnProfile} />
-        </TabsContent>
-
-        <TabsContent value="employment" className="mt-6">
-          <StaffEmployment staff={staff} isAdmin={isAdmin} />
-        </TabsContent>
-
-        <TabsContent value="permissions" className="mt-6">
-          <StaffPermissions staff={staff} isAdmin={isAdmin} />
-        </TabsContent>
-
-        <TabsContent value="rota" className="mt-6">
-          <RotaAreaPermissions staff={staff} isAdmin={isAdmin} />
-        </TabsContent>
-
-        <TabsContent value="leave" className="mt-6">
-          <StaffLeaveBalance staffId={staffId} isAdmin={isAdmin} staffName={staff?.full_name} />
-        </TabsContent>
-
-        <TabsContent value="hr" className="mt-6">
-          <StaffHRManagement staffId={staffId} isAdmin={isAdmin} isOwnProfile={isOwnProfile} />
-        </TabsContent>
-
-        <TabsContent value="supervision" className="mt-6">
-          <StaffSupervisions staffId={staffId} isAdmin={isAdmin} staffName={staff?.full_name} />
-        </TabsContent>
-      </Tabs>
+          {activeTab === 'overview' && <StaffBasicInfo staff={staff} isAdmin={isAdmin} isOwnProfile={isOwnProfile} />}
+          {activeTab === 'employment' && <StaffEmployment staff={staff} isAdmin={isAdmin} />}
+          {activeTab === 'permissions' && <StaffPermissions staff={staff} isAdmin={isAdmin} />}
+          {activeTab === 'rota' && <RotaAreaPermissions staff={staff} isAdmin={isAdmin} />}
+          {activeTab === 'leave' && <StaffLeaveBalance staffId={staffId} isAdmin={isAdmin} staffName={staff?.full_name} />}
+          {activeTab === 'hr' && <StaffHRManagement staffId={staffId} isAdmin={isAdmin} isOwnProfile={isOwnProfile} />}
+          {activeTab === 'supervision' && <StaffSupervisions staffId={staffId} isAdmin={isAdmin} staffName={staff?.full_name} />}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {[
+            { value: 'overview', label: 'Overview', icon: User, bg: 'from-blue-400 to-blue-600', desc: 'Contact details & personal info' },
+            { value: 'employment', label: 'Employment', icon: Briefcase, bg: 'from-teal-400 to-teal-600', desc: 'Job title, contract & pay' },
+            { value: 'permissions', label: 'Permissions', icon: Shield, bg: 'from-purple-400 to-purple-600', desc: 'App access & role settings' },
+            { value: 'rota', label: 'Rota Areas', icon: MapPin, bg: 'from-amber-400 to-amber-600', desc: 'Area assignments & availability' },
+            { value: 'leave', label: 'Leave', icon: Palmtree, bg: 'from-green-400 to-green-600', desc: 'Holiday balance & requests' },
+            { value: 'hr', label: 'HR & Docs', icon: FileText, bg: 'from-indigo-400 to-indigo-600', desc: 'Documents, DBS & training' },
+            { value: 'supervision', label: 'Supervision', icon: ClipboardList, bg: 'from-rose-400 to-rose-600', desc: '12-weekly supervision records' },
+          ].map(section => {
+            const Icon = section.icon;
+            return (
+              <button
+                key={section.value}
+                onClick={() => setActiveTab(section.value)}
+                className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-4 sm:p-5 min-h-[110px] active:scale-95"
+              >
+                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${section.bg} flex items-center justify-center mb-2 shadow-sm`}>
+                  <Icon className="w-6 h-6 text-white" strokeWidth={1.8} />
+                </div>
+                <span className="text-sm font-semibold text-slate-700 text-center leading-tight">
+                  {section.label}
+                </span>
+                <span className="text-[10px] text-slate-400 text-center mt-1 leading-tight line-clamp-2">
+                  {section.desc}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
     </div>
   );

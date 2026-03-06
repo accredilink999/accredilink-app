@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { ShiftApi } from '@/api/rotaApi';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -43,7 +43,13 @@ import {
   ListChecks,
   Shield,
   Languages,
-  Activity
+  Activity,
+  User,
+  ClipboardList,
+  MessageSquare,
+  Armchair,
+  Stethoscope,
+  ChevronLeft
 } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 
@@ -108,6 +114,7 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
     const [deleteServiceUserConfirmOpen, setDeleteServiceUserConfirmOpen] = useState(false);
     const [showCommunicationPastLogs, setShowCommunicationPastLogs] = useState(false);
     const [showSittingPastLogs, setShowSittingPastLogs] = useState(false);
+    const [activeSection, setActiveSection] = useState('grid');
     const [displayedLogs, setDisplayedLogs] = useState([]);
     const [careLogDateRange, setCareLogDateRange] = useState({
        start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -121,6 +128,7 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
      // Refetch care logs when dialog opens or service user changes
      useEffect(() => {
        if (!open || !serviceUser?.id) return;
+       setActiveSection('grid');
        queryClient.refetchQueries({ queryKey: ['allCareLogs'] });
      }, [open, serviceUser?.id, queryClient]);
 
@@ -448,6 +456,7 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
   });
 
   if (!serviceUser) return null;
+  if (!open) return null;
 
   const statusColors = {
     active: 'bg-green-100 text-green-700',
@@ -457,112 +466,173 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
     discharged: 'bg-slate-100 text-slate-700'
   };
 
+  // Section labels for header
+  const sectionLabels = {
+    grid: null,
+    info: 'Client Info',
+    care: 'Care Plan',
+    medications: 'Meds & eMAR',
+    calls: 'Scheduled Calls',
+    logs: 'Care Logs',
+    communications: 'Comms Log',
+    sitting: 'Sitting Service',
+    safeguarding: 'Safeguarding',
+    clinical: 'Clinical Assessments',
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent
-        className="max-w-4xl max-h-[90vh] overflow-y-auto"
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onInteractOutside={(e) => e.preventDefault()}
-      >
-        <DialogHeader className="pb-4 border-b">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <Avatar name={serviceUser.full_name} size="lg" src={serviceUser.photo_url} />
-              <div>
-                <DialogTitle>{serviceUser.full_name}</DialogTitle>
-                {isAdmin ? (
-                  <select
-                    value={pendingStatus || serviceUser.status}
-                    onChange={(e) => {
-                      setPendingStatus(e.target.value);
-                      setStatusConfirmOpen(true);
-                    }}
-                    className={`text-sm px-3 py-1 rounded font-medium border-none cursor-pointer ${statusColors[pendingStatus || serviceUser.status]}`}
-                  >
-                    <option value="active">Active</option>
-                    <option value="on_hold">On Hold</option>
-                    <option value="in_hospital">In Hospital</option>
-                    <option value="in_respite">In Respite</option>
-                    <option value="discharged">Discharged</option>
-                  </select>
-                ) : (
-                  <Badge className={statusColors[serviceUser.status]}>
-                    {serviceUser.status.replace('_', ' ')}
-                  </Badge>
-                )}
-                {serviceUser.status === 'on_hold' && serviceUser.hold_type === 'temporary' && serviceUser.hold_remaining_calls > 0 && (
-                  <Badge className="bg-amber-100 text-amber-800 border border-amber-300 ml-1">
-                    {serviceUser.hold_remaining_calls} call{serviceUser.hold_remaining_calls !== 1 ? 's' : ''} remaining
-                  </Badge>
-                )}
-              </div>
+    <div className="min-h-full">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 shadow-sm">
+        <div className="flex items-center gap-3 p-3 sm:p-4">
+          <button
+            onClick={() => {
+              if (activeSection !== 'grid') {
+                setActiveSection('grid');
+              } else {
+                onClose();
+              }
+            }}
+            className="flex items-center justify-center w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors flex-shrink-0"
+          >
+            <ChevronLeft className="w-5 h-5 text-slate-600" />
+          </button>
+
+          <Avatar name={serviceUser.full_name} size="md" src={serviceUser.photo_url} />
+
+          <div className="flex-1 min-w-0">
+            <h1 className="font-bold text-base sm:text-lg text-slate-900 truncate">{serviceUser.full_name}</h1>
+            <div className="flex items-center gap-2 flex-wrap">
+              {isAdmin ? (
+                <select
+                  value={pendingStatus || serviceUser.status}
+                  onChange={(e) => {
+                    setPendingStatus(e.target.value);
+                    setStatusConfirmOpen(true);
+                  }}
+                  className={`text-xs px-2 py-0.5 rounded font-medium border-none cursor-pointer ${statusColors[pendingStatus || serviceUser.status]}`}
+                >
+                  <option value="active">Active</option>
+                  <option value="on_hold">On Hold</option>
+                  <option value="in_hospital">In Hospital</option>
+                  <option value="in_respite">In Respite</option>
+                  <option value="discharged">Discharged</option>
+                </select>
+              ) : (
+                <Badge className={`text-xs ${statusColors[serviceUser.status]}`}>
+                  {serviceUser.status.replace('_', ' ')}
+                </Badge>
+              )}
+              {serviceUser.dna_cpr_in_place === 'yes' && (
+                <Badge className="bg-red-600 text-white font-bold text-xs">DNA CPR</Badge>
+              )}
+              {sectionLabels[activeSection] && (
+                <span className="text-xs text-slate-400 hidden sm:inline">/ {sectionLabels[activeSection]}</span>
+              )}
             </div>
-            <div className="flex flex-wrap gap-2">
-               {!onEditDisabled && (
-               <>
-               <Button variant="outline" size="sm" onClick={onEdit}>
-                 <Edit className="w-3 h-3 mr-1" />
-                 Edit
-               </Button>
-               </>
-               )}
-             </div>
           </div>
-        </DialogHeader>
 
-        <AlertDialog open={statusConfirmOpen} onOpenChange={setStatusConfirmOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Change Client Status?</AlertDialogTitle>
-              <AlertDialogDescription>
-                {pendingStatus === 'on_hold' ? (
-                  <>Are you sure you want to put <strong>{serviceUser.full_name}</strong> on hold? Their calls will be suspended until the hold is manually removed.</>
-                ) : (
-                  <>Are you sure you want to change {serviceUser.full_name}'s status from <strong>{serviceUser.status.replace('_', ' ')}</strong> to <strong>{pendingStatus?.replace('_', ' ')}</strong>?</>
-                )}
-                {serviceUser.status === 'on_hold' && pendingStatus === 'active' && serviceUser.hold_type === 'temporary' && (
-                  <p className="mt-2 text-amber-600 font-medium">Note: This will cancel the temporary hold ({serviceUser.hold_remaining_calls} calls were remaining).</p>
-                )}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <div className="flex gap-2">
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction 
-                onClick={() => {
-                  updateStatusMutation.mutate(pendingStatus);
-                  setStatusConfirmOpen(false);
-                }}
-              >
-                Confirm
-              </AlertDialogAction>
-            </div>
-          </AlertDialogContent>
-        </AlertDialog>
+          {!onEditDisabled && (
+            <Button variant="outline" size="sm" onClick={onEdit} className="flex-shrink-0">
+              <Edit className="w-3 h-3 mr-1" />
+              Edit
+            </Button>
+          )}
+        </div>
+      </div>
 
-        <div className="pt-4">
-        <Tabs defaultValue="info" className="w-full">
-           <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 md:grid-cols-5 lg:grid-cols-9 gap-1 h-auto bg-transparent p-0 mb-6">
-             <TabsTrigger value="info" className="text-xs sm:text-sm font-bold rounded-lg py-2 px-2 sm:px-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-50 data-[state=active]:to-teal-100 data-[state=active]:border data-[state=active]:border-teal-300 data-[state=active]:text-teal-900 data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:bg-slate-50 transition-all">Info</TabsTrigger>
-             <TabsTrigger value="care" className="text-xs sm:text-sm font-bold rounded-lg py-2 px-2 sm:px-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-50 data-[state=active]:to-teal-100 data-[state=active]:border data-[state=active]:border-teal-300 data-[state=active]:text-teal-900 data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:bg-slate-50 transition-all">Plan</TabsTrigger>
-             <TabsTrigger value="medications" className="text-xs sm:text-sm font-bold rounded-lg py-2 px-2 sm:px-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-50 data-[state=active]:to-teal-100 data-[state=active]:border data-[state=active]:border-teal-300 data-[state=active]:text-teal-900 data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:bg-slate-50 transition-all">Meds</TabsTrigger>
+      <AlertDialog open={statusConfirmOpen} onOpenChange={setStatusConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Change Client Status?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingStatus === 'on_hold' ? (
+                <>Are you sure you want to put <strong>{serviceUser.full_name}</strong> on hold? Their calls will be suspended until the hold is manually removed.</>
+              ) : (
+                <>Are you sure you want to change {serviceUser.full_name}&apos;s status from <strong>{serviceUser.status.replace('_', ' ')}</strong> to <strong>{pendingStatus?.replace('_', ' ')}</strong>?</>
+              )}
+              {serviceUser.status === 'on_hold' && pendingStatus === 'active' && serviceUser.hold_type === 'temporary' && (
+                <p className="mt-2 text-amber-600 font-medium">Note: This will cancel the temporary hold ({serviceUser.hold_remaining_calls} calls were remaining).</p>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-2">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                updateStatusMutation.mutate(pendingStatus);
+                setStatusConfirmOpen(false);
+              }}
+            >
+              Confirm
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
 
-             <TabsTrigger value="calls" className="text-xs sm:text-sm font-bold rounded-lg py-2 px-2 sm:px-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-50 data-[state=active]:to-teal-100 data-[state=active]:border data-[state=active]:border-teal-300 data-[state=active]:text-teal-900 data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:bg-slate-50 transition-all">Calls</TabsTrigger>
-             <TabsTrigger value="logs" className="text-xs sm:text-sm font-bold rounded-lg py-2 px-2 sm:px-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-50 data-[state=active]:to-teal-100 data-[state=active]:border data-[state=active]:border-teal-300 data-[state=active]:text-teal-900 data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:bg-slate-50 transition-all">
-               Logs
-               {filteredLogsCount > 0 && (
-                 <Badge className="ml-1 bg-teal-600 text-white text-xs">{filteredLogsCount}</Badge>
-               )}
-             </TabsTrigger>
-             <TabsTrigger value="communications" className="text-xs sm:text-sm font-bold rounded-lg py-2 px-2 sm:px-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-50 data-[state=active]:to-teal-100 data-[state=active]:border data-[state=active]:border-teal-300 data-[state=active]:text-teal-900 data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:bg-slate-50 transition-all">Comms</TabsTrigger>
-             <TabsTrigger value="sitting" className="text-xs sm:text-sm font-bold rounded-lg py-2 px-2 sm:px-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-50 data-[state=active]:to-teal-100 data-[state=active]:border data-[state=active]:border-teal-300 data-[state=active]:text-teal-900 data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:bg-slate-50 transition-all">Sitting</TabsTrigger>
-             <TabsTrigger value="safeguarding" className="text-xs sm:text-sm font-bold rounded-lg py-2 px-2 sm:px-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-50 data-[state=active]:to-purple-100 data-[state=active]:border data-[state=active]:border-purple-300 data-[state=active]:text-purple-900 data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:bg-slate-50 transition-all">
-               <Shield className="w-3 h-3 mr-1 inline" />
-               Safe
-             </TabsTrigger>
-             <TabsTrigger value="clinical" className="text-xs sm:text-sm font-bold rounded-lg py-2 px-2 sm:px-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-rose-50 data-[state=active]:to-rose-100 data-[state=active]:border data-[state=active]:border-rose-300 data-[state=active]:text-rose-900 data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:bg-slate-50 transition-all">
-               <Activity className="w-3 h-3 mr-1 inline" />
-               Clinical
-             </TabsTrigger>
+        <div className="p-3 sm:p-4 pb-24">
+        <Tabs value={activeSection} onValueChange={setActiveSection} className="w-full">
+           {/* Icon Tile Grid — shown when no section is selected */}
+           {activeSection === 'grid' && (
+             <div className="grid grid-cols-3 gap-3 sm:gap-4">
+               {[
+                 { value: 'info', label: 'Client\nInfo', icon: User, bg: 'from-blue-400 to-blue-600', iconBg: 'bg-blue-200', iconColor: 'text-blue-700' },
+                 { value: 'care', label: 'Care\nPlan', icon: FileText, bg: 'from-teal-400 to-teal-600', iconBg: 'bg-teal-200', iconColor: 'text-teal-700' },
+                 { value: 'medications', label: 'Meds\n& eMAR', icon: Pill, bg: 'from-rose-400 to-rose-600', iconBg: 'bg-rose-200', iconColor: 'text-rose-700' },
+                 { value: 'calls', label: 'Scheduled\nCalls', icon: Clock, bg: 'from-amber-400 to-amber-600', iconBg: 'bg-amber-200', iconColor: 'text-amber-700' },
+                 { value: 'logs', label: 'Care\nLogs', icon: ClipboardList, bg: 'from-green-400 to-green-600', iconBg: 'bg-green-200', iconColor: 'text-green-700', badge: filteredLogsCount || null },
+                 { value: 'communications', label: 'Comms\nLog', icon: MessageSquare, bg: 'from-indigo-400 to-indigo-600', iconBg: 'bg-indigo-200', iconColor: 'text-indigo-700' },
+                 { value: 'sitting', label: 'Sitting\nService', icon: Armchair, bg: 'from-orange-400 to-orange-600', iconBg: 'bg-orange-200', iconColor: 'text-orange-700' },
+                 { value: 'safeguarding', label: 'Safe-\nguarding', icon: Shield, bg: 'from-purple-400 to-purple-600', iconBg: 'bg-purple-200', iconColor: 'text-purple-700' },
+                 { value: 'clinical', label: 'Clinical\nAssess.', icon: Stethoscope, bg: 'from-pink-400 to-pink-600', iconBg: 'bg-pink-200', iconColor: 'text-pink-700' },
+               ].map(tile => {
+                 const Icon = tile.icon;
+                 return (
+                   <button
+                     key={tile.value}
+                     onClick={() => setActiveSection(tile.value)}
+                     className="relative flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-4 sm:p-5 min-h-[100px] sm:min-h-[120px] active:scale-95"
+                   >
+                     <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br ${tile.bg} flex items-center justify-center mb-2 sm:mb-3 shadow-sm`}>
+                       <Icon className="w-6 h-6 sm:w-7 sm:h-7 text-white" strokeWidth={1.8} />
+                     </div>
+                     <span className="text-xs sm:text-sm font-semibold text-slate-700 text-center leading-tight whitespace-pre-line">
+                       {tile.label}
+                     </span>
+                     {tile.badge > 0 && (
+                       <span className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                         {tile.badge}
+                       </span>
+                     )}
+                   </button>
+                 );
+               })}
+             </div>
+           )}
+
+           {/* Back to grid button — shown when a section is active */}
+           {activeSection !== 'grid' && (
+             <button
+               onClick={() => setActiveSection('grid')}
+               className="flex items-center gap-1.5 text-sm font-medium text-teal-700 hover:text-teal-900 mb-4 transition-colors"
+             >
+               <ChevronLeft className="w-4 h-4" />
+               Back to sections
+             </button>
+           )}
+
+           {/* Hidden TabsList to keep Radix Tabs working */}
+           <TabsList className="hidden">
+             <TabsTrigger value="grid">Grid</TabsTrigger>
+             <TabsTrigger value="info">Info</TabsTrigger>
+             <TabsTrigger value="care">Plan</TabsTrigger>
+             <TabsTrigger value="medications">Meds</TabsTrigger>
+             <TabsTrigger value="calls">Calls</TabsTrigger>
+             <TabsTrigger value="logs">Logs</TabsTrigger>
+             <TabsTrigger value="communications">Comms</TabsTrigger>
+             <TabsTrigger value="sitting">Sitting</TabsTrigger>
+             <TabsTrigger value="safeguarding">Safe</TabsTrigger>
+             <TabsTrigger value="clinical">Clinical</TabsTrigger>
            </TabsList>
 
           <TabsContent value="info" className="space-y-4 mt-4">
@@ -1154,7 +1224,6 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
              variant="destructive"
              onConfirm={() => deleteMutation.mutate()}
            />
-           </DialogContent>
-           </Dialog>
+           </div>
            );
            }

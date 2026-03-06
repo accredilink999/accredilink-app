@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Loader2, Plus, Trash2, FileIcon, Download, X, ChevronDown, ListChecks, Maximize2 } from 'lucide-react';
+import { Loader2, Plus, Trash2, FileIcon, Download, X, ChevronDown, ListChecks, Maximize2, Camera, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { deployClientCallsToRota } from '@/utils/deployPattern';
 import MARChart from '@/components/medications/MARChart';
@@ -137,7 +137,28 @@ export default function ServiceUserForm({ serviceUser, open, onClose }) {
     serviceUser?.risk_assessment_files?.map((file, idx) => ({ ...file, id: `existing-${idx}` })) || []
   );
   const [uploadingRisk, setUploadingRisk] = useState(false);
-  
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  const handleUploadPhoto = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { toast.error('Please select an image file'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5MB'); return; }
+    setUploadingPhoto(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      setFormData(prev => ({ ...prev, photo_url: file_url }));
+      formDirtyRef.current = true;
+      toast.success('Photo uploaded');
+    } catch (error) {
+      console.error('Photo upload failed:', error);
+      toast.error('Failed to upload photo');
+    } finally {
+      setUploadingPhoto(false);
+      e.target.value = '';
+    }
+  };
+
   const riskCategories = ['Health', 'Medication', 'Mobility', 'Nutrition', 'Environment'];
 
   const [riskRows, setRiskRows] = useState(() => {
@@ -644,6 +665,40 @@ ${formData.care_plan ? `CARE PLAN DETAILS:\n${formData.care_plan}` : ''}`;
            </TabsList>
 
           <TabsContent value="personal" className="space-y-4 mt-4">
+            {/* Profile Photo */}
+            <div className="flex items-center gap-4">
+              <div className="relative group">
+                {formData.photo_url ? (
+                  <img src={formData.photo_url} alt="Profile" className="w-20 h-20 rounded-full object-cover border-2 border-teal-200" />
+                ) : (
+                  <div className="w-20 h-20 rounded-full bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center">
+                    <User className="w-8 h-8 text-slate-400" />
+                  </div>
+                )}
+                <label className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                  {uploadingPhoto ? (
+                    <Loader2 className="w-5 h-5 text-white animate-spin" />
+                  ) : (
+                    <Camera className="w-5 h-5 text-white" />
+                  )}
+                  <input type="file" accept="image/*" onChange={handleUploadPhoto} className="hidden" disabled={uploadingPhoto} />
+                </label>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-700">Profile Photo</p>
+                <p className="text-xs text-slate-500">Hover to change. Max 5MB.</p>
+                {formData.photo_url && (
+                  <button
+                    type="button"
+                    onClick={() => { setFormData(prev => ({ ...prev, photo_url: null })); formDirtyRef.current = true; }}
+                    className="text-xs text-red-500 hover:text-red-700 mt-1"
+                  >
+                    Remove photo
+                  </button>
+                )}
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Full Name *</Label>

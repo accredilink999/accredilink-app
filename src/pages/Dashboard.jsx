@@ -37,7 +37,11 @@ import {
   Menu,
   MessageSquare,
   ArrowRightLeft,
-  Hand } from
+  Hand,
+  PoundSterling,
+  CalendarOff,
+  Heart,
+  Bot } from
 'lucide-react';
 import ShiftSwapResponseModal from '@/components/rota/ShiftSwapResponseModal';
 import HelpTip from '@/components/ui/HelpTip';
@@ -548,42 +552,33 @@ export default function Dashboard() {
 
 
       {/* Quick Actions */}
-      <Card className="bg-orange-200 text-card-foreground p-3 rounded-xl border sm:p-5 from-indigo-50 to-purple-50 border-indigo-200 shadow-sm hover:shadow-md transition-shadow">
+      <div>
         <HelpTip tip="Shortcuts to your most common tasks. These update based on your role and today's schedule.">
-          <h3 className="font-semibold text-slate-900 mb-4 text-sm sm:text-base">Quick Actions</h3>
+          <h3 className="font-semibold text-slate-900 mb-3 text-sm sm:text-base">Quick Actions</h3>
         </HelpTip>
-        <div className="grid grid-cols-2 gap-2 sm:gap-3">
-          <Link to={createPageUrl('Rota')} className="w-full">
-            <Button
-              variant="outline"
-              className="w-full justify-center sm:justify-start h-auto py-4 sm:py-3 flex-col sm:flex-row text-xs sm:text-sm">
-
-              <Clock className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2 text-orange-600" />
-              <span className="mt-1 sm:mt-0">Today's Shifts</span>
-            </Button>
-          </Link>
-
-
-          <Link to={createPageUrl('ClientManagement')} className="w-full">
-            <Button variant="outline" className="w-full justify-center sm:justify-start h-auto py-4 sm:py-3 flex-col sm:flex-row text-xs sm:text-sm">
-              <Users className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2 text-green-600" />
-              <span className="mt-1 sm:mt-0">Clients</span>
-            </Button>
-          </Link>
-          <Link to={createPageUrl('Incidents')} className="w-full">
-            <Button variant="outline" className="w-full justify-center sm:justify-start h-auto py-4 sm:py-3 flex-col sm:flex-row text-xs sm:text-sm">
-              <AlertTriangle className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2 text-red-600" />
-              <span className="mt-1 sm:mt-0">Report</span>
-            </Button>
-          </Link>
-          <Link to={createPageUrl('AIAssistant')} className="w-full">
-            <Button variant="outline" className="w-full justify-center sm:justify-start h-auto py-4 sm:py-3 flex-col sm:flex-row text-xs sm:text-sm">
-              <Activity className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2 text-blue-600" />
-              <span className="mt-1 sm:mt-0">AI</span>
-            </Button>
-          </Link>
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+          {[
+            { to: 'Rota', label: 'Shifts', icon: Clock, bg: 'from-orange-400 to-orange-600' },
+            { to: 'ClientManagement', label: 'Clients', icon: Heart, bg: 'from-teal-400 to-teal-600' },
+            { to: 'Incidents', label: 'Report', icon: AlertTriangle, bg: 'from-red-400 to-red-600' },
+            { to: 'LeaveRequests', label: 'Leave', icon: CalendarOff, bg: 'from-amber-400 to-amber-600' },
+            ...(isAdmin ? [
+              { to: 'Payroll', label: 'Payroll', icon: PoundSterling, bg: 'from-emerald-400 to-emerald-600' },
+            ] : []),
+            { to: 'AIAssistant', label: 'AI', icon: Bot, bg: 'from-purple-400 to-purple-600' },
+          ].map(section => {
+            const Icon = section.icon;
+            return (
+              <Link key={section.to} to={createPageUrl(section.to)} className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-3 sm:p-4 min-h-[90px] active:scale-95">
+                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br ${section.bg} flex items-center justify-center mb-1.5 shadow-sm`}>
+                  <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" strokeWidth={1.8} />
+                </div>
+                <span className="text-xs font-semibold text-slate-700 text-center leading-tight">{section.label}</span>
+              </Link>
+            );
+          })}
         </div>
-      </Card>
+      </div>
 
       {/* Quick Stats */}
       <HelpTip tip="Quick overview of today's key numbers — shifts scheduled, completed, care logs, and alerts.">

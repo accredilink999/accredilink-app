@@ -54,165 +54,135 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Menu Sections */}
-      <div className="space-y-4 mb-6">
-        {/* Core Management */}
-        <div>
-          <HelpTip tip="Organisation setup, AI assistant, and control room.">
-            <h2 className="text-xl font-bold text-slate-900 mb-3">Core Management</h2>
-          </HelpTip>
-          <div className="space-y-2">
-            <Link to={createPageUrl('OrgAdmin')} className="flex items-center gap-2 text-teal-600 hover:text-teal-700 font-bold text-base py-2">
-              <Building2 className="w-5 h-5 text-teal-600" />
-              Organisation Admin
+      {/* Core Management */}
+      <h2 className="text-lg font-bold text-slate-900 mb-2">Core</h2>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
+        {[
+          { to: 'OrgAdmin', label: 'Organisation', icon: Building2, bg: 'from-teal-400 to-teal-600', desc: 'Organisation admin' },
+          { to: 'ControlRoom', label: 'Control Room', icon: Shield, bg: 'from-slate-500 to-slate-700', desc: 'Live overview' },
+          { to: 'AIAssistant', label: 'AI Assistant', icon: Bot, bg: 'from-purple-400 to-purple-600', desc: 'AI admin helper' },
+        ].map(section => {
+          const Icon = section.icon;
+          return (
+            <Link key={section.to} to={createPageUrl(section.to)} className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-4 sm:p-5 min-h-[110px] active:scale-95">
+              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${section.bg} flex items-center justify-center mb-2 shadow-sm`}>
+                <Icon className="w-6 h-6 text-white" strokeWidth={1.8} />
+              </div>
+              <span className="text-sm font-semibold text-slate-700 text-center leading-tight">{section.label}</span>
+              <span className="text-[10px] text-slate-400 text-center mt-1 leading-tight line-clamp-2">{section.desc}</span>
             </Link>
-            <Link to={createPageUrl('ControlRoom')} className="flex items-center gap-2 text-slate-700 hover:text-slate-800 font-bold text-base py-2">
-              <Shield className="w-5 h-5 text-slate-700 fill-slate-700" />
-              Control Room
-            </Link>
-            <Link to={createPageUrl('AIAssistant')} className="flex items-center gap-2 text-purple-600 hover:text-purple-700 font-bold text-base py-2">
-              <Bot className="w-5 h-5 text-purple-600 fill-purple-600" />
-              AI Admin Assistant
-            </Link>
-          </div>
-        </div>
+          );
+        })}
+      </div>
 
-        {/* Client & Care Management */}
-        <div>
-          <HelpTip tip="Manage service users, care logs, and clinical records.">
-            <h2 className="text-xl font-bold text-slate-900 mb-3">Client & Care Management</h2>
-          </HelpTip>
-          <div className="space-y-2">
-            <Link to={createPageUrl('ClientManagement')} className="flex items-center gap-2 text-teal-500 hover:text-teal-600 font-bold text-base py-2">
-              <Heart className="w-5 h-5 text-teal-500 fill-teal-500" />
-              Client Management
+      {/* People & Clinical */}
+      <h2 className="text-lg font-bold text-slate-900 mb-2">People & Clinical</h2>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
+        {[
+          { to: 'ClientManagement', label: 'Clients', icon: Heart, bg: 'from-teal-400 to-teal-600', desc: 'Client management' },
+          { to: 'StaffManagement', label: 'Staff', icon: Users, bg: 'from-blue-400 to-blue-600', desc: 'Staff management' },
+          { to: 'ClinicalDashboard', label: 'Clinical', icon: Activity, bg: 'from-rose-400 to-rose-600', desc: 'Clinical dashboard' },
+        ].map(section => {
+          const Icon = section.icon;
+          return (
+            <Link key={section.to} to={createPageUrl(section.to)} className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-4 sm:p-5 min-h-[110px] active:scale-95">
+              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${section.bg} flex items-center justify-center mb-2 shadow-sm`}>
+                <Icon className="w-6 h-6 text-white" strokeWidth={1.8} />
+              </div>
+              <span className="text-sm font-semibold text-slate-700 text-center leading-tight">{section.label}</span>
+              <span className="text-[10px] text-slate-400 text-center mt-1 leading-tight line-clamp-2">{section.desc}</span>
             </Link>
-            <Link to={createPageUrl('StaffManagement')} className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-bold text-base py-2">
-              <Users className="w-5 h-5 text-blue-600 fill-blue-600" />
-              Staff Management
-            </Link>
-          </div>
-        </div>
+          );
+        })}
+      </div>
 
-        {/* Clinical */}
-        <div>
-          <HelpTip tip="Manage service users, care logs, and clinical records.">
-            <h2 className="text-xl font-bold text-slate-900 mb-3">Clinical</h2>
-          </HelpTip>
-          <div className="space-y-2">
-            <Link to={createPageUrl('ClinicalDashboard')} className="flex items-center gap-2 text-rose-600 hover:text-rose-700 font-bold text-base py-2">
-              <Activity className="w-5 h-5 text-rose-600 fill-rose-600" />
-              Clinical Dashboard
+      {/* Scheduling */}
+      <h2 className="text-lg font-bold text-slate-900 mb-2">Scheduling</h2>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
+        {[
+          { to: 'RotaManagement', label: 'Rota', icon: Calendar, bg: 'from-orange-400 to-orange-600', desc: 'Rota management' },
+          { to: 'WorkCalendar', label: 'Calendar', icon: CalendarClock, bg: 'from-indigo-400 to-indigo-600', desc: 'Work calendar' },
+        ].map(section => {
+          const Icon = section.icon;
+          return (
+            <Link key={section.to} to={createPageUrl(section.to)} className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-4 sm:p-5 min-h-[110px] active:scale-95">
+              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${section.bg} flex items-center justify-center mb-2 shadow-sm`}>
+                <Icon className="w-6 h-6 text-white" strokeWidth={1.8} />
+              </div>
+              <span className="text-sm font-semibold text-slate-700 text-center leading-tight">{section.label}</span>
+              <span className="text-[10px] text-slate-400 text-center mt-1 leading-tight line-clamp-2">{section.desc}</span>
             </Link>
-          </div>
-        </div>
+          );
+        })}
+      </div>
 
-        {/* Scheduling & Requests */}
-        <div>
-          <HelpTip tip="Rota management, work calendar, and scheduling tools.">
-            <h2 className="text-xl font-bold text-slate-900 mb-3">Scheduling & Requests</h2>
-          </HelpTip>
-          <div className="space-y-2">
-            <Link to={createPageUrl('RotaManagement')} className="flex items-center gap-2 text-orange-500 hover:text-orange-600 font-bold text-base py-2">
-              <Calendar className="w-5 h-5 text-orange-500 fill-orange-500" />
-              Rota Management
+      {/* HR & Finance */}
+      <h2 className="text-lg font-bold text-slate-900 mb-2">HR & Finance</h2>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
+        {[
+          { to: 'AdminApprovalsFinancials', label: 'Approvals', icon: CheckSquare, bg: 'from-indigo-400 to-indigo-600', desc: 'Approvals & financials' },
+          { to: 'Invoicing', label: 'Invoicing', icon: Receipt, bg: 'from-teal-400 to-teal-600', desc: 'Invoice management' },
+          ...(isSuperAdmin ? [{ to: 'Payroll', label: 'Payroll', icon: PoundSterling, bg: 'from-emerald-400 to-emerald-600', desc: 'Payroll processing' }] : []),
+          { to: 'ComplianceManagement', label: 'Compliance', icon: Shield, bg: 'from-red-400 to-red-600', desc: 'CIW/CQC compliance' },
+        ].map(section => {
+          const Icon = section.icon;
+          return (
+            <Link key={section.to} to={createPageUrl(section.to)} className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-4 sm:p-5 min-h-[110px] active:scale-95">
+              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${section.bg} flex items-center justify-center mb-2 shadow-sm`}>
+                <Icon className="w-6 h-6 text-white" strokeWidth={1.8} />
+              </div>
+              <span className="text-sm font-semibold text-slate-700 text-center leading-tight">{section.label}</span>
+              <span className="text-[10px] text-slate-400 text-center mt-1 leading-tight line-clamp-2">{section.desc}</span>
             </Link>
-            <Link to={createPageUrl('WorkCalendar')} className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-bold text-base py-2">
-              <Calendar className="w-5 h-5 text-indigo-600 fill-indigo-600" />
-              Work Calendar
-            </Link>
-          </div>
-        </div>
+          );
+        })}
+      </div>
 
-        {/* HR & Payroll */}
-        <div>
-          <HelpTip tip="Invoicing, expenses, payroll, and financial approvals.">
-            <h2 className="text-xl font-bold text-slate-900 mb-3">HR & Payroll</h2>
-          </HelpTip>
-          <div className="space-y-2">
-            <Link to={createPageUrl('AdminApprovalsFinancials')} className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-bold text-base py-2">
-              <CheckSquare className="w-5 h-5 text-indigo-600 fill-indigo-600" />
-              Approvals & Financials
+      {/* Training & Documents */}
+      <h2 className="text-lg font-bold text-slate-900 mb-2">Training & Documents</h2>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
+        {[
+          { to: 'Training', label: 'Training', icon: GraduationCap, bg: 'from-cyan-400 to-cyan-600', desc: 'Training management' },
+          { to: 'DocumentManagement', label: 'Documents', icon: FolderOpen, bg: 'from-indigo-400 to-indigo-600', desc: 'Document management' },
+          { to: 'Archive', label: 'Archive', icon: Archive, bg: 'from-slate-400 to-slate-600', desc: 'Archived records' },
+          { to: 'FormBuilder', label: 'Forms', icon: FileEdit, bg: 'from-fuchsia-400 to-fuchsia-600', desc: 'Custom form builder' },
+        ].map(section => {
+          const Icon = section.icon;
+          return (
+            <Link key={section.to} to={createPageUrl(section.to)} className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-4 sm:p-5 min-h-[110px] active:scale-95">
+              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${section.bg} flex items-center justify-center mb-2 shadow-sm`}>
+                <Icon className="w-6 h-6 text-white" strokeWidth={1.8} />
+              </div>
+              <span className="text-sm font-semibold text-slate-700 text-center leading-tight">{section.label}</span>
+              <span className="text-[10px] text-slate-400 text-center mt-1 leading-tight line-clamp-2">{section.desc}</span>
             </Link>
-            <Link to={createPageUrl('Invoicing')} className="flex items-center gap-2 text-teal-600 hover:text-teal-700 font-bold text-base py-2">
-              <Receipt className="w-5 h-5 text-teal-600 fill-teal-600" />
-              Invoicing
-            </Link>
-            {isSuperAdmin && (
-              <Link to={createPageUrl('Payroll')} className="flex items-center gap-2 text-emerald-600 hover:text-emerald-700 font-bold text-base py-2">
-                <PoundSterling className="w-5 h-5 text-emerald-600 fill-emerald-600" />
-                Payroll
-              </Link>
-            )}
-            <Link to={createPageUrl('ComplianceManagement')} className="flex items-center gap-2 text-red-600 hover:text-red-700 font-bold text-base py-2">
-              <Shield className="w-5 h-5 text-red-600 fill-red-600" />
-              Compliance Management
-            </Link>
-          </div>
-        </div>
+          );
+        })}
+      </div>
 
-        {/* Training & Documents */}
-        <div>
-          <HelpTip tip="Staff profiles, training, documents, and leave management.">
-            <h2 className="text-xl font-bold text-slate-900 mb-3">Training & Documents</h2>
-          </HelpTip>
-          <div className="space-y-2">
-            <Link to={createPageUrl('Training')} className="flex items-center gap-2 text-cyan-600 hover:text-cyan-700 font-bold text-base py-2">
-              <GraduationCap className="w-5 h-5 text-cyan-600 fill-cyan-600" />
-              Training Management
+      {/* Communication & Reports */}
+      <h2 className="text-lg font-bold text-slate-900 mb-2">Communication & Reports</h2>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
+        {[
+          { to: 'Messages', label: 'Messages', icon: MessageCircle, bg: 'from-pink-400 to-pink-600', desc: 'Communication hub' },
+          { to: 'Communications', label: 'Video', icon: Video, bg: 'from-blue-400 to-blue-600', desc: 'Video comms' },
+          { to: 'PushNotificationManagement', label: 'Push', icon: Bell, bg: 'from-indigo-400 to-indigo-600', desc: 'Push notifications' },
+          { to: 'Reports', label: 'Reports', icon: BarChart3, bg: 'from-sky-400 to-sky-600', desc: 'Reports & analytics' },
+          { to: 'AppDownloads', label: 'Downloads', icon: Download, bg: 'from-emerald-400 to-emerald-600', desc: 'App downloads' },
+          { to: 'ErrorLog', label: 'Errors', icon: Bug, bg: 'from-red-400 to-red-600', desc: 'Error log' },
+          { to: 'DataImport', label: 'Import', icon: FileSpreadsheet, bg: 'from-amber-400 to-amber-600', desc: 'CSV data import' },
+        ].map(section => {
+          const Icon = section.icon;
+          return (
+            <Link key={section.to} to={createPageUrl(section.to)} className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-4 sm:p-5 min-h-[110px] active:scale-95">
+              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${section.bg} flex items-center justify-center mb-2 shadow-sm`}>
+                <Icon className="w-6 h-6 text-white" strokeWidth={1.8} />
+              </div>
+              <span className="text-sm font-semibold text-slate-700 text-center leading-tight">{section.label}</span>
+              <span className="text-[10px] text-slate-400 text-center mt-1 leading-tight line-clamp-2">{section.desc}</span>
             </Link>
-            <Link to={createPageUrl('DocumentManagement')} className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-bold text-base py-2">
-              <FolderOpen className="w-5 h-5 text-indigo-600 fill-indigo-600" />
-              Document Management
-            </Link>
-            <Link to={createPageUrl('Archive')} className="flex items-center gap-2 text-slate-600 hover:text-slate-700 font-bold text-base py-2">
-              <Archive className="w-5 h-5 text-slate-600 fill-slate-600" />
-              Archive
-            </Link>
-            <Link to={createPageUrl('FormBuilder')} className="flex items-center gap-2 text-fuchsia-600 hover:text-fuchsia-700 font-bold text-base py-2">
-              <FileEdit className="w-5 h-5 text-fuchsia-600 fill-fuchsia-600" />
-              Form Builder
-            </Link>
-          </div>
-        </div>
-
-        {/* Communication & Reports */}
-        <div>
-          <HelpTip tip="Messages, announcements, and notification settings.">
-            <h2 className="text-xl font-bold text-slate-900 mb-3">Communication & Reports</h2>
-          </HelpTip>
-          <div className="space-y-2">
-            <Link to={createPageUrl('Messages')} className="flex items-center gap-2 text-pink-600 hover:text-pink-700 font-bold text-base py-2">
-              <MessageCircle className="w-5 h-5 text-pink-600 fill-pink-600" />
-              Communication Management
-            </Link>
-            <Link to={createPageUrl('Communications')} className="flex items-center gap-2 text-blue-500 hover:text-blue-600 font-bold text-base py-2">
-              <Video className="w-5 h-5 text-blue-500 fill-blue-500" />
-              Video Communications
-            </Link>
-
-            <Link to={createPageUrl('PushNotificationManagement')} className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-bold text-base py-2">
-              <Bell className="w-5 h-5 text-indigo-600 fill-indigo-600" />
-              Push Notification System
-            </Link>
-            <Link to={createPageUrl('Reports')} className="flex items-center gap-2 text-sky-600 hover:text-sky-700 font-bold text-base py-2">
-              <BarChart3 className="w-5 h-5 text-sky-600 fill-sky-600" />
-              Reports & Analytics
-            </Link>
-            <Link to={createPageUrl('AppDownloads')} className="flex items-center gap-2 text-emerald-600 hover:text-emerald-700 font-bold text-base py-2">
-              <Download className="w-5 h-5 text-emerald-600 fill-emerald-600" />
-              App Downloads Management
-            </Link>
-            <Link to={createPageUrl('ErrorLog')} className="flex items-center gap-2 text-red-500 hover:text-red-600 font-bold text-base py-2">
-              <Bug className="w-5 h-5 text-red-500 fill-red-500" />
-              Error Log
-            </Link>
-            <Link to={createPageUrl('DataImport')} className="flex items-center gap-2 text-amber-600 hover:text-amber-700 font-bold text-base py-2">
-              <FileSpreadsheet className="w-5 h-5 text-amber-600 fill-amber-600" />
-              Data Import (CSV)
-            </Link>
-          </div>
-        </div>
+          );
+        })}
       </div>
     </div>
   );

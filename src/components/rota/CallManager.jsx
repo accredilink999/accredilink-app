@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import SpeechButton from '@/components/ui/SpeechButton';
-import { Clock, MapPin, CheckCircle, AlertCircle, Play, Square, Plus, Edit, Trash2, FileText, Car, ListChecks, ClipboardList, User, Users } from 'lucide-react';
+import { Clock, MapPin, CheckCircle, AlertCircle, Play, Square, Plus, Edit, Trash2, FileText, Car, ListChecks, ClipboardList, User, Users, Home, XCircle, SkipForward } from 'lucide-react';
 import { format } from 'date-fns';
 import { notifyAdminsOfActivity } from '@/utils/adminNotifications';
 import { toast } from 'sonner';
@@ -1078,123 +1078,128 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-2 w-full">
-                  {canClockIn && (
-                                     <Button
-                                       size="sm"
-                                       onClick={() => clockInMutation.mutate(call)}
-                                       disabled={clockInMutation.isPending}
-                                       className="bg-green-600 hover:bg-green-700 w-full min-h-[44px] px-4 touch-manipulation"
-                                     >
-                                       <Play className="w-3 h-3 mr-1" />
-                                       Check In
-                                     </Button>
-                                   )}
-                                   {canClockOut && (
-                     <Button
-                       size="sm"
-                       onClick={() => {
-                         const incomplete = getIncompleteTasks(call);
-                         if (incomplete.length > 0) {
-                           setTaskWarningCall(call);
-                         } else if (hasCarLog || partnerHasLog) {
-                           clockOutMutation.mutate(call);
-                         } else {
-                           setClockOutConfirmCall(call);
-                         }
-                       }}
-                       disabled={clockOutMutation.isPending}
-                       className="bg-red-600 hover:bg-red-700 w-full min-h-[44px] px-4 touch-manipulation"
-                     >
-                       <Square className="w-3 h-3 mr-1" />
-                       Check Out
-                     </Button>
-                   )}
-                  {(isMyShift || isAdmin) && !hasCarLog && !partnerHasLog && !isOnHold && call.status !== 'completed' && call.status !== 'missed' && call.status !== 'not_at_home' && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setCareLogCall(call)}
-                        className="gap-1 w-full min-h-[44px] px-4 touch-manipulation"
-                      >
-                        <FileText className="w-3 h-3" />
-                        Care Log
-                      </Button>
-                    )}
-                  {!hasCarLog && partnerHasLog && call.status !== 'completed' && (
-                    <div className="col-span-2 text-xs text-purple-700 bg-purple-50 px-3 py-2 rounded flex items-center gap-1.5">
+                {!hasCarLog && partnerHasLog && call.status !== 'completed' && (
+                    <div className="mb-3 text-xs text-purple-700 bg-purple-50 px-3 py-2 rounded flex items-center gap-1.5">
                       <Users className="w-3.5 h-3.5 flex-shrink-0" />
                       Partner Has Filled In The Log For This Call
                     </div>
                   )}
+                <div className="grid grid-cols-3 gap-2 w-full">
+                  {canClockIn && (
+                    <button
+                      onClick={() => clockInMutation.mutate(call)}
+                      disabled={clockInMutation.isPending}
+                      className="flex flex-col items-center justify-center rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-3 min-h-[80px] active:scale-95 touch-manipulation disabled:opacity-50"
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center mb-1.5 shadow-sm">
+                        <Play className="w-5 h-5 text-white" strokeWidth={1.8} />
+                      </div>
+                      <span className="text-xs font-semibold text-slate-700">Check In</span>
+                    </button>
+                  )}
+                  {canClockOut && (
+                    <button
+                      onClick={() => {
+                        const incomplete = getIncompleteTasks(call);
+                        if (incomplete.length > 0) {
+                          setTaskWarningCall(call);
+                        } else if (hasCarLog || partnerHasLog) {
+                          clockOutMutation.mutate(call);
+                        } else {
+                          setClockOutConfirmCall(call);
+                        }
+                      }}
+                      disabled={clockOutMutation.isPending}
+                      className="flex flex-col items-center justify-center rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-3 min-h-[80px] active:scale-95 touch-manipulation disabled:opacity-50"
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center mb-1.5 shadow-sm">
+                        <Square className="w-5 h-5 text-white" strokeWidth={1.8} />
+                      </div>
+                      <span className="text-xs font-semibold text-slate-700">Check Out</span>
+                    </button>
+                  )}
+                  {(isMyShift || isAdmin) && !hasCarLog && !partnerHasLog && !isOnHold && call.status !== 'completed' && call.status !== 'missed' && call.status !== 'not_at_home' && (
+                    <button
+                      onClick={() => setCareLogCall(call)}
+                      className="flex flex-col items-center justify-center rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-3 min-h-[80px] active:scale-95 touch-manipulation"
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center mb-1.5 shadow-sm">
+                        <FileText className="w-5 h-5 text-white" strokeWidth={1.8} />
+                      </div>
+                      <span className="text-xs font-semibold text-slate-700">Care Log</span>
+                    </button>
+                  )}
                   {(isMyShift || isAdmin) && call.status !== 'completed' && call.status !== 'missed' && call.status !== 'not_at_home' && (
-                    <Button
-                      size="sm"
-                      variant="outline"
+                    <button
                       onClick={() => setNotMyCallConfirm(call)}
-                      className="w-full min-h-[44px] px-4 touch-manipulation"
+                      className="flex flex-col items-center justify-center rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-3 min-h-[80px] active:scale-95 touch-manipulation"
                     >
-                      Not My Call
-                    </Button>
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center mb-1.5 shadow-sm">
+                        <XCircle className="w-5 h-5 text-white" strokeWidth={1.8} />
+                      </div>
+                      <span className="text-xs font-semibold text-slate-700 leading-tight">Not My Call</span>
+                    </button>
                   )}
                   {(isMyShift || isAdmin) && call.status !== 'completed' && call.status !== 'missed' && call.status !== 'not_at_home' && (
-                    <Button
-                      size="sm"
-                      variant="outline"
+                    <button
                       onClick={() => updateStatusMutation.mutate({ callId: call.id, status: 'not_at_home' })}
-                      className="w-full min-h-[44px] px-4 touch-manipulation border-amber-300 text-amber-700 hover:bg-amber-50"
+                      className="flex flex-col items-center justify-center rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-3 min-h-[80px] active:scale-95 touch-manipulation"
                     >
-                      Not at Home
-                    </Button>
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center mb-1.5 shadow-sm">
+                        <Home className="w-5 h-5 text-white" strokeWidth={1.8} />
+                      </div>
+                      <span className="text-xs font-semibold text-slate-700 leading-tight">Not Home</span>
+                    </button>
                   )}
                   {(isMyShift || isAdmin) && call.status !== 'completed' && call.status !== 'missed' && call.status !== 'not_at_home' && (
-                    <Button
-                      size="sm"
-                      variant="outline"
+                    <button
                       onClick={() => updateStatusMutation.mutate({ callId: call.id, status: 'missed' })}
-                      className="w-full min-h-[44px] px-4 touch-manipulation border-red-300 text-red-700 hover:bg-red-50"
+                      className="flex flex-col items-center justify-center rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-3 min-h-[80px] active:scale-95 touch-manipulation"
                     >
-                      Missed
-                    </Button>
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-rose-400 to-rose-600 flex items-center justify-center mb-1.5 shadow-sm">
+                        <AlertCircle className="w-5 h-5 text-white" strokeWidth={1.8} />
+                      </div>
+                      <span className="text-xs font-semibold text-slate-700">Missed</span>
+                    </button>
                   )}
                   {(isMyShift || isAdmin) && call.status === 'pending' && !call.clock_in_time && !isOnHold && (
-                    <Button
-                      size="sm"
-                      variant="outline"
+                    <button
                       onClick={() => updateStatusMutation.mutate({ callId: call.id, status: 'completed' })}
-                      className="w-full min-h-[44px] px-4 touch-manipulation border-green-300 text-green-700 hover:bg-green-50"
+                      className="flex flex-col items-center justify-center rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-3 min-h-[80px] active:scale-95 touch-manipulation"
                     >
-                      <CheckCircle className="w-3 h-3 mr-1" />
-                      Mark Complete
-                    </Button>
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center mb-1.5 shadow-sm">
+                        <CheckCircle className="w-5 h-5 text-white" strokeWidth={1.8} />
+                      </div>
+                      <span className="text-xs font-semibold text-slate-700 leading-tight">Complete</span>
+                    </button>
                   )}
-                  {/* Decrement hold for on-hold temporary users */}
                   {isOnHold && serviceUser?.hold_type === 'temporary' && serviceUser?.hold_remaining_calls > 0 && (isMyShift || isAdmin) && (
-                    <Button
-                      size="sm"
-                      variant="outline"
+                    <button
                       onClick={() => decrementHoldMutation.mutate({
                         serviceUserId: serviceUser.id,
                         serviceUserName: call.service_user_name,
                         currentRemaining: serviceUser.hold_remaining_calls
                       })}
                       disabled={decrementHoldMutation.isPending}
-                      className="w-full min-h-[44px] px-4 touch-manipulation border-amber-300 text-amber-700 hover:bg-amber-50 col-span-2"
+                      className="flex flex-col items-center justify-center rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-3 min-h-[80px] active:scale-95 touch-manipulation col-span-3 disabled:opacity-50"
                     >
-                      <CheckCircle className="w-3 h-3 mr-1" />
-                      Skip Call (Decrement Hold)
-                    </Button>
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center mb-1.5 shadow-sm">
+                        <SkipForward className="w-5 h-5 text-white" strokeWidth={1.8} />
+                      </div>
+                      <span className="text-xs font-semibold text-slate-700">Skip Call (Decrement Hold)</span>
+                    </button>
                   )}
                   {isAdmin && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
+                    <button
                       onClick={() => setDeleteConfirmCallId(call.id)}
                       disabled={deleteCallMutation.isPending}
-                      className="w-full min-h-[44px] px-4 touch-manipulation"
+                      className="flex flex-col items-center justify-center rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-3 min-h-[80px] active:scale-95 touch-manipulation disabled:opacity-50"
                     >
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-400 to-slate-600 flex items-center justify-center mb-1.5 shadow-sm">
+                        <Trash2 className="w-5 h-5 text-white" strokeWidth={1.8} />
+                      </div>
+                      <span className="text-xs font-semibold text-slate-700">Delete</span>
+                    </button>
                   )}
                 </div>
 
