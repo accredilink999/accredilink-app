@@ -40,6 +40,16 @@ export default function TrainingAdmin() {
   const [qExplanation, setQExplanation] = useState('');
   const [qSortOrder, setQSortOrder] = useState(0);
 
+  // AI Generator state
+  const [genNumQuestions, setGenNumQuestions] = useState(10);
+  const [genDifficulty, setGenDifficulty] = useState('standard');
+  const [genScriptText, setGenScriptText] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [generatedQuestions, setGeneratedQuestions] = useState([]);
+  const [genSelectedIds, setGenSelectedIds] = useState(new Set());
+  const [savingGenerated, setSavingGenerated] = useState(false);
+  const [genSourceInfo, setGenSourceInfo] = useState('');
+
   // Stats
   const [stats, setStats] = useState({ total: 0, published: 0, draft: 0, withQuestions: 0 });
 
@@ -208,6 +218,78 @@ export default function TrainingAdmin() {
     } catch (e) {
       showToast('Error: ' + e.message);
     }
+  }
+
+  // AI Question Generator
+  async function generateQuestions() {
+    if (!selectedCourse) { showToast('Select a course first'); return; }
+    setGenerating(true);
+    setGeneratedQuestions([]);
+    setGenSelectedIds(new Set());
+    setGenSourceInfo('');
+    try {
+      const res = await apiFetch('/api/training/generate', {
+        method: 'POST',
+        body: JSON.stringify({
+          course_title: selectedCourse.title,
+          youtube_url: selectedCourse.youtube_url || '',
+          script_text: genScriptText || '',
+          num_questions: genNumQuestions,
+          difficulty: genDifficulty,
+        }),
+      });
+      setGeneratedQuestions(res.questions || []);
+      setGenSelectedIds(new Set((res.questions || []).map((_, i) => i)));
+      const srcLabel = res.source_type === 'youtube_transcript'
+        ? `Generated from YouTube transcript (${res.content_length} chars)`
+        : res.source_type === 'script'
+        ? `Generated from pasted script (${res.content_length} chars)`
+        : 'Generated from AI knowledge of this topic';
+      setGenSourceInfo(srcLabel);
+      showToast(`${(res.questions || []).length} questions generated!`);
+    } catch (e) {
+      showToast('Generation failed: ' + e.message);
+    }
+    setGenerating(false);
+  }
+
+  function toggleGenQuestion(idx) {
+    setGenSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  }
+
+  async function saveGeneratedQuestions() {
+    if (genSelectedIds.size === 0) { showToast('Select at least one question'); return; }
+    setSavingGenerated(true);
+    let saved = 0;
+    const startOrder = questions.length;
+    for (const idx of [...genSelectedIds].sort((a, b) => a - b)) {
+      const gq = generatedQuestions[idx];
+      if (!gq) continue;
+      try {
+        await apiFetch('/api/training/questions', {
+          method: 'POST',
+          body: JSON.stringify({
+            course_id: selectedCourse.id,
+            question: gq.question,
+            options: gq.options,
+            correct_index: gq.correct_index,
+            explanation: gq.explanation || '',
+            sort_order: startOrder + saved + 1,
+          }),
+        });
+        saved++;
+      } catch {}
+    }
+    showToast(`${saved} questions saved!`);
+    setGeneratedQuestions([]);
+    setGenSelectedIds(new Set());
+    loadQuestions(selectedCourse.id);
+    setSavingGenerated(false);
   }
 
   function generateSlug(title) {
@@ -500,13 +582,172 @@ export default function TrainingAdmin() {
                     <h2 className="text-lg font-bold">{selectedCourse.title}</h2>
                     <p className="text-sm text-slate-400">{questions.length} question{questions.length !== 1 ? 's' : ''} &middot; Pass mark: {selectedCourse.pass_mark}%</p>
                   </div>
-                  <button
-                    onClick={() => { resetQuestionForm(); setQSortOrder(questions.length + 1); setShowQuestionForm(true); }}
-                    className="px-4 py-2 bg-teal-600 hover:bg-teal-500 rounded-lg text-sm font-medium transition-colors"
-                  >
-                    + Add Question
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { resetQuestionForm(); setQSortOrder(questions.length + 1); setShowQuestionForm(true); }}
+                      className="px-4 py-2 bg-teal-600 hover:bg-teal-500 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      + Add Question
+                    </button>
+                  </div>
                 </div>
+
+                {/* AI Question Generator */}
+                <div className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-purple-700/40 rounded-xl p-5 mb-6">
+                  <h3 className="text-sm font-bold text-purple-300 mb-3 flex items-center gap-2">
+                    <span className="text-lg">🤖</span> AI Question Generator
+                  </h3>
+                  <p className="text-xs text-slate-400 mb-4">
+                    Generate test questions from the course YouTube video transcript, a pasted script, or AI knowledge of the topic.
+                  </p>
+
+                  <div className="grid sm:grid-cols-3 gap-3 mb-4">
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Number of Questions</label>
+                      <select
+                        value={genNumQuestions}
+                        onChange={e => setGenNumQuestions(parseInt(e.target.value))}
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white text-sm focus:border-purple-400 outline-none"
+                      >
+                        <option value={5}>5 questions</option>
+                        <option value={10}>10 questions</option>
+                        <option value={15}>15 questions</option>
+                        <option value={20}>20 questions</option>
+                        <option value={25}>25 questions</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Difficulty</label>
+                      <select
+                        value={genDifficulty}
+                        onChange={e => setGenDifficulty(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white text-sm focus:border-purple-400 outline-none"
+                      >
+                        <option value="standard">Standard (knowledge checks)</option>
+                        <option value="advanced">Advanced (scenario-based)</option>
+                      </select>
+                    </div>
+                    <div className="flex items-end">
+                      <button
+                        onClick={generateQuestions}
+                        disabled={generating}
+                        className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {generating ? (
+                          <><div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> Generating...</>
+                        ) : (
+                          <><span>🤖</span> Generate Questions</>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">
+                      Paste script/transcript (optional — if empty, will try YouTube URL or use AI knowledge)
+                    </label>
+                    <textarea
+                      value={genScriptText}
+                      onChange={e => setGenScriptText(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white text-sm focus:border-purple-400 outline-none h-24 resize-none"
+                      placeholder="Paste your video script or transcript here... Leave empty to auto-extract from YouTube or generate from topic knowledge."
+                    />
+                  </div>
+
+                  {selectedCourse?.youtube_url && !genScriptText && (
+                    <p className="text-xs text-blue-400 mt-2">
+                      📡 Will attempt to extract transcript from: {selectedCourse.youtube_url}
+                    </p>
+                  )}
+                </div>
+
+                {/* Generated Questions Review */}
+                {generatedQuestions.length > 0 && (
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h3 className="text-sm font-bold text-purple-300">Generated Questions — Review & Save</h3>
+                        <p className="text-xs text-slate-500 mt-0.5">{genSourceInfo}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            if (genSelectedIds.size === generatedQuestions.length) setGenSelectedIds(new Set());
+                            else setGenSelectedIds(new Set(generatedQuestions.map((_, i) => i)));
+                          }}
+                          className="px-3 py-1.5 bg-slate-700 text-slate-300 rounded-lg text-xs hover:bg-slate-600 transition-colors"
+                        >
+                          {genSelectedIds.size === generatedQuestions.length ? 'Deselect All' : 'Select All'}
+                        </button>
+                        <button
+                          onClick={saveGeneratedQuestions}
+                          disabled={savingGenerated || genSelectedIds.size === 0}
+                          className="px-4 py-1.5 bg-green-600 hover:bg-green-500 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
+                        >
+                          {savingGenerated ? (
+                            <><div className="animate-spin w-3 h-3 border-2 border-white border-t-transparent rounded-full" /> Saving...</>
+                          ) : (
+                            <>✓ Save {genSelectedIds.size} Selected</>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => { setGeneratedQuestions([]); setGenSelectedIds(new Set()); }}
+                          className="px-3 py-1.5 bg-slate-700 text-red-400 rounded-lg text-xs hover:bg-slate-600 transition-colors"
+                        >
+                          Discard All
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      {generatedQuestions.map((gq, gi) => (
+                        <div
+                          key={gi}
+                          className={`border rounded-xl p-4 transition-colors cursor-pointer ${
+                            genSelectedIds.has(gi)
+                              ? 'bg-purple-900/20 border-purple-600/50'
+                              : 'bg-slate-900/50 border-slate-700 opacity-60'
+                          }`}
+                          onClick={() => toggleGenQuestion(gi)}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${
+                              genSelectedIds.has(gi) ? 'border-purple-500 bg-purple-500 text-white' : 'border-slate-500'
+                            }`}>
+                              {genSelectedIds.has(gi) && '✓'}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-white mb-2">
+                                <span className="text-purple-400 mr-1">Q{gi + 1}.</span> {gq.question}
+                              </p>
+                              <div className="grid grid-cols-2 gap-1.5 mb-2">
+                                {(gq.options || []).map((opt, oi) => (
+                                  <div key={oi} className={`text-xs px-2.5 py-1.5 rounded-lg border ${
+                                    oi === gq.correct_index
+                                      ? 'bg-green-900/30 border-green-600/50 text-green-400'
+                                      : 'bg-slate-800 border-slate-600 text-slate-400'
+                                  }`}>
+                                    {String.fromCharCode(65 + oi)}. {opt} {oi === gq.correct_index && ' ✓'}
+                                  </div>
+                                ))}
+                              </div>
+                              {gq.explanation && (
+                                <p className="text-xs text-slate-500 italic">💡 {gq.explanation}</p>
+                              )}
+                              {gq.difficulty && (
+                                <span className={`text-xs px-1.5 py-0.5 rounded mt-1 inline-block ${
+                                  gq.difficulty === 'advanced' ? 'bg-orange-900/30 text-orange-400' :
+                                  gq.difficulty === 'intermediate' ? 'bg-yellow-900/30 text-yellow-400' :
+                                  'bg-slate-700 text-slate-400'
+                                }`}>{gq.difficulty}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {loadingQuestions ? (
                   <div className="flex justify-center py-8"><div className="animate-spin w-6 h-6 border-2 border-teal-400 border-t-transparent rounded-full" /></div>
