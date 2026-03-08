@@ -22,19 +22,29 @@ import {
 import { format, addDays } from 'date-fns';
 
 const SUPERVISION_SECTIONS = [
-  { key: 'previous_actions_review', label: '1. Review of Previous Actions', placeholder: 'Review action points from last supervision. What was agreed? What progress has been made?' },
-  { key: 'workload_discussion', label: '2. Workload & Caseload Discussion', placeholder: 'Current rota, service users, any concerns about workload or scheduling' },
-  { key: 'care_quality', label: '3. Quality of Care & Practice', placeholder: 'Observations on care delivery, spot-check outcomes, standards of practice' },
-  { key: 'safeguarding', label: '4. Safeguarding', placeholder: 'Any safeguarding concerns? Awareness of procedures and escalation routes' },
-  { key: 'medication', label: '5. Medication', placeholder: 'Any medication errors or concerns? MAR chart accuracy, competency' },
-  { key: 'health_wellbeing', label: '6. Health & Wellbeing', placeholder: 'How is the staff member coping? Work-life balance, any health concerns affecting work' },
-  { key: 'training_development', label: '7. Training & Development', placeholder: 'Mandatory training status, recent training completed, future training needs, NVQ/QCF progress' },
-  { key: 'policies_compliance', label: '8. Policies & Compliance', placeholder: 'Awareness of key policies (H&S, complaints, disciplinary), PPE, uniform, ID badge' },
-  { key: 'communication_teamwork', label: '9. Communication & Teamwork', placeholder: 'Relationships with colleagues, office communication, service user/family feedback' },
-  { key: 'incidents_complaints', label: '10. Incidents / Complaints / Compliments', placeholder: 'Any incidents, complaints or compliments since last supervision' },
-  { key: 'reflective_practice', label: '11. Reflective Practice', placeholder: 'What has gone well? What could be improved? Any difficult situations encountered?' },
-  { key: 'agreed_actions', label: '12. Agreed Actions & Objectives', placeholder: 'SMART objectives, specific actions with ownership and deadlines' },
-  { key: 'any_other_business', label: '13. Any Other Business', placeholder: 'Anything else the supervisee or supervisor wishes to raise' },
+  { key: 'previous_actions_review', label: '1. Review of Previous Actions', placeholder: 'Review action points from last supervision. What was agreed? What progress has been made?', types: ['formal_1to1', 'group'] },
+  { key: 'workload_discussion', label: '2. Workload & Caseload Discussion', placeholder: 'Current rota, service users, any concerns about workload or scheduling', types: ['formal_1to1', 'group'] },
+  { key: 'care_quality', label: '3. Quality of Care & Practice', placeholder: 'Observations on care delivery, spot-check outcomes, standards of practice', types: ['formal_1to1', 'observed_practice', 'spot_check', 'group'] },
+  { key: 'safeguarding', label: '4. Safeguarding', placeholder: 'Any safeguarding concerns? Awareness of procedures and escalation routes', types: ['formal_1to1', 'group'] },
+  { key: 'medication', label: '5. Medication', placeholder: 'Any medication errors or concerns? MAR chart accuracy, competency', types: ['formal_1to1', 'spot_check'] },
+  { key: 'health_wellbeing', label: '6. Health & Wellbeing', placeholder: 'How is the staff member coping? Work-life balance, any health concerns affecting work', types: ['formal_1to1'] },
+  { key: 'training_development', label: '7. Training & Development', placeholder: 'Mandatory training status, recent training completed, future training needs, NVQ/QCF progress', types: ['formal_1to1'] },
+  { key: 'policies_compliance', label: '8. Policies & Compliance', placeholder: 'Awareness of key policies (H&S, complaints, disciplinary), PPE, uniform, ID badge', types: ['formal_1to1', 'spot_check'] },
+  { key: 'communication_teamwork', label: '9. Communication & Teamwork', placeholder: 'Relationships with colleagues, office communication, service user/family feedback', types: ['formal_1to1', 'group'] },
+  { key: 'incidents_complaints', label: '10. Incidents / Complaints / Compliments', placeholder: 'Any incidents, complaints or compliments since last supervision', types: ['formal_1to1', 'group'] },
+  { key: 'reflective_practice', label: '11. Reflective Practice', placeholder: 'What has gone well? What could be improved? Any difficult situations encountered?', types: ['formal_1to1', 'group'] },
+  { key: 'agreed_actions', label: '12. Agreed Actions & Objectives', placeholder: 'SMART objectives, specific actions with ownership and deadlines', types: ['formal_1to1', 'observed_practice', 'spot_check', 'group'] },
+  { key: 'any_other_business', label: '13. Any Other Business', placeholder: 'Anything else the supervisee or supervisor wishes to raise', types: ['formal_1to1', 'observed_practice', 'spot_check', 'group'] },
+  // Observed Practice specific
+  { key: 'observed_task', label: 'Task Observed', placeholder: 'What care task was observed? (e.g. personal care, medication round, moving & handling)', types: ['observed_practice'] },
+  { key: 'observed_competency', label: 'Competency Assessment', placeholder: 'Was the task performed correctly and safely? Any areas for improvement?', types: ['observed_practice'] },
+  { key: 'observed_feedback', label: 'Feedback Given', placeholder: 'What feedback was provided to the staff member?', types: ['observed_practice'] },
+  // Spot Check specific
+  { key: 'spot_punctuality', label: 'Punctuality & Attendance', placeholder: 'Did the carer arrive on time? Were they in correct uniform with ID?', types: ['spot_check'] },
+  { key: 'spot_care_delivery', label: 'Care Delivery Observed', placeholder: 'How was care being delivered? Did it follow the care plan?', types: ['spot_check'] },
+  { key: 'spot_documentation', label: 'Documentation Check', placeholder: 'Were care logs, MAR charts and daily records completed accurately?', types: ['spot_check'] },
+  { key: 'spot_client_feedback', label: 'Client / Family Feedback', placeholder: 'What did the service user or family say about the care received?', types: ['spot_check'] },
+  { key: 'spot_environment', label: 'Environment Check', placeholder: 'Was the environment safe and clean? Any hazards identified?', types: ['spot_check'] },
 ];
 
 const SUPERVISION_TYPES = [
@@ -150,10 +160,12 @@ function SupervisionForm({ staffId, staffName, staffList, user, onClose, onSubmi
         <p className="text-sm font-semibold text-slate-700 mb-3">Supervision Discussion</p>
       </div>
 
-      {/* Pre-populated agenda sections */}
-      {SUPERVISION_SECTIONS.map(section => (
+      {/* Pre-populated agenda sections — filtered by supervision type */}
+      {SUPERVISION_SECTIONS
+        .filter(section => !section.types || section.types.includes(formData.supervision_type))
+        .map((section, idx) => (
         <div key={section.key}>
-          <Label className="text-sm font-medium text-slate-700">{section.label}</Label>
+          <Label className="text-sm font-medium text-slate-700">{idx + 1}. {section.label.replace(/^\d+\.\s*/, '')}</Label>
           <Textarea
             value={formData[section.key] || ''}
             onChange={(e) => handleFieldChange(section.key, e.target.value)}

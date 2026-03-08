@@ -199,9 +199,15 @@ export default function BodyMap({ markers = [], onChange, readOnly = false }) {
 
   const selectedMarker = selectedIndex !== null ? markers[selectedIndex] : null;
 
+  const handleLocationChange = useCallback((location) => {
+    if (readOnly || !onChange || selectedIndex === null) return;
+    const updated = markers.map((m, i) => i === selectedIndex ? { ...m, location } : m);
+    onChange(updated);
+  }, [readOnly, onChange, markers, selectedIndex]);
+
   const handlePointerDown = useCallback((cx, cy, side) => {
     if (readOnly || !onChange) return;
-    const newMarker = { x: cx, y: cy, side, note: '' };
+    const newMarker = { x: cx, y: cy, side, note: '', location: '' };
     const updated = [...markers, newMarker];
     onChange(updated);
     setSelectedIndex(updated.length - 1);
@@ -266,30 +272,39 @@ export default function BodyMap({ markers = [], onChange, readOnly = false }) {
               Marker {selectedIndex + 1}
             </span>
             <span className="text-xs text-slate-500 capitalize">
-              {selectedMarker.side} — {getBodyRegion(selectedMarker.x, selectedMarker.y)}
+              {selectedMarker.side} side
             </span>
           </div>
           {readOnly ? (
-            <p className="text-sm text-slate-800">
-              {selectedMarker.note || 'No note added'}
-            </p>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-slate-900">{selectedMarker.location || 'No location specified'}</p>
+              <p className="text-sm text-slate-600">{selectedMarker.note || 'No note added'}</p>
+            </div>
           ) : (
-            <div className="flex items-center gap-2">
+            <div className="space-y-2">
               <Input
-                value={selectedMarker.note || ''}
-                onChange={(e) => handleNoteChange(e.target.value)}
-                placeholder="Describe the concern for this area..."
-                className="h-9 text-sm flex-1 border-slate-300"
+                value={selectedMarker.location || ''}
+                onChange={(e) => handleLocationChange(e.target.value)}
+                placeholder="Body part (e.g. Left Knee, Right Hip, Lower Back)..."
+                className="h-9 text-sm border-slate-300"
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={handleDeleteMarker}
-                className="h-9 w-9 text-red-500 hover:text-red-700 hover:bg-red-50 shrink-0"
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={selectedMarker.note || ''}
+                  onChange={(e) => handleNoteChange(e.target.value)}
+                  placeholder="Describe the concern for this area..."
+                  className="h-9 text-sm flex-1 border-slate-300"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleDeleteMarker}
+                  className="h-9 w-9 text-red-500 hover:text-red-700 hover:bg-red-50 shrink-0"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
           )}
         </div>
@@ -308,7 +323,7 @@ export default function BodyMap({ markers = [], onChange, readOnly = false }) {
               <span className="font-bold text-red-500 w-5">{i + 1}.</span>
               <span className="capitalize font-medium">{m.side}</span>
               <span className="text-slate-400">—</span>
-              <span>{getBodyRegion(m.x, m.y)}</span>
+              <span>{m.location || 'Tap to set location'}</span>
               {m.note && <span className="text-slate-500 ml-1">— {m.note}</span>}
             </div>
           ))}

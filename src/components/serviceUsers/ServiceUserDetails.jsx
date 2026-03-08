@@ -116,6 +116,8 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
     const [viewerOpen, setViewerOpen] = useState(false);
     const [pendingStatus, setPendingStatus] = useState(null);
     const [statusConfirmOpen, setStatusConfirmOpen] = useState(false);
+    const [holdType, setHoldType] = useState('permanent');
+    const [holdRemainingCalls, setHoldRemainingCalls] = useState(5);
     const [marFullscreen, setMARFullscreen] = useState(false);
     const [deleteServiceUserConfirmOpen, setDeleteServiceUserConfirmOpen] = useState(false);
     const [showCommunicationPastLogs, setShowCommunicationPastLogs] = useState(false);
@@ -186,13 +188,20 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
   const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
 
   const updateStatusMutation = useMutation({
-    mutationFn: (newStatus) => base44.entities.ServiceUser.update(serviceUser.id, { status: newStatus }),
+    mutationFn: ({ status, hold_type, hold_remaining_calls }) => {
+      const updates = { status };
+      if (status === 'on_hold') {
+        updates.hold_type = hold_type || 'permanent';
+        updates.hold_remaining_calls = hold_type === 'temporary' ? (hold_remaining_calls || 0) : null;
+      } else {
+        updates.hold_type = null;
+        updates.hold_remaining_calls = null;
+      }
+      return base44.entities.ServiceUser.update(serviceUser.id, updates);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['serviceUsers'] });
-      queryClient.setQueryData(['currentServiceUser', serviceUser.id], (old) => ({
-        ...old,
-        status: pendingStatus
-      }));
+      queryClient.invalidateQueries({ queryKey: ['currentServiceUser', serviceUser.id] });
     },
   });
 
@@ -564,7 +573,7 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
                 </select>
               ) : (
                 <Badge className={`text-xs ${statusColors[serviceUser.status]}`}>
-                  {serviceUser.status.replace('_', ' ')}
+                  {serviceUser.status.replace('_', ' ')}{serviceUser.status === 'on_hold' && serviceUser.hold_type === 'temporary' && ` (${serviceUser.hold_remaining_calls} calls left)`}
                 </Badge>
               )}
               {serviceUser.dna_cpr_in_place === 'yes' && (
@@ -589,22 +598,60 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Change Client Status?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {pendingStatus === 'on_hold' ? (
-                <>Are you sure you want to put <strong>{serviceUser.full_name}</strong> on hold? Their calls will be suspended until the hold is manually removed.</>
-              ) : (
-                <>Are you sure you want to change {serviceUser.full_name}&apos;s status from <strong>{serviceUser.status.replace('_', ' ')}</strong> to <strong>{pendingStatus?.replace('_', ' ')}</strong>?</>
-              )}
-              {serviceUser.status === 'on_hold' && pendingStatus === 'active' && serviceUser.hold_type === 'temporary' && (
-                <p className="mt-2 text-amber-600 font-medium">Note: This will cancel the temporary hold ({serviceUser.hold_remaining_calls} calls were remaining).</p>
-              )}
+            <AlertDialogDescription asChild>
+              <div>
+                {pendingStatus === 'on_hold' ? (
+                  <>
+                    <p>Are you sure you want to put <strong>{serviceUser.full_name}</strong> on hold?</p>
+                    <div className="mt-3 space-y-3">
+                      <div>
+                        <label className="text-sm font-medium text-slate-700 block mb-1">Hold Type</label>
+                        <select
+                          value={holdType}
+                          onChange={(e) => setHoldType(e.target.value)}
+                          className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"
+                        >
+                          <option value="permanent">Permanent (until manually removed)</option>
+                          <option value="temporary">Temporary (set number of calls)</option>
+                        </select>
+                      </div>
+                      {holdType === 'temporary' && (
+                        <div>
+                          <label className="text-sm font-medium text-slate-700 block mb-1">Resume after how many missed calls?</label>
+                          <select
+                            value={holdRemainingCalls}
+                            onChange={(e) => setHoldRemainingCalls(parseInt(e.target.value))}
+                            className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"
+                          >
+                            {[1, 2, 3, 4, 5, 7, 10, 14, 21, 28].map(n => (
+                              <option key={n} value={n}>{n} call{n > 1 ? 's' : ''}</option>
+                            ))}
+                          </select>
+                          <p className="text-xs text-slate-500 mt-1">Client will automatically return to active after {holdRemainingCalls} call{holdRemainingCalls > 1 ? 's are' : ' is'} skipped.</p>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p>Are you sure you want to change {serviceUser.full_name}&apos;s status from <strong>{serviceUser.status.replace('_', ' ')}</strong> to <strong>{pendingStatus?.replace('_', ' ')}</strong>?</p>
+                    {serviceUser.status === 'on_hold' && pendingStatus === 'active' && serviceUser.hold_type === 'temporary' && (
+                      <p className="mt-2 text-amber-600 font-medium">Note: This will cancel the temporary hold ({serviceUser.hold_remaining_calls} calls were remaining).</p>
+                    )}
+                  </>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex gap-2">
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                updateStatusMutation.mutate(pendingStatus);
+                updateStatusMutation.mutate({
+                  status: pendingStatus,
+                  hold_type: holdType,
+                  hold_remaining_calls: holdRemainingCalls,
+                });
                 setStatusConfirmOpen(false);
               }}
             >

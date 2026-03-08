@@ -840,19 +840,28 @@ export default function ChatWindow({ conversation, currentUserId, currentUserNam
           </div>
 
           <div className="flex-1 min-w-0 bg-white rounded-lg border border-slate-200 px-3 py-2">
-            <input
+            <textarea
               ref={inputRef}
               value={message}
               onChange={handleInputChange}
               placeholder="Type a message"
-              className="w-full text-[15px] text-slate-900 placeholder:text-[#667781] outline-none bg-transparent"
+              rows={1}
+              enterKeyHint="send"
+              className="w-full text-[15px] text-slate-900 placeholder:text-[#667781] outline-none bg-transparent resize-none overflow-hidden"
+              style={{ maxHeight: '120px' }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
                   handleSend(e);
                 }
+                // Shift+Enter = newline (default textarea behavior)
+              }}
+              onInput={(e) => {
+                // Auto-resize textarea height
+                e.target.style.height = 'auto';
+                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
               }}
               onFocus={() => {
-                // iOS keyboard fix — scroll input into view after keyboard opens
                 setTimeout(() => {
                   inputRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                 }, 350);

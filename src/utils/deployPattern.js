@@ -451,13 +451,14 @@ export async function deployClientCallsToRota({ serviceUserId, serviceUserName, 
 
   const today = new Date().toISOString().split('T')[0];
 
-  // 1. Delete all future shift_calls for this service user
+  // 1. Delete future shift_calls for this service user
+  //    PRESERVE today's completed/in-progress calls to avoid losing work
   let existing = [];
   let offset = 0;
   while (true) {
     const { data, error } = await supabase
       .from('shift_calls')
-      .select('id')
+      .select('id, call_date, status')
       .eq('service_user_id', serviceUserId)
       .gte('call_date', today)
       .range(offset, offset + PAGE - 1);
@@ -467,11 +468,31 @@ export async function deployClientCallsToRota({ serviceUserId, serviceUserName, 
     offset += PAGE;
   }
 
-  if (existing.length > 0) {
-    const ids = existing.map(c => c.id);
+  // Only delete pending calls — keep completed and in_progress
+  const toDelete = existing.filter(c =>
+    c.call_date !== today || (c.status !== 'completed' && c.status !== 'in_progress')
+  );
+
+  if (toDelete.length > 0) {
+    const ids = toDelete.map(c => c.id);
     for (let i = 0; i < ids.length; i += BATCH) {
       await supabase.from('shift_calls').delete().in('id', ids.slice(i, i + BATCH));
     }
+  }
+
+  // Track which call time slots are already covered today (completed/in-progress)
+  // so we don't recreate them
+  const preservedToday = existing.filter(c =>
+    c.call_date === today && (c.status === 'completed' || c.status === 'in_progress')
+  );
+  // Fetch scheduled_time for preserved calls to match against
+  const preservedTimes = new Set();
+  if (preservedToday.length > 0) {
+    const { data: ptData } = await supabase
+      .from('shift_calls')
+      .select('scheduled_time')
+      .in('id', preservedToday.map(c => c.id));
+    if (ptData) ptData.forEach(c => preservedTimes.add(c.scheduled_time?.slice(0, 5)));
   }
 
   // 2. Fetch all future assigned shifts in this area (exclude sit-in shifts)
@@ -508,6 +529,10 @@ export async function deployClientCallsToRota({ serviceUserId, serviceUserName, 
       const dur = parseInt(ct.duration) || 60;
 
       if (callMins >= shiftStartMins && callMins + dur <= shiftEndMins) {
+        // Skip if this time slot is already covered by a preserved (completed/in-progress) call today
+        if (shift.date === today && preservedTimes.has(ct.time?.slice(0, 5))) {
+          continue;
+        }
         callsToCreate.push({
           shift_id: shift.id,
           service_user_id: serviceUserId,
@@ -532,5 +557,5 @@ export async function deployClientCallsToRota({ serviceUserId, serviceUserName, 
     await ShiftCallApi.bulkCreate(callsToCreate);
   }
 
-  return { created: callsToCreate.length, deleted: existing.length };
+  return { created: callsToCreate.length, deleted: toDelete.length, preserved: preservedToday.length };
 }

@@ -15,13 +15,20 @@ let _initPromise = null
  * Call once after successful authentication.
  */
 export async function initOrg() {
-  if (_initPromise) return _initPromise
+  // Allow retry if previous attempt returned null (failed)
+  if (_initPromise) {
+    const prev = await _initPromise
+    if (prev) return prev
+    // Previous attempt failed — clear and retry
+    _initPromise = null
+  }
 
   _initPromise = (async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return null
 
+      // Try organization_members first
       const { data, error } = await supabase
         .from('organization_members')
         .select('organization_id, role')
@@ -29,24 +36,42 @@ export async function initOrg() {
         .limit(1)
         .single()
 
-      if (error || !data) {
-        _currentOrgId = null
-        _currentOrgRole = null
-        return null
-      }
+      if (!error && data) {
+        _currentOrgId = data.organization_id
+        _currentOrgRole = data.role
+      } else {
+        // Fallback: check users table for organization_id
+        const { data: userRow } = await supabase
+          .from('users')
+          .select('organization_id')
+          .eq('id', user.id)
+          .single()
 
-      _currentOrgId = data.organization_id
-      _currentOrgRole = data.role
+        if (userRow?.organization_id) {
+          _currentOrgId = userRow.organization_id
+          _currentOrgRole = 'member'
+          // Auto-repair: re-insert into organization_members
+          await supabase.from('organization_members').upsert({
+            organization_id: userRow.organization_id,
+            user_id: user.id,
+            role: 'member',
+          }, { onConflict: 'organization_id,user_id' }).then(() => {})
+        } else {
+          _currentOrgId = null
+          _currentOrgRole = null
+          return null
+        }
+      }
 
       // Fetch org details for subscription gating
       const { data: org } = await supabase
         .from('organizations')
         .select('id, name, slug, plan, is_active, trial_ends_at, stripe_subscription_id, stripe_customer_id, invite_code, owner_onboarded')
-        .eq('id', data.organization_id)
+        .eq('id', _currentOrgId)
         .single()
       _currentOrg = org || null
 
-      return data.organization_id
+      return _currentOrgId
     } catch {
       _currentOrgId = null
       _currentOrgRole = null

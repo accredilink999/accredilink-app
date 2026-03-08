@@ -290,7 +290,7 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
           .update({ paired_shift_id: null, paired_staff_name: null })
           .eq('id', shift.paired_shift_id);
       }
-      // Revert to blank available shift instead of deleting
+      // Revert to blank available shift
       return ShiftApi.update(shift.id, {
         staff_id: null,
         staff_name: null,
@@ -309,6 +309,35 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
     },
     onError: (err) => {
       toast.error(err.message || 'Failed to clear shift');
+    },
+  });
+
+  // Permanently delete the shift from the database
+  const permanentDeleteMutation = useMutation({
+    mutationFn: async () => {
+      // Delete associated shift_calls
+      const calls = await ShiftCallApi.filter({ shift_id: shift.id });
+      for (const call of calls) {
+        await ShiftCallApi.delete(call.id);
+      }
+      // Clear pairing on partner shift
+      if (shift.paired_shift_id) {
+        await supabase.from('shifts')
+          .update({ paired_shift_id: null, paired_staff_name: null })
+          .eq('id', shift.paired_shift_id);
+      }
+      // Permanently delete the shift record
+      const { error } = await supabase.from('shifts').delete().eq('id', shift.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      queryClient.invalidateQueries({ queryKey: ['shift-calls'] });
+      toast.success('Shift permanently deleted');
+      onClose();
+    },
+    onError: (err) => {
+      toast.error(err.message || 'Failed to delete shift');
     },
   });
 
@@ -1247,23 +1276,33 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
           <AlertDialog open={deleteShiftConfirm} onOpenChange={setDeleteShiftConfirm}>
           <AlertDialogContent>
           <AlertDialogHeader>
-           <AlertDialogTitle>Clear Shift?</AlertDialogTitle>
+           <AlertDialogTitle>Remove Shift</AlertDialogTitle>
            <AlertDialogDescription>
-             This will remove the staff assignment and client calls, reverting this shift to a blank available slot.
+             Choose how to remove this shift:
            </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="flex gap-3">
-           <AlertDialogCancel>Cancel</AlertDialogCancel>
-           <AlertDialogAction 
+          <div className="flex flex-col gap-2 pt-1">
+           <AlertDialogAction
              onClick={() => {
                deleteShiftMutation.mutate();
                setDeleteShiftConfirm(false);
              }}
              disabled={deleteShiftMutation.isPending}
-             className="bg-red-600 hover:bg-red-700"
+             className="bg-amber-600 hover:bg-amber-700 w-full"
            >
-             {deleteShiftMutation.isPending ? 'Clearing...' : 'Clear Shift'}
+             {deleteShiftMutation.isPending ? 'Clearing...' : 'Clear Staff (keep shift claimable)'}
            </AlertDialogAction>
+           <AlertDialogAction
+             onClick={() => {
+               permanentDeleteMutation.mutate();
+               setDeleteShiftConfirm(false);
+             }}
+             disabled={permanentDeleteMutation.isPending}
+             className="bg-red-600 hover:bg-red-700 w-full"
+           >
+             {permanentDeleteMutation.isPending ? 'Deleting...' : 'Delete Permanently'}
+           </AlertDialogAction>
+           <AlertDialogCancel className="w-full">Cancel</AlertDialogCancel>
           </div>
           </AlertDialogContent>
           </AlertDialog>

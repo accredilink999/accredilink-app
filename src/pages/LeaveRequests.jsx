@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
+import { toast } from 'sonner';
 import { format, differenceInDays } from 'date-fns';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -99,15 +101,53 @@ export default function LeaveRequests() {
     });
   };
 
-  const handleApprove = (request) => {
-    updateMutation.mutate({
-      id: request.id,
-      data: {
-        status: 'approved',
-        reviewed_by: user?.id,
-        reviewed_by_name: user?.full_name
+  const handleApprove = async (request) => {
+    try {
+      // 1. Find all shifts for this staff in the leave date range
+      const { data: affectedShifts = [] } = await supabase
+        .from('shifts')
+        .select('id, paired_shift_id')
+        .eq('staff_id', request.staff_id)
+        .gte('date', request.start_date)
+        .lte('date', request.end_date);
+
+      // 2. Clear staff from affected shifts (revert to blank/available)
+      for (const shift of affectedShifts) {
+        await supabase.from('shift_calls').delete().eq('shift_id', shift.id);
+        if (shift.paired_shift_id) {
+          await supabase.from('shifts')
+            .update({ paired_shift_id: null, paired_staff_name: null })
+            .eq('id', shift.paired_shift_id);
+        }
+        await supabase.from('shifts')
+          .update({
+            staff_id: null, staff_name: null,
+            paired_shift_id: null, paired_staff_name: null,
+            shift_pattern_id: null, is_base_shift: true,
+            status: 'available_cover'
+          })
+          .eq('id', shift.id);
       }
-    });
+
+      // 3. Update leave request status
+      updateMutation.mutate({
+        id: request.id,
+        data: {
+          status: 'approved',
+          reviewed_by: user?.id,
+          reviewed_by_name: user?.full_name
+        }
+      });
+
+      if (affectedShifts.length > 0) {
+        toast.success(`Leave approved — ${affectedShifts.length} shift(s) cleared from rota`);
+      }
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      queryClient.invalidateQueries({ queryKey: ['todayShifts'] });
+    } catch (err) {
+      console.error('Leave approval error:', err);
+      toast.error('Failed to clear shifts: ' + (err.message || 'Unknown error'));
+    }
   };
 
   const handleReject = (request) => {

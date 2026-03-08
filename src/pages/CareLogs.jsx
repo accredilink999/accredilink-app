@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { ShiftApi } from '@/api/rotaApi';
-import { format, parseISO, isToday, isYesterday } from 'date-fns';
+import { format, parseISO, isToday, isYesterday, subDays, isAfter, isBefore, startOfDay } from 'date-fns';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +47,7 @@ const intakeColors = {
 export default function CareLogs() {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState('all');
+  const [customDate, setCustomDate] = useState('');
   const [serviceUserFilter, setServiceUserFilter] = useState('all');
   const [selectedLog, setSelectedLog] = useState(null);
   const [showCareLogForm, setShowCareLogForm] = useState(false);
@@ -65,7 +66,7 @@ export default function CareLogs() {
 
   const { data: careLogs = [] } = useQuery({
     queryKey: ['careLogs'],
-    queryFn: () => base44.entities.CareLog.list('-created_date', 200),
+    queryFn: () => base44.entities.CareLog.list('-created_date', 500),
   });
 
   const { data: serviceUsers = [] } = useQuery({
@@ -100,6 +101,12 @@ export default function CareLogs() {
       matchesDate = isToday(parseISO(log.visit_date));
     } else if (dateFilter === 'yesterday') {
       matchesDate = isYesterday(parseISO(log.visit_date));
+    } else if (dateFilter === 'last7') {
+      matchesDate = isAfter(parseISO(log.visit_date), subDays(new Date(), 7));
+    } else if (dateFilter === 'last30') {
+      matchesDate = isAfter(parseISO(log.visit_date), subDays(new Date(), 30));
+    } else if (dateFilter === 'custom' && customDate) {
+      matchesDate = log.visit_date === customDate;
     }
     
     return matchesSearch && matchesServiceUser && matchesDate;
@@ -184,8 +191,19 @@ export default function CareLogs() {
               <SelectItem value="all">All Dates</SelectItem>
               <SelectItem value="today">Today</SelectItem>
               <SelectItem value="yesterday">Yesterday</SelectItem>
+              <SelectItem value="last7">Last 7 Days</SelectItem>
+              <SelectItem value="last30">Last 30 Days</SelectItem>
+              <SelectItem value="custom">Pick Date</SelectItem>
             </SelectContent>
           </Select>
+          {dateFilter === 'custom' && (
+            <Input
+              type="date"
+              value={customDate}
+              onChange={(e) => setCustomDate(e.target.value)}
+              className="w-full sm:w-40"
+            />
+          )}
           <Select value={serviceUserFilter} onValueChange={setServiceUserFilter}>
             <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="Service User" />
