@@ -47,6 +47,7 @@ import CourseSeeder from './pages/CourseSeeder';
 import OrgAdmin from './pages/OrgAdmin';
 import LegalPages from './pages/LegalPages';
 import PhotoGallery from './pages/PhotoGallery';
+import StaffAwards from './pages/StaffAwards';
 import __Layout from './Layout.jsx';
 
 
@@ -97,6 +98,7 @@ export const PAGES = {
     "OrgAdmin": OrgAdmin,
     "LegalPages": LegalPages,
     "PhotoGallery": PhotoGallery,
+    "StaffAwards": StaffAwards,
 }
 
 export const pagesConfig = {

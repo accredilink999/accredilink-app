@@ -33,7 +33,8 @@ import {
         Star,
         FileText,
         Scale,
-        ImagePlus
+        ImagePlus,
+        Trophy
       } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -65,6 +66,7 @@ export default function AdminDashboard() {
           { to: 'AIAssistant', label: 'AI Assistant', icon: Bot, bg: 'from-purple-400 to-purple-600', desc: 'AI admin helper' },
           { to: 'Documents', label: 'Files', icon: FileText, bg: 'from-blue-400 to-blue-600', desc: 'File management' },
           { to: 'LegalPages', label: 'Legal Docs', icon: Scale, bg: 'from-gray-400 to-gray-600', desc: 'Terms & policies' },
+          { to: 'StaffAwards', label: 'Staff Awards', icon: Trophy, bg: 'from-amber-400 to-yellow-500', desc: 'Recognise your team' },
         ].map(section => {
           const Icon = section.icon;
           return (
