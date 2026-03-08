@@ -40,6 +40,25 @@ const EMOJI_OPTIONS = [
   '🚀', '⚡', '🎵', '📣', '🛡️', '🧠', '❤️‍🔥', '💯',
 ];
 
+const SUGGESTED_AWARDS = [
+  { name: 'Star Performer',       emoji: '⭐', color: 'amber' },
+  { name: 'Team Player',          emoji: '🤝', color: 'blue' },
+  { name: 'Above & Beyond',       emoji: '🚀', color: 'purple' },
+  { name: 'Compassionate Care',   emoji: '❤️', color: 'rose' },
+  { name: 'Client Feedback Star', emoji: '🌟', color: 'amber' },
+  { name: 'Punctuality Champion', emoji: '⏰', color: 'emerald' },
+  { name: 'Great Teamwork',       emoji: '🙌', color: 'cyan' },
+  { name: 'Problem Solver',       emoji: '🧠', color: 'purple' },
+  { name: 'Brightest Smile',      emoji: '😁', color: 'orange' },
+  { name: 'Most Improved',        emoji: '📈', color: 'emerald' },
+  { name: 'Night Owl',            emoji: '🦉', color: 'blue' },
+  { name: 'Mentor of the Month',  emoji: '🎓', color: 'cyan' },
+  { name: 'Safety Champion',      emoji: '🛡️', color: 'emerald' },
+  { name: 'GOAT',                 emoji: '🐐', color: 'amber' },
+  { name: 'Kindness Award',       emoji: '🫶', color: 'pink' },
+  { name: 'Early Bird',           emoji: '🐝', color: 'orange' },
+];
+
 function getColorDef(name) {
   return COLOR_OPTIONS.find(c => c.name === name) || COLOR_OPTIONS[0];
 }
@@ -98,6 +117,43 @@ export default function StaffAwards() {
       if (error) { console.warn('staff_awards query:', error.message); return []; }
       return data || [];
     },
+  });
+
+  // Quick-add a suggested award type
+  const addSuggestedMutation = useMutation({
+    mutationFn: async (suggestion) => {
+      const { error } = await supabase.from('award_types').insert({
+        organization_id: getCurrentOrgId(),
+        name: suggestion.name,
+        emoji: suggestion.emoji,
+        color: suggestion.color,
+      });
+      if (error) throw error;
+    },
+    onSuccess: (_, suggestion) => {
+      toast.success(`"${suggestion.name}" added!`);
+      queryClient.invalidateQueries({ queryKey: ['awardTypes'] });
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  // Add all suggested awards at once
+  const addAllSuggestedMutation = useMutation({
+    mutationFn: async () => {
+      const orgId = getCurrentOrgId();
+      const existingNames = new Set(awardTypes.map(t => t.name.toLowerCase()));
+      const toAdd = SUGGESTED_AWARDS
+        .filter(s => !existingNames.has(s.name.toLowerCase()))
+        .map(s => ({ organization_id: orgId, name: s.name, emoji: s.emoji, color: s.color }));
+      if (toAdd.length === 0) throw new Error('All suggested awards already added');
+      const { error } = await supabase.from('award_types').insert(toAdd);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('All suggested awards added!');
+      queryClient.invalidateQueries({ queryKey: ['awardTypes'] });
+    },
+    onError: (err) => toast.error(err.message),
   });
 
   // Create award type
@@ -256,8 +312,43 @@ export default function StaffAwards() {
           </button>
         </div>
 
-        {awardTypes.length === 0 && (
-          <p className="text-sm text-slate-400 text-center mt-2">Create your first award type to get started</p>
+        {/* Suggested Awards — show when org has fewer than 16 custom types */}
+        {awardTypes.length < 16 && (
+          <div className="mt-5">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400">Suggested Awards — tap to add</h3>
+              {awardTypes.length === 0 && (
+                <button
+                  onClick={() => addAllSuggestedMutation.mutate()}
+                  disabled={addAllSuggestedMutation.isPending}
+                  className="text-xs text-amber-600 hover:text-amber-700 font-medium"
+                >
+                  {addAllSuggestedMutation.isPending ? 'Adding...' : 'Add all'}
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+              {SUGGESTED_AWARDS
+                .filter(s => !awardTypes.some(t => t.name.toLowerCase() === s.name.toLowerCase()))
+                .map(s => {
+                  const c = getColorDef(s.color);
+                  return (
+                    <button
+                      key={s.name}
+                      onClick={() => addSuggestedMutation.mutate(s)}
+                      disabled={addSuggestedMutation.isPending}
+                      className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 dark:border-slate-600 p-2 min-h-[70px] hover:border-amber-400 hover:bg-amber-50/50 dark:hover:bg-amber-950/20 transition-all active:scale-95"
+                      title={s.name}
+                    >
+                      <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${c.bg} flex items-center justify-center mb-1 shadow-sm opacity-70`}>
+                        <span className="text-lg">{s.emoji}</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 text-center leading-tight line-clamp-2">{s.name}</span>
+                    </button>
+                  );
+                })}
+            </div>
+          </div>
         )}
       </div>
 
