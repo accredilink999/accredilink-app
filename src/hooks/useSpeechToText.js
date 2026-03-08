@@ -2,10 +2,9 @@
  * useSpeechToText — Universal speech-to-text hook.
  *
  * Strategy:
- * 1. On desktop Chrome: Use Web Speech API (SpeechRecognition)
- * 2. On Capacitor / mobile: Use native file capture (opens device recorder)
- *    then transcribe via Groq Whisper
- * 3. Fallback: MediaRecorder + Whisper (if getUserMedia works)
+ * 1. On Capacitor native (iOS/Android): @capacitor-community/speech-recognition
+ * 2. On desktop Chrome: Web Speech API (SpeechRecognition)
+ * 3. Fallback: MediaRecorder + Whisper transcription
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react'
@@ -14,11 +13,19 @@ import { toast } from 'sonner'
 
 const isCapacitor = () => !!window.Capacitor?.isNativePlatform?.()
 
-/** Check if native SpeechRecognition API is available AND functional */
+/** Check if Web Speech API is available (desktop Chrome only) */
 function hasSpeechRecognition() {
-  // Exclude Capacitor WebViews — SpeechRecognition exists but doesn't work
   if (isCapacitor()) return false
   return 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window
+}
+
+/** Lazy-load the Capacitor speech plugin only on native */
+let _nativeSR = null
+async function getNativeSpeechRecognition() {
+  if (_nativeSR) return _nativeSR
+  const mod = await import('@capacitor-community/speech-recognition')
+  _nativeSR = mod.SpeechRecognition
+  return _nativeSR
 }
 
 export default function useSpeechToText({ onResult, onError, lang = 'en-GB', continuous = false } = {}) {
@@ -29,32 +36,13 @@ export default function useSpeechToText({ onResult, onError, lang = 'en-GB', con
   const audioChunksRef = useRef([])
   const streamRef = useRef(null)
   const isListeningRef = useRef(false)
-  const fileInputRef = useRef(null)
+  const nativeListeningRef = useRef(false)
 
   // Keep refs in sync with latest callbacks to avoid stale closures
   const onResultRef = useRef(onResult)
   const onErrorRef = useRef(onError)
   useEffect(() => { onResultRef.current = onResult }, [onResult])
   useEffect(() => { onErrorRef.current = onError }, [onError])
-
-  // Create hidden file input for native audio capture (mobile/Capacitor)
-  useEffect(() => {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = 'audio/*'
-    input.capture = 'microphone'
-    input.style.display = 'none'
-    input.setAttribute('id', 'speech-to-text-file-input')
-    document.body.appendChild(input)
-    fileInputRef.current = input
-
-    input.addEventListener('change', handleFileSelected)
-
-    return () => {
-      input.removeEventListener('change', handleFileSelected)
-      if (input.parentNode) input.parentNode.removeChild(input)
-    }
-  }, [])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -68,12 +56,16 @@ export default function useSpeechToText({ onResult, onError, lang = 'en-GB', con
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(t => t.stop())
       }
+      if (nativeListeningRef.current) {
+        getNativeSpeechRecognition().then(SR => SR.stop()).catch(() => {})
+      }
     }
   }, [])
 
   const handleError = useCallback((msg) => {
     console.warn('[SpeechToText] Error:', msg)
     isListeningRef.current = false
+    nativeListeningRef.current = false
     setIsListening(false)
     setIsTranscribing(false)
     if (onErrorRef.current) {
@@ -83,7 +75,7 @@ export default function useSpeechToText({ onResult, onError, lang = 'en-GB', con
     }
   }, [])
 
-  /** Process a captured audio file (from file input or MediaRecorder) */
+  /** Process a captured audio blob via Whisper (fallback only) */
   const transcribeAudioBlob = useCallback(async (blob) => {
     setIsTranscribing(true)
     try {
@@ -122,30 +114,62 @@ export default function useSpeechToText({ onResult, onError, lang = 'en-GB', con
     }
   }, [handleError])
 
-  /** Handle file selected from native audio capture */
-  const handleFileSelected = useCallback((event) => {
-    const file = event.target?.files?.[0]
-    if (file) {
-      transcribeAudioBlob(file)
-    }
-    // Reset the input so the same file can be selected again
-    if (event.target) event.target.value = ''
-  }, [transcribeAudioBlob])
-
-  // Re-attach event listener when handler changes
-  useEffect(() => {
-    const input = fileInputRef.current
-    if (!input) return
-    input.removeEventListener('change', handleFileSelected)
-    input.addEventListener('change', handleFileSelected)
-    return () => input.removeEventListener('change', handleFileSelected)
-  }, [handleFileSelected])
-
   /** Start listening — picks the best available method */
   const startListening = useCallback(async () => {
     if (isListeningRef.current) return
 
-    // ── Method 1: Native SpeechRecognition (desktop Chrome only) ──
+    // ── Method 1: Capacitor native speech recognition ──
+    if (isCapacitor()) {
+      try {
+        const SR = await getNativeSpeechRecognition()
+
+        const { available } = await SR.available()
+        if (!available) {
+          handleError('Speech recognition not available on this device')
+          return
+        }
+
+        const perms = await SR.requestPermissions()
+        if (perms.speechRecognition !== 'granted') {
+          handleError('Speech recognition permission denied. Please allow in device settings.')
+          return
+        }
+
+        isListeningRef.current = true
+        nativeListeningRef.current = true
+        setIsListening(true)
+        toast.info('Listening... tap mic to stop', { duration: 3000 })
+
+        const result = await SR.start({
+          language: lang,
+          maxResults: 3,
+          partialResults: false,
+          popup: false,
+        })
+
+        isListeningRef.current = false
+        nativeListeningRef.current = false
+        setIsListening(false)
+
+        if (result?.matches?.length > 0) {
+          if (onResultRef.current) onResultRef.current(result.matches[0])
+          toast.success('Speech added', { duration: 1500 })
+        } else {
+          handleError('No speech detected. Please try again.')
+        }
+        return
+      } catch (err) {
+        isListeningRef.current = false
+        nativeListeningRef.current = false
+        setIsListening(false)
+        console.error('[SpeechToText] Native speech error:', err)
+        if (err?.message?.includes('canceled') || err?.message?.includes('Canceled')) return
+        handleError('Speech error: ' + (err.message || 'Unknown'))
+        return
+      }
+    }
+
+    // ── Method 2: Web Speech API (desktop Chrome) ──
     if (hasSpeechRecognition()) {
       try {
         const SR = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -183,14 +207,6 @@ export default function useSpeechToText({ onResult, onError, lang = 'en-GB', con
         return
       } catch (err) {
         console.warn('[SpeechToText] SpeechRecognition failed:', err)
-      }
-    }
-
-    // ── Method 2: On Capacitor/mobile — use native file capture ──
-    if (isCapacitor() || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) {
-      if (fileInputRef.current) {
-        fileInputRef.current.click()
-        return
       }
     }
 
@@ -241,25 +257,28 @@ export default function useSpeechToText({ onResult, onError, lang = 'en-GB', con
         return
       } catch (err) {
         console.error('[SpeechToText] MediaRecorder error:', err)
-        // Fall through to file input as last resort
       }
-    }
-
-    // ── Last resort: file input on any platform ──
-    if (fileInputRef.current) {
-      fileInputRef.current.click()
-      return
     }
 
     handleError('Speech input is not supported on this device/browser.')
   }, [handleError, lang, continuous, transcribeAudioBlob])
 
   /** Stop listening */
-  const stopListening = useCallback(() => {
+  const stopListening = useCallback(async () => {
+    // Native Capacitor speech
+    if (nativeListeningRef.current) {
+      try {
+        const SR = await getNativeSpeechRecognition()
+        await SR.stop()
+      } catch {}
+      nativeListeningRef.current = false
+    }
+    // Web Speech API
     if (recognitionRef.current) {
       try { recognitionRef.current.stop() } catch {}
       recognitionRef.current = null
     }
+    // MediaRecorder
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop()
       mediaRecorderRef.current = null

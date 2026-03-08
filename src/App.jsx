@@ -19,6 +19,8 @@ import AppUpdateChecker from '@/components/AppUpdateChecker';
 import HelpNudge from '@/components/HelpNudge';
 import { initOrg, resetOrg, checkOrgAccess } from '@/lib/orgContext';
 import SubscriptionGate from '@/components/billing/SubscriptionGate';
+import OrgSetup from '@/pages/OrgSetup';
+import TermsConsentGate from '@/components/TermsConsentGate';
 import { supabase } from '@/api/supabaseClient';
 
 const { Pages, Layout, mainPage } = pagesConfig;
@@ -34,6 +36,8 @@ const AppShell = () => {
   const location = useLocation();
   const hasEverAuthedRef = useRef(false);
   const [orgReady, setOrgReady] = useState(null); // null = loading, true = ready
+  const [needsOrgSetup, setNeedsOrgSetup] = useState(false);
+  const [needsTermsConsent, setNeedsTermsConsent] = useState(false);
 
   if (isAuthenticated) hasEverAuthedRef.current = true;
 
@@ -88,7 +92,10 @@ const AppShell = () => {
           }
         }
 
-        // Always let the user through — no org membership just means legacy user
+        // No org and no signup metadata → fresh App Store user, show OrgSetup
+        if (!companyName && !inviteCode) {
+          setNeedsOrgSetup(true);
+        }
         setOrgReady(true);
       } catch (err) {
         console.error('Org init error:', err);
@@ -98,6 +105,28 @@ const AppShell = () => {
 
     initOrgContext();
   }, [isAuthenticated]);
+
+  // Check terms acceptance after auth — required by App Store & Google Play
+  useEffect(() => {
+    if (!isAuthenticated || !orgReady) return;
+    const checkTerms = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('terms_accepted_at')
+          .eq('id', user.id)
+          .single();
+        if (!profile?.terms_accepted_at) {
+          setNeedsTermsConsent(true);
+        }
+      } catch {
+        // If the column doesn't exist yet, skip the gate
+      }
+    };
+    checkTerms();
+  }, [isAuthenticated, orgReady]);
 
   const isLoading = isLoadingPublicSettings || isLoadingAuth;
 
@@ -130,6 +159,16 @@ const AppShell = () => {
 
   // Wait for org context to initialize
   if (orgReady === null && isAuthenticated) return null;
+
+  // New user with no org — show OrgSetup (existing users with orgs skip this entirely)
+  if (needsOrgSetup && isAuthenticated) {
+    return <OrgSetup onComplete={async () => { setNeedsOrgSetup(false); resetOrg(); await initOrg(); }} />;
+  }
+
+  // Terms consent gate — required by Apple App Store & Google Play
+  if (needsTermsConsent && isAuthenticated) {
+    return <TermsConsentGate onAccepted={() => setNeedsTermsConsent(false)} />;
+  }
 
   // Subscription gating — block access if trial expired or subscription cancelled
   // Settings page is always accessible so users can reach billing

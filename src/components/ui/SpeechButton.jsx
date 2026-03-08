@@ -1,9 +1,9 @@
 /**
  * SpeechButton — Mic button for speech-to-text.
  *
+ * On Capacitor native (iOS/Android): Uses @capacitor-community/speech-recognition
  * On desktop Chrome: Uses Web Speech API for live transcription.
- * On mobile/Capacitor: Records audio via MediaRecorder, transcribes via Whisper.
- * Last resort: Native file input for audio capture.
+ * Fallback: MediaRecorder + Whisper transcription.
  */
 
 import React, { useState, useRef, useCallback } from 'react'
@@ -19,6 +19,15 @@ function hasSpeechRecognition() {
   return 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window
 }
 
+/** Lazy-load the Capacitor speech plugin only on native */
+let _nativeSR = null
+async function getNativeSpeechRecognition() {
+  if (_nativeSR) return _nativeSR
+  const mod = await import('@capacitor-community/speech-recognition')
+  _nativeSR = mod.SpeechRecognition
+  return _nativeSR
+}
+
 export default function SpeechButton({ onResult, className = '', size = 'icon', lang = 'en-GB' }) {
   const [isListening, setIsListening] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
@@ -26,10 +35,11 @@ export default function SpeechButton({ onResult, className = '', size = 'icon', 
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
   const streamRef = useRef(null)
+  const nativeListeningRef = useRef(false)
   const onResultRef = useRef(onResult)
   onResultRef.current = onResult
 
-  // ── Transcribe audio blob via Whisper ──
+  // ── Transcribe audio blob via Whisper (fallback only) ──
   const transcribeBlob = useCallback(async (blob) => {
     setIsTranscribing(true)
     try {
@@ -80,7 +90,69 @@ export default function SpeechButton({ onResult, className = '', size = 'icon', 
     setIsListening(false)
   }, [])
 
-  // ── Start MediaRecorder (for Capacitor / mobile) ──
+  // ── Capacitor native speech recognition ──
+  const startNativeSpeech = useCallback(async () => {
+    try {
+      const SR = await getNativeSpeechRecognition()
+
+      // Check availability
+      const { available } = await SR.available()
+      if (!available) {
+        toast.error('Speech recognition not available on this device')
+        return
+      }
+
+      // Request permissions
+      const perms = await SR.requestPermissions()
+      if (perms.speechRecognition !== 'granted') {
+        toast.error('Speech recognition permission denied. Please allow in device settings.')
+        return
+      }
+
+      setIsListening(true)
+      nativeListeningRef.current = true
+      toast.info('Listening... tap mic to stop', { duration: 3000 })
+
+      // start() returns { matches: string[] } when user stops speaking
+      const result = await SR.start({
+        language: lang,
+        maxResults: 3,
+        partialResults: false,
+        popup: false,
+      })
+
+      nativeListeningRef.current = false
+      setIsListening(false)
+
+      if (result?.matches?.length > 0) {
+        const transcript = result.matches[0]
+        if (onResultRef.current) onResultRef.current(transcript)
+        toast.success('Speech added', { duration: 1500 })
+      } else {
+        toast.error('No speech detected. Try again.')
+      }
+    } catch (err) {
+      nativeListeningRef.current = false
+      setIsListening(false)
+      console.error('[SpeechButton] Native speech error:', err)
+      if (err?.message?.includes('canceled') || err?.message?.includes('Canceled')) {
+        // User cancelled — no error needed
+        return
+      }
+      toast.error('Speech error: ' + (err.message || 'Unknown'))
+    }
+  }, [lang])
+
+  const stopNativeSpeech = useCallback(async () => {
+    try {
+      const SR = await getNativeSpeechRecognition()
+      await SR.stop()
+    } catch {}
+    nativeListeningRef.current = false
+    setIsListening(false)
+  }, [])
+
+  // ── Start MediaRecorder (fallback for non-Chrome desktop) ──
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -169,9 +241,11 @@ export default function SpeechButton({ onResult, className = '', size = 'icon', 
   const handleClick = useCallback(() => {
     if (isTranscribing) return
 
-    // Currently recording → stop
+    // Currently listening → stop
     if (isListening) {
-      if (recognitionRef.current) {
+      if (nativeListeningRef.current) {
+        stopNativeSpeech()
+      } else if (recognitionRef.current) {
         try { recognitionRef.current.stop() } catch {}
         recognitionRef.current = null
         setIsListening(false)
@@ -181,62 +255,48 @@ export default function SpeechButton({ onResult, className = '', size = 'icon', 
       return
     }
 
-    // Desktop: use SpeechRecognition
+    // Capacitor native: use native speech recognition plugin
+    if (isCapacitor()) {
+      startNativeSpeech()
+      return
+    }
+
+    // Desktop: use Web SpeechRecognition API
     if (hasSpeechRecognition()) {
       startSpeechRecognition()
       return
     }
 
-    // Mobile/Capacitor: use MediaRecorder + Whisper
+    // Fallback: MediaRecorder + Whisper
     if ('MediaRecorder' in window && navigator.mediaDevices?.getUserMedia) {
       startRecording()
       return
     }
 
     toast.error('Voice input not supported on this device')
-  }, [isListening, isTranscribing, startSpeechRecognition, startRecording, stopRecording])
-
-  const useMobile = !hasSpeechRecognition()
+  }, [isListening, isTranscribing, startNativeSpeech, stopNativeSpeech, startSpeechRecognition, startRecording, stopRecording])
 
   return (
-    <>
-      <Button
-        type="button"
-        variant="ghost"
-        size={size}
-        onClick={handleClick}
-        disabled={isTranscribing}
-        className={`${
-          isTranscribing
-            ? 'bg-amber-500 text-white hover:bg-amber-600'
-            : isListening
-              ? 'bg-red-500 text-white hover:bg-red-600 animate-pulse'
-              : 'bg-blue-500 text-white hover:bg-blue-600'
-        } ${className}`}
-        title={isTranscribing ? 'Transcribing...' : isListening ? 'Tap to stop' : 'Tap to speak'}
-      >
-        {isTranscribing
-          ? <Loader2 className="w-4 h-4 animate-spin" />
+    <Button
+      type="button"
+      variant="ghost"
+      size={size}
+      onClick={handleClick}
+      disabled={isTranscribing}
+      className={`${
+        isTranscribing
+          ? 'bg-amber-500 text-white hover:bg-amber-600'
           : isListening
-            ? <MicOff className="w-4 h-4" />
-            : <Mic className="w-4 h-4" />}
-      </Button>
-
-      {/* Hidden file input as last-resort fallback — only used if MediaRecorder fails */}
-      {useMobile && (
-        <input
-          type="file"
-          accept="audio/*"
-          capture="user"
-          className="hidden"
-          id="speech-fallback-input"
-          onChange={(e) => {
-            const file = e.target.files?.[0]
-            if (file) transcribeBlob(file)
-            e.target.value = ''
-          }}
-        />
-      )}
-    </>
+            ? 'bg-red-500 text-white hover:bg-red-600 animate-pulse'
+            : 'bg-blue-500 text-white hover:bg-blue-600'
+      } ${className}`}
+      title={isTranscribing ? 'Transcribing...' : isListening ? 'Tap to stop' : 'Tap to speak'}
+    >
+      {isTranscribing
+        ? <Loader2 className="w-4 h-4 animate-spin" />
+        : isListening
+          ? <MicOff className="w-4 h-4" />
+          : <Mic className="w-4 h-4" />}
+    </Button>
   )
 }

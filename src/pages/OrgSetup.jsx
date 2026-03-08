@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '@/api/supabaseClient'
 import { initOrg } from '@/lib/orgContext'
-import { Building2, ArrowRight, Loader2, KeyRound } from 'lucide-react'
+import { Building2, ArrowRight, Loader2, KeyRound, LogOut } from 'lucide-react'
 
 export default function OrgSetup({ onComplete }) {
   const [mode, setMode] = useState('create') // 'create' = new org (default for signups), 'join' = invite code
@@ -10,6 +10,12 @@ export default function OrgSetup({ onComplete }) {
   const [foundOrg, setFoundOrg] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const isDark = document.documentElement.classList.contains('dark')
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    window.location.href = '/login'
+  }
 
   const generateSlug = (name) =>
     name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60)
@@ -109,21 +115,21 @@ export default function OrgSetup({ onComplete }) {
   // Join with invite code
   if (mode === 'join') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
+      <div className={`min-h-screen flex items-center justify-center p-4 ${isDark ? 'bg-slate-900' : 'bg-gradient-to-br from-slate-50 to-slate-100'}`}>
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-teal-600 text-white mb-4">
               <KeyRound className="w-8 h-8" />
             </div>
-            <h1 className="text-2xl font-bold text-slate-900">Join Your Team</h1>
-            <p className="text-slate-500 mt-2">
+            <h1 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Join Your Team</h1>
+            <p className={`mt-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               Enter the invite code your manager gave you.
             </p>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+          <div className={`rounded-xl shadow-sm border p-6 space-y-4 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
+              <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                 Invite Code
               </label>
               <input
@@ -131,20 +137,20 @@ export default function OrgSetup({ onComplete }) {
                 value={inviteCode}
                 onChange={(e) => { setInviteCode(e.target.value.toUpperCase()); setFoundOrg(null); setError(null) }}
                 placeholder="e.g. A1B2C3D4"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none text-center text-lg tracking-widest font-mono uppercase"
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none text-center text-lg tracking-widest font-mono uppercase ${isDark ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'border-slate-300'}`}
                 maxLength={12}
                 autoFocus
               />
             </div>
 
             {error && (
-              <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+              <p className={`text-sm px-3 py-2 rounded-lg ${isDark ? 'text-red-400 bg-red-900/30' : 'text-red-600 bg-red-50'}`}>{error}</p>
             )}
 
             {foundOrg && (
-              <div className="bg-teal-50 border border-teal-200 rounded-lg p-3">
-                <p className="text-sm font-medium text-teal-800">Organisation found:</p>
-                <p className="text-lg font-bold text-teal-900">{foundOrg.name}</p>
+              <div className={`border rounded-lg p-3 ${isDark ? 'bg-teal-900/30 border-teal-700' : 'bg-teal-50 border-teal-200'}`}>
+                <p className={`text-sm font-medium ${isDark ? 'text-teal-400' : 'text-teal-800'}`}>Organisation found:</p>
+                <p className={`text-lg font-bold ${isDark ? 'text-teal-300' : 'text-teal-900'}`}>{foundOrg.name}</p>
               </div>
             )}
 
@@ -173,9 +179,17 @@ export default function OrgSetup({ onComplete }) {
 
             <button
               onClick={() => { setMode('create'); setError(null); setFoundOrg(null); setInviteCode('') }}
-              className="w-full text-sm text-slate-500 hover:text-slate-700"
+              className={`w-full text-sm ${isDark ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700'}`}
             >
               &larr; Create a new organisation instead
+            </button>
+
+            <button
+              onClick={handleLogout}
+              className={`w-full flex items-center justify-center gap-2 text-sm pt-2 ${isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              Sign Out
             </button>
           </div>
         </div>
@@ -183,23 +197,23 @@ export default function OrgSetup({ onComplete }) {
     )
   }
 
-  // Step 2b: Create new org
+  // Create new org
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
+    <div className={`min-h-screen flex items-center justify-center p-4 ${isDark ? 'bg-slate-900' : 'bg-gradient-to-br from-slate-50 to-slate-100'}`}>
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-teal-600 text-white mb-4">
             <Building2 className="w-8 h-8" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">Create Your Organisation</h1>
-          <p className="text-slate-500 mt-2">
+          <h1 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Create Your Organisation</h1>
+          <p className={`mt-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
             Set up your care company on CareCall AI.
           </p>
         </div>
 
-        <form onSubmit={handleCreate} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+        <form onSubmit={handleCreate} className={`rounded-xl shadow-sm border p-6 space-y-4 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
               Organisation Name
             </label>
             <input
@@ -207,19 +221,19 @@ export default function OrgSetup({ onComplete }) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Sunrise Domiciliary Care"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none ${isDark ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'border-slate-300'}`}
               required
               autoFocus
             />
             {name.trim() && (
-              <p className="text-xs text-slate-400 mt-1">
+              <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                 URL: carecall.ai/{generateSlug(name.trim())}
               </p>
             )}
           </div>
 
           {error && (
-            <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+            <p className={`text-sm px-3 py-2 rounded-lg ${isDark ? 'text-red-400 bg-red-900/30' : 'text-red-600 bg-red-50'}`}>{error}</p>
           )}
 
           <button
@@ -237,11 +251,11 @@ export default function OrgSetup({ onComplete }) {
             )}
           </button>
 
-          <p className="text-xs text-center text-slate-400">
+          <p className={`text-xs text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             14-day free trial. No credit card required.
           </p>
 
-          <p className="text-xs text-center text-slate-400">
+          <p className={`text-xs text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             Have an invite code from your manager?{' '}
             <button
               type="button"
@@ -251,6 +265,15 @@ export default function OrgSetup({ onComplete }) {
               Join your team
             </button>
           </p>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            className={`w-full flex items-center justify-center gap-2 text-sm pt-2 ${isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'}`}
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            Sign Out
+          </button>
         </form>
       </div>
     </div>

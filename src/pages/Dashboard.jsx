@@ -41,7 +41,8 @@ import {
   PoundSterling,
   CalendarOff,
   Heart,
-  Bot } from
+  Bot,
+  Star } from
 'lucide-react';
 import ShiftSwapResponseModal from '@/components/rota/ShiftSwapResponseModal';
 import HelpTip from '@/components/ui/HelpTip';
@@ -565,6 +566,7 @@ export default function Dashboard() {
             ...(isAdmin ? [
               { to: 'Payroll', label: 'Payroll', icon: PoundSterling, bg: 'from-emerald-400 to-emerald-600' },
             ] : []),
+            { to: 'Feedback', label: 'Feedback', icon: Star, bg: 'from-amber-400 to-yellow-500' },
             { to: 'AIAssistant', label: 'AI', icon: Bot, bg: 'from-purple-400 to-purple-600' },
           ].map(section => {
             const Icon = section.icon;

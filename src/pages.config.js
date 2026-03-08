@@ -20,7 +20,7 @@ import DataImport from './pages/DataImport';
 import Dashboard from './pages/Dashboard';
 import DocumentManagement from './pages/DocumentManagement';
 import Documents from './pages/Documents';
-import ErrorLog from './pages/ErrorLog';
+import Feedback from './pages/Feedback';
 import Expenses from './pages/Expenses';
 import FormBuilder from './pages/FormBuilder';
 import HowToUseApp from './pages/HowToUseApp';
@@ -32,7 +32,6 @@ import Messages from './pages/Messages';
 import NotificationCenter from './pages/NotificationCenter';
 import Payroll from './pages/Payroll';
 import Profile from './pages/Profile';
-import PushNotificationManagement from './pages/PushNotificationManagement';
 import Reports from './pages/Reports';
 import RequestsManagement from './pages/RequestsManagement';
 import Rota from './pages/Rota';
@@ -46,6 +45,7 @@ import ClinicalDashboard from './pages/ClinicalDashboard';
 import ControlRoom from './pages/ControlRoom';
 import CourseSeeder from './pages/CourseSeeder';
 import OrgAdmin from './pages/OrgAdmin';
+import LegalPages from './pages/LegalPages';
 import __Layout from './Layout.jsx';
 
 
@@ -69,8 +69,8 @@ export const PAGES = {
     "Dashboard": Dashboard,
     "DocumentManagement": DocumentManagement,
     "Documents": Documents,
-    "ErrorLog": ErrorLog,
     "Expenses": Expenses,
+    "Feedback": Feedback,
     "FormBuilder": FormBuilder,
     "HowToUseApp": HowToUseApp,
     "Incidents": Incidents,
@@ -81,7 +81,6 @@ export const PAGES = {
     "NotificationCenter": NotificationCenter,
     "Payroll": Payroll,
     "Profile": Profile,
-    "PushNotificationManagement": PushNotificationManagement,
     "Reports": Reports,
     "RequestsManagement": RequestsManagement,
     "Rota": Rota,
@@ -95,6 +94,7 @@ export const PAGES = {
     "ControlRoom": ControlRoom,
     "CourseSeeder": CourseSeeder,
     "OrgAdmin": OrgAdmin,
+    "LegalPages": LegalPages,
 }
 
 export const pagesConfig = {

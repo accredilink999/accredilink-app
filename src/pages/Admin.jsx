@@ -12,7 +12,6 @@ import {
         Calendar,
         MessageCircle,
         FolderOpen,
-        Bell,
         Briefcase,
         PoundSterling,
         BarChart3,
@@ -27,11 +26,11 @@ import {
         Bot,
         CheckSquare,
         Download,
-        Bug,
         FileSpreadsheet,
         Video,
         Activity,
-        Building2
+        Building2,
+        Star
       } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -166,11 +165,10 @@ export default function AdminDashboard() {
         {[
           { to: 'Messages', label: 'Messages', icon: MessageCircle, bg: 'from-pink-400 to-pink-600', desc: 'Communication hub' },
           { to: 'Communications', label: 'Video', icon: Video, bg: 'from-blue-400 to-blue-600', desc: 'Video comms' },
-          { to: 'PushNotificationManagement', label: 'Push', icon: Bell, bg: 'from-indigo-400 to-indigo-600', desc: 'Push notifications' },
           { to: 'Reports', label: 'Reports', icon: BarChart3, bg: 'from-sky-400 to-sky-600', desc: 'Reports & analytics' },
           { to: 'AppDownloads', label: 'Downloads', icon: Download, bg: 'from-emerald-400 to-emerald-600', desc: 'App downloads' },
-          { to: 'ErrorLog', label: 'Errors', icon: Bug, bg: 'from-red-400 to-red-600', desc: 'Error log' },
           { to: 'DataImport', label: 'Import', icon: FileSpreadsheet, bg: 'from-amber-400 to-amber-600', desc: 'CSV data import' },
+          { to: 'Feedback', label: 'Feedback', icon: Star, bg: 'from-yellow-400 to-amber-500', desc: 'Client feedback' },
         ].map(section => {
           const Icon = section.icon;
           return (

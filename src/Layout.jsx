@@ -247,10 +247,19 @@ export default function Layout({ children, currentPageName }) {
       document.head.appendChild(themeColorMeta);
     }
 
-    // Force light mode — app is designed for light/teal theme only
-    document.documentElement.classList.remove('dark');
-    document.documentElement.style.colorScheme = 'light';
-    themeColorMeta.content = '#ffffff';
+    // Restore dark mode preference from localStorage or system
+    const savedDark = localStorage.getItem('darkMode');
+    const prefersDark = savedDark === 'true' ||
+      (savedDark === null && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    if (prefersDark) {
+      document.documentElement.classList.add('dark');
+      document.documentElement.style.colorScheme = 'dark';
+      themeColorMeta.content = '#0f172a';
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.style.colorScheme = 'light';
+      themeColorMeta.content = '#ffffff';
+    }
   }, []);
 
 

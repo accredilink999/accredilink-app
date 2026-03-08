@@ -45,6 +45,15 @@
 
     <title>Care Call AI</title>
 
+    <!-- Dark mode — apply before paint to prevent flash of white -->
+    <script>
+      (function(){
+        var d = localStorage.getItem('darkMode');
+        var dark = d === 'true' || (d === null && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (dark) document.documentElement.classList.add('dark');
+      })();
+    </script>
+
     <style>
       /* Prevent document-level scroll so mobile browser chrome stays hidden */
       html, body, #root {
@@ -58,6 +67,9 @@
         top: 0;
         left: 0;
         background-color: #ffffff;
+      }
+      html.dark, html.dark body, html.dark #root {
+        background-color: #0f172a;
       }
 
       /* ── Splash screen ─────────────────────────────────────────── */

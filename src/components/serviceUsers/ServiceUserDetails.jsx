@@ -25,6 +25,7 @@ import { supabase } from '@/api/supabaseClient';
 import CallTypeManager from '../rota/CallTypeManager';
 import SafeguardingReports from './SafeguardingReports';
 import ClinicalPanel from '../clinical/ClinicalPanel';
+import { openExternalUrl } from '@/lib/openExternalUrl';
 import {
   Phone,
   MapPin,
@@ -49,7 +50,11 @@ import {
   MessageSquare,
   Armchair,
   Stethoscope,
-  ChevronLeft
+  ChevronLeft,
+  Star,
+  Send,
+  ExternalLink,
+  RefreshCw
 } from 'lucide-react';
 import { useLanguage } from '@/lib/LanguageContext';
 
@@ -115,6 +120,16 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
     const [showCommunicationPastLogs, setShowCommunicationPastLogs] = useState(false);
     const [showSittingPastLogs, setShowSittingPastLogs] = useState(false);
     const [activeSection, setActiveSection] = useState('grid');
+
+    // Review request state
+    const [reviewName, setReviewName] = useState('');
+    const [reviewEmail, setReviewEmail] = useState('');
+    const [reviewRelationship, setReviewRelationship] = useState('');
+    const [sendingReview, setSendingReview] = useState(false);
+    const [reviewSent, setReviewSent] = useState(false);
+    const [clientReviews, setClientReviews] = useState([]);
+    const [loadingReviews, setLoadingReviews] = useState(false);
+    const [syncingReviews, setSyncingReviews] = useState(false);
     const [displayedLogs, setDisplayedLogs] = useState([]);
     const [careLogDateRange, setCareLogDateRange] = useState({
        start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -124,6 +139,25 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
        start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
        end: new Date().toISOString().split('T')[0]
      });
+
+     // Load client reviews for this service user
+     const loadClientReviews = async () => {
+       if (!serviceUser?.id) return;
+       setLoadingReviews(true);
+       try {
+         const { data, error } = await supabase
+           .from('client_reviews')
+           .select('*')
+           .eq('service_user_id', serviceUser.id)
+           .order('created_at', { ascending: false });
+         if (!error && data) setClientReviews(data);
+       } catch (e) { console.error('Failed to load reviews:', e); }
+       setLoadingReviews(false);
+     };
+
+     useEffect(() => {
+       if (open && serviceUser?.id) loadClientReviews();
+     }, [open, serviceUser?.id]);
 
      // Refetch care logs when dialog opens or service user changes
      useEffect(() => {
@@ -585,6 +619,7 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
                  { value: 'sitting', label: 'Sitting\nService', icon: Armchair, bg: 'from-orange-400 to-orange-600', iconBg: 'bg-orange-200', iconColor: 'text-orange-700' },
                  { value: 'safeguarding', label: 'Safe-\nguarding', icon: Shield, bg: 'from-purple-400 to-purple-600', iconBg: 'bg-purple-200', iconColor: 'text-purple-700' },
                  { value: 'clinical', label: 'Clinical\nAssess.', icon: Stethoscope, bg: 'from-pink-400 to-pink-600', iconBg: 'bg-pink-200', iconColor: 'text-pink-700' },
+                 { value: 'review', label: 'Client\nFeedback', icon: Star, bg: 'from-yellow-400 to-amber-500', iconBg: 'bg-amber-200', iconColor: 'text-amber-700' },
                ].map(tile => {
                  const Icon = tile.icon;
                  return (
@@ -633,6 +668,7 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
              <TabsTrigger value="sitting">Sitting</TabsTrigger>
              <TabsTrigger value="safeguarding">Safe</TabsTrigger>
              <TabsTrigger value="clinical">Clinical</TabsTrigger>
+             <TabsTrigger value="review">Review</TabsTrigger>
            </TabsList>
 
           <TabsContent value="info" className="space-y-4 mt-4">
@@ -1211,6 +1247,255 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
            </TabsContent>
            <TabsContent value="clinical" className="space-y-3 mt-4">
              <ClinicalPanel serviceUser={serviceUser} />
+           </TabsContent>
+
+           <TabsContent value="review" className="space-y-4 mt-4">
+             {/* Client Reviews for Inspection Evidence */}
+             <Card className="p-5">
+               <div className="flex items-center justify-between mb-3">
+                 <div className="flex items-center gap-2">
+                   <Star className="w-5 h-5 text-amber-500" />
+                   <h3 className="font-semibold text-slate-900">Client Feedback</h3>
+                   {clientReviews.length > 0 && (
+                     <Badge variant="secondary" className="text-xs">{clientReviews.length}</Badge>
+                   )}
+                 </div>
+                 <div className="flex gap-2">
+                   <Button
+                     variant="outline"
+                     size="sm"
+                     onClick={async () => {
+                       setSyncingReviews(true);
+                       try {
+                         const { data, error } = await supabase.functions.invoke('syncReviews');
+                         if (error) throw error;
+                         toast.success(`Synced: ${data?.matched_to_clients || 0} matched, ${data?.created_unlinked || 0} new`);
+                         loadClientReviews();
+                       } catch (err) {
+                         toast.error('Failed to sync reviews');
+                       }
+                       setSyncingReviews(false);
+                     }}
+                     disabled={syncingReviews}
+                   >
+                     <RefreshCw className={`w-3 h-3 mr-1 ${syncingReviews ? 'animate-spin' : ''}`} />
+                     Sync
+                   </Button>
+                 </div>
+               </div>
+
+               {loadingReviews ? (
+                 <div className="flex justify-center py-8">
+                   <Loader2 className="w-6 h-6 animate-spin text-amber-500" />
+                 </div>
+               ) : clientReviews.length === 0 ? (
+                 <div className="text-center py-6 text-slate-400">
+                   <Star className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                   <p className="text-sm">No feedback recorded for this client yet.</p>
+                   <p className="text-xs mt-1">Send a review invitation below to collect feedback for inspections.</p>
+                 </div>
+               ) : (
+                 <div className="space-y-3">
+                   {clientReviews.map((review) => (
+                     <div key={review.id} className={`border rounded-lg p-3 ${review.status === 'completed' ? 'bg-green-50 border-green-200' : review.status === 'declined' ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
+                       <div className="flex items-start justify-between">
+                         <div>
+                           <p className="text-sm font-medium text-slate-900">{review.reviewer_name}</p>
+                           <p className="text-xs text-slate-500">{review.relationship_label || review.relationship || 'Unknown relationship'}</p>
+                         </div>
+                         <Badge
+                           variant={review.status === 'completed' ? 'default' : 'outline'}
+                           className={`text-xs ${review.status === 'completed' ? 'bg-green-600' : review.status === 'declined' ? 'bg-red-100 text-red-700 border-red-300' : 'bg-amber-100 text-amber-700 border-amber-300'}`}
+                         >
+                           {review.status === 'completed' ? 'Completed' : review.status === 'declined' ? 'Declined' : 'Pending'}
+                         </Badge>
+                       </div>
+                       {review.rating && (
+                         <div className="flex items-center gap-1 mt-2">
+                           {[1,2,3,4,5].map((s) => (
+                             <Star key={s} className={`w-4 h-4 ${s <= Math.round(review.rating) ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />
+                           ))}
+                           <span className="text-xs text-slate-600 ml-1">{review.rating}/5</span>
+                         </div>
+                       )}
+                       {review.comment && (
+                         <p className="text-sm text-slate-700 mt-2 italic">"{review.comment}"</p>
+                       )}
+                       <div className="flex items-center gap-3 mt-2 text-xs text-slate-400">
+                         {review.review_date && <span>Reviewed: {new Date(review.review_date).toLocaleDateString()}</span>}
+                         {review.invited_at && <span>Invited: {new Date(review.invited_at).toLocaleDateString()}</span>}
+                         {review.source && <span>via {review.source}</span>}
+                       </div>
+                     </div>
+                   ))}
+                 </div>
+               )}
+             </Card>
+
+             {/* Submit Review — links to homecare.co.uk review form */}
+             <Card
+               className="p-5 border-2 border-amber-200 hover:border-amber-400 hover:shadow-md transition-all cursor-pointer"
+               onClick={() => openExternalUrl('https://www.homecare.co.uk/review-submit/65432259136/rcsid/1012/')}
+             >
+               <div className="flex items-center gap-2 mb-1">
+                 <Star className="w-5 h-5 text-amber-500" />
+                 <h3 className="font-semibold text-slate-900">Submit a Review</h3>
+               </div>
+               <p className="text-sm text-slate-500 mb-3">
+                 Hand the device to the client or their family to leave a review directly:
+               </p>
+               <div className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-medium">
+                 <Star className="w-5 h-5" />
+                 Leave a Review on homecare.co.uk
+                 <ExternalLink className="w-4 h-4" />
+               </div>
+             </Card>
+
+             {/* OR divider */}
+             <div className="flex items-center gap-3">
+               <div className="flex-1 h-px bg-slate-200" />
+               <span className="text-xs font-medium text-slate-400">OR SEND BY EMAIL</span>
+               <div className="flex-1 h-px bg-slate-200" />
+             </div>
+
+             {/* Email invite form */}
+             <Card className="p-5">
+               <div className="flex items-center gap-2 mb-1">
+                 <Send className="w-5 h-5 text-teal-500" />
+                 <h3 className="font-semibold text-slate-900">Email a Review Invitation</h3>
+               </div>
+               <p className="text-sm text-slate-500 mb-4">
+                 Send a review invitation for <span className="font-medium text-slate-700">{serviceUser?.full_name}</span> to their family member, next of kin, or the service user themselves via homecare.co.uk.
+               </p>
+
+               {reviewSent ? (
+                 <div className="bg-green-50 border border-green-200 rounded-xl p-5 text-center">
+                   <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
+                     <Send className="w-6 h-6 text-green-600" />
+                   </div>
+                   <p className="text-sm font-semibold text-green-800 mb-1">Invitation Sent!</p>
+                   <p className="text-xs text-green-600">The reviewer will receive an email with a link to leave their review on homecare.co.uk.</p>
+                   <button
+                     onClick={() => { setReviewSent(false); setReviewName(''); setReviewEmail(''); setReviewRelationship(''); }}
+                     className="mt-3 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                   >
+                     Send Another
+                   </button>
+                 </div>
+               ) : (
+                 <div className="space-y-3">
+                   <div>
+                     <Label className="text-xs font-medium text-slate-600">Reviewer Name *</Label>
+                     <Input
+                       value={reviewName}
+                       onChange={(e) => setReviewName(e.target.value)}
+                       placeholder="e.g. Jane Smith"
+                       className="mt-1"
+                     />
+                   </div>
+                   <div>
+                     <Label className="text-xs font-medium text-slate-600">Email Address *</Label>
+                     <Input
+                       type="email"
+                       value={reviewEmail}
+                       onChange={(e) => setReviewEmail(e.target.value)}
+                       placeholder="e.g. jane.smith@email.com"
+                       className="mt-1"
+                     />
+                   </div>
+                   <div>
+                     <Label className="text-xs font-medium text-slate-600">Relationship</Label>
+                     <select
+                       value={reviewRelationship}
+                       onChange={(e) => setReviewRelationship(e.target.value)}
+                       className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                     >
+                       <option value="">Select...</option>
+                       <option value="38">Client / Service User</option>
+                       <option value="59">Friend of Client/Service User</option>
+                       <option value="39">Brother of Client/Service User</option>
+                       <option value="40">Sister of Client/Service User</option>
+                       <option value="41">Wife of Client/Service User</option>
+                       <option value="42">Husband of Client/Service User</option>
+                       <option value="116">Partner of Client/Service User</option>
+                       <option value="44">Son of Client/Service User</option>
+                       <option value="45">Daughter of Client/Service User</option>
+                       <option value="46">Grandson of Client/Service User</option>
+                       <option value="47">Granddaughter of Client/Service User</option>
+                       <option value="54">Father of Client/Service User</option>
+                       <option value="55">Mother of Client/Service User</option>
+                       <option value="56">Aunt of Client/Service User</option>
+                       <option value="57">Uncle of Client/Service User</option>
+                       <option value="43">Cousin of Client/Service User</option>
+                       <option value="58">Relative of Client/Service User</option>
+                       <option value="175">Next of Kin</option>
+                       <option value="61">Power of Attorney</option>
+                       <option value="130">Guardian of Client/Service User</option>
+                     </select>
+                   </div>
+
+                   <div className="flex justify-end gap-2 pt-2">
+                     <Button
+                       variant="outline"
+                       size="sm"
+                       onClick={() => { setReviewName(''); setReviewEmail(''); setReviewRelationship(''); }}
+                     >
+                       Clear
+                     </Button>
+                     <Button
+                       size="sm"
+                       disabled={!reviewName || !reviewEmail || sendingReview}
+                       onClick={async () => {
+                         setSendingReview(true);
+                         try {
+                           // Get selected relationship label
+                           const relSelect = document.querySelector('select[value="' + reviewRelationship + '"]');
+                           const relLabel = relSelect?.options?.[relSelect.selectedIndex]?.text || '';
+                           const { data, error } = await supabase.functions.invoke('sendReviewInvite', {
+                             body: {
+                               name: reviewName,
+                               email: reviewEmail,
+                               relationship: reviewRelationship,
+                               relationship_label: relLabel,
+                               service_user_id: serviceUser?.id,
+                               service_user_name: serviceUser?.full_name,
+                               invited_by: currentUser?.full_name || currentUser?.email || 'Staff',
+                             },
+                           });
+                           if (error) throw error;
+                           if (data?.error) throw new Error(data.error);
+                           setReviewSent(true);
+                           toast.success(`Review invitation sent to ${reviewName}`);
+                           loadClientReviews();
+                         } catch (err) {
+                           toast.error(err.message || 'Failed to send review invitation');
+                         }
+                         setSendingReview(false);
+                       }}
+                       className="bg-amber-500 hover:bg-amber-600 text-white"
+                     >
+                       {sendingReview ? (
+                         <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                       ) : (
+                         <Send className="w-4 h-4 mr-1" />
+                       )}
+                       {sendingReview ? 'Sending...' : 'Send Invitation'}
+                     </Button>
+                   </div>
+                 </div>
+               )}
+             </Card>
+
+             <Card className="p-4 bg-amber-50 border-amber-200">
+               <h4 className="text-xs font-semibold text-amber-800 mb-2">Tips for Getting Reviews</h4>
+               <ul className="text-xs text-amber-700 space-y-1">
+                 <li>&#8226; Ask after a positive care visit or milestone</li>
+                 <li>&#8226; Family members often leave the most detailed reviews</li>
+                 <li>&#8226; Professional reviews from social workers add credibility</li>
+                 <li>&#8226; Reviews help build trust with potential new clients</li>
+                 <li>&#8226; Completed reviews are stored here as inspection evidence</li>
+               </ul>
+             </Card>
            </TabsContent>
            </Tabs>
            </div>

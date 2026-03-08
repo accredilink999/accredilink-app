@@ -31,7 +31,6 @@ import {
         Building2,
         Upload,
         Flame,
-        SlidersHorizontal,
         Download,
         CheckCircle2,
         MapPin,
@@ -58,9 +57,7 @@ import {
   removeBiometric,
   getStoredCredential,
 } from '@/utils/biometric';
-import GlobalNotificationSettings from '@/components/admin/GlobalNotificationSettings';
 import PushCredentialsManager from '@/components/admin/PushCredentialsManager';
-import NotificationRulesManager from '@/components/admin/NotificationRulesManager';
 import PushNotificationSetup from '@/components/notifications/PushNotificationSetup';
 import { initFirebaseMessaging, requestFCMToken } from '@/lib/firebaseMessaging';
 import { toast } from 'sonner';
@@ -1069,10 +1066,15 @@ export default function Settings() {
 
   React.useEffect(() => {
     localStorage.setItem('darkMode', isDarkMode);
+    const themeColorMeta = document.querySelector('meta[name="theme-color"]');
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
+      document.documentElement.style.colorScheme = 'dark';
+      if (themeColorMeta) themeColorMeta.content = '#0f172a';
     } else {
       document.documentElement.classList.remove('dark');
+      document.documentElement.style.colorScheme = 'light';
+      if (themeColorMeta) themeColorMeta.content = '#ffffff';
     }
   }, [isDarkMode]);
 
@@ -1354,20 +1356,6 @@ export default function Settings() {
         <PermissionsSection />
       </SettingsErrorBoundary>
 
-      {/* Admin: Global Notifications */}
-      {isAdmin && (
-        <SettingsErrorBoundary>
-          <Card className="p-5 bg-white border-0 shadow-sm border-l-4 border-l-teal-500">
-            <HelpTip tip="Configure notification rules for the entire organisation — who gets notified, and when.">
-              <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                <Bell className="w-5 h-5 text-teal-600" />
-                Global Notification Settings
-              </h3>
-            </HelpTip>
-            <GlobalNotificationSettings />
-          </Card>
-        </SettingsErrorBoundary>
-      )}
 
       {/* Push Notification Device Setup (all users) */}
       <SettingsErrorBoundary>
@@ -1412,13 +1400,6 @@ export default function Settings() {
               <p className="text-sm text-slate-500">Switch to dark theme</p>
             </div>
             <Switch checked={isDarkMode} onCheckedChange={setIsDarkMode} />
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium text-slate-900">Compact view</p>
-              <p className="text-sm text-slate-500">Show more content on screen</p>
-            </div>
-            <Switch />
           </div>
         </div>
       </Card>
@@ -1495,24 +1476,6 @@ export default function Settings() {
         </Card>
       )}
 
-      {/* Privacy & Security */}
-      <Card className="p-5 bg-white border-0 shadow-sm">
-        <HelpTip tip="Set up biometric login, manage location sharing, and control session security.">
-          <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-            <Shield className="w-5 h-5 text-slate-500" />
-            Privacy & Security
-          </h3>
-        </HelpTip>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium text-slate-900">Location sharing</p>
-              <p className="text-sm text-slate-500">Allow location access for clock in/out</p>
-            </div>
-            <Switch defaultChecked />
-          </div>
-        </div>
-      </Card>
 
 
 
@@ -1521,23 +1484,31 @@ export default function Settings() {
       {/* App Info */}
       <AppInfoCard userEmail={user?.email} />
 
-      {/* Legal Links */}
-      <Card className="p-4">
-        <h3 className="font-semibold text-sm text-slate-700 mb-3">Legal</h3>
-        <div className="flex gap-4">
-          <button
-            onClick={() => openExternalUrl('https://carecallai.co.uk/privacy')}
-            className="text-sm text-teal-600 hover:underline"
-          >
-            Privacy Policy
-          </button>
-          <button
-            onClick={() => openExternalUrl('https://carecallai.co.uk/terms')}
-            className="text-sm text-teal-600 hover:underline"
-          >
-            Terms of Service
-          </button>
+      {/* Legal — in-app access required by App Store & Google Play */}
+      <Card className="p-5 bg-white border-0 shadow-sm">
+        <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+          <Shield className="w-5 h-5 text-slate-500" />
+          Legal
+        </h3>
+        <div className="space-y-2">
+          {[
+            { label: 'Terms of Service', path: '/LegalPages?tab=terms' },
+            { label: 'Privacy Policy', path: '/LegalPages?tab=privacy' },
+            { label: 'Intellectual Property', path: '/LegalPages?tab=ip' },
+          ].map(item => (
+            <a
+              key={item.label}
+              href={item.path}
+              className="w-full flex items-center justify-between p-3 bg-slate-50 rounded-lg border hover:bg-slate-100 transition-colors text-left no-underline"
+            >
+              <span className="text-sm font-medium text-slate-700">{item.label}</span>
+              <span className="text-xs text-slate-400">&rsaquo;</span>
+            </a>
+          ))}
         </div>
+        <p className="text-xs text-slate-400 mt-3">
+          By using CareCallAI you agree to our Terms of Service and Privacy Policy.
+        </p>
       </Card>
 
       {/* Logout */}

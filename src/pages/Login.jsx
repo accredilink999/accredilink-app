@@ -12,11 +12,15 @@ export default function Login() {
   const [error, setError] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
   const [biometricReady, setBiometricReady] = useState(false)
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
 
   // Force password change state
   const [mustChangePassword, setMustChangePassword] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+
+  // Dark mode detection
+  const isDark = document.documentElement.classList.contains('dark')
 
   // Hide splash screen when login page is ready
   useEffect(() => {
@@ -166,6 +170,14 @@ export default function Login() {
         return
       }
 
+      // Record terms acceptance for GDPR audit trail
+      if (data?.user) {
+        supabase.from('profiles').update({
+          terms_accepted_at: new Date().toISOString(),
+          terms_version: '2026-03',
+        }).eq('id', data.user.id).then(() => {}).catch(() => {});
+      }
+
       // If email confirmation is required, show success message
       if (data?.user && !data?.session) {
         setSuccessMsg('Account created! Check your email to confirm, then sign in.')
@@ -244,8 +256,10 @@ export default function Login() {
 
   const inputStyle = {
     width: '100%', padding: '10px 12px', borderRadius: 8,
-    border: '1px solid #cbd5e1', fontSize: 16, outline: 'none',
+    border: `1px solid ${isDark ? '#334155' : '#cbd5e1'}`, fontSize: 16, outline: 'none',
     boxSizing: 'border-box',
+    backgroundColor: isDark ? '#1e293b' : '#fff',
+    color: isDark ? '#e2e8f0' : '#0f172a',
   }
 
   const subtitle = mustChangePassword
@@ -261,7 +275,7 @@ export default function Login() {
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'flex-start',
-      background: '#f8fafc',
+      background: isDark ? '#0f172a' : '#f8fafc',
       padding: '24px 16px',
       fontFamily: 'system-ui, -apple-system, sans-serif',
       position: 'fixed',
@@ -273,9 +287,9 @@ export default function Login() {
       <div style={{
         width: '100%',
         maxWidth: 400,
-        background: '#fff',
+        background: isDark ? '#1e293b' : '#fff',
         borderRadius: 12,
-        boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
+        boxShadow: isDark ? '0 4px 24px rgba(0,0,0,0.3)' : '0 4px 24px rgba(0,0,0,0.08)',
         padding: 32,
         margin: 'auto 0',
       }}>
@@ -283,10 +297,10 @@ export default function Login() {
           <img src="/logo.png" alt="CareCallAI" style={{
             width: 80, height: 'auto', marginBottom: 12, borderRadius: 12,
           }} />
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0f172a', margin: '8px 0 4px' }}>
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: isDark ? '#f1f5f9' : '#0f172a', margin: '8px 0 4px' }}>
             Care Call AI
           </h1>
-          <p style={{ color: '#64748b', fontSize: 14 }}>{subtitle}</p>
+          <p style={{ color: isDark ? '#94a3b8' : '#64748b', fontSize: 14 }}>{subtitle}</p>
         </div>
 
         {/* Sign In / Sign Up toggle — always visible */}
@@ -301,7 +315,7 @@ export default function Login() {
               style={{
                 flex: 1, padding: '10px 0', fontSize: 15, fontWeight: 600,
                 border: 'none', cursor: 'pointer',
-                background: mode === 'signin' ? '#0d9488' : '#fff',
+                background: mode === 'signin' ? '#0d9488' : (isDark ? '#1e293b' : '#fff'),
                 color: mode === 'signin' ? '#fff' : '#0d9488',
               }}
             >
@@ -313,7 +327,7 @@ export default function Login() {
               style={{
                 flex: 1, padding: '10px 0', fontSize: 15, fontWeight: 600,
                 border: 'none', cursor: 'pointer',
-                background: mode === 'signup' ? '#0d9488' : '#fff',
+                background: mode === 'signup' ? '#0d9488' : (isDark ? '#1e293b' : '#fff'),
                 color: mode === 'signup' ? '#fff' : '#0d9488',
               }}
             >
@@ -376,9 +390,9 @@ export default function Login() {
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 12, margin: '16px 0',
               }}>
-                <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
+                <div style={{ flex: 1, height: 1, background: isDark ? '#334155' : '#e2e8f0' }} />
                 <span style={{ fontSize: 12, color: '#94a3b8' }}>or use password</span>
-                <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
+                <div style={{ flex: 1, height: 1, background: isDark ? '#334155' : '#e2e8f0' }} />
               </div>
             </div>
           );
@@ -394,7 +408,7 @@ export default function Login() {
             </div>
 
             <div style={{ marginBottom: 16 }}>
-              <label htmlFor="new-password" style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#334155', marginBottom: 6 }}>
+              <label htmlFor="new-password" style={{ display: 'block', fontSize: 14, fontWeight: 500, color: isDark ? '#cbd5e1' : '#334155', marginBottom: 6 }}>
                 New Password
               </label>
               <input
@@ -411,7 +425,7 @@ export default function Login() {
             </div>
 
             <div style={{ marginBottom: 20 }}>
-              <label htmlFor="confirm-password" style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#334155', marginBottom: 6 }}>
+              <label htmlFor="confirm-password" style={{ display: 'block', fontSize: 14, fontWeight: 500, color: isDark ? '#cbd5e1' : '#334155', marginBottom: 6 }}>
                 Confirm New Password
               </label>
               <input
@@ -442,7 +456,7 @@ export default function Login() {
         ) : mode === 'signin' ? (
           <form onSubmit={handleSignIn}>
             <div style={{ marginBottom: 16 }}>
-              <label htmlFor="signin-email" style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#334155', marginBottom: 6 }}>
+              <label htmlFor="signin-email" style={{ display: 'block', fontSize: 14, fontWeight: 500, color: isDark ? '#cbd5e1' : '#334155', marginBottom: 6 }}>
                 Email
               </label>
               <input
@@ -460,7 +474,7 @@ export default function Login() {
             </div>
 
             <div style={{ marginBottom: 20 }}>
-              <label htmlFor="signin-password" style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#334155', marginBottom: 6 }}>
+              <label htmlFor="signin-password" style={{ display: 'block', fontSize: 14, fontWeight: 500, color: isDark ? '#cbd5e1' : '#334155', marginBottom: 6 }}>
                 Password
               </label>
               <input
@@ -506,7 +520,7 @@ export default function Login() {
         ) : (
           <form onSubmit={handleSignUp}>
             <div style={{ marginBottom: 16 }}>
-              <label htmlFor="signup-name" style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#334155', marginBottom: 6 }}>
+              <label htmlFor="signup-name" style={{ display: 'block', fontSize: 14, fontWeight: 500, color: isDark ? '#cbd5e1' : '#334155', marginBottom: 6 }}>
                 Full Name
               </label>
               <input
@@ -523,7 +537,7 @@ export default function Login() {
             </div>
 
             <div style={{ marginBottom: 16 }}>
-              <label htmlFor="signup-email" style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#334155', marginBottom: 6 }}>
+              <label htmlFor="signup-email" style={{ display: 'block', fontSize: 14, fontWeight: 500, color: isDark ? '#cbd5e1' : '#334155', marginBottom: 6 }}>
                 Email
               </label>
               <input
@@ -541,7 +555,7 @@ export default function Login() {
             </div>
 
             <div style={{ marginBottom: 20 }}>
-              <label htmlFor="signup-password" style={{ display: 'block', fontSize: 14, fontWeight: 500, color: '#334155', marginBottom: 6 }}>
+              <label htmlFor="signup-password" style={{ display: 'block', fontSize: 14, fontWeight: 500, color: isDark ? '#cbd5e1' : '#334155', marginBottom: 6 }}>
                 Password
               </label>
               <input
@@ -558,20 +572,45 @@ export default function Login() {
               />
             </div>
 
-            <p style={{ fontSize: 12, color: '#94a3b8', textAlign: 'center', margin: '0 0 12px' }}>
-              By creating an account, you agree to our{' '}
-              <a href="https://carecallai.co.uk/terms" target="_blank" rel="noopener noreferrer" style={{ color: '#0d9488', textDecoration: 'underline' }}>Terms of Service</a>
-              {' '}and{' '}
-              <a href="https://carecallai.co.uk/privacy" target="_blank" rel="noopener noreferrer" style={{ color: '#0d9488', textDecoration: 'underline' }}>Privacy Policy</a>.
-            </p>
+            {/* Mandatory terms acceptance — required by Apple App Store & Google Play */}
+            <label
+              style={{
+                display: 'flex', alignItems: 'flex-start', gap: 10, margin: '0 0 16px',
+                cursor: 'pointer', userSelect: 'none',
+              }}
+              onClick={() => setAgreedToTerms(!agreedToTerms)}
+            >
+              <span style={{
+                width: 20, height: 20, borderRadius: 5, flexShrink: 0, marginTop: 1,
+                border: `2px solid ${agreedToTerms ? '#0d9488' : (isDark ? '#475569' : '#cbd5e1')}`,
+                background: agreedToTerms ? '#0d9488' : 'transparent',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all 0.2s',
+              }}>
+                {agreedToTerms && (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+              </span>
+              <span style={{ fontSize: 12, color: isDark ? '#94a3b8' : '#64748b', lineHeight: 1.5 }}>
+                I agree to the{' '}
+                <a href="https://carecallai.co.uk/terms" target="_blank" rel="noopener noreferrer" style={{ color: '#0d9488', textDecoration: 'underline' }} onClick={e => e.stopPropagation()}>Terms of Service</a>,{' '}
+                <a href="https://carecallai.co.uk/privacy" target="_blank" rel="noopener noreferrer" style={{ color: '#0d9488', textDecoration: 'underline' }} onClick={e => e.stopPropagation()}>Privacy Policy</a>,
+                {' '}and{' '}
+                <a href="https://carecallai.co.uk/terms" target="_blank" rel="noopener noreferrer" style={{ color: '#0d9488', textDecoration: 'underline' }} onClick={e => e.stopPropagation()}>Intellectual Property terms</a>.
+              </span>
+            </label>
 
             <button
               type="submit"
-              disabled={!!status}
+              disabled={!!status || !agreedToTerms}
               style={{
                 width: '100%', padding: '12px 0', borderRadius: 8,
-                background: status ? '#94a3b8' : '#0d9488', color: '#fff',
-                fontSize: 16, fontWeight: 600, border: 'none', cursor: status ? 'wait' : 'pointer',
+                background: (status || !agreedToTerms) ? '#94a3b8' : '#0d9488', color: '#fff',
+                fontSize: 16, fontWeight: 600, border: 'none',
+                cursor: (status || !agreedToTerms) ? 'not-allowed' : 'pointer',
+                opacity: !agreedToTerms ? 0.6 : 1,
               }}
             >
               {status || 'Create Account'}
@@ -594,7 +633,7 @@ export default function Login() {
         )}
 
         {/* Privacy & Terms footer — required by App Store & Google Play */}
-        <div style={{ textAlign: 'center', marginTop: 20, paddingTop: 16, borderTop: '1px solid #e2e8f0' }}>
+        <div style={{ textAlign: 'center', marginTop: 20, paddingTop: 16, borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
           <p style={{ fontSize: 12, color: '#94a3b8' }}>
             <a href="https://carecallai.co.uk/privacy" target="_blank" rel="noopener noreferrer" style={{ color: '#64748b', textDecoration: 'underline' }}>Privacy Policy</a>
             {' · '}
