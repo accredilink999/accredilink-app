@@ -2,11 +2,12 @@
 -- because auth_org_id() queries organization_members itself.
 -- Use direct auth.uid() check instead.
 
--- Drop the recursive policy
+-- Drop all existing policies on organization_members
 DROP POLICY IF EXISTS "organization_members_org_isolation" ON organization_members;
 DROP POLICY IF EXISTS "org_members_read" ON organization_members;
 DROP POLICY IF EXISTS "org_members_manage" ON organization_members;
 DROP POLICY IF EXISTS "org_members_self_insert" ON organization_members;
+DROP POLICY IF EXISTS "org_members_own" ON organization_members;
 
 -- Users can see their own memberships
 CREATE POLICY "org_members_own" ON organization_members
