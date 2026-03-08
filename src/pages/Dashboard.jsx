@@ -454,7 +454,7 @@ export default function Dashboard() {
          {/* Monthly award stars */}
          <div className="flex items-center justify-center gap-1 mt-1.5 cursor-pointer" onClick={() => setShowLeaderboard(true)}>
            {[1, 2, 3, 4, 5].map(i => (
-             <Star key={i} className={`w-5 h-5 transition-all ${i <= myMonthlyStars ? 'text-amber-400 fill-amber-400 drop-shadow-sm' : 'text-slate-300 dark:text-slate-600'}`} />
+             <Star key={i} className={`w-5 h-5 transition-all ${i <= myMonthlyStars ? 'text-amber-400 fill-amber-400 drop-shadow-sm' : 'text-slate-800 dark:text-slate-400'}`} strokeWidth={2} />
            ))}
            {myMonthlyStars > 0 && <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold ml-1">{myMonthlyStars}</span>}
          </div>
@@ -1025,7 +1025,7 @@ export default function Dashboard() {
                     <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{entry.name}</p>
                     <div className="flex gap-0.5 mt-0.5">
                       {[1, 2, 3, 4, 5].map(i => (
-                        <Star key={i} className={`w-3.5 h-3.5 ${i <= Math.min(5, entry.count) ? 'text-amber-400 fill-amber-400' : 'text-slate-300 dark:text-slate-600'}`} />
+                        <Star key={i} className={`w-3.5 h-3.5 ${i <= Math.min(5, entry.count) ? 'text-amber-400 fill-amber-400' : 'text-slate-700 dark:text-slate-400'}`} strokeWidth={2} />
                       ))}
                     </div>
                   </div>
