@@ -5,7 +5,7 @@ import { supabase } from '@/api/supabaseClient';
 import { ShiftApi } from '@/api/rotaApi';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
-import { format, isToday, parseISO, startOfWeek, endOfWeek } from 'date-fns';
+import { format, isToday, parseISO, startOfWeek, endOfWeek, startOfMonth } from 'date-fns';
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -59,6 +59,10 @@ export default function Dashboard() {
   const [selectedShift, setSelectedShift] = useState(null);
   const [showTasksPopup, setShowTasksPopup] = useState(false);
   const [showAwardsPopup, setShowAwardsPopup] = useState(false);
+  const [showAwardBanner, setShowAwardBanner] = useState(false);
+  const [dismissedAwardIds, setDismissedAwardIds] = useState([]);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
   const [careLogData, setCareLogData] = useState({
     service_user_id: '',
     visit_date: today,
@@ -339,8 +343,62 @@ export default function Dashboard() {
     },
   });
 
-  // My new awards (unread)
-  const myNewAwards = todayAwards.filter(a => a.recipient_id === user?.id);
+  // This month's awards (for star count + leaderboard)
+  const { data: monthlyAwards = [] } = useQuery({
+    queryKey: ['monthlyAwards', monthStart],
+    queryFn: async () => {
+      const orgId = getCurrentOrgId();
+      let q = supabase.from('staff_awards').select('*');
+      if (orgId) q = q.eq('organization_id', orgId);
+      const { data, error } = await q
+        .gte('created_at', monthStart + 'T00:00:00')
+        .order('created_at', { ascending: false });
+      if (error) return [];
+      return (data || []).filter(a => a.awarded_by_id !== a.recipient_id);
+    },
+  });
+
+  // My star count this month (capped at 5)
+  const myMonthlyStars = Math.min(5, monthlyAwards.filter(a => a.recipient_id === user?.id).length);
+
+  // Monthly leaderboard
+  const monthlyLeaderboard = React.useMemo(() => {
+    const counts = {};
+    monthlyAwards.forEach(a => {
+      if (!counts[a.recipient_id]) {
+        counts[a.recipient_id] = { name: a.recipient_name, count: 0 };
+      }
+      counts[a.recipient_id].count++;
+    });
+    return Object.entries(counts)
+      .map(([id, { name, count }]) => ({ id, name, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [monthlyAwards]);
+
+  // My new awards (received, not self-sent)
+  const myNewAwards = todayAwards.filter(a => a.recipient_id === user?.id && a.awarded_by_id !== user?.id);
+  // Awards to display in popup (exclude self-sent, show only received)
+  const displayAwards = todayAwards.filter(a => a.awarded_by_id !== user?.id);
+
+  // Color gradient lookup for award emoji circles
+  const AWARD_COLORS = {
+    amber: 'from-amber-400 to-yellow-500',
+    blue: 'from-blue-400 to-blue-600',
+    emerald: 'from-emerald-400 to-emerald-600',
+    rose: 'from-rose-400 to-rose-600',
+    purple: 'from-purple-400 to-purple-600',
+    cyan: 'from-cyan-400 to-cyan-600',
+    orange: 'from-orange-400 to-orange-600',
+    pink: 'from-pink-400 to-pink-600',
+  };
+
+  // Auto-show gold banner when user receives new awards
+  const undismissedAwards = myNewAwards.filter(a => !dismissedAwardIds.includes(a.id));
+  useEffect(() => {
+    if (undismissedAwards.length > 0) {
+      setShowAwardBanner(true);
+    }
+  }, [undismissedAwards.length]);
 
   // Toggle task completion
   const toggleTaskMutation = useMutation({
@@ -393,8 +451,38 @@ export default function Dashboard() {
          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-teal-600 to-cyan-600 bg-clip-text text-transparent">
             Good Day {user?.staff_full_name || user?.full_name || 'there'}
           </h1>
+         {/* Monthly award stars */}
+         <div className="flex items-center justify-center gap-1 mt-1.5 cursor-pointer" onClick={() => setShowLeaderboard(true)}>
+           {[1, 2, 3, 4, 5].map(i => (
+             <Star key={i} className={`w-5 h-5 transition-all ${i <= myMonthlyStars ? 'text-amber-400 fill-amber-400 drop-shadow-sm' : 'text-slate-300 dark:text-slate-600'}`} />
+           ))}
+           {myMonthlyStars > 0 && <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold ml-1">{myMonthlyStars}</span>}
+         </div>
          <p className="text-slate-500 mt-1 text-sm sm:text-base">{format(new Date(), 'EEEE, d MMMM yyyy')}</p>
        </div>
+
+      {/* Gold Award Notification Banner */}
+      {showAwardBanner && undismissedAwards.length > 0 && (
+        <div
+          className="p-4 rounded-xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-400 shadow-lg cursor-pointer animate-pulse hover:animate-none transition-all"
+          onClick={() => {
+            setShowAwardBanner(false);
+            setDismissedAwardIds(prev => [...prev, ...undismissedAwards.map(a => a.id)]);
+            setShowAwardsPopup(true);
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-white/30 flex items-center justify-center">
+              <span className="text-2xl">{undismissedAwards[0]?.emoji || '⭐'}</span>
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-bold text-amber-900">You received an award!</p>
+              <p className="text-xs text-amber-800">{undismissedAwards[0]?.title} from {undismissedAwards[0]?.awarded_by_name || 'Admin'}</p>
+            </div>
+            <span className="text-amber-900 font-bold text-xs">View &rarr;</span>
+          </div>
+        </div>
+      )}
 
       {/* Unread Notifications & Announcements Banner */}
       {(unreadNotifications.length > 0 || unacknowledgedAnnouncements.length > 0) && (
@@ -755,7 +843,7 @@ export default function Dashboard() {
             </div>
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Awards</span>
           </div>
-          <p className="text-3xl font-bold gold-shimmer">{todayAwards.length}</p>
+          <p className="text-3xl font-bold gold-shimmer">{displayAwards.length}</p>
           <p className="text-xs text-slate-500 dark:text-slate-400">
             {myNewAwards.length > 0 ? (
               <span className="text-amber-600 font-semibold">{myNewAwards.length} for you!</span>
@@ -848,17 +936,17 @@ export default function Dashboard() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            {todayAwards.length === 0 ? (
+            {displayAwards.length === 0 ? (
               <div className="text-center py-8 text-slate-500">
                 <Trophy className="w-10 h-10 mx-auto mb-2 text-slate-300" />
                 <p className="text-sm">No awards given today</p>
               </div>
             ) : (
-              todayAwards.map(award => (
+              displayAwards.map(award => (
                 <Card key={award.id} className={`p-4 border-0 shadow-sm ${award.recipient_id === user?.id ? 'bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950 dark:to-yellow-950 ring-2 ring-amber-300' : 'bg-white dark:bg-slate-900'}`}>
                   <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center flex-shrink-0 shadow-md">
-                      <Trophy className="w-5 h-5 text-white" />
+                    <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${AWARD_COLORS[award.color] || AWARD_COLORS.amber} flex items-center justify-center flex-shrink-0 shadow-md`}>
+                      <span className="text-lg">{award.emoji || '⭐'}</span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-bold text-slate-900 dark:text-white">{award.recipient_name}</p>
@@ -878,13 +966,16 @@ export default function Dashboard() {
                       size="sm"
                       variant="ghost"
                       className="text-xs text-blue-600 hover:bg-blue-50"
-                      onClick={() => {
-                        const text = `${award.recipient_name} received a "${award.title}" award at CareCallAI! ${award.message || ''}`;
+                      onClick={async () => {
+                        const text = `${award.emoji || '⭐'} ${award.recipient_name} received a "${award.title}" award at CareCallAI! ${award.message || ''}`;
                         if (navigator.share) {
-                          navigator.share({ title: 'Staff Award', text });
+                          try {
+                            await navigator.share({ title: 'Staff Award', text, url: window.location.origin });
+                          } catch (e) { /* user cancelled */ }
                         } else {
-                          navigator.clipboard.writeText(text);
-                          alert('Copied to clipboard!');
+                          // Desktop fallback — open WhatsApp web
+                          const encoded = encodeURIComponent(text);
+                          window.open(`https://wa.me/?text=${encoded}`, '_blank');
                         }
                       }}
                     >
@@ -899,6 +990,59 @@ export default function Dashboard() {
                 </Card>
               ))
             )}
+          </div>
+          <div className="flex justify-center pt-1 border-t border-slate-100 dark:border-slate-800">
+            <Button size="sm" variant="ghost" className="text-xs text-amber-600 hover:bg-amber-50" onClick={() => { setShowAwardsPopup(false); setShowLeaderboard(true); }}>
+              <Trophy className="w-3.5 h-3.5 mr-1" /> Monthly Leaderboard
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Monthly Leaderboard Popup */}
+      <Dialog open={showLeaderboard} onOpenChange={setShowLeaderboard}>
+        <DialogContent className="w-[95vw] sm:max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-amber-500 trophy-glow" />
+              <span className="gold-shimmer text-lg">Awards Leaderboard</span>
+            </DialogTitle>
+            <p className="text-xs text-slate-500 mt-1">{format(new Date(), 'MMMM yyyy')} &bull; Resets 1st of each month</p>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            {monthlyLeaderboard.length === 0 ? (
+              <div className="text-center py-8 text-slate-500">
+                <Star className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                <p className="text-sm">No awards this month yet</p>
+              </div>
+            ) : (
+              monthlyLeaderboard.map((entry, idx) => (
+                <div key={entry.id} className={`flex items-center gap-3 p-3 rounded-lg ${idx === 0 ? 'bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950 dark:to-yellow-950 ring-1 ring-amber-300' : idx === 1 ? 'bg-slate-50 dark:bg-slate-900' : idx === 2 ? 'bg-orange-50/50 dark:bg-orange-950/30' : 'bg-white dark:bg-slate-900'}`}>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0" style={{ background: idx === 0 ? 'linear-gradient(135deg, #f59e0b, #eab308)' : idx === 1 ? 'linear-gradient(135deg, #94a3b8, #cbd5e1)' : idx === 2 ? 'linear-gradient(135deg, #f97316, #ea580c)' : '#e2e8f0', color: idx < 3 ? 'white' : '#64748b' }}>
+                    {idx + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{entry.name}</p>
+                    <div className="flex gap-0.5 mt-0.5">
+                      {[1, 2, 3, 4, 5].map(i => (
+                        <Star key={i} className={`w-3.5 h-3.5 ${i <= Math.min(5, entry.count) ? 'text-amber-400 fill-amber-400' : 'text-slate-300 dark:text-slate-600'}`} />
+                      ))}
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-lg font-bold gold-shimmer">{entry.count}</p>
+                    <p className="text-xs text-slate-400">award{entry.count !== 1 ? 's' : ''}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <div className="flex justify-center pt-2">
+            <Link to={createPageUrl('StaffAwards')}>
+              <Button size="sm" variant="outline" className="text-xs">
+                <Trophy className="w-3.5 h-3.5 mr-1" /> View All Awards
+              </Button>
+            </Link>
           </div>
         </DialogContent>
       </Dialog>

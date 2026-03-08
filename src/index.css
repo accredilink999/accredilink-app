@@ -216,6 +216,12 @@
 /* ── Status bar / chrome ── */
 .dark { color-scheme: dark; }
 
+/* ── Keyboard / scroll fix — keep focused inputs visible ── */
+input:focus, textarea:focus, select:focus, [contenteditable]:focus {
+  scroll-margin-bottom: 120px;
+  scroll-padding-bottom: 120px;
+}
+
 /* Chat upload progress animation */
 @keyframes upload-progress {
   0% { width: 5%; }
