@@ -30,7 +30,10 @@ import {
         Video,
         Activity,
         Building2,
-        Star
+        Star,
+        FileText,
+        Scale,
+        ImagePlus
       } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -60,6 +63,8 @@ export default function AdminDashboard() {
           { to: 'OrgAdmin', label: 'Organisation', icon: Building2, bg: 'from-teal-400 to-teal-600', desc: 'Organisation admin' },
           { to: 'ControlRoom', label: 'Control Room', icon: Shield, bg: 'from-slate-500 to-slate-700', desc: 'Live overview' },
           { to: 'AIAssistant', label: 'AI Assistant', icon: Bot, bg: 'from-purple-400 to-purple-600', desc: 'AI admin helper' },
+          { to: 'Documents', label: 'Files', icon: FileText, bg: 'from-blue-400 to-blue-600', desc: 'File management' },
+          { to: 'LegalPages', label: 'Legal Docs', icon: Scale, bg: 'from-gray-400 to-gray-600', desc: 'Terms & policies' },
         ].map(section => {
           const Icon = section.icon;
           return (
@@ -81,6 +86,7 @@ export default function AdminDashboard() {
           { to: 'ClientManagement', label: 'Clients', icon: Heart, bg: 'from-teal-400 to-teal-600', desc: 'Client management' },
           { to: 'StaffManagement', label: 'Staff', icon: Users, bg: 'from-blue-400 to-blue-600', desc: 'Staff management' },
           { to: 'ClinicalDashboard', label: 'Clinical', icon: Activity, bg: 'from-rose-400 to-rose-600', desc: 'Clinical dashboard' },
+          { to: 'PhotoGallery', label: 'Photos', icon: ImagePlus, bg: 'from-violet-400 to-violet-600', desc: 'Organisation photos' },
         ].map(section => {
           const Icon = section.icon;
           return (

@@ -46,6 +46,7 @@ import ControlRoom from './pages/ControlRoom';
 import CourseSeeder from './pages/CourseSeeder';
 import OrgAdmin from './pages/OrgAdmin';
 import LegalPages from './pages/LegalPages';
+import PhotoGallery from './pages/PhotoGallery';
 import __Layout from './Layout.jsx';
 
 
@@ -95,6 +96,7 @@ export const PAGES = {
     "CourseSeeder": CourseSeeder,
     "OrgAdmin": OrgAdmin,
     "LegalPages": LegalPages,
+    "PhotoGallery": PhotoGallery,
 }
 
 export const pagesConfig = {
