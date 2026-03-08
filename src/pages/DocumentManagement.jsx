@@ -13,6 +13,7 @@ import FormSubmissionsCabinet from '@/components/formBuilder/FormSubmissionsCabi
 import SubmissionViewer from '@/components/formBuilder/SubmissionViewer';
 import CompanyLogoUploader from '@/components/CompanyLogoUploader';
 import { Zap, FolderPlus, Archive } from 'lucide-react';
+import { archiveItem } from '@/utils/archiveHelper';
 
 export default function DocumentManagement() {
   const queryClient = useQueryClient();
@@ -37,7 +38,16 @@ export default function DocumentManagement() {
   });
 
   const deleteSubmissionMutation = useMutation({
-    mutationFn: (id) => base44.entities.FormSubmission.delete(id),
+    mutationFn: async (submission) => {
+      await archiveItem({
+        entityType: 'form_submission',
+        entityId: submission.id || submission,
+        itemName: submission.submitter_email || submission.form_id || 'Form Submission',
+        itemData: typeof submission === 'object' ? submission : { id: submission },
+      });
+      const id = typeof submission === 'object' ? submission.id : submission;
+      await base44.entities.FormSubmission.delete(id);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['formSubmissions'] });
     },
@@ -124,7 +134,7 @@ export default function DocumentManagement() {
         variant="destructive"
         onConfirm={() => {
           if (pendingDeleteSubmission) {
-            deleteSubmissionMutation.mutate(pendingDeleteSubmission.id);
+            deleteSubmissionMutation.mutate(pendingDeleteSubmission);
             setPendingDeleteSubmission(null);
           }
         }}

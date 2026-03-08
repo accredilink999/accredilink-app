@@ -5,6 +5,7 @@ import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
 import { format } from 'date-fns';
 import { usePullToRefresh } from '@/components/hooks/usePullToRefresh';
+import { archiveItem } from '@/utils/archiveHelper';
 
 const playNotificationSound = (priority = 'normal') => {
   try {
@@ -249,7 +250,18 @@ export default function Messages() {
   }, [messages, user?.id]);
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Message.delete(id),
+    mutationFn: async (msg) => {
+      const id = typeof msg === 'object' ? msg.id : msg;
+      if (typeof msg === 'object') {
+        await archiveItem({
+          entityType: 'message',
+          entityId: id,
+          itemName: msg.title || msg.subject || 'Message',
+          itemData: msg,
+        });
+      }
+      await base44.entities.Message.delete(id);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['messages'] });
       setDeleteDialogOpen(false);
@@ -372,7 +384,7 @@ export default function Messages() {
 
   const confirmDelete = () => {
     if (messageToDelete) {
-      deleteMutation.mutate(messageToDelete.id);
+      deleteMutation.mutate(messageToDelete);
     }
   };
 

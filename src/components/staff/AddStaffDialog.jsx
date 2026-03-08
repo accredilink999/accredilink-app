@@ -36,7 +36,7 @@ function generateTempPassword() {
   return pwd.split('').sort(() => Math.random() - 0.5).join('');
 }
 
-const SITE_URL = 'https://care-call-ai-clone.vercel.app';
+const SITE_URL = 'https://app.carecallai.co.uk';
 
 export default function AddStaffDialog({ open, onClose }) {
   const queryClient = useQueryClient();

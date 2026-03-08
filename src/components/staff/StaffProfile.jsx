@@ -18,6 +18,7 @@ import StaffSupervisions from '@/components/staff/StaffSupervisions';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from 'sonner';
 import { ArrowLeft, Edit, Shield, MapPin, UserX, UserCheck, Trash2, Mail, Loader2, User, Briefcase, Calendar, FileText, ClipboardList, ChevronLeft, Palmtree } from 'lucide-react';
+import { archiveItem } from '@/utils/archiveHelper';
 
 export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }) {
   const queryClient = useQueryClient();
@@ -89,10 +90,14 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
+      await archiveItem({
+        entityType: 'staff',
+        entityId: staffId,
+        itemName: staff?.full_name || staff?.email || 'Staff Member',
+        itemData: staff,
+      });
       await base44.entities.User.delete(staffId);
-      // Also try to delete from profiles table
       try {
-        const { supabase } = await import('@/api/supabaseClient');
         await supabase.from('profiles').delete().eq('id', staffId);
       } catch (e) {
         console.warn('Could not delete profile:', e);
@@ -102,7 +107,7 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
       queryClient.invalidateQueries({ queryKey: ['staff'] });
       queryClient.invalidateQueries({ queryKey: ['allStaff'] });
       setShowDeleteDialog(false);
-      toast.success('User deleted');
+      toast.success('User archived and deleted');
       onBack();
     },
     onError: (error) => {

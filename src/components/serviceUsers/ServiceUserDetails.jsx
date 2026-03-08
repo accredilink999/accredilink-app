@@ -26,6 +26,7 @@ import CallTypeManager from '../rota/CallTypeManager';
 import SafeguardingReports from './SafeguardingReports';
 import ClinicalPanel from '../clinical/ClinicalPanel';
 import { openExternalUrl } from '@/lib/openExternalUrl';
+import { archiveItem } from '@/utils/archiveHelper';
 import {
   Phone,
   MapPin,
@@ -442,9 +443,18 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => base44.entities.ServiceUser.delete(serviceUser.id),
+    mutationFn: async () => {
+      await archiveItem({
+        entityType: 'client',
+        entityId: serviceUser.id,
+        itemName: serviceUser.full_name || serviceUser.first_name || 'Service User',
+        itemData: serviceUser,
+      });
+      await base44.entities.ServiceUser.delete(serviceUser.id);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['serviceUsers'] });
+      toast.success('Service user archived and deleted');
       onClose();
     },
   });
