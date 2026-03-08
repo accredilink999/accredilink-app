@@ -151,7 +151,7 @@ export default function PayrollSettingsManager() {
           <div className="space-y-2">
             <Label>Company Name</Label>
             <Input
-              placeholder="e.g., Accredi-Care Ltd"
+              placeholder="e.g., Your Care Company Ltd"
               value={formData.company_name}
               onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
             />

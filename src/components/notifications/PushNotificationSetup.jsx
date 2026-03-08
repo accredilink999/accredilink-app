@@ -180,7 +180,7 @@ export default function PushNotificationSetup() {
               <p className="font-medium text-red-900">Push Notifications Blocked</p>
               <p className="text-sm text-red-800 mt-1">
                 {isNative
-                  ? 'Push notifications are blocked. Go to your device Settings → Apps → Accredilink → Notifications and enable them.'
+                  ? 'Push notifications are blocked. Go to your device Settings → Apps → CareCallAI → Notifications and enable them.'
                   : 'You have blocked notifications for this site. To re-enable, click the lock icon in your browser\'s address bar and allow notifications, then reload.'
                 }
               </p>

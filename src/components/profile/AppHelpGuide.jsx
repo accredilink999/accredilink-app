@@ -28,7 +28,7 @@ const sections = [
     icon: Home,
     color: "bg-teal-50 hover:bg-teal-100",
     content: `
-**Welcome to Accredi-Care!**
+**Welcome to CareCallAI!**
 
 This app helps you manage your daily care work efficiently. Here's what you need to know:
 

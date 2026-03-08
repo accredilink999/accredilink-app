@@ -280,7 +280,7 @@ export default function Login() {
         margin: 'auto 0',
       }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <img src="/logo.png" alt="Accredilink" style={{
+          <img src="/logo.png" alt="CareCallAI" style={{
             width: 80, height: 'auto', marginBottom: 12, borderRadius: 12,
           }} />
           <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0f172a', margin: '8px 0 4px' }}>
@@ -558,6 +558,13 @@ export default function Login() {
               />
             </div>
 
+            <p style={{ fontSize: 12, color: '#94a3b8', textAlign: 'center', margin: '0 0 12px' }}>
+              By creating an account, you agree to our{' '}
+              <a href="https://carecallai.co.uk/terms" target="_blank" rel="noopener noreferrer" style={{ color: '#0d9488', textDecoration: 'underline' }}>Terms of Service</a>
+              {' '}and{' '}
+              <a href="https://carecallai.co.uk/privacy" target="_blank" rel="noopener noreferrer" style={{ color: '#0d9488', textDecoration: 'underline' }}>Privacy Policy</a>.
+            </p>
+
             <button
               type="submit"
               disabled={!!status}
@@ -585,6 +592,15 @@ export default function Login() {
             </p>
           </form>
         )}
+
+        {/* Privacy & Terms footer — required by App Store & Google Play */}
+        <div style={{ textAlign: 'center', marginTop: 20, paddingTop: 16, borderTop: '1px solid #e2e8f0' }}>
+          <p style={{ fontSize: 12, color: '#94a3b8' }}>
+            <a href="https://carecallai.co.uk/privacy" target="_blank" rel="noopener noreferrer" style={{ color: '#64748b', textDecoration: 'underline' }}>Privacy Policy</a>
+            {' · '}
+            <a href="https://carecallai.co.uk/terms" target="_blank" rel="noopener noreferrer" style={{ color: '#64748b', textDecoration: 'underline' }}>Terms of Service</a>
+          </p>
+        </div>
       </div>
       <PWAInstallPrompt />
     </div>

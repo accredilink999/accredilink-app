@@ -29,7 +29,7 @@ const REPORT_TYPES = [
   { id: 'suggestion', label: 'Suggestion', icon: Lightbulb, color: 'text-amber-500' },
 ];
 
-const HELP_SYSTEM_PROMPT = `You are MikeAI, a friendly and knowledgeable AI assistant for Accredilink (also known as Accredi-Care), a care management app used by domiciliary care staff and administrators.
+const HELP_SYSTEM_PROMPT = `You are MikeAI, a friendly and knowledgeable AI assistant for CareCallAI, a care management app used by domiciliary care staff and administrators.
 
 You have LIVE ACCESS to the app's data including staff lists, client lists, upcoming shifts, pending leave requests, recent incidents, and expiring training. Use this data to give specific, accurate answers.
 
@@ -48,7 +48,7 @@ Keep responses concise but complete. Be warm, professional and helpful. Introduc
 If you genuinely cannot resolve the issue or it sounds like a technical bug, suggest the user submit a formal bug report using the button below.
 Never make up data - only reference what's in the live context. The user is currently on: PAGE_PLACEHOLDER`;
 
-const AI_GREETING = "Hey there! I'm MikeAI, your Accredi-Care assistant. How can I help you today? You can type or tap the mic to speak.";
+const AI_GREETING = "Hey there! I'm MikeAI, your CareCallAI assistant. How can I help you today? You can type or tap the mic to speak.";
 
 export default function HelpButton() {
   const { user } = useAuth();
@@ -306,7 +306,7 @@ export default function HelpButton() {
                 {view === 'chat' ? 'MikeAI' : 'Submit Report'}
               </h3>
               <p className="text-xs text-teal-100">
-                {view === 'chat' ? 'Your Accredi-Care assistant' : 'Report an issue or suggestion'}
+                {view === 'chat' ? 'Your CareCallAI assistant' : 'Report an issue or suggestion'}
               </p>
             </div>
             {view === 'chat' && isSpeaking && (

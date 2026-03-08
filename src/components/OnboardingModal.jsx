@@ -45,7 +45,7 @@ export default function OnboardingModal({ user, open }) {
               <Heart className="w-6 h-6 text-white" />
             </div>
             <div>
-              <DialogTitle className="text-xl">Welcome to Accredi-Care</DialogTitle>
+              <DialogTitle className="text-xl">Welcome to CareCallAI</DialogTitle>
               <p className="text-sm text-slate-500 mt-1">Complete your profile to get started</p>
             </div>
           </div>

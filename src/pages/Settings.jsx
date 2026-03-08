@@ -461,7 +461,7 @@ function PermissionsSection() {
       {anyDenied && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-sm text-amber-800">
           {window.Capacitor?.isNativePlatform?.()
-            ? 'Some permissions are blocked. Go to your device Settings → Apps → Accredilink → Permissions to allow them.'
+            ? 'Some permissions are blocked. Go to your device Settings → Apps → CareCallAI → Permissions to allow them.'
             : 'Some permissions are blocked. To fix this, tap the lock/site-settings icon in your browser\'s address bar and allow the blocked permissions, then reload.'}
         </div>
       )}
@@ -872,7 +872,7 @@ function AppShareQRCode({ isAdmin }) {
   const handleShare = async () => {
     if (navigator.share) {
       try {
-        await navigator.share({ title: 'Accredi-Care App', url: appUrl });
+        await navigator.share({ title: 'CareCallAI', url: appUrl });
       } catch {}
     } else {
       handleCopy();
@@ -1520,6 +1520,25 @@ export default function Settings() {
 
       {/* App Info */}
       <AppInfoCard userEmail={user?.email} />
+
+      {/* Legal Links */}
+      <Card className="p-4">
+        <h3 className="font-semibold text-sm text-slate-700 mb-3">Legal</h3>
+        <div className="flex gap-4">
+          <button
+            onClick={() => openExternalUrl('https://carecallai.co.uk/privacy')}
+            className="text-sm text-teal-600 hover:underline"
+          >
+            Privacy Policy
+          </button>
+          <button
+            onClick={() => openExternalUrl('https://carecallai.co.uk/terms')}
+            className="text-sm text-teal-600 hover:underline"
+          >
+            Terms of Service
+          </button>
+        </div>
+      </Card>
 
       {/* Logout */}
       <Button 

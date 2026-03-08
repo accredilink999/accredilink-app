@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Accredilink</string>
-    <string name="title_activity_main">Accredilink</string>
+    <string name="app_name">CareCallAI</string>
+    <string name="title_activity_main">CareCallAI</string>
     <string name="package_name">com.carecallai.app</string>
     <string name="custom_url_scheme">com.carecallai.app</string>
 </resources>

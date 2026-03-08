@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Accredilink</string>
+	<string>CareCallAI</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -52,17 +52,19 @@
 	<key>FirebaseAppDelegateProxyEnabled</key>
 	<false/>
 	<key>NSFaceIDUsageDescription</key>
-	<string>Accredilink uses Face ID for quick and secure login</string>
+	<string>CareCallAI uses Face ID for quick and secure login so care workers can access the app between visits.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Accredilink needs camera access for document scanning and photos</string>
+	<string>CareCallAI needs camera access to photograph care evidence, scan documents and capture wound images for clinical records.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Accredilink needs microphone access for voice notes and audio messages</string>
+	<string>CareCallAI uses the microphone for voice notes that care workers attach to visit records.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Accredilink uses speech recognition for voice-to-text</string>
+	<string>CareCallAI uses speech recognition so care workers can dictate care notes hands-free during visits.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Accredilink uses your location for clock in/out verification</string>
+	<string>CareCallAI uses your location to verify GPS check-in and check-out at care visits, as required by CIW and CQC regulations.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Accredilink uses your location for shift tracking</string>
+	<string>CareCallAI uses background location during active shifts to track mileage between care visits and verify visit times for compliance reporting.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>CareCallAI needs photo library access to attach images to care records, wound assessments and incident reports.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 </dict>

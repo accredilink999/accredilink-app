@@ -2,15 +2,14 @@ import type { CapacitorConfig } from '@capacitor/cli'
 
 const config: CapacitorConfig = {
   appId: 'com.carecallai.app',
-  appName: 'Accredilink',
+  appName: 'CareCallAI',
   webDir: 'dist',
 
-  // Serve from live Vercel deployment — app always shows latest version
+  // Serve locally from built dist/ folder — required for App Store approval
   server: {
     androidScheme: 'https',
-    url: 'https://care-call-ai-clone.vercel.app',
-    // Allow the WebView to navigate within the app domain
-    allowNavigation: ['care-call-ai-clone.vercel.app', '*.supabase.co'],
+    // Allow Supabase API calls
+    allowNavigation: ['*.supabase.co'],
   },
 
   plugins: {
