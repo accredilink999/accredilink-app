@@ -43,7 +43,7 @@ export default function StaffAwards() {
       if (orgId) q = q.eq('organization_id', orgId);
       q = q.gte('created_at', since.toISOString());
       const { data, error } = await q;
-      if (error) throw error;
+      if (error) { console.warn('staff_awards query:', error.message); return []; }
       return data || [];
     },
   });
@@ -127,7 +127,7 @@ export default function StaffAwards() {
     <div className="max-w-4xl mx-auto pb-6">
       <PageHeader
         title="Staff Awards"
-        icon={<Trophy className="w-7 h-7 text-amber-500" />}
+        icon={Trophy}
         subtitle="Recognise and reward your team"
       />
 
