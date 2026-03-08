@@ -3,6 +3,7 @@ import { BreadcrumbJsonLd } from "@/components/SEO/JsonLd";
 export const metadata = {
   title: "Privacy Policy",
   description: "CareCallAI privacy policy. How we collect, use and protect your data.",
+  alternates: { canonical: "https://carecallai.co.uk/privacy" },
 };
 
 export default function PrivacyPage() {

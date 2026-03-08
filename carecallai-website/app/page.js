@@ -42,7 +42,7 @@ import CTABanner from "@/components/CTABanner";
 import FAQ from "@/components/FAQ";
 import PhoneMockup, { PhoneScreenRota, PhoneScreenMAR, PhoneScreenCheckIn, PhoneScreenCareLog, PhoneScreenIncident } from "@/components/PhoneMockup";
 import BrowserMockup, { DashboardScreen, ComplianceScreen, StaffManagementScreen, TrainingScreen, InvoicingScreen } from "@/components/BrowserMockup";
-import { OrganizationJsonLd, SoftwareApplicationJsonLd, FAQJsonLd } from "@/components/SEO/JsonLd";
+import { OrganizationJsonLd, WebSiteJsonLd, SoftwareApplicationJsonLd, FAQJsonLd } from "@/components/SEO/JsonLd";
 
 const features = [
   { icon: Calendar, title: "Scheduling & Rota", description: "Multi-area rotas, shift patterns, one-off calls and drag-and-drop scheduling for your entire team.", href: "/features/scheduling" },
@@ -99,10 +99,32 @@ const comparisonFeatures = [
   { feature: "Clinical Suite (NEWS2, SALT, Waterlow)", us: true, typical: false, basic: false },
 ];
 
+export const metadata = {
+  title: "Home Care Management Software UK — CareCallAI",
+  description:
+    "All-in-one care management software for UK domiciliary care agencies. Scheduling, care logging, eMAR, GPS tracking, CIW & CQC compliance, invoicing and AI assistant. From £99/mo. Free 7-day trial.",
+  alternates: { canonical: "https://carecallai.co.uk" },
+  openGraph: {
+    title: "Home Care Management Software UK — CareCallAI",
+    description:
+      "Scheduling, care logging, MAR charts, GPS tracking, compliance and invoicing — everything your care agency needs from £99/mo.",
+    url: "https://carecallai.co.uk",
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "CareCallAI — Care Management Software UK" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Home Care Management Software UK — CareCallAI",
+    description:
+      "All-in-one care software for UK agencies. Scheduling, eMAR, GPS, compliance. From £99/mo with free trial.",
+    images: ["/opengraph-image"],
+  },
+};
+
 export default function HomePage() {
   return (
     <>
       <OrganizationJsonLd />
+      <WebSiteJsonLd />
       <SoftwareApplicationJsonLd />
       <FAQJsonLd items={faqs} />
 
@@ -123,8 +145,8 @@ export default function HomePage() {
               </AnimateOnScroll>
               <AnimateOnScroll animation="slide-left" delay={100}>
                 <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight mb-6">
-                  Care Management<br />
-                  <span className="text-gradient">Made Simple</span>
+                  Home Care Management<br />
+                  <span className="text-gradient">Software UK</span>
                 </h1>
               </AnimateOnScroll>
               <AnimateOnScroll animation="slide-left" delay={200}>

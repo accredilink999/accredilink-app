@@ -5,9 +5,19 @@ import AnimateOnScroll from "@/components/AnimateOnScroll";
 import { BreadcrumbJsonLd } from "@/components/SEO/JsonLd";
 
 export const metadata = {
-  title: "Start Free Trial",
+  title: "Start Free Trial — 7 Days Free, No Card Required",
   description:
     "Start your free 7-day CareCallAI trial. No credit card required. Full access to scheduling, care logging, MAR charts and compliance features.",
+  alternates: { canonical: "https://carecallai.co.uk/demo" },
+  openGraph: {
+    title: "Start Free Trial — CareCallAI",
+    description: "Try CareCallAI free for 7 days. No credit card required. Full access to all care management features.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Start Free Trial — CareCallAI",
+    description: "Try CareCallAI free for 7 days. No credit card required. Full access to all care management features.",
+  },
 };
 
 const trialBenefits = [

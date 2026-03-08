@@ -7,10 +7,20 @@ import { BreadcrumbJsonLd } from "@/components/SEO/JsonLd";
 export const revalidate = 3600; // Revalidate every hour
 
 export const metadata = {
-  title: "Blog",
+  title: "Care Agency Blog — CIW Compliance, Rostering & Software Guides",
   description:
     "Expert guides, tips and news for UK domiciliary care agencies. Scheduling, compliance, MAR charts, staff management and more.",
+  alternates: { canonical: "https://carecallai.co.uk/blog" },
   keywords: ["care management blog", "home care tips UK", "domiciliary care guides"],
+  openGraph: {
+    title: "Care Agency Blog — CareCallAI",
+    description: "Expert guides and tips for UK domiciliary care agencies. CIW compliance, rostering, MAR charts and more.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Care Agency Blog — CareCallAI",
+    description: "Expert guides and tips for UK domiciliary care agencies. CIW compliance, rostering, MAR charts and more.",
+  },
 };
 
 export default async function BlogPage() {

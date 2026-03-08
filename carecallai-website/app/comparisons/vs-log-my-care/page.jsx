@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import AnimateOnScroll from "@/components/AnimateOnScroll";
 import ComparisonTable from "@/components/ComparisonTable";
 import CTABanner from "@/components/CTABanner";
@@ -8,6 +10,7 @@ export const metadata = {
   description:
     "Compare CareCallAI and Log my Care for home care agencies. More complete solution with scheduling, invoicing and AI features.",
   keywords: ["log my care alternative", "log my care vs carecallai", "free care software comparison UK"],
+  alternates: { canonical: "https://carecallai.co.uk/comparisons/vs-log-my-care" },
   openGraph: {
     title: "CareCallAI vs Log my Care — Feature Comparison",
     description: "More complete solution with scheduling, invoicing and AI. See how CareCallAI compares to Log my Care.",
@@ -87,6 +90,36 @@ export default function VsLogMyCarePage() {
               <p>
                 CareCallAI&apos;s <strong className="text-teal-600">£99/month Starter plan</strong> covers up to 15 users and includes features that Log my Care doesn&apos;t offer at any tier — like automated shift patterns, base templates and integrated invoicing.
               </p>
+            </div>
+          </AnimateOnScroll>
+        </div>
+      </section>
+
+      {/* Explore features */}
+      <section className="py-16 bg-white">
+        <div className="max-w-4xl mx-auto px-4">
+          <AnimateOnScroll>
+            <h2 className="text-2xl font-bold text-slate-900 text-center mb-8">
+              Explore CareCallAI Features
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[
+                { name: "Scheduling & Rota", href: "/features/scheduling" },
+                { name: "Invoicing & Payroll", href: "/features/invoicing-payroll" },
+                { name: "AI Assistant", href: "/features/ai-assistant" },
+                { name: "Staff Management", href: "/features/staff-management" },
+                { name: "Mobile App", href: "/features/mobile-app" },
+                { name: "CIW & CQC Compliance", href: "/features/compliance" },
+              ].map((f) => (
+                <Link
+                  key={f.href}
+                  href={f.href}
+                  className="flex items-center gap-2 p-4 bg-slate-50 rounded-xl border border-slate-200 hover:border-teal-300 hover:shadow transition-all group"
+                >
+                  <span className="text-sm font-medium text-slate-700 group-hover:text-teal-600">{f.name}</span>
+                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-teal-600 ml-auto" />
+                </Link>
+              ))}
             </div>
           </AnimateOnScroll>
         </div>

@@ -1,9 +1,36 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Clock, Tag, Calendar } from "lucide-react";
+import { ArrowLeft, ArrowRight, Clock, Tag, Calendar } from "lucide-react";
 import { getAllSlugs, getPostBySlug } from "@/lib/blog";
 import CTABanner from "@/components/CTABanner";
 import { BreadcrumbJsonLd, BlogPostJsonLd } from "@/components/SEO/JsonLd";
+
+const relatedResources = [
+  { name: "Care Rostering Software", href: "/care-rostering-software", keywords: ["rota", "roster", "scheduling", "shift"] },
+  { name: "Digital Care Planning", href: "/digital-care-planning", keywords: ["care plan", "assessment", "clinical"] },
+  { name: "Domiciliary Care Software", href: "/domiciliary-care-software", keywords: ["domiciliary", "home care", "homecare"] },
+  { name: "Home Care Management Software", href: "/home-care-management-software", keywords: ["management", "agency", "software"] },
+  { name: "Care Agency Software Wales", href: "/care-agency-software-wales", keywords: ["wales", "ciw", "welsh", "risca"] },
+  { name: "Scheduling & Rota", href: "/features/scheduling", keywords: ["rota", "schedule", "shift", "roster"] },
+  { name: "Medication / MAR Charts", href: "/features/medication-management", keywords: ["medication", "mar", "emar", "prescri"] },
+  { name: "Care Logging", href: "/features/care-logging", keywords: ["care log", "daily notes", "record"] },
+  { name: "GPS Tracking", href: "/features/gps-tracking", keywords: ["gps", "tracking", "check-in", "location"] },
+  { name: "Compliance & Auditing", href: "/features/compliance", keywords: ["compliance", "audit", "ciw", "cqc", "inspection"] },
+  { name: "Staff Management", href: "/features/staff-management", keywords: ["staff", "hr", "training", "dbs"] },
+  { name: "Free Staff Training", href: "/training", keywords: ["training", "cpd", "certificate", "course", "learning"] },
+];
+
+function getRelevantResources(post) {
+  const text = `${post.title} ${post.description} ${post.category}`.toLowerCase();
+  const matched = relatedResources.filter((r) =>
+    r.keywords.some((kw) => text.includes(kw))
+  );
+  // Always show at least 3, max 4
+  if (matched.length >= 3) return matched.slice(0, 4);
+  // Fallback: add generic ones
+  const fallbacks = relatedResources.filter((r) => !matched.includes(r));
+  return [...matched, ...fallbacks].slice(0, 4);
+}
 
 export const revalidate = 3600; // Revalidate every hour
 
@@ -20,6 +47,7 @@ export async function generateMetadata({ params }) {
     title: post.metaTitle || post.title,
     description: post.metaDescription || post.description,
     keywords: [post.category.toLowerCase(), "care software", "home care UK", ...(post.seoKeywords || [])],
+    alternates: { canonical: `https://carecallai.co.uk/blog/${slug}` },
     openGraph: {
       type: "article",
       title: post.title,
@@ -214,6 +242,23 @@ export default async function BlogPostPage({ params }) {
             >
               Start Free Trial
             </Link>
+          </div>
+
+          {/* Related Resources */}
+          <div className="mt-10">
+            <h3 className="font-semibold text-slate-900 mb-4">Related Resources</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {getRelevantResources(post).map((r) => (
+                <Link
+                  key={r.href}
+                  href={r.href}
+                  className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 hover:border-teal-300 hover:shadow transition-all group"
+                >
+                  <span className="text-sm font-medium text-slate-700 group-hover:text-teal-600">{r.name}</span>
+                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-teal-600 ml-auto" />
+                </Link>
+              ))}
+            </div>
           </div>
         </div>
       </article>

@@ -3,6 +3,7 @@ import { BreadcrumbJsonLd } from "@/components/SEO/JsonLd";
 export const metadata = {
   title: "Terms of Service",
   description: "CareCallAI terms of service. The terms and conditions governing your use of the platform.",
+  alternates: { canonical: "https://carecallai.co.uk/terms" },
 };
 
 export default function TermsPage() {

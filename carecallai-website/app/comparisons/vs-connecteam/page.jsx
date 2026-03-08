@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import AnimateOnScroll from "@/components/AnimateOnScroll";
 import ComparisonTable from "@/components/ComparisonTable";
 import CTABanner from "@/components/CTABanner";
@@ -9,6 +10,7 @@ export const metadata = {
   description:
     "Compare CareCallAI and Connecteam for home care agencies. Purpose-built care features, 40% lower cost, CIW & CQC compliance included.",
   keywords: ["connecteam alternative care", "connecteam vs care software", "better than connecteam for home care"],
+  alternates: { canonical: "https://carecallai.co.uk/comparisons/vs-connecteam" },
   openGraph: {
     title: "CareCallAI vs Connecteam — Feature Comparison",
     description: "Purpose-built for UK care. CIW & CQC compliance, MAR charts, care plans — everything Connecteam doesn't offer.",
@@ -88,6 +90,36 @@ export default function VsConnecteamPage() {
               <p>
                 Connecteam charges per &quot;hub&quot; (Operations, Communications, HR) at $29-99/hub/month for 30 users. To get equivalent functionality, you&apos;d need all three hubs — costing around £140/month. CareCallAI&apos;s Professional plan gives you everything for <strong className="text-teal-600">£99/month</strong> — 40% less.
               </p>
+            </div>
+          </AnimateOnScroll>
+        </div>
+      </section>
+
+      {/* Explore features */}
+      <section className="py-16 bg-white">
+        <div className="max-w-4xl mx-auto px-4">
+          <AnimateOnScroll>
+            <h2 className="text-2xl font-bold text-slate-900 text-center mb-8">
+              Explore CareCallAI Features
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[
+                { name: "CIW & CQC Compliance", href: "/features/compliance" },
+                { name: "Medication / MAR Charts", href: "/features/medication-management" },
+                { name: "Care Logging", href: "/features/care-logging" },
+                { name: "Invoicing & Payroll", href: "/features/invoicing-payroll" },
+                { name: "AI Assistant", href: "/features/ai-assistant" },
+                { name: "GPS Tracking", href: "/features/gps-tracking" },
+              ].map((f) => (
+                <Link
+                  key={f.href}
+                  href={f.href}
+                  className="flex items-center gap-2 p-4 bg-slate-50 rounded-xl border border-slate-200 hover:border-teal-300 hover:shadow transition-all group"
+                >
+                  <span className="text-sm font-medium text-slate-700 group-hover:text-teal-600">{f.name}</span>
+                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-teal-600 ml-auto" />
+                </Link>
+              ))}
             </div>
           </AnimateOnScroll>
         </div>

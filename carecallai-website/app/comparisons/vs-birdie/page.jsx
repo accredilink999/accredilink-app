@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import AnimateOnScroll from "@/components/AnimateOnScroll";
 import ComparisonTable from "@/components/ComparisonTable";
 import CTABanner from "@/components/CTABanner";
@@ -8,6 +10,7 @@ export const metadata = {
   description:
     "Compare CareCallAI and Birdie for home care agencies. Similar features, significantly lower pricing, Welsh-built with CIW expertise.",
   keywords: ["birdie care software alternative", "birdie vs carecallai", "cheaper alternative to birdie care"],
+  alternates: { canonical: "https://carecallai.co.uk/comparisons/vs-birdie" },
   openGraph: {
     title: "CareCallAI vs Birdie — Feature Comparison",
     description: "Same features, significantly lower pricing. See how CareCallAI compares to Birdie for UK home care agencies.",
@@ -85,6 +88,36 @@ export default function VsBirdiePage() {
               <p>
                 Additionally, CareCallAI includes invoicing and payroll features that Birdie doesn&apos;t offer, plus an AI assistant for care plan drafting.
               </p>
+            </div>
+          </AnimateOnScroll>
+        </div>
+      </section>
+
+      {/* Explore features */}
+      <section className="py-16 bg-white">
+        <div className="max-w-4xl mx-auto px-4">
+          <AnimateOnScroll>
+            <h2 className="text-2xl font-bold text-slate-900 text-center mb-8">
+              Explore CareCallAI Features
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[
+                { name: "Scheduling & Rota", href: "/features/scheduling" },
+                { name: "Care Logging", href: "/features/care-logging" },
+                { name: "Medication / MAR Charts", href: "/features/medication-management" },
+                { name: "CIW & CQC Compliance", href: "/features/compliance" },
+                { name: "AI Assistant", href: "/features/ai-assistant" },
+                { name: "Invoicing & Payroll", href: "/features/invoicing-payroll" },
+              ].map((f) => (
+                <Link
+                  key={f.href}
+                  href={f.href}
+                  className="flex items-center gap-2 p-4 bg-slate-50 rounded-xl border border-slate-200 hover:border-teal-300 hover:shadow transition-all group"
+                >
+                  <span className="text-sm font-medium text-slate-700 group-hover:text-teal-600">{f.name}</span>
+                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-teal-600 ml-auto" />
+                </Link>
+              ))}
             </div>
           </AnimateOnScroll>
         </div>

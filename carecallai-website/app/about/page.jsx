@@ -5,9 +5,11 @@ import BetaPromo from "@/components/BetaPromo";
 import { BreadcrumbJsonLd } from "@/components/SEO/JsonLd";
 
 export const metadata = {
-  title: "About Us",
+  title: "About CareCallAI — Care Software Built in Wales",
   description:
     "CareCallAI is built by care professionals, for care professionals. Our mission is to make home care management simple, compliant and affordable for every UK agency.",
+  keywords: ["CareCallAI", "care software company Wales", "Welsh care technology", "care management software UK"],
+  alternates: { canonical: "https://carecallai.co.uk/about" },
   openGraph: {
     title: "About Us — CareCallAI",
     description: "Built by care professionals, for care professionals. Making home care management simple, compliant and affordable.",

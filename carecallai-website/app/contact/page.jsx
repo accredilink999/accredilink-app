@@ -4,9 +4,10 @@ import AnimateOnScroll from "@/components/AnimateOnScroll";
 import { BreadcrumbJsonLd } from "@/components/SEO/JsonLd";
 
 export const metadata = {
-  title: "Contact Us",
+  title: "Contact Us — Book a Demo or Get Support",
   description:
     "Get in touch with CareCallAI. Book a demo, ask about pricing, or get support. We're based in Wales and available Monday to Friday.",
+  alternates: { canonical: "https://carecallai.co.uk/contact" },
   openGraph: {
     title: "Contact Us — CareCallAI",
     description: "Book a demo, ask about pricing, or get support. Based in Wales, available Monday to Friday.",
