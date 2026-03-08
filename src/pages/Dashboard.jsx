@@ -562,11 +562,10 @@ export default function Dashboard() {
             { to: 'Rota', label: 'Shifts', icon: Clock, bg: 'from-orange-400 to-orange-600' },
             { to: 'ClientManagement', label: 'Clients', icon: Heart, bg: 'from-teal-400 to-teal-600' },
             { to: 'Incidents', label: 'Report', icon: AlertTriangle, bg: 'from-red-400 to-red-600' },
-            { to: 'LeaveRequests', label: 'Leave', icon: CalendarOff, bg: 'from-amber-400 to-amber-600' },
+            { to: 'ApprovalsAndFinancials', label: 'My Admin', icon: FileText, bg: 'from-indigo-400 to-indigo-600' },
             ...(isAdmin ? [
               { to: 'Payroll', label: 'Payroll', icon: PoundSterling, bg: 'from-emerald-400 to-emerald-600' },
             ] : []),
-            { to: 'Feedback', label: 'Feedback', icon: Star, bg: 'from-amber-400 to-yellow-500' },
             { to: 'AIAssistant', label: 'AI', icon: Bot, bg: 'from-purple-400 to-purple-600' },
           ].map(section => {
             const Icon = section.icon;
