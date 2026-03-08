@@ -92,9 +92,23 @@ const AppShell = () => {
           }
         }
 
-        // No org and no signup metadata → fresh App Store user, show OrgSetup
+        // No org and no signup metadata — but only show OrgSetup for TRULY new users
+        // (account created within last 5 minutes). Existing legacy users get let through.
         if (!companyName && !inviteCode) {
-          setNeedsOrgSetup(true);
+          const createdAt = user?.created_at ? new Date(user.created_at) : null;
+          const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+          const isNewUser = createdAt && createdAt > fiveMinAgo;
+
+          // Also check if they already have data in the users table (legacy user)
+          const { data: existingUser } = await supabase
+            .from('users')
+            .select('id')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          if (isNewUser && !existingUser) {
+            setNeedsOrgSetup(true);
+          }
         }
         setOrgReady(true);
       } catch (err) {
