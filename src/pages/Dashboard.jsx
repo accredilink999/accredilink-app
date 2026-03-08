@@ -18,6 +18,8 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import Avatar from '@/components/ui/Avatar';
 import PageHeader from '@/components/ui/PageHeader';
 import ShiftDetailModal from '@/components/rota/ShiftDetailModal';
+import { getCurrentOrgId } from '@/lib/orgContext';
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Calendar,
   Clock,
@@ -42,7 +44,11 @@ import {
   CalendarOff,
   Heart,
   Bot,
-  Star } from
+  Star,
+  Trophy,
+  ListChecks,
+  Share2,
+  ClipboardCheck } from
 'lucide-react';
 import ShiftSwapResponseModal from '@/components/rota/ShiftSwapResponseModal';
 import HelpTip from '@/components/ui/HelpTip';
@@ -51,6 +57,8 @@ export default function Dashboard() {
   const today = format(new Date(), 'yyyy-MM-dd');
   const [showCareLogDialog, setShowCareLogDialog] = useState(false);
   const [selectedShift, setSelectedShift] = useState(null);
+  const [showTasksPopup, setShowTasksPopup] = useState(false);
+  const [showAwardsPopup, setShowAwardsPopup] = useState(false);
   const [careLogData, setCareLogData] = useState({
     service_user_id: '',
     visit_date: today,
@@ -79,6 +87,24 @@ export default function Dashboard() {
     }
     .flash-blue {
       animation: flash-blue 1s infinite;
+    }
+    @keyframes gold-shimmer {
+      0% { background-position: -200% center; }
+      100% { background-position: 200% center; }
+    }
+    @keyframes trophy-glow {
+      0%, 100% { filter: drop-shadow(0 0 4px rgba(234,179,8,0.4)); }
+      50% { filter: drop-shadow(0 0 12px rgba(234,179,8,0.8)); }
+    }
+    .gold-shimmer {
+      background: linear-gradient(90deg, #f59e0b, #fbbf24, #fde68a, #fbbf24, #f59e0b);
+      background-size: 200% auto;
+      animation: gold-shimmer 3s linear infinite;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .trophy-glow {
+      animation: trophy-glow 2s ease-in-out infinite;
     }
   `;
 
@@ -258,6 +284,76 @@ export default function Dashboard() {
       return (data || []).filter(s => areaSet.has(s.rota_area_id) || areaSet.has(s.area_id));
     },
     enabled: !!user?.id,
+  });
+
+  // Today's shift calls for this user (for task counts)
+  const { data: myTodayShiftCalls = [] } = useQuery({
+    queryKey: ['myShiftCalls', today, user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data, error } = await supabase
+        .from('shift_calls')
+        .select('id, tasks, service_user_id, service_user_name, call_type, scheduled_time, status')
+        .eq('staff_id', user.id)
+        .eq('call_date', today);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user?.id,
+  });
+
+  // Next upcoming shift (for "Next Shift" tile)
+  const { data: nextShift } = useQuery({
+    queryKey: ['nextShift', user?.id, today],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data, error } = await supabase
+        .from('shifts')
+        .select('id, date, start_time, end_time, shift_type, shift_name, status, rota_area_id')
+        .eq('staff_id', user.id)
+        .gte('date', today)
+        .neq('status', 'completed')
+        .order('date', { ascending: true })
+        .order('start_time', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+
+  // Today's awards for the org
+  const { data: todayAwards = [] } = useQuery({
+    queryKey: ['todayAwards', today],
+    queryFn: async () => {
+      const orgId = getCurrentOrgId();
+      let q = supabase.from('staff_awards').select('*');
+      if (orgId) q = q.eq('organization_id', orgId);
+      const { data, error } = await q
+        .gte('created_at', today + 'T00:00:00')
+        .lte('created_at', today + 'T23:59:59')
+        .order('created_at', { ascending: false });
+      if (error) return [];
+      return data || [];
+    },
+  });
+
+  // My new awards (unread)
+  const myNewAwards = todayAwards.filter(a => a.recipient_id === user?.id);
+
+  // Toggle task completion
+  const toggleTaskMutation = useMutation({
+    mutationFn: async ({ callId, tasks }) => {
+      const { error } = await supabase
+        .from('shift_calls')
+        .update({ tasks })
+        .eq('id', callId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['myShiftCalls'] });
+    },
   });
 
   const createCareLogMutation = useMutation({
@@ -579,42 +675,103 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Quick Stats */}
-      <HelpTip tip="Quick overview of today's key numbers — shifts scheduled, completed, care logs, and alerts.">
-        <h3 className="font-semibold text-slate-900 text-sm sm:text-base">Today's Overview</h3>
+      {/* Overview */}
+      <HelpTip tip="Your personal overview — next shift, today's visits, tasks, and staff awards.">
+        <h3 className="font-semibold text-slate-900 text-sm sm:text-base">Overview</h3>
       </HelpTip>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
-        <StatsCard
-          title="Today's Visits"
-          value={todayShifts.length}
-          subtitle={`${completedShifts} completed`}
-          icon={Calendar} />
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        {/* Next Shift */}
+        <Card className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 border-0 shadow-sm">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+              <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            </div>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Next Shift</span>
+          </div>
+          {nextShift ? (
+            <div>
+              <p className="text-lg font-bold text-slate-900 dark:text-white">
+                {nextShift.date === today ? 'Today' : format(parseISO(nextShift.date), 'EEE d MMM')}
+              </p>
+              <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">
+                {(nextShift.start_time || '').slice(0, 5)} - {(nextShift.end_time || '').slice(0, 5)}
+              </p>
+              {nextShift.shift_name && (
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">{nextShift.shift_name}</p>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500 dark:text-slate-400">No upcoming shifts</p>
+          )}
+        </Card>
 
-        <StatsCard
-          title="Active Clients"
-          value={serviceUsers.length}
-          icon={Users}
-          iconClassName="bg-purple-50" />
+        {/* Today's Visits */}
+        <Card className="p-4 bg-gradient-to-br from-teal-50 to-cyan-50 dark:from-teal-950 dark:to-cyan-950 border-0 shadow-sm">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-teal-100 dark:bg-teal-900 flex items-center justify-center">
+              <Heart className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+            </div>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Today's Visits</span>
+          </div>
+          <p className="text-3xl font-bold text-slate-900 dark:text-white">{myTodayShiftCalls.length}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {myTodayShiftCalls.filter(c => c.status === 'completed').length} completed
+          </p>
+        </Card>
 
-        <StatsCard
-          title="Open Incidents"
-          value={openIncidents.length}
-          icon={AlertTriangle}
-          iconClassName={openIncidents.length > 0 ? "bg-red-50" : "bg-emerald-50"} />
+        {/* Today's Tasks */}
+        <Card
+          className="p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950 dark:to-pink-950 border-0 shadow-sm cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98]"
+          onClick={() => setShowTasksPopup(true)}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900 flex items-center justify-center">
+              <ListChecks className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+            </div>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Tasks</span>
+          </div>
+          {(() => {
+            const allTasks = myTodayShiftCalls.flatMap(c => (c.tasks || []).map(t => ({ ...t, callId: c.id, clientName: c.service_user_name })));
+            const done = allTasks.filter(t => t.completed).length;
+            return (
+              <>
+                <p className="text-3xl font-bold text-slate-900 dark:text-white">{allTasks.length}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {done} done{allTasks.length > 0 && <span className="text-purple-500 ml-1">Tap to view</span>}
+                </p>
+              </>
+            );
+          })()}
+        </Card>
 
-        <StatsCard
-          title="Pending Leave"
-          value={pendingLeave.length}
-          icon={FileText}
-          iconClassName="bg-amber-50" />
-
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:gap-6">
-        {/* Quick Actions & Alerts */}
-        <div className="space-y-4">
-
-        </div>
+        {/* Staff Awards */}
+        <Card
+          className="p-4 bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950 dark:to-yellow-950 border-0 shadow-sm cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98] relative overflow-hidden"
+          onClick={() => setShowAwardsPopup(true)}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900 flex items-center justify-center">
+              <Trophy className="w-4 h-4 text-amber-600 dark:text-amber-400 trophy-glow" />
+            </div>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Awards</span>
+          </div>
+          <p className="text-3xl font-bold gold-shimmer">{todayAwards.length}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {myNewAwards.length > 0 ? (
+              <span className="text-amber-600 font-semibold">{myNewAwards.length} for you!</span>
+            ) : (
+              'given today'
+            )}
+          </p>
+          {myNewAwards.length > 0 && (
+            <div className="absolute top-2 right-2">
+              <span className="flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+              </span>
+            </div>
+          )}
+        </Card>
       </div>
 
       {/* Shift Detail Modal */}
@@ -627,6 +784,124 @@ export default function Dashboard() {
         userId={user?.id} />
 
       }
+
+      {/* Tasks Popup */}
+      <Dialog open={showTasksPopup} onOpenChange={setShowTasksPopup}>
+        <DialogContent className="w-[95vw] sm:max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ListChecks className="w-5 h-5 text-purple-600" />
+              Today's Tasks
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {myTodayShiftCalls.filter(c => c.tasks && c.tasks.length > 0).length === 0 ? (
+              <div className="text-center py-8 text-slate-500">
+                <ClipboardCheck className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                <p className="text-sm">No tasks assigned today</p>
+              </div>
+            ) : (
+              myTodayShiftCalls.filter(c => c.tasks && c.tasks.length > 0).map(call => (
+                <div key={call.id} className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Heart className="w-4 h-4 text-teal-500" />
+                    <span className="text-sm font-semibold text-slate-900 dark:text-white">{call.service_user_name || 'Client'}</span>
+                    {call.scheduled_time && (
+                      <Badge variant="outline" className="text-xs ml-auto">{(call.scheduled_time || '').slice(0, 5)}</Badge>
+                    )}
+                  </div>
+                  <div className="space-y-1 pl-6">
+                    {(call.tasks || []).map((task, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-start gap-2 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                      >
+                        <Checkbox
+                          checked={!!task.completed}
+                          onCheckedChange={(checked) => {
+                            const updatedTasks = [...call.tasks];
+                            updatedTasks[idx] = { ...updatedTasks[idx], completed: !!checked };
+                            toggleTaskMutation.mutate({ callId: call.id, tasks: updatedTasks });
+                          }}
+                          className="mt-0.5"
+                        />
+                        <span className={`text-sm ${task.completed ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                          {task.text || task}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Awards Popup */}
+      <Dialog open={showAwardsPopup} onOpenChange={setShowAwardsPopup}>
+        <DialogContent className="w-[95vw] sm:max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-amber-500 trophy-glow" />
+              <span className="gold-shimmer text-lg">Staff Awards Today</span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            {todayAwards.length === 0 ? (
+              <div className="text-center py-8 text-slate-500">
+                <Trophy className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                <p className="text-sm">No awards given today</p>
+              </div>
+            ) : (
+              todayAwards.map(award => (
+                <Card key={award.id} className={`p-4 border-0 shadow-sm ${award.recipient_id === user?.id ? 'bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950 dark:to-yellow-950 ring-2 ring-amber-300' : 'bg-white dark:bg-slate-900'}`}>
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center flex-shrink-0 shadow-md">
+                      <Trophy className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-slate-900 dark:text-white">{award.recipient_name}</p>
+                      <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">{award.title}</p>
+                      {award.message && (
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 italic">"{award.message}"</p>
+                      )}
+                      <div className="flex items-center gap-2 mt-2 text-xs text-slate-400">
+                        <span>From {award.awarded_by_name || 'Admin'}</span>
+                        <span>&bull;</span>
+                        <span>{format(new Date(award.created_at), 'HH:mm')}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mt-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-xs text-blue-600 hover:bg-blue-50"
+                      onClick={() => {
+                        const text = `${award.recipient_name} received a "${award.title}" award at CareCallAI! ${award.message || ''}`;
+                        if (navigator.share) {
+                          navigator.share({ title: 'Staff Award', text });
+                        } else {
+                          navigator.clipboard.writeText(text);
+                          alert('Copied to clipboard!');
+                        }
+                      }}
+                    >
+                      <Share2 className="w-3 h-3 mr-1" /> Share
+                    </Button>
+                    <Link to={createPageUrl('Chat')}>
+                      <Button size="sm" variant="ghost" className="text-xs text-teal-600 hover:bg-teal-50">
+                        <MessageSquare className="w-3 h-3 mr-1" /> Send Message
+                      </Button>
+                    </Link>
+                  </div>
+                </Card>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* One-Off Care Log Dialog */}
        <Dialog open={showCareLogDialog} onOpenChange={setShowCareLogDialog}>

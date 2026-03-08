@@ -17,7 +17,12 @@ import StaffLeaveBalance from '@/components/staff/StaffLeaveBalance';
 import StaffSupervisions from '@/components/staff/StaffSupervisions';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from 'sonner';
-import { ArrowLeft, Edit, Shield, MapPin, UserX, UserCheck, Trash2, Mail, Loader2, User, Briefcase, Calendar, FileText, ClipboardList, ChevronLeft, Palmtree } from 'lucide-react';
+import { ArrowLeft, Edit, Shield, MapPin, UserX, UserCheck, Trash2, Mail, Loader2, User, Briefcase, Calendar, FileText, ClipboardList, ChevronLeft, Palmtree, Trophy } from 'lucide-react';
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { getCurrentOrgId } from '@/lib/orgContext';
+import { format } from 'date-fns';
 import { archiveItem } from '@/utils/archiveHelper';
 
 export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }) {
@@ -113,6 +118,58 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
     onError: (error) => {
       toast.error(error.message || 'Failed to delete user');
     },
+  });
+
+  const [showAwardDialog, setShowAwardDialog] = useState(false);
+  const [awardData, setAwardData] = useState({ title: '', message: '' });
+
+  const { data: staffAwards = [] } = useQuery({
+    queryKey: ['staffAwards', staffId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('staff_awards')
+        .select('*')
+        .eq('recipient_id', staffId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (error) return [];
+      return data || [];
+    },
+    enabled: !!staffId,
+  });
+
+  const giveAwardMutation = useMutation({
+    mutationFn: async (award) => {
+      const { error } = await supabase.from('staff_awards').insert({
+        organization_id: getCurrentOrgId(),
+        recipient_id: staffId,
+        recipient_name: staff?.full_name || 'Staff',
+        awarded_by_id: currentUser?.id,
+        awarded_by_name: currentUser?.full_name || currentUser?.email,
+        award_type: 'star',
+        title: award.title,
+        message: award.message || null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['staffAwards', staffId] });
+      queryClient.invalidateQueries({ queryKey: ['todayAwards'] });
+      setShowAwardDialog(false);
+      setAwardData({ title: '', message: '' });
+      toast.success(`Award given to ${staff?.full_name}!`);
+
+      // Create a notification for the recipient
+      base44.entities.Notification.create({
+        recipient_id: staffId,
+        type: 'award',
+        title: 'You received a Staff Award!',
+        message: `${currentUser?.full_name || 'Admin'} gave you a "${award.title}" award`,
+        link: '/Dashboard',
+        is_read: false,
+      }).catch(() => {});
+    },
+    onError: (err) => toast.error(err.message || 'Failed to give award'),
   });
 
   const [resendingEmail, setResendingEmail] = useState(false);
@@ -341,6 +398,42 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
           {activeTab === 'leave' && <StaffLeaveBalance staffId={staffId} isAdmin={isAdmin} staffName={staff?.full_name} />}
           {activeTab === 'hr' && <StaffHRManagement staffId={staffId} isAdmin={isAdmin} isOwnProfile={isOwnProfile} />}
           {activeTab === 'supervision' && <StaffSupervisions staffId={staffId} isAdmin={isAdmin} staffName={staff?.full_name} />}
+          {activeTab === 'awards' && (
+            <Card className="p-4 sm:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-amber-500" />
+                  Awards for {staff?.full_name?.split(' ')[0]}
+                </h3>
+                {isAdmin && (
+                  <Button size="sm" onClick={() => setShowAwardDialog(true)} className="bg-amber-500 hover:bg-amber-600 text-white">
+                    <Trophy className="w-4 h-4 mr-1" /> Give Award
+                  </Button>
+                )}
+              </div>
+              {staffAwards.length === 0 ? (
+                <div className="text-center py-8 text-slate-400">
+                  <Trophy className="w-10 h-10 mx-auto mb-2" />
+                  <p className="text-sm">No awards yet</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {staffAwards.map(a => (
+                    <div key={a.id} className="flex items-start gap-3 p-3 rounded-lg bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950 dark:to-yellow-950 border border-amber-100 dark:border-amber-900">
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center flex-shrink-0 shadow">
+                        <Trophy className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-amber-700 dark:text-amber-400">{a.title}</p>
+                        {a.message && <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 italic">"{a.message}"</p>}
+                        <p className="text-xs text-slate-400 mt-1">From {a.awarded_by_name || 'Admin'} &bull; {format(new Date(a.created_at), 'd MMM yyyy HH:mm')}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -352,6 +445,7 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
             { value: 'leave', label: 'Leave', icon: Palmtree, bg: 'from-green-400 to-green-600', desc: 'Holiday balance & requests' },
             { value: 'hr', label: 'HR & Docs', icon: FileText, bg: 'from-indigo-400 to-indigo-600', desc: 'Documents, DBS & training' },
             { value: 'supervision', label: 'Supervision', icon: ClipboardList, bg: 'from-rose-400 to-rose-600', desc: '12-weekly supervision records' },
+            { value: 'awards', label: 'Awards', icon: Trophy, bg: 'from-amber-400 to-yellow-500', desc: 'Recognition & achievements' },
           ].map(section => {
             const Icon = section.icon;
             return (
@@ -374,6 +468,49 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
           })}
         </div>
       )}
+
+      {/* Give Award Dialog */}
+      <Dialog open={showAwardDialog} onOpenChange={setShowAwardDialog}>
+        <DialogContent className="w-[95vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-amber-500" />
+              Give Award to {staff?.full_name?.split(' ')[0]}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <label className="text-sm font-medium text-slate-700">Award Title *</label>
+              <Input
+                value={awardData.title}
+                onChange={(e) => setAwardData({ ...awardData, title: e.target.value })}
+                placeholder="e.g. Employee of the Month, Outstanding Care, Team Player..."
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-700">Message (optional)</label>
+              <Textarea
+                value={awardData.message}
+                onChange={(e) => setAwardData({ ...awardData, message: e.target.value })}
+                placeholder="Tell them why they're receiving this award..."
+                className="mt-1"
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAwardDialog(false)}>Cancel</Button>
+            <Button
+              onClick={() => giveAwardMutation.mutate(awardData)}
+              disabled={!awardData.title.trim() || giveAwardMutation.isPending}
+              className="bg-amber-500 hover:bg-amber-600 text-white"
+            >
+              {giveAwardMutation.isPending ? 'Giving...' : 'Give Award'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );

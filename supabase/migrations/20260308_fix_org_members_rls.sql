@@ -58,5 +58,6 @@ CREATE POLICY "profiles_self" ON profiles
   WITH CHECK (id = auth.uid());
 
 -- Allow service role (triggers) to insert profiles for new users
+DROP POLICY IF EXISTS "profiles_insert_any" ON profiles;
 CREATE POLICY "profiles_insert_any" ON profiles
   FOR INSERT WITH CHECK (true);
