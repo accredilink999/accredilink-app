@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from './utils';
 import { base44 } from '@/api/base44Client';
@@ -60,7 +60,8 @@ import {
                                 ArrowLeft,
                                 Download,
                                 HelpCircle,
-                                FileText
+                                FileText,
+                                RefreshCw
                               } from 'lucide-react';
 
 
@@ -381,6 +382,56 @@ export default function Layout({ children, currentPageName }) {
     });
     return () => subscription.unsubscribe();
   }, [user?.id]);
+
+  // ─── Pull-to-Refresh ─────────────────────────────────────────────
+  const mainRef = useRef(null);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const touchStartY = useRef(0);
+  const isPulling = useRef(false);
+  const PULL_THRESHOLD = 80;
+
+  const handleTouchStart = useCallback((e) => {
+    const main = mainRef.current;
+    if (!main || isRefreshing) return;
+    if (main.scrollTop <= 0) {
+      touchStartY.current = e.touches[0].clientY;
+      isPulling.current = true;
+    }
+  }, [isRefreshing]);
+
+  const handleTouchMove = useCallback((e) => {
+    if (!isPulling.current || isRefreshing) return;
+    const main = mainRef.current;
+    if (!main || main.scrollTop > 0) {
+      isPulling.current = false;
+      setPullDistance(0);
+      return;
+    }
+    const diff = e.touches[0].clientY - touchStartY.current;
+    if (diff > 0) {
+      // Dampen the pull distance for a natural feel
+      setPullDistance(Math.min(diff * 0.4, 120));
+    }
+  }, [isRefreshing]);
+
+  const handleTouchEnd = useCallback(() => {
+    if (!isPulling.current) return;
+    isPulling.current = false;
+    if (pullDistance >= PULL_THRESHOLD && !isRefreshing) {
+      setIsRefreshing(true);
+      setPullDistance(PULL_THRESHOLD);
+      // Invalidate all React Query caches to refresh all data
+      queryClient.invalidateQueries();
+      // Minimum spinner display time
+      setTimeout(() => {
+        setIsRefreshing(false);
+        setPullDistance(0);
+      }, 1200);
+    } else {
+      setPullDistance(0);
+    }
+  }, [pullDistance, isRefreshing, queryClient]);
 
     // Add styles for alternating flash animation and disable pull-to-refresh
     const flashStyles = `
@@ -764,7 +815,25 @@ export default function Layout({ children, currentPageName }) {
       <PWAInstallPrompt />
 
       {/* Main Content — scrolls internally to prevent browser chrome from appearing */}
-                   <main className="flex-1 overflow-y-auto overflow-x-hidden lg:pb-0" style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', paddingBottom: 'calc(5rem + env(safe-area-inset-bottom))' }}>
+                   <main
+                     ref={mainRef}
+                     className="flex-1 overflow-y-auto overflow-x-hidden lg:pb-0"
+                     style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', paddingBottom: 'calc(5rem + env(safe-area-inset-bottom))' }}
+                     onTouchStart={handleTouchStart}
+                     onTouchMove={handleTouchMove}
+                     onTouchEnd={handleTouchEnd}
+                   >
+                                     {/* Pull-to-Refresh Indicator */}
+                                     {(pullDistance > 0 || isRefreshing) && (
+                                       <div className="flex items-center justify-center transition-all duration-200" style={{ height: pullDistance, overflow: 'hidden' }}>
+                                         <div className={`flex items-center gap-2 ${isRefreshing ? 'text-teal-600' : pullDistance >= PULL_THRESHOLD ? 'text-teal-600' : 'text-slate-400'}`}>
+                                           <RefreshCw className={`w-5 h-5 transition-transform ${isRefreshing ? 'animate-spin' : ''}`} style={{ transform: isRefreshing ? undefined : `rotate(${pullDistance * 3}deg)` }} />
+                                           <span className="text-xs font-medium">
+                                             {isRefreshing ? 'Refreshing...' : pullDistance >= PULL_THRESHOLD ? 'Release to refresh' : 'Pull to refresh'}
+                                           </span>
+                                         </div>
+                                       </div>
+                                     )}
                                      {/* App Update Banner */}
                                      <AppUpdateBanner />
                                      <GpsWarningBanner />
