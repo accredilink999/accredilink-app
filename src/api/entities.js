@@ -35,6 +35,7 @@ const WRITE_ALIASES = {
 // DB columns have been renamed to match code names directly — no per-table aliases needed.
 const TABLE_WRITE_ALIASES = {
   leave_requests: { type: 'leave_type', reviewed_by_name: 'reviewer_name' },
+  work_calendar_events: { type: 'event_type', start_date: 'start_datetime', end_date: 'end_datetime', assigned_to: 'attendees' },
 }
 
 // Tables that don't have a created_at column — override the default sort
@@ -66,6 +67,7 @@ const ORG_FILTERED_TABLES = new Set([
   'safeguarding_reports', 'supervision_records', 'meetings',
   'meeting_participants', 'clinical_observations', 'wound_records',
   'falls_records', 'repositioning_records', 'continence_records',
+  'archived_mar_charts',
 ])
 
 /** Add org filter to a query if the table supports it */
@@ -115,6 +117,7 @@ function mapKeys(data, tableName) {
 // DB columns have been renamed to match code names directly — no per-table aliases needed.
 const TABLE_READ_ALIASES = {
   leave_requests: { leave_type: 'type', reviewer_name: 'reviewed_by_name' },
+  work_calendar_events: { event_type: 'type', start_datetime: 'start_date', end_datetime: 'end_date', attendees: 'assigned_to' },
 }
 
 function addAliases(record, tableName) {
@@ -425,4 +428,7 @@ export const entities = {
 
   // Migrated Payslips
   MigratedPayslip:             buildEntity('migrated_payslips'),
+
+  // Archived MAR Charts
+  ArchivedMARChart:            buildEntity('archived_mar_charts'),
 }

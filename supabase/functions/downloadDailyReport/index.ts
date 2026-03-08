@@ -28,8 +28,12 @@ Deno.serve(async (req) => {
     }
 
     // Fetch the report
-    const report = await supabase.entities.HealthcareLog.get(report_id);
-    if (!report) {
+    const { data: report, error: reportError } = await supabase
+      .from('healthcare_logs')
+      .select('*')
+      .eq('id', report_id)
+      .single();
+    if (reportError || !report) {
       return Response.json({ error: 'Report not found' }, { status: 404 });
     }
 
