@@ -17,7 +17,7 @@ export default function ForgotPasswordPage() {
 
     try {
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'https://care-call-ai-clone.vercel.app'}/reset-password`,
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'https://app.carecallai.co.uk'}/reset-password`,
       });
 
       if (resetError) throw resetError;

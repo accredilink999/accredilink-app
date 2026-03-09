@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://care-call-ai-clone.vercel.app';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.carecallai.co.uk';
 
 export default function PaymentSuccessPage() {
   const [sessionId, setSessionId] = useState(null);

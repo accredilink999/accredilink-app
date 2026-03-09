@@ -179,7 +179,7 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
     setResendingEmail(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(staff.email, {
-        redirectTo: 'https://care-call-ai-clone.vercel.app',
+        redirectTo: 'https://app.carecallai.co.uk',
       });
       if (error) throw error;
       toast.success(`Password reset email sent to ${staff.email}`);
