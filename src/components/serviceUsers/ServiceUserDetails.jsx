@@ -133,6 +133,7 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
     const [clientReviews, setClientReviews] = useState([]);
     const [loadingReviews, setLoadingReviews] = useState(false);
     const [syncingReviews, setSyncingReviews] = useState(false);
+    const [feedbackUrl, setFeedbackUrl] = useState('');
     const [displayedLogs, setDisplayedLogs] = useState([]);
     const [careLogDateRange, setCareLogDateRange] = useState({
        start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -161,6 +162,13 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
      useEffect(() => {
        if (open && serviceUser?.id) loadClientReviews();
      }, [open, serviceUser?.id]);
+
+     // Load feedback URL from org settings
+     useEffect(() => {
+       base44.entities.SystemSettings.filter({ setting_key: 'feedback_url' })
+         .then(s => { if (s?.[0]?.setting_value) setFeedbackUrl(s[0].setting_value); })
+         .catch(() => {});
+     }, []);
 
      // Refetch care logs when dialog opens or service user changes
      useEffect(() => {
@@ -1389,24 +1397,32 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
                )}
              </Card>
 
-             {/* Submit Review — links to homecare.co.uk review form */}
-             <Card
-               className="p-5 border-2 border-amber-200 hover:border-amber-400 hover:shadow-md transition-all cursor-pointer"
-               onClick={() => openExternalUrl('https://www.homecare.co.uk/review-submit/65432259136/rcsid/1012/')}
-             >
-               <div className="flex items-center gap-2 mb-1">
-                 <Star className="w-5 h-5 text-amber-500" />
-                 <h3 className="font-semibold text-slate-900">Submit a Review</h3>
-               </div>
-               <p className="text-sm text-slate-500 mb-3">
-                 Hand the device to the client or their family to leave a review directly:
-               </p>
-               <div className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-medium">
-                 <Star className="w-5 h-5" />
-                 Leave a Review on homecare.co.uk
-                 <ExternalLink className="w-4 h-4" />
-               </div>
-             </Card>
+             {/* Submit Review — uses org's configured feedback URL */}
+             {feedbackUrl && (
+               <Card
+                 className="p-5 border-2 border-amber-200 hover:border-amber-400 hover:shadow-md transition-all cursor-pointer"
+                 onClick={() => openExternalUrl(feedbackUrl)}
+               >
+                 <div className="flex items-center gap-2 mb-1">
+                   <Star className="w-5 h-5 text-amber-500" />
+                   <h3 className="font-semibold text-slate-900">Submit a Review</h3>
+                 </div>
+                 <p className="text-sm text-slate-500 mb-3">
+                   Hand the device to the client or their family to leave a review directly:
+                 </p>
+                 <div className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-medium">
+                   <Star className="w-5 h-5" />
+                   Leave a Review
+                   <ExternalLink className="w-4 h-4" />
+                 </div>
+               </Card>
+             )}
+             {!feedbackUrl && (
+               <Card className="p-4 bg-slate-50 border border-dashed border-slate-300 text-center">
+                 <p className="text-sm text-slate-500">No feedback URL configured.</p>
+                 <p className="text-xs text-slate-400">Set one in Settings → Company Settings or the Feedback page.</p>
+               </Card>
+             )}
 
              {/* OR divider */}
              <div className="flex items-center gap-3">
@@ -1422,7 +1438,7 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
                  <h3 className="font-semibold text-slate-900">Email a Review Invitation</h3>
                </div>
                <p className="text-sm text-slate-500 mb-4">
-                 Send a review invitation for <span className="font-medium text-slate-700">{serviceUser?.full_name}</span> to their family member, next of kin, or the service user themselves via homecare.co.uk.
+                 Send a review invitation for <span className="font-medium text-slate-700">{serviceUser?.full_name}</span> to their family member, next of kin, or the service user themselves.
                </p>
 
                {reviewSent ? (
@@ -1431,7 +1447,7 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
                      <Send className="w-6 h-6 text-green-600" />
                    </div>
                    <p className="text-sm font-semibold text-green-800 mb-1">Invitation Sent!</p>
-                   <p className="text-xs text-green-600">The reviewer will receive an email with a link to leave their review on homecare.co.uk.</p>
+                   <p className="text-xs text-green-600">The reviewer will receive an email with a link to leave their review.</p>
                    <button
                      onClick={() => { setReviewSent(false); setReviewName(''); setReviewEmail(''); setReviewRelationship(''); }}
                      className="mt-3 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"

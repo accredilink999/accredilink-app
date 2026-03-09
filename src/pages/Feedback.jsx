@@ -21,6 +21,8 @@ import {
   Filter,
   RefreshCw,
   ExternalLink,
+  Mail,
+  Link as LinkIcon,
 } from 'lucide-react';
 
 export default function Feedback() {
@@ -35,6 +37,9 @@ export default function Feedback() {
   const [feedback, setFeedback] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState('');
+  const [feedbackUrl, setFeedbackUrl] = useState('');
+  const [emailTo, setEmailTo] = useState('');
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
 
   // New feedback form
   const [showForm, setShowForm] = useState(false);
@@ -60,6 +65,12 @@ export default function Feedback() {
 
   useEffect(() => {
     loadFeedback();
+    // Load feedback URL from org settings
+    base44.entities.SystemSettings.filter({ setting_key: 'feedback_url' })
+      .then(settings => {
+        if (settings?.[0]?.setting_value) setFeedbackUrl(settings[0].setting_value);
+      })
+      .catch(() => {});
   }, []);
 
   async function loadFeedback() {
@@ -277,18 +288,103 @@ export default function Feedback() {
             )}
           </Card>
 
-          {/* Quick link to homecare.co.uk */}
-          <div className="text-center">
-            <a
-              href="https://www.homecare.co.uk/memberarea/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-sm text-orange-600 hover:text-orange-700 font-medium"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              Manage reviews on homecare.co.uk
-            </a>
-          </div>
+          {/* Feedback actions */}
+          {feedbackUrl && (
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(feedbackUrl, '_blank')}
+                className="text-orange-600 border-orange-200 hover:bg-orange-50"
+              >
+                <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
+                Leave a Review
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowEmailDialog(true)}
+                className="text-teal-600 border-teal-200 hover:bg-teal-50"
+              >
+                <Mail className="w-3.5 h-3.5 mr-1.5" />
+                Send Review Link via Email
+              </Button>
+            </div>
+          )}
+          {/* Inline URL config for admins */}
+          {isAdmin && (
+            <Card className="p-4 bg-slate-50 border border-slate-200">
+              <div className="flex items-center gap-2 mb-2">
+                <LinkIcon className="w-4 h-4 text-slate-500" />
+                <span className="text-sm font-medium text-slate-700">Review / Feedback URL</span>
+              </div>
+              <p className="text-xs text-slate-500 mb-2">Paste the link where clients or families can leave reviews (e.g. homecare.co.uk, Google Reviews, Trustpilot)</p>
+              <div className="flex gap-2">
+                <Input
+                  value={feedbackUrl}
+                  onChange={e => setFeedbackUrl(e.target.value)}
+                  placeholder="https://www.homecare.co.uk/review-submit/..."
+                  className="flex-1 bg-white"
+                />
+                <Button
+                  size="sm"
+                  disabled={!feedbackUrl.trim()}
+                  onClick={async () => {
+                    try {
+                      const existing = await base44.entities.SystemSettings.filter({ setting_key: 'feedback_url' });
+                      if (existing.length > 0) {
+                        await base44.entities.SystemSettings.update(existing[0].id, { setting_value: feedbackUrl.trim() });
+                      } else {
+                        await base44.entities.SystemSettings.create({ setting_key: 'feedback_url', setting_value: feedbackUrl.trim(), description: 'External feedback/reviews URL' });
+                      }
+                      showToast('Feedback URL saved');
+                    } catch { showToast('Failed to save'); }
+                  }}
+                >
+                  Save
+                </Button>
+              </div>
+            </Card>
+          )}
+
+          {/* Email review link dialog */}
+          {showEmailDialog && (
+            <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setShowEmailDialog(false)}>
+              <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-5" onClick={e => e.stopPropagation()}>
+                <h3 className="font-semibold text-slate-900 mb-1">Send Review Link</h3>
+                <p className="text-xs text-slate-500 mb-4">
+                  Send your feedback URL to a client, family member, or professional so they can leave a review.
+                </p>
+                <Input
+                  type="email"
+                  value={emailTo}
+                  onChange={e => setEmailTo(e.target.value)}
+                  placeholder="Enter email address"
+                  className="mb-3"
+                />
+                <div className="flex gap-2 justify-end">
+                  <Button variant="ghost" size="sm" onClick={() => setShowEmailDialog(false)}>Cancel</Button>
+                  <Button
+                    size="sm"
+                    disabled={!emailTo.trim() || !emailTo.includes('@')}
+                    onClick={() => {
+                      const subject = encodeURIComponent('We\'d love your feedback');
+                      const body = encodeURIComponent(
+                        `Hello,\n\nWe would really appreciate it if you could take a moment to leave us a review. It only takes a minute and helps us improve our service.\n\nLeave a review here: ${feedbackUrl}\n\nThank you for your support!\n\nKind regards`
+                      );
+                      window.open(`mailto:${emailTo.trim()}?subject=${subject}&body=${body}`, '_blank');
+                      showToast('Email client opened');
+                      setShowEmailDialog(false);
+                      setEmailTo('');
+                    }}
+                  >
+                    <Mail className="w-3.5 h-3.5 mr-1.5" />
+                    Send
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

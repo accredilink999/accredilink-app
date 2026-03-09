@@ -958,6 +958,7 @@ export default function Settings() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [companyName, setCompanyName] = useState('');
   const [companyLogo, setCompanyLogo] = useState(null);
+  const [feedbackUrl, setFeedbackUrl] = useState('');
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.job_title === 'admin' || user?.job_title === 'manager';
   const [shiftActivityNotifs, setShiftActivityNotifs] = useState(true);
   const [shiftNotifScope, setShiftNotifScope] = useState('all'); // 'all' or 'my_team'
@@ -1047,12 +1048,14 @@ export default function Settings() {
   React.useEffect(() => {
     const loadCompanySettings = async () => {
       try {
-        const settings = await base44.entities.SystemSettings.filter({ setting_key: ['company_name', 'company_logo'] });
+        const settings = await base44.entities.SystemSettings.filter({ setting_key: ['company_name', 'company_logo', 'feedback_url'] });
         settings.forEach(setting => {
           if (setting.setting_key === 'company_name') {
             setCompanyName(setting.setting_value || '');
           } else if (setting.setting_key === 'company_logo') {
             setCompanyLogo(setting.setting_value);
+          } else if (setting.setting_key === 'feedback_url') {
+            setFeedbackUrl(setting.setting_value || '');
           }
         });
       } catch (error) {
@@ -1138,6 +1141,22 @@ export default function Settings() {
     onError: () => {
       toast.error('Failed to save company name');
     }
+  });
+
+  const saveFeedbackUrlMutation = useMutation({
+    mutationFn: async (url) => {
+      const existing = await base44.entities.SystemSettings.filter({ setting_key: 'feedback_url' });
+      if (existing.length > 0) {
+        return base44.entities.SystemSettings.update(existing[0].id, { setting_value: url });
+      }
+      return base44.entities.SystemSettings.create({
+        setting_key: 'feedback_url',
+        setting_value: url,
+        description: 'External feedback/reviews URL'
+      });
+    },
+    onSuccess: () => toast.success('Feedback URL saved'),
+    onError: () => toast.error('Failed to save feedback URL'),
   });
 
   const saveLogoMutation = useMutation({
@@ -1456,6 +1475,25 @@ export default function Settings() {
                     </Button>
                   </label>
                 </div>
+              </div>
+            </div>
+            <div>
+              <Label className="text-slate-700 mb-2 block">Feedback / Reviews URL</Label>
+              <p className="text-xs text-slate-500 mb-2">External link where clients or families can leave reviews (e.g. homecare.co.uk, Google Reviews, Trustpilot)</p>
+              <div className="flex gap-2">
+                <Input
+                  value={feedbackUrl}
+                  onChange={(e) => setFeedbackUrl(e.target.value)}
+                  placeholder="https://www.homecare.co.uk/review-submit/..."
+                  className="flex-1"
+                />
+                <Button
+                  onClick={() => feedbackUrl.trim() && saveFeedbackUrlMutation.mutate(feedbackUrl.trim())}
+                  size="sm"
+                  disabled={saveFeedbackUrlMutation.isPending}
+                >
+                  {saveFeedbackUrlMutation.isPending ? 'Saving...' : 'Save'}
+                </Button>
               </div>
             </div>
           </div>
