@@ -17,7 +17,7 @@ export function OrganizationJsonLd() {
       "https://www.facebook.com/profile.php?id=61585016304011",
       "https://www.instagram.com/accredicare999",
       "https://www.linkedin.com/company/accredilink",
-      "https://x.com/AccredilinkCare",
+      "https://x.com/CareCallAI",
       "https://www.youtube.com/@CareCallAIGuru",
     ],
   };

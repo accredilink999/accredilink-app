@@ -42,14 +42,18 @@ export const metadata = {
   },
   twitter: {
     card: "summary_large_image",
+    site: "@CareCallAI",
+    creator: "@CareCallAI",
     title: "CareCallAI — Home Care Management Software UK",
     description:
       "All-in-one home care management software for UK domiciliary care agencies.",
+    images: ["/opengraph-image"],
+  },
+  other: {
+    "hreflang": "en-GB",
   },
   robots: { index: true, follow: true },
-  alternates: {
-    canonical: "https://carecallai.co.uk",
-  },
+  alternates: {},
   verification: {
     google: "crtZqqM3R8KGjNm6I63eRwiQptRqQIe6gUwj7hWHqa8",
   },
@@ -57,7 +61,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en-GB" className={inter.variable}>
       <head>
         <Script
           async
