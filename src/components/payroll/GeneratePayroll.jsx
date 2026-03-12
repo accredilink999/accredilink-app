@@ -71,6 +71,14 @@ export default function GeneratePayroll() {
       const staffShifts = shifts.filter(s => s.staff_id === member.id);
       const totalHours = staffShifts.reduce((sum, shift) => sum + getShiftHours(shift), 0);
       const ov = overrides[member.id] || {};
+
+      // Determine pay type: salaried staff get monthly salary, hourly staff get hours x rate
+      const payType = ov.payType || member.pay_type || (member.salary && !member.hourly_rate ? 'salaried' : 'hourly');
+      const isSalaried = payType === 'salaried';
+
+      // For salaried staff: monthly gross = annual salary / 12, hours are tracked but don't affect pay
+      const monthlySalary = isSalaried ? Math.round(((ov.salary !== undefined ? parseFloat(ov.salary) : (member.salary || 0)) / 12) * 100) / 100 : 0;
+
       const regularHours = ov.regularHours !== undefined ? parseFloat(ov.regularHours) : parseFloat(totalHours.toFixed(2));
       const overtimeHours = ov.overtimeHours !== undefined ? parseFloat(ov.overtimeHours) : 0;
       const hourlyRate = ov.hourlyRate !== undefined ? parseFloat(ov.hourlyRate) : (member.hourly_rate || 0);
@@ -81,16 +89,22 @@ export default function GeneratePayroll() {
       const otherDeductions = ov.otherDeductions !== undefined ? parseFloat(ov.otherDeductions) : 0;
       const otherDeductionsLabel = ov.otherDeductionsLabel || '';
 
-      const result = calculatePayslip({
-        regularHours, overtimeHours, hourlyRate, overtimeRate,
-        taxCode, niCategory, pensionPercent, otherDeductions
-      });
+      const result = isSalaried
+        ? calculatePayslip({
+            regularHours: 1, overtimeHours: 0, hourlyRate: monthlySalary, overtimeRate: 0,
+            taxCode, niCategory, pensionPercent, otherDeductions
+          })
+        : calculatePayslip({
+            regularHours, overtimeHours, hourlyRate, overtimeRate,
+            taxCode, niCategory, pensionPercent, otherDeductions
+          });
 
       return {
         ...member,
         staffShifts,
         shiftCount: staffShifts.length,
         calculatedHours: totalHours,
+        payType, isSalaried, monthlySalary,
         regularHours, overtimeHours, hourlyRate,
         overtimeRate: result.overtimeRate,
         taxCode, niCategory, pensionPercent,
@@ -144,11 +158,14 @@ export default function GeneratePayroll() {
         staff_name: s.full_name,
         period_start: periodStart,
         period_end: periodEnd,
-        regular_hours: s.regularHours,
+        regular_hours: s.isSalaried ? s.calculatedHours : s.regularHours,
         overtime_hours: s.overtimeHours,
-        hourly_rate: s.hourlyRate,
+        hourly_rate: s.isSalaried ? 0 : s.hourlyRate,
         overtime_rate: s.overtimeRate,
         gross_pay: s.grossPay,
+        pay_type: s.payType,
+        monthly_salary: s.isSalaried ? s.monthlySalary : null,
+        annual_salary: s.isSalaried ? (s.salary || 0) : null,
         deductions: {
           tax: s.tax,
           ni: s.ni,
@@ -253,7 +270,10 @@ export default function GeneratePayroll() {
                             <Clock className="w-3 h-3" />
                             {member.shiftCount} shifts · {member.calculatedHours.toFixed(1)}h
                           </span>
-                          <span>£{member.hourlyRate}/hr</span>
+                          {member.isSalaried
+                            ? <span>£{(member.salary || 0).toLocaleString()}/yr (£{member.monthlySalary.toFixed(2)}/mo)</span>
+                            : <span>£{member.hourlyRate}/hr</span>
+                          }
                           <Badge variant="outline" className="text-xs">{member.taxCode}</Badge>
                           <Badge variant="outline" className="text-xs">NI {member.niCategory}</Badge>
                         </div>

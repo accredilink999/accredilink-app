@@ -111,14 +111,25 @@ const PrintablePayslip = React.forwardRef(({ record, settings }, ref) => {
             </tr>
           </thead>
           <tbody>
-            <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
-              <td style={{ padding: '8px 10px' }}>Basic Pay</td>
-              <td style={{ padding: '8px 10px', textAlign: 'center' }}>{(record.regular_hours || 0).toFixed(2)}</td>
-              <td style={{ padding: '8px 10px', textAlign: 'right' }}>£{(record.hourly_rate || 0).toFixed(2)}</td>
-              <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 'bold' }}>
-                £{((record.regular_hours || 0) * (record.hourly_rate || 0)).toFixed(2)}
-              </td>
-            </tr>
+            {record.pay_type === 'salaried' ? (
+              <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                <td style={{ padding: '8px 10px' }}>Monthly Salary (£{(record.annual_salary || 0).toLocaleString()}/yr)</td>
+                <td style={{ padding: '8px 10px', textAlign: 'center' }}>{(record.regular_hours || 0).toFixed(2)}</td>
+                <td style={{ padding: '8px 10px', textAlign: 'right' }}>—</td>
+                <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 'bold' }}>
+                  £{(record.gross_pay || 0).toFixed(2)}
+                </td>
+              </tr>
+            ) : (
+              <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                <td style={{ padding: '8px 10px' }}>Basic Pay</td>
+                <td style={{ padding: '8px 10px', textAlign: 'center' }}>{(record.regular_hours || 0).toFixed(2)}</td>
+                <td style={{ padding: '8px 10px', textAlign: 'right' }}>£{(record.hourly_rate || 0).toFixed(2)}</td>
+                <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 'bold' }}>
+                  £{((record.regular_hours || 0) * (record.hourly_rate || 0)).toFixed(2)}
+                </td>
+              </tr>
+            )}
             {record.overtime_hours > 0 && (
               <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
                 <td style={{ padding: '8px 10px' }}>Overtime</td>
