@@ -156,8 +156,8 @@ export default function StaffLeaveBalance({ staffId, isAdmin, staffName }) {
               </div>
               <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-4">
                 <p className="text-xs text-red-600 font-medium">Used</p>
-                <p className="text-2xl font-bold text-red-900">{currentYearBalance.used_days}</p>
-                <p className="text-xs text-red-600 mt-1">days</p>
+                <p className="text-2xl font-bold text-red-900">{currentYearBalance.used_days || 0}</p>
+                <p className="text-xs text-red-600 mt-1">days ({((currentYearBalance.used_days || 0) * 7.5).toFixed(1)}h)</p>
               </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
