@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { ShiftApi } from '@/api/rotaApi';
+import { supabase } from '@/api/supabaseClient';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -51,11 +51,23 @@ export default function GeneratePayroll() {
   const { data: shifts = [], isLoading: shiftsLoading } = useQuery({
     queryKey: ['shifts-for-payroll', periodStart, periodEnd],
     queryFn: async () => {
-      const allShifts = await ShiftApi.list('-date', 5000);
-      return allShifts.filter(shift => {
-        const shiftDate = shift.date;
-        return shiftDate >= periodStart && shiftDate <= periodEnd && shift.staff_id;
-      });
+      // Query shifts directly by date range with pagination to avoid 1000-row limit
+      let all = [];
+      let page = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from('shifts')
+          .select('*')
+          .gte('date', periodStart)
+          .lte('date', periodEnd)
+          .not('staff_id', 'is', null)
+          .range(page * 1000, (page + 1) * 1000 - 1);
+        if (error) throw error;
+        all = all.concat(data || []);
+        if (!data || data.length < 1000) break;
+        page++;
+      }
+      return all;
     },
     enabled: !!periodStart && !!periodEnd,
   });
