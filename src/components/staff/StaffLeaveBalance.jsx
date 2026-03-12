@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertCircle, Edit2, Plus } from 'lucide-react';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 const LEAVE_PRESETS = [
   { label: 'Full-Time (37.5 hours/week)', hours: 210, days: 28 },
@@ -40,12 +41,19 @@ export default function StaffLeaveBalance({ staffId, isAdmin, staffName }) {
     mutationFn: (data) => base44.entities.HolidayAllowance.create({
       staff_id: staffId,
       staff_name: staffName,
+      used_days: 0,
+      pending_days: 0,
       ...data
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leaveBalance', staffId] });
       setShowDialog(false);
-      setFormData({ total_allowance_days: 0, carried_over_days: 0 });
+      setFormData({ total_allowance_days: 0, total_allowance_hours: 0, carried_over_days: 0 });
+      toast.success('Leave balance created');
+    },
+    onError: (err) => {
+      console.error('Failed to create leave balance:', err);
+      toast.error(`Failed to create leave balance: ${err.message || 'Unknown error'}`);
     },
   });
 
@@ -60,6 +68,11 @@ export default function StaffLeaveBalance({ staffId, isAdmin, staffName }) {
       setShowDialog(false);
       setEditingYear(null);
       setFormData({ total_allowance_days: 0, total_allowance_hours: 0, carried_over_days: 0 });
+      toast.success('Leave balance updated');
+    },
+    onError: (err) => {
+      console.error('Failed to update leave balance:', err);
+      toast.error(`Failed to update leave balance: ${err.message || 'Unknown error'}`);
     },
   });
 
@@ -99,8 +112,8 @@ export default function StaffLeaveBalance({ staffId, isAdmin, staffName }) {
   };
 
   const currentYearBalance = leaveBalances.find(b => b.year === currentYear);
-  const remaining = currentYearBalance 
-    ? (currentYearBalance.total_allowance_days + currentYearBalance.carried_over_days) - currentYearBalance.used_days - currentYearBalance.pending_days
+  const remaining = currentYearBalance
+    ? (currentYearBalance.total_allowance_days + (currentYearBalance.carried_over_days || 0)) - (currentYearBalance.used_days || 0) - (currentYearBalance.pending_days || 0)
     : 0;
   const remainingHours = remaining * 7.5;
 
@@ -222,7 +235,7 @@ export default function StaffLeaveBalance({ staffId, isAdmin, staffName }) {
                       <div>
                         <p className="text-slate-600">Remaining</p>
                         <p className="font-semibold text-slate-900">
-                          {(balance.total_allowance_days + balance.carried_over_days) - balance.used_days - balance.pending_days}
+                          {(balance.total_allowance_days + (balance.carried_over_days || 0)) - (balance.used_days || 0) - (balance.pending_days || 0)}
                         </p>
                       </div>
                     </div>

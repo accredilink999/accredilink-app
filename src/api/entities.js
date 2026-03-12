@@ -36,6 +36,7 @@ const WRITE_ALIASES = {
 const TABLE_WRITE_ALIASES = {
   leave_requests: { type: 'leave_type', reviewed_by_name: 'reviewer_name' },
   work_calendar_events: { type: 'event_type', start_date: 'start_datetime', end_date: 'end_datetime', assigned_to: 'attendees' },
+  holiday_allowances: { total_allowance_days: 'total_days', carried_over_days: 'carried_over', total_allowance_hours: 'total_hours' },
 }
 
 // Tables that don't have a created_at column — override the default sort
@@ -118,6 +119,7 @@ function mapKeys(data, tableName) {
 const TABLE_READ_ALIASES = {
   leave_requests: { leave_type: 'type', reviewer_name: 'reviewed_by_name' },
   work_calendar_events: { event_type: 'type', start_datetime: 'start_date', end_datetime: 'end_date', attendees: 'assigned_to' },
+  holiday_allowances: { total_days: 'total_allowance_days', carried_over: 'carried_over_days', total_hours: 'total_allowance_hours' },
 }
 
 function addAliases(record, tableName) {
