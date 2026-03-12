@@ -1470,11 +1470,21 @@ export default function InvoiceManager({ invoices, clients, settings }) {
     )
     .sort((a, b) => new Date(b.invoice_date) - new Date(a.invoice_date));
 
-  // Build set of client+service_user combos from recurring templates to match old generated invoices
-  const recurringKeys = new Set(recurringTemplates.map(t => `${t.client_id || ''}|${t.service_user_id || ''}`));
+  // Build set of client+service_user combos from recurring templates (including batch sub-invoices)
+  const recurringKeys = new Set();
+  recurringTemplates.forEach(t => {
+    recurringKeys.add(`${t.client_id || ''}|${t.service_user_id || ''}`);
+    // For batch templates, also extract individual client_ids from line_items
+    if (t.is_batch && t.line_items) {
+      const items = typeof t.line_items === 'string' ? JSON.parse(t.line_items) : (t.line_items || []);
+      items.forEach(item => {
+        if (item.client_id) recurringKeys.add(`${item.client_id}|${item.service_user_id || ''}`);
+      });
+    }
+  });
   const isRecurringGenerated = (i) => {
     if (i.status === 'recurring' || i.is_recurring) return true;
-    // Match draft invoices whose client+service_user matches a recurring template
+    // Match draft invoices whose client+service_user matches a recurring template or batch item
     if ((!i.status || i.status === 'draft') && i.client_id && recurringKeys.has(`${i.client_id}|${i.service_user_id || ''}`)) return true;
     return false;
   };
