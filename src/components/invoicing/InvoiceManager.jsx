@@ -2001,10 +2001,73 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                               <p className="text-xs text-slate-500 mt-1">Period: {periodLabel}</p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-4">
-                            <p className="text-xl font-bold text-slate-900">
+                          <div className="flex items-center gap-2">
+                            <p className="text-xl font-bold text-slate-900 mr-2">
                               £{batchTotal.toLocaleString('en-GB', { minimumFractionDigits: 2 })}
                             </p>
+                            {/* Batch action buttons */}
+                            <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <MoreVertical className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={async () => {
+                                    for (const inv of group) {
+                                      await handleDownloadInvoice(inv);
+                                    }
+                                    toast.success(`${group.length} PDFs downloaded`);
+                                  }}>
+                                    <Download className="w-4 h-4 mr-2" /> Download All PDFs ({group.length})
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={async () => {
+                                    for (const inv of group) {
+                                      await handleDownloadInvoice(inv);
+                                    }
+                                    for (const inv of group) {
+                                      updateStatusMutation.mutate({ id: inv.id, status: 'sent', is_recurring: inv.is_recurring });
+                                    }
+                                    toast.success(`${group.length} invoices downloaded & marked as sent`);
+                                  }}>
+                                    <Send className="w-4 h-4 mr-2" /> Download All & Mark Sent
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => {
+                                    for (const inv of group) {
+                                      updateStatusMutation.mutate({ id: inv.id, status: 'sent', is_recurring: inv.is_recurring });
+                                    }
+                                    toast.success(`${group.length} invoices marked as sent`);
+                                  }}>
+                                    <ArrowRight className="w-4 h-4 mr-2" /> Mark All as Sent
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => {
+                                    for (const inv of group) {
+                                      updateStatusMutation.mutate({ id: inv.id, status: 'paid', is_recurring: inv.is_recurring });
+                                    }
+                                    toast.success(`${group.length} invoices marked as paid`);
+                                  }}>
+                                    <CheckCircle2 className="w-4 h-4 mr-2" /> Mark All as Paid
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => {
+                                    // Expand batch and open first invoice for editing
+                                    setExpandedBatches(prev => { const n = new Set(prev); n.add(batchKey); return n; });
+                                  }}>
+                                    <Edit2 className="w-4 h-4 mr-2" /> Expand to Edit Individual
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    className="text-red-600"
+                                    onClick={() => {
+                                      if (confirm(`Delete all ${group.length} invoices in this batch?`)) {
+                                        group.forEach(inv => deleteMutation.mutate(inv.id));
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-2" /> Delete All ({group.length})
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
                             <svg className={`w-5 h-5 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                             </svg>
