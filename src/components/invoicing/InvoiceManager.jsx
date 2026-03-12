@@ -46,6 +46,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState(new Set());
   const [combineLoading, setCombineLoading] = useState(false);
   const [generatingTemplateId, setGeneratingTemplateId] = useState(null);
+  const [expandedBatches, setExpandedBatches] = useState(new Set());
   const queryClient = useQueryClient();
 
   // Real-time invoice updates via Supabase
@@ -1902,41 +1903,124 @@ export default function InvoiceManager({ invoices, clients, settings }) {
               })
             )}
 
-            {/* Generated Recurring Invoices */}
-            {recurringInvoices.length > 0 && (
-              <>
-                <div className="flex items-center gap-2 mt-6 mb-2">
-                  <h3 className="text-sm font-semibold text-slate-700">Generated Invoices ({recurringInvoices.length})</h3>
-                  {recurringInvoices.length > 0 && (
+            {/* Generated Recurring Invoices — grouped by batch (period+date) */}
+            {recurringInvoices.length > 0 && (() => {
+              // Group invoices by period_from|period_to|invoice_date to form batches
+              const batchGroups = {};
+              recurringInvoices.forEach(inv => {
+                const key = `${inv.period_from || ''}|${inv.period_to || ''}|${inv.invoice_date || ''}`;
+                if (!batchGroups[key]) batchGroups[key] = [];
+                batchGroups[key].push(inv);
+              });
+              const sortedKeys = Object.keys(batchGroups).sort((a, b) => {
+                const dateA = batchGroups[a][0]?.invoice_date || '';
+                const dateB = batchGroups[b][0]?.invoice_date || '';
+                return dateB.localeCompare(dateA);
+              });
+
+              return (
+                <>
+                  <div className="flex items-center gap-2 mt-6 mb-2">
+                    <h3 className="text-sm font-semibold text-slate-700">Generated Invoices ({recurringInvoices.length})</h3>
                     <Button
                       size="sm"
                       variant="outline"
                       className="text-xs"
                       onClick={() => {
-                        const allIds = new Set(recurringInvoices.map(i => i.id));
                         const allSelected = recurringInvoices.every(i => selectedInvoiceIds.has(i.id));
-                        if (allSelected) {
-                          setSelectedInvoiceIds(prev => {
-                            const next = new Set(prev);
-                            recurringInvoices.forEach(i => next.delete(i.id));
-                            return next;
-                          });
-                        } else {
-                          setSelectedInvoiceIds(prev => {
-                            const next = new Set(prev);
-                            recurringInvoices.forEach(i => next.add(i.id));
-                            return next;
-                          });
-                        }
+                        setSelectedInvoiceIds(prev => {
+                          const next = new Set(prev);
+                          recurringInvoices.forEach(i => allSelected ? next.delete(i.id) : next.add(i.id));
+                          return next;
+                        });
                       }}
                     >
                       {recurringInvoices.every(i => selectedInvoiceIds.has(i.id)) ? 'Deselect All' : 'Select All'}
                     </Button>
-                  )}
-                </div>
-                {recurringInvoices.map(renderInvoiceCard)}
-              </>
-            )}
+                  </div>
+
+                  {sortedKeys.map(batchKey => {
+                    const group = batchGroups[batchKey];
+                    const isExpanded = expandedBatches.has(batchKey);
+                    const batchTotal = group.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+                    const batchSelected = group.filter(i => selectedInvoiceIds.has(i.id)).length;
+                    const allInBatchSelected = group.every(i => selectedInvoiceIds.has(i.id));
+                    const first = group[0];
+                    const periodLabel = first.period_from
+                      ? `${new Date(first.period_from).toLocaleDateString('en-GB')} — ${first.period_to ? new Date(first.period_to).toLocaleDateString('en-GB') : ''}`
+                      : new Date(first.invoice_date).toLocaleDateString('en-GB');
+
+                    if (group.length === 1) {
+                      // Single invoice — render normally
+                      return renderInvoiceCard(group[0]);
+                    }
+
+                    return (
+                      <Card key={batchKey} className="overflow-hidden">
+                        {/* Batch header — click to expand */}
+                        <div
+                          className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors"
+                          onClick={() => setExpandedBatches(prev => {
+                            const next = new Set(prev);
+                            next.has(batchKey) ? next.delete(batchKey) : next.add(batchKey);
+                            return next;
+                          })}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="shrink-0" onClick={e => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                checked={allInBatchSelected}
+                                onChange={() => {
+                                  setSelectedInvoiceIds(prev => {
+                                    const next = new Set(prev);
+                                    group.forEach(i => allInBatchSelected ? next.delete(i.id) : next.add(i.id));
+                                    return next;
+                                  });
+                                }}
+                                className="w-4 h-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                              />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Layers className="w-4 h-4 text-purple-600" />
+                                <h3 className="font-semibold text-slate-900">
+                                  Batch — {group.length} invoices
+                                </h3>
+                                <span className="text-xs font-medium px-2 py-0.5 rounded bg-purple-100 text-purple-700">
+                                  {(first.status || 'draft').toUpperCase()}
+                                </span>
+                                {batchSelected > 0 && (
+                                  <span className="text-xs font-medium px-2 py-0.5 rounded bg-teal-100 text-teal-700">
+                                    {batchSelected} selected
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-slate-500 mt-1">Period: {periodLabel}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <p className="text-xl font-bold text-slate-900">
+                              £{batchTotal.toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                            </p>
+                            <svg className={`w-5 h-5 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
+                        </div>
+
+                        {/* Expanded batch — individual invoices */}
+                        {isExpanded && (
+                          <div className="border-t border-slate-200 bg-slate-50/50 p-3 space-y-2">
+                            {group.map(renderInvoiceCard)}
+                          </div>
+                        )}
+                      </Card>
+                    );
+                  })}
+                </>
+              );
+            })()}
           </>
         ) : (
           sections.find(s => s.key === activeSection)?.invoices.length === 0 ? (
