@@ -11,6 +11,7 @@ export const metadata = {
   description:
     "How CareCallAI meets CQC requirements across all five key lines of enquiry. Safe, Effective, Caring, Responsive, Well-led.",
   keywords: ["CQC compliant care software", "Care Quality Commission software", "CQC key lines of enquiry software"],
+  alternates: { canonical: "https://carecallai.co.uk/compliance/cqc" },
   openGraph: {
     title: "CQC Compliance — CareCallAI",
     description: "Covers all five CQC key lines of enquiry: Safe, Effective, Caring, Responsive, Well-led. Built-in compliance from £99/mo.",
@@ -105,13 +106,24 @@ export default function CQCCompliancePage() {
       <BreadcrumbJsonLd
         items={[
           { name: "Home", href: "/" },
-          { name: "Compliance" },
-          { name: "CQC Compliance" },
+          { name: "Compliance", href: "/compliance/cqc" },
+          { name: "CQC", href: "/compliance/cqc" },
         ]}
       />
       <FAQJsonLd items={faqs} />
 
-      <section className="py-16 sm:py-24 bg-gradient-to-b from-teal-50 to-white">
+      {/* Visible breadcrumb */}
+      <nav className="max-w-4xl mx-auto px-4 pt-6 sm:pt-8" aria-label="Breadcrumb">
+        <ol className="flex items-center gap-1.5 text-sm text-slate-500">
+          <li><Link href="/" className="hover:text-teal-600 transition-colors">Home</Link></li>
+          <li><span className="mx-1">/</span></li>
+          <li><span className="text-slate-400">Compliance</span></li>
+          <li><span className="mx-1">/</span></li>
+          <li className="text-slate-900 font-medium">CQC</li>
+        </ol>
+      </nav>
+
+      <section className="py-12 sm:py-20 bg-gradient-to-b from-teal-50 to-white">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <AnimateOnScroll>
             <div className="inline-flex items-center gap-2 bg-teal-100 text-teal-700 text-sm font-medium px-4 py-1.5 rounded-full mb-6">
