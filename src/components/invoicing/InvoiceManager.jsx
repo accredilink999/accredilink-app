@@ -2022,44 +2022,47 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                                   }}>
                                     <Download className="w-4 h-4 mr-2" /> Download All PDFs ({group.length})
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={async () => {
+                                  <DropdownMenuItem onSelect={async (e) => {
+                                    e.preventDefault();
+                                    const ids = group.map(i => i.id);
                                     for (const inv of group) {
                                       await handleDownloadInvoice(inv);
                                     }
-                                    for (const inv of group) {
-                                      updateStatusMutation.mutate({ id: inv.id, status: 'sent', is_recurring: inv.is_recurring });
-                                    }
+                                    await supabase.from('invoices').update({ status: 'sent' }).in('id', ids);
+                                    queryClient.invalidateQueries({ queryKey: ['invoices'] });
                                     toast.success(`${group.length} invoices downloaded & marked as sent`);
                                   }}>
                                     <Send className="w-4 h-4 mr-2" /> Download All & Mark Sent
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => {
-                                    for (const inv of group) {
-                                      updateStatusMutation.mutate({ id: inv.id, status: 'sent', is_recurring: inv.is_recurring });
-                                    }
+                                  <DropdownMenuItem onClick={async () => {
+                                    const ids = group.map(i => i.id);
+                                    await supabase.from('invoices').update({ status: 'sent' }).in('id', ids);
+                                    queryClient.invalidateQueries({ queryKey: ['invoices'] });
                                     toast.success(`${group.length} invoices marked as sent`);
                                   }}>
                                     <ArrowRight className="w-4 h-4 mr-2" /> Mark All as Sent
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => {
-                                    for (const inv of group) {
-                                      updateStatusMutation.mutate({ id: inv.id, status: 'paid', is_recurring: inv.is_recurring });
-                                    }
+                                  <DropdownMenuItem onClick={async () => {
+                                    const ids = group.map(i => i.id);
+                                    await supabase.from('invoices').update({ status: 'paid' }).in('id', ids);
+                                    queryClient.invalidateQueries({ queryKey: ['invoices'] });
                                     toast.success(`${group.length} invoices marked as paid`);
                                   }}>
                                     <CheckCircle2 className="w-4 h-4 mr-2" /> Mark All as Paid
                                   </DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => {
-                                    // Expand batch and open first invoice for editing
                                     setExpandedBatches(prev => { const n = new Set(prev); n.add(batchKey); return n; });
                                   }}>
                                     <Edit2 className="w-4 h-4 mr-2" /> Expand to Edit Individual
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     className="text-red-600"
-                                    onClick={() => {
+                                    onClick={async () => {
                                       if (confirm(`Delete all ${group.length} invoices in this batch?`)) {
-                                        group.forEach(inv => deleteMutation.mutate(inv.id));
+                                        const ids = group.map(i => i.id);
+                                        await supabase.from('invoices').delete().in('id', ids);
+                                        queryClient.invalidateQueries({ queryKey: ['invoices'] });
+                                        toast.success(`${group.length} invoices deleted`);
                                       }
                                     }}
                                   >
@@ -2087,15 +2090,123 @@ export default function InvoiceManager({ invoices, clients, settings }) {
               );
             })()}
           </>
-        ) : (
-          sections.find(s => s.key === activeSection)?.invoices.length === 0 ? (
-            <Card className="p-8 text-center bg-slate-50">
-              <p className="text-slate-500">No {activeSection} invoices</p>
-            </Card>
-          ) : (
-            sections.find(s => s.key === activeSection)?.invoices.map(renderInvoiceCard)
-          )
-        )}
+        ) : (() => {
+          const sectionInvoices = sections.find(s => s.key === activeSection)?.invoices || [];
+          if (sectionInvoices.length === 0) {
+            return (
+              <Card className="p-8 text-center bg-slate-50">
+                <p className="text-slate-500">No {activeSection} invoices</p>
+              </Card>
+            );
+          }
+          // Group by period to show batches in Sent/Paid/Draft tabs too
+          const groups = {};
+          sectionInvoices.forEach(inv => {
+            const key = `${inv.period_from || ''}|${inv.period_to || ''}|${inv.invoice_date || ''}`;
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(inv);
+          });
+          return Object.entries(groups).sort(([, a], [, b]) => {
+            const da = a[0]?.invoice_date || '';
+            const db = b[0]?.invoice_date || '';
+            return db.localeCompare(da);
+          }).map(([key, grp]) => {
+            if (grp.length === 1) return renderInvoiceCard(grp[0]);
+            const isExp = expandedBatches.has(key);
+            const grpTotal = grp.reduce((s, i) => s + (i.total_amount || 0), 0);
+            const first = grp[0];
+            const pLabel = first.period_from
+              ? `${new Date(first.period_from).toLocaleDateString('en-GB')} — ${first.period_to ? new Date(first.period_to).toLocaleDateString('en-GB') : ''}`
+              : new Date(first.invoice_date).toLocaleDateString('en-GB');
+            const allSel = grp.every(i => selectedInvoiceIds.has(i.id));
+            const selCount = grp.filter(i => selectedInvoiceIds.has(i.id)).length;
+            return (
+              <Card key={key} className="overflow-hidden">
+                <div
+                  className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors"
+                  onClick={() => setExpandedBatches(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; })}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="shrink-0" onClick={e => e.stopPropagation()}>
+                      <input type="checkbox" checked={allSel} onChange={() => {
+                        setSelectedInvoiceIds(prev => { const n = new Set(prev); grp.forEach(i => allSel ? n.delete(i.id) : n.add(i.id)); return n; });
+                      }} className="w-4 h-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Layers className="w-4 h-4 text-purple-600" />
+                        <h3 className="font-semibold text-slate-900">Batch — {grp.length} invoices</h3>
+                        <span className="text-xs font-medium px-2 py-0.5 rounded bg-purple-100 text-purple-700">
+                          {(first.status || 'draft').toUpperCase()}
+                        </span>
+                        {selCount > 0 && <span className="text-xs font-medium px-2 py-0.5 rounded bg-teal-100 text-teal-700">{selCount} selected</span>}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">Period: {pLabel}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xl font-bold text-slate-900 mr-2">£{grpTotal.toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
+                    <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild><Button variant="ghost" size="sm"><MoreVertical className="w-4 h-4" /></Button></DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={async () => { for (const inv of grp) await handleDownloadInvoice(inv); toast.success(`${grp.length} PDFs downloaded`); }}>
+                            <Download className="w-4 h-4 mr-2" /> Download All PDFs ({grp.length})
+                          </DropdownMenuItem>
+                          {activeSection !== 'sent' && activeSection !== 'paid' && (
+                            <DropdownMenuItem onSelect={async (e) => {
+                              e.preventDefault();
+                              for (const inv of grp) await handleDownloadInvoice(inv);
+                              await supabase.from('invoices').update({ status: 'sent' }).in('id', grp.map(i => i.id));
+                              queryClient.invalidateQueries({ queryKey: ['invoices'] });
+                              toast.success(`${grp.length} invoices downloaded & marked as sent`);
+                            }}>
+                              <Send className="w-4 h-4 mr-2" /> Download All & Mark Sent
+                            </DropdownMenuItem>
+                          )}
+                          {activeSection !== 'sent' && (
+                            <DropdownMenuItem onClick={async () => {
+                              await supabase.from('invoices').update({ status: 'sent' }).in('id', grp.map(i => i.id));
+                              queryClient.invalidateQueries({ queryKey: ['invoices'] });
+                              toast.success(`${grp.length} invoices marked as sent`);
+                            }}>
+                              <ArrowRight className="w-4 h-4 mr-2" /> Mark All as Sent
+                            </DropdownMenuItem>
+                          )}
+                          {activeSection !== 'paid' && (
+                            <DropdownMenuItem onClick={async () => {
+                              await supabase.from('invoices').update({ status: 'paid' }).in('id', grp.map(i => i.id));
+                              queryClient.invalidateQueries({ queryKey: ['invoices'] });
+                              toast.success(`${grp.length} invoices marked as paid`);
+                            }}>
+                              <CheckCircle2 className="w-4 h-4 mr-2" /> Mark All as Paid
+                            </DropdownMenuItem>
+                          )}
+                          {activeSection !== 'draft' && (
+                            <DropdownMenuItem onClick={async () => {
+                              await supabase.from('invoices').update({ status: 'draft' }).in('id', grp.map(i => i.id));
+                              queryClient.invalidateQueries({ queryKey: ['invoices'] });
+                              toast.success(`${grp.length} invoices moved to draft`);
+                            }}>
+                              <ArrowRight className="w-4 h-4 mr-2" /> Move All to Draft
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem onClick={() => setExpandedBatches(prev => { const n = new Set(prev); n.add(key); return n; })}>
+                            <Edit2 className="w-4 h-4 mr-2" /> Expand to Edit Individual
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    <svg className={`w-5 h-5 text-slate-400 transition-transform ${isExp ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+                {isExp && <div className="border-t border-slate-200 bg-slate-50/50 p-3 space-y-2">{grp.map(renderInvoiceCard)}</div>}
+              </Card>
+            );
+          });
+        })()}
       </div>
 
       {/* Create/Edit Invoice Dialog */}
