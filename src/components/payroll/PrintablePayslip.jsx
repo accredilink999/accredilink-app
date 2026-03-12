@@ -123,10 +123,20 @@ const PrintablePayslip = React.forwardRef(({ record, settings }, ref) => {
             ) : (
               <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
                 <td style={{ padding: '8px 10px' }}>Basic Pay</td>
-                <td style={{ padding: '8px 10px', textAlign: 'center' }}>{(record.regular_hours || 0).toFixed(2)}</td>
+                <td style={{ padding: '8px 10px', textAlign: 'center' }}>{((record.regular_hours || 0) - (record.holiday_hours || 0)).toFixed(2)}</td>
                 <td style={{ padding: '8px 10px', textAlign: 'right' }}>£{(record.hourly_rate || 0).toFixed(2)}</td>
                 <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 'bold' }}>
-                  £{((record.regular_hours || 0) * (record.hourly_rate || 0)).toFixed(2)}
+                  £{(((record.regular_hours || 0) - (record.holiday_hours || 0)) * (record.hourly_rate || 0)).toFixed(2)}
+                </td>
+              </tr>
+            )}
+            {(record.holiday_days > 0 || record.holiday_hours > 0) && (
+              <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                <td style={{ padding: '8px 10px' }}>Holiday Pay ({record.holiday_days || 0} day{(record.holiday_days || 0) !== 1 ? 's' : ''})</td>
+                <td style={{ padding: '8px 10px', textAlign: 'center' }}>{(record.holiday_hours || 0).toFixed(2)}</td>
+                <td style={{ padding: '8px 10px', textAlign: 'right' }}>{record.pay_type === 'salaried' ? '—' : `£${(record.hourly_rate || 0).toFixed(2)}`}</td>
+                <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 'bold' }}>
+                  £{(record.holiday_pay || 0).toFixed(2)}
                 </td>
               </tr>
             )}

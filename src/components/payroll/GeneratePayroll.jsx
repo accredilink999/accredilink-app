@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Calculator, Loader, CheckCircle, Users, PoundSterling, Clock, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
+import { format, startOfMonth, endOfMonth, parseISO, differenceInDays } from 'date-fns';
 import { calculatePayslip, TAX_CODES, NI_CATEGORIES } from '@/config/ukPayroll';
 
 // Calculate hours from shift start/end times
@@ -60,6 +60,19 @@ export default function GeneratePayroll() {
     enabled: !!periodStart && !!periodEnd,
   });
 
+  // Fetch approved leave requests overlapping this pay period
+  const { data: approvedLeave = [] } = useQuery({
+    queryKey: ['approved-leave-for-payroll', periodStart, periodEnd],
+    queryFn: async () => {
+      const all = await base44.entities.LeaveRequest.filter({ status: 'approved' }, '-created_date', 500);
+      return all.filter(lr => {
+        // Leave overlaps the pay period if start <= periodEnd AND end >= periodStart
+        return lr.start_date <= periodEnd && lr.end_date >= periodStart;
+      });
+    },
+    enabled: !!periodStart && !!periodEnd,
+  });
+
   const activeStaff = useMemo(() =>
     staff.filter(s => s.employment_status === 'active'),
     [staff]
@@ -71,6 +84,18 @@ export default function GeneratePayroll() {
       const staffShifts = shifts.filter(s => s.staff_id === member.id);
       const totalHours = staffShifts.reduce((sum, shift) => sum + getShiftHours(shift), 0);
       const ov = overrides[member.id] || {};
+
+      // Calculate approved leave days in this period for this staff member
+      const staffLeave = approvedLeave.filter(lr => lr.staff_id === member.id && lr.type === 'annual_leave');
+      let leaveDaysInPeriod = 0;
+      staffLeave.forEach(lr => {
+        const leaveStart = lr.start_date > periodStart ? lr.start_date : periodStart;
+        const leaveEnd = lr.end_date < periodEnd ? lr.end_date : periodEnd;
+        if (leaveStart <= leaveEnd) {
+          leaveDaysInPeriod += differenceInDays(parseISO(leaveEnd), parseISO(leaveStart)) + 1;
+        }
+      });
+      const leaveHours = leaveDaysInPeriod * 7.5; // standard day = 7.5 hours
 
       // Determine pay type: salaried staff get monthly salary, hourly staff get hours x rate
       const payType = ov.payType || member.pay_type || (member.salary && !member.hourly_rate ? 'salaried' : 'hourly');
@@ -89,19 +114,23 @@ export default function GeneratePayroll() {
       const otherDeductions = ov.otherDeductions !== undefined ? parseFloat(ov.otherDeductions) : 0;
       const otherDeductionsLabel = ov.otherDeductionsLabel || '';
 
+      // For hourly staff, holiday pay = leave hours x hourly rate (added to gross)
+      const holidayPay = !isSalaried ? Math.round(leaveHours * hourlyRate * 100) / 100 : 0;
+
       const result = isSalaried
         ? calculatePayslip({
             regularHours: 1, overtimeHours: 0, hourlyRate: monthlySalary, overtimeRate: 0,
             taxCode, niCategory, pensionPercent, otherDeductions
           })
         : calculatePayslip({
-            regularHours, overtimeHours, hourlyRate, overtimeRate,
+            regularHours: regularHours + leaveHours, overtimeHours, hourlyRate, overtimeRate,
             taxCode, niCategory, pensionPercent, otherDeductions
           });
 
       return {
         ...member,
         staffShifts,
+        leaveDaysInPeriod, leaveHours, holidayPay,
         shiftCount: staffShifts.length,
         calculatedHours: totalHours,
         payType, isSalaried, monthlySalary,
@@ -160,6 +189,9 @@ export default function GeneratePayroll() {
         period_end: periodEnd,
         regular_hours: s.isSalaried ? s.calculatedHours : s.regularHours,
         overtime_hours: s.overtimeHours,
+        holiday_days: s.leaveDaysInPeriod || 0,
+        holiday_hours: s.leaveHours || 0,
+        holiday_pay: s.holidayPay || 0,
         hourly_rate: s.isSalaried ? 0 : s.hourlyRate,
         overtime_rate: s.overtimeRate,
         gross_pay: s.grossPay,
@@ -274,6 +306,11 @@ export default function GeneratePayroll() {
                             ? <span>£{(member.salary || 0).toLocaleString()}/yr (£{member.monthlySalary.toFixed(2)}/mo)</span>
                             : <span>£{member.hourlyRate}/hr</span>
                           }
+                          {member.leaveDaysInPeriod > 0 && (
+                            <Badge className="text-xs bg-blue-100 text-blue-800">
+                              {member.leaveDaysInPeriod}d leave{!member.isSalaried ? ` (+£${member.holidayPay.toFixed(2)})` : ''}
+                            </Badge>
+                          )}
                           <Badge variant="outline" className="text-xs">{member.taxCode}</Badge>
                           <Badge variant="outline" className="text-xs">NI {member.niCategory}</Badge>
                         </div>

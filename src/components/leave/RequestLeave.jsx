@@ -44,6 +44,7 @@ export default function RequestLeave({ userId, userName }) {
       type: formData.type,
       start_date: formData.start_date,
       end_date: formData.end_date,
+      days_requested: daysDiff,
       reason: formData.reason,
       status: 'pending'
     });
