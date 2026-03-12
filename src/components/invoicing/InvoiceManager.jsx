@@ -1483,14 +1483,16 @@ export default function InvoiceManager({ invoices, clients, settings }) {
       });
     }
   });
-  const isRecurringGenerated = (i) => {
+  // Only show as "recurring" if still a draft — once sent/paid they move to those tabs
+  const isRecurringDraft = (i) => {
+    const isDraft = !i.status || i.status === 'draft' || i.status === 'live' || i.status === 'recurring';
+    if (!isDraft) return false;
     if (i.status === 'recurring' || i.is_recurring) return true;
-    // Match draft invoices whose client+service_user matches a recurring template or batch item
-    if ((!i.status || i.status === 'draft') && i.client_id && recurringKeys.has(`${i.client_id}|${i.service_user_id || ''}`)) return true;
+    if (i.client_id && recurringKeys.has(`${i.client_id}|${i.service_user_id || ''}`)) return true;
     return false;
   };
-  const recurringInvoices = searchedInvoices.filter(isRecurringGenerated);
-  const createdInvoices = searchedInvoices.filter(i => (!i.status || i.status === 'draft' || i.status === 'live') && !isRecurringGenerated(i));
+  const recurringInvoices = searchedInvoices.filter(isRecurringDraft);
+  const createdInvoices = searchedInvoices.filter(i => (!i.status || i.status === 'draft' || i.status === 'live') && !isRecurringDraft(i));
   const sentInvoices = searchedInvoices.filter(i => i.status === 'sent' || i.status === 'viewed' || i.status === 'overdue');
   const paidInvoices = searchedInvoices.filter(i => i.status === 'paid');
 
