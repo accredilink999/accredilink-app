@@ -80,6 +80,47 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
 
   const deactivateMutation = useMutation({
     mutationFn: async (activate) => {
+      // When deactivating, clear all FUTURE shifts for this staff member
+      if (!activate) {
+        const today = new Date().toISOString().split('T')[0];
+        const BATCH = 50;
+        let futureShifts = [];
+        let offset = 0;
+        while (true) {
+          const { data, error } = await supabase
+            .from('shifts')
+            .select('id, shift_name, paired_shift_id')
+            .eq('staff_id', staffId)
+            .gte('date', today)
+            .range(offset, offset + 999);
+          if (error || !data || data.length === 0) break;
+          futureShifts.push(...data);
+          if (data.length < 1000) break;
+          offset += 1000;
+        }
+        if (futureShifts.length > 0) {
+          const partnerIds = futureShifts.filter(s => s.paired_shift_id).map(s => s.paired_shift_id);
+          const shiftIds = futureShifts.map(s => s.id);
+          for (let i = 0; i < shiftIds.length; i += BATCH) {
+            await supabase.from('shift_calls').delete().in('shift_id', shiftIds.slice(i, i + BATCH));
+          }
+          const toRevert = futureShifts.filter(s => s.shift_name).map(s => s.id);
+          for (let i = 0; i < toRevert.length; i += BATCH) {
+            await supabase.from('shifts')
+              .update({ staff_id: null, staff_name: null, shift_pattern_id: null, paired_shift_id: null, paired_staff_name: null, is_base_shift: true, status: 'available' })
+              .in('id', toRevert.slice(i, i + BATCH));
+          }
+          const toDelete = futureShifts.filter(s => !s.shift_name).map(s => s.id);
+          for (let i = 0; i < toDelete.length; i += BATCH) {
+            await supabase.from('shifts').delete().in('id', toDelete.slice(i, i + BATCH));
+          }
+          if (partnerIds.length > 0) {
+            for (let i = 0; i < partnerIds.length; i += BATCH) {
+              await supabase.from('shifts').update({ paired_shift_id: null, paired_staff_name: null }).in('id', partnerIds.slice(i, i + BATCH));
+            }
+          }
+        }
+      }
       return base44.entities.User.update(staffId, {
         is_active: activate,
         employment_status: activate ? 'active' : 'terminated',
@@ -88,19 +129,112 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
     onSuccess: (_, activate) => {
       queryClient.invalidateQueries({ queryKey: ['staff'] });
       queryClient.invalidateQueries({ queryKey: ['allStaff'] });
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
       setShowDeactivateDialog(false);
-      toast.success(activate ? 'User reactivated' : 'User deactivated');
+      toast.success(activate ? 'User reactivated' : (
+        'User deactivated — future shifts reverted to blank'
+      ));
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
+      // Step 1: Archive staff data before deletion
       await archiveItem({
         entityType: 'staff',
         entityId: staffId,
         itemName: staff?.full_name || staff?.email || 'Staff Member',
         itemData: staff,
       });
+
+      // Step 2: Clear ALL shifts assigned to this staff member
+      // Revert assigned shifts back to blank (available) state
+      const BATCH = 50;
+      let allShiftIds = [];
+      let offset = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from('shifts')
+          .select('id, shift_name, paired_shift_id')
+          .eq('staff_id', staffId)
+          .range(offset, offset + 999);
+        if (error || !data || data.length === 0) break;
+        allShiftIds.push(...data);
+        if (data.length < 1000) break;
+        offset += 1000;
+      }
+
+      if (allShiftIds.length > 0) {
+        // Collect paired shift IDs to clear pairing on the other side
+        const partnerIds = allShiftIds
+          .filter(s => s.paired_shift_id)
+          .map(s => s.paired_shift_id);
+
+        // Delete shift_calls for these shifts
+        const shiftIds = allShiftIds.map(s => s.id);
+        for (let i = 0; i < shiftIds.length; i += BATCH) {
+          await supabase.from('shift_calls').delete().in('shift_id', shiftIds.slice(i, i + BATCH));
+        }
+
+        // Shifts WITH shift_name = template slots → revert to blank
+        const toRevert = allShiftIds.filter(s => s.shift_name).map(s => s.id);
+        for (let i = 0; i < toRevert.length; i += BATCH) {
+          await supabase.from('shifts')
+            .update({
+              staff_id: null,
+              staff_name: null,
+              shift_pattern_id: null,
+              paired_shift_id: null,
+              paired_staff_name: null,
+              is_base_shift: true,
+              status: 'available',
+            })
+            .in('id', toRevert.slice(i, i + BATCH));
+        }
+
+        // Shifts WITHOUT shift_name = orphans → delete entirely
+        const toDelete = allShiftIds.filter(s => !s.shift_name).map(s => s.id);
+        for (let i = 0; i < toDelete.length; i += BATCH) {
+          await supabase.from('shifts').delete().in('id', toDelete.slice(i, i + BATCH));
+        }
+
+        // Clear pairing on partner shifts
+        if (partnerIds.length > 0) {
+          for (let i = 0; i < partnerIds.length; i += BATCH) {
+            await supabase.from('shifts')
+              .update({ paired_shift_id: null, paired_staff_name: null })
+              .in('id', partnerIds.slice(i, i + BATCH));
+          }
+        }
+      }
+
+      // Step 3: Delete shift patterns belonging to this staff
+      try {
+        await supabase.from('shift_patterns').delete().eq('staff_id', staffId);
+      } catch (e) {
+        console.warn('Could not delete shift patterns:', e);
+      }
+
+      // Step 4: Clear paired_staff references where this person was the partner
+      try {
+        const { data: pairedRefs } = await supabase
+          .from('shifts')
+          .select('id')
+          .eq('paired_staff_name', staff?.full_name)
+          .limit(2000);
+        if (pairedRefs && pairedRefs.length > 0) {
+          const pIds = pairedRefs.map(s => s.id);
+          for (let i = 0; i < pIds.length; i += BATCH) {
+            await supabase.from('shifts')
+              .update({ paired_shift_id: null, paired_staff_name: null })
+              .in('id', pIds.slice(i, i + BATCH));
+          }
+        }
+      } catch (e) {
+        console.warn('Could not clear paired references:', e);
+      }
+
+      // Step 5: Delete user and profile records
       await base44.entities.User.delete(staffId);
       try {
         await supabase.from('profiles').delete().eq('id', staffId);
@@ -111,8 +245,10 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['staff'] });
       queryClient.invalidateQueries({ queryKey: ['allStaff'] });
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      queryClient.invalidateQueries({ queryKey: ['shift-patterns'] });
       setShowDeleteDialog(false);
-      toast.success('User archived and deleted');
+      toast.success('User archived and deleted — all shifts reverted to blank');
       onBack();
     },
     onError: (error) => {
