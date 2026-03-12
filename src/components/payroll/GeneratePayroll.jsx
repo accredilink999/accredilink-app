@@ -308,23 +308,54 @@ export default function GeneratePayroll() {
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <Checkbox checked={isSelected} onCheckedChange={() => toggleStaff(member.id)} />
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-slate-900 truncate">{member.full_name}</p>
-                        <div className="flex flex-wrap gap-2 mt-1 text-xs text-slate-500">
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {member.shiftCount} shifts · {member.calculatedHours.toFixed(1)}h
-                          </span>
-                          {member.isSalaried
-                            ? <span>£{(member.salary || 0).toLocaleString()}/yr (£{member.monthlySalary.toFixed(2)}/mo)</span>
-                            : <span>£{member.hourlyRate}/hr</span>
-                          }
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-slate-900 truncate">{member.full_name}</p>
                           {member.leaveDaysInPeriod > 0 && (
                             <Badge className="text-xs bg-blue-100 text-blue-800">
-                              {member.leaveDaysInPeriod}d leave{!member.isSalaried ? ` (+£${member.holidayPay.toFixed(2)})` : ''}
+                              {member.leaveDaysInPeriod}d leave
                             </Badge>
                           )}
-                          <Badge variant="outline" className="text-xs">{member.taxCode}</Badge>
-                          <Badge variant="outline" className="text-xs">NI {member.niCategory}</Badge>
+                        </div>
+                        {/* Inline editable hours + rate */}
+                        <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-slate-400" />
+                            <Input
+                              type="number"
+                              step="0.5"
+                              min="0"
+                              value={overrides[member.id]?.regularHours ?? member.calculatedHours.toFixed(2)}
+                              onChange={(e) => updateOverride(member.id, 'regularHours', e.target.value)}
+                              className="w-16 h-6 text-xs px-1 text-center"
+                              title="Hours"
+                            />
+                            <span className="text-xs text-slate-500">hrs</span>
+                          </div>
+                          {!member.isSalaried && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-slate-400">@</span>
+                              <span className="text-xs text-slate-400">£</span>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={overrides[member.id]?.hourlyRate ?? (member.hourly_rate || 0)}
+                                onChange={(e) => updateOverride(member.id, 'hourlyRate', e.target.value)}
+                                className="w-16 h-6 text-xs px-1 text-center"
+                                title="Hourly Rate"
+                              />
+                              <span className="text-xs text-slate-500">/hr</span>
+                            </div>
+                          )}
+                          {member.isSalaried && (
+                            <span className="text-xs text-slate-500">£{(member.salary || 0).toLocaleString()}/yr</span>
+                          )}
+                          {member.shiftCount > 0 && (
+                            <span className="text-xs text-slate-400">({member.shiftCount} shifts auto)</span>
+                          )}
+                          {member.shiftCount === 0 && !overrides[member.id]?.regularHours && (
+                            <span className="text-xs text-amber-600">No shifts — enter hours manually</span>
+                          )}
                         </div>
                       </div>
                     </div>
