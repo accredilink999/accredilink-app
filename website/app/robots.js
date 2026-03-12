@@ -4,7 +4,7 @@ export default function robots() {
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/admin', '/api/'],
+        disallow: ['/admin', '/api/', '/login', '/signup', '/ciw-compliance', '/safeguarding', '/funding-guidance'],
       },
     ],
     sitemap: 'https://accredilinkcare.co.uk/sitemap.xml',
