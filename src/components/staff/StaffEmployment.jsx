@@ -1,9 +1,26 @@
 import React from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { DollarSign, Briefcase } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from 'sonner';
+import { TAX_CODES, NI_CATEGORIES } from '@/config/ukPayroll';
 
 export default function StaffEmployment({ staff, isAdmin }) {
+  const queryClient = useQueryClient();
+
+  const updateMutation = useMutation({
+    mutationFn: ({ field, value }) => base44.entities.User.update(staff.id, { [field]: value }),
+    onSuccess: (_, { field }) => {
+      queryClient.invalidateQueries({ queryKey: ['staff', staff.id] });
+      queryClient.invalidateQueries({ queryKey: ['allStaff'] });
+      queryClient.invalidateQueries({ queryKey: ['staff'] });
+      toast.success(`${field === 'tax_code' ? 'Tax code' : 'NI category'} updated`);
+    },
+    onError: (err) => toast.error(`Update failed: ${err.message}`),
+  });
+
   if (!isAdmin) {
     return (
       <Card className="p-8 text-center">
@@ -34,6 +51,42 @@ export default function StaffEmployment({ staff, isAdmin }) {
           <div className="flex justify-between">
             <span className="text-slate-600">NI Number:</span>
             <span className="text-slate-900">{staff?.ni_number || 'Not provided'}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-slate-600">Tax Code:</span>
+            <Select
+              value={staff?.tax_code || '1257L'}
+              onValueChange={(v) => updateMutation.mutate({ field: 'tax_code', value: v })}
+            >
+              <SelectTrigger className="w-[220px] h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TAX_CODES.map(tc => (
+                  <SelectItem key={tc.value} value={tc.value} className="text-xs">
+                    {tc.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-slate-600">NI Category:</span>
+            <Select
+              value={staff?.ni_category || 'A'}
+              onValueChange={(v) => updateMutation.mutate({ field: 'ni_category', value: v })}
+            >
+              <SelectTrigger className="w-[220px] h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {NI_CATEGORIES.map(nc => (
+                  <SelectItem key={nc.value} value={nc.value} className="text-xs">
+                    {nc.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
