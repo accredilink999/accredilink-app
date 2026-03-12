@@ -61,7 +61,8 @@ import {
                                 Download,
                                 HelpCircle,
                                 FileText,
-                                RefreshCw
+                                RefreshCw,
+                                PoundSterling
                               } from 'lucide-react';
 
 
@@ -70,6 +71,7 @@ const navigation = [
                     { name: 'Incidents', icon: AlertTriangle, page: 'Incidents' },
                     { name: 'My Documents', icon: Folder, page: 'Documents' },
                     { name: 'Training', icon: GraduationCap, page: 'Training' },
+                    { name: 'My Payslips', icon: PoundSterling, page: 'Payroll' },
                   ];
 
 const ROOT_PAGES = ['Dashboard'];

@@ -264,7 +264,16 @@ export default function PayslipView({ record, open, onClose, readOnly = false })
           </div>
         )}
 
-        {/* Printable Payslip Preview (hidden for PDF) */}
+        {/* Visible Payslip Preview in read-only mode */}
+        {readOnly && (
+          <div className="border rounded-lg overflow-hidden bg-white">
+            <div style={{ transform: 'scale(0.55)', transformOrigin: 'top left', width: '182%', maxHeight: '500px', overflow: 'auto' }}>
+              <PrintablePayslip record={previewRecord} settings={{ ...settings, company_logo: companySettings?.company_logo, company_name: companySettings?.company_name || settings?.company_name }} />
+            </div>
+          </div>
+        )}
+
+        {/* Hidden Payslip for PDF generation */}
         <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
           <PrintablePayslip ref={printRef} record={previewRecord} settings={{ ...settings, company_logo: companySettings?.company_logo, company_name: companySettings?.company_name || settings?.company_name }} />
         </div>
