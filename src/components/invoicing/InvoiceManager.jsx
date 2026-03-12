@@ -364,6 +364,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
             amount_due: invData.total_amount || 0,
             currency: invData.currency || template.currency || 'GBP',
             status: 'draft',
+            is_recurring: true,
           };
           // Only include line_items if not using day_items
           if (!invData.day_items) {
@@ -439,6 +440,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
         amount_due: template.total_amount || 0,
         currency: template.currency || 'GBP',
         status: 'draft',
+        is_recurring: true,
       }).select().single();
       if (invErr) throw invErr;
 
@@ -1468,16 +1470,24 @@ export default function InvoiceManager({ invoices, clients, settings }) {
     )
     .sort((a, b) => new Date(b.invoice_date) - new Date(a.invoice_date));
 
-  const createdInvoices = searchedInvoices.filter(i => !i.status || i.status === 'draft' || i.status === 'live');
+  // Build set of client+service_user combos from recurring templates to match old generated invoices
+  const recurringKeys = new Set(recurringTemplates.map(t => `${t.client_id || ''}|${t.service_user_id || ''}`));
+  const isRecurringGenerated = (i) => {
+    if (i.status === 'recurring' || i.is_recurring) return true;
+    // Match draft invoices whose client+service_user matches a recurring template
+    if ((!i.status || i.status === 'draft') && i.client_id && recurringKeys.has(`${i.client_id}|${i.service_user_id || ''}`)) return true;
+    return false;
+  };
+  const recurringInvoices = searchedInvoices.filter(isRecurringGenerated);
+  const createdInvoices = searchedInvoices.filter(i => (!i.status || i.status === 'draft' || i.status === 'live') && !isRecurringGenerated(i));
   const sentInvoices = searchedInvoices.filter(i => i.status === 'sent' || i.status === 'viewed' || i.status === 'overdue');
   const paidInvoices = searchedInvoices.filter(i => i.status === 'paid');
-  const recurringInvoices = searchedInvoices.filter(i => i.status === 'recurring' || i.is_recurring);
 
   const sections = [
     { key: 'draft', label: 'Draft', count: createdInvoices.length, invoices: createdInvoices },
     { key: 'sent', label: 'Sent', count: sentInvoices.length, invoices: sentInvoices },
     { key: 'paid', label: 'Paid', count: paidInvoices.length, invoices: paidInvoices },
-    { key: 'recurring', label: 'Recurring', count: recurringTemplates.length, invoices: recurringInvoices },
+    { key: 'recurring', label: 'Recurring', count: recurringTemplates.length + recurringInvoices.length, invoices: recurringInvoices },
   ];
 
   const getServiceUserName = (invoice) => {
@@ -1880,6 +1890,42 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                   </Card>
                 );
               })
+            )}
+
+            {/* Generated Recurring Invoices */}
+            {recurringInvoices.length > 0 && (
+              <>
+                <div className="flex items-center gap-2 mt-6 mb-2">
+                  <h3 className="text-sm font-semibold text-slate-700">Generated Invoices ({recurringInvoices.length})</h3>
+                  {recurringInvoices.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs"
+                      onClick={() => {
+                        const allIds = new Set(recurringInvoices.map(i => i.id));
+                        const allSelected = recurringInvoices.every(i => selectedInvoiceIds.has(i.id));
+                        if (allSelected) {
+                          setSelectedInvoiceIds(prev => {
+                            const next = new Set(prev);
+                            recurringInvoices.forEach(i => next.delete(i.id));
+                            return next;
+                          });
+                        } else {
+                          setSelectedInvoiceIds(prev => {
+                            const next = new Set(prev);
+                            recurringInvoices.forEach(i => next.add(i.id));
+                            return next;
+                          });
+                        }
+                      }}
+                    >
+                      {recurringInvoices.every(i => selectedInvoiceIds.has(i.id)) ? 'Deselect All' : 'Select All'}
+                    </Button>
+                  )}
+                </div>
+                {recurringInvoices.map(renderInvoiceCard)}
+              </>
             )}
           </>
         ) : (
