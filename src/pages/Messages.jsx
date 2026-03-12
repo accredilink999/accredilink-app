@@ -199,7 +199,8 @@ export default function Messages() {
       return message;
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['messages'] });
+      // Use refetchQueries for immediate update (ensures Layout header flashes for sender too)
+      queryClient.refetchQueries({ queryKey: ['messages'] });
       queryClient.invalidateQueries({ queryKey: ['unacknowledgedAnnouncements'] });
       setIsDialogOpen(false);
       resetForm();
