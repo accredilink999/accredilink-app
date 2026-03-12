@@ -29,15 +29,25 @@ const PrintablePayslip = React.forwardRef(({ record, settings }, ref) => {
     >
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px', paddingBottom: '12px', borderBottom: `3px solid ${brandColor}` }}>
-        <div>
-          <h1 style={{ margin: '0', fontSize: '22px', fontWeight: 'bold', color: brandColor }}>
-            {record.company_name || settings?.company_name || 'Company Name'}
-          </h1>
-          {(record.employer_paye_ref || settings?.tax_id) && (
-            <p style={{ margin: '3px 0 0', fontSize: '11px', color: '#6b7280' }}>
-              PAYE Ref: {record.employer_paye_ref || settings?.tax_id}
-            </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {(record.company_logo || settings?.company_logo) && (
+            <img
+              src={record.company_logo || settings?.company_logo}
+              alt="Company Logo"
+              style={{ height: '50px', maxWidth: '120px', objectFit: 'contain' }}
+              crossOrigin="anonymous"
+            />
           )}
+          <div>
+            <h1 style={{ margin: '0', fontSize: '22px', fontWeight: 'bold', color: brandColor }}>
+              {record.company_name || settings?.company_name || 'Company Name'}
+            </h1>
+            {(record.employer_paye_ref || settings?.tax_id) && (
+              <p style={{ margin: '3px 0 0', fontSize: '11px', color: '#6b7280' }}>
+                PAYE Ref: {record.employer_paye_ref || settings?.tax_id}
+              </p>
+            )}
+          </div>
         </div>
         <div style={{ textAlign: 'right' }}>
           <h2 style={{ margin: '0', fontSize: '36px', fontWeight: 'bold', color: '#d1d5db', letterSpacing: '2px' }}>PAYSLIP</h2>

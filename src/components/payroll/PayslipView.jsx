@@ -27,6 +27,16 @@ export default function PayslipView({ record, open, onClose, readOnly = false })
     }
   });
 
+  const { data: companySettings = {} } = useQuery({
+    queryKey: ['companySettings'],
+    queryFn: async () => {
+      const rows = await base44.entities.SystemSettings.filter({ setting_key: ['company_name', 'company_logo'] });
+      const result = {};
+      rows.forEach(s => { result[s.setting_key] = s.setting_value; });
+      return result;
+    },
+  });
+
   useEffect(() => {
     if (record) {
       const deductions = typeof record.deductions === 'string'
@@ -256,7 +266,7 @@ export default function PayslipView({ record, open, onClose, readOnly = false })
 
         {/* Printable Payslip Preview (hidden for PDF) */}
         <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
-          <PrintablePayslip ref={printRef} record={previewRecord} settings={settings} />
+          <PrintablePayslip ref={printRef} record={previewRecord} settings={{ ...settings, company_logo: companySettings?.company_logo, company_name: companySettings?.company_name || settings?.company_name }} />
         </div>
 
         {/* Actions */}

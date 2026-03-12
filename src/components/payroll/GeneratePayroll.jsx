@@ -48,6 +48,17 @@ export default function GeneratePayroll() {
     }
   });
 
+  // Fetch company settings (name + logo) from SystemSettings
+  const { data: companySettings = {} } = useQuery({
+    queryKey: ['companySettings'],
+    queryFn: async () => {
+      const rows = await base44.entities.SystemSettings.filter({ setting_key: ['company_name', 'company_logo'] });
+      const result = {};
+      rows.forEach(s => { result[s.setting_key] = s.setting_value; });
+      return result;
+    },
+  });
+
   const { data: shifts = [], isLoading: shiftsLoading } = useQuery({
     queryKey: ['shifts-for-payroll', periodStart, periodEnd],
     queryFn: async () => {
@@ -193,12 +204,12 @@ export default function GeneratePayroll() {
   };
 
   const generatePayrollMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ start, end }) => {
       const records = selectedPayrollData.map(s => ({
         staff_id: s.id,
         staff_name: s.full_name,
-        period_start: periodStart,
-        period_end: periodEnd,
+        period_start: start,
+        period_end: end,
         regular_hours: s.isSalaried ? s.calculatedHours : s.regularHours,
         overtime_hours: s.overtimeHours,
         holiday_days: s.leaveDaysInPeriod || 0,
@@ -224,7 +235,8 @@ export default function GeneratePayroll() {
         pension_percent: s.pensionPercent,
         ni_number: s.ni_number || '',
         employer_paye_ref: settings?.tax_id || '',
-        company_name: settings?.company_name || '',
+        company_name: settings?.company_name || companySettings?.company_name || '',
+        company_logo: companySettings?.company_logo || '',
         payment_method: 'bank_transfer',
       }));
 
@@ -572,7 +584,7 @@ export default function GeneratePayroll() {
 
       {/* Generate Button */}
       <Button
-        onClick={() => generatePayrollMutation.mutate()}
+        onClick={() => generatePayrollMutation.mutate({ start: periodStart, end: periodEnd })}
         disabled={selectedStaff.length === 0 || generatePayrollMutation.isPending}
         className="w-full bg-teal-600 hover:bg-teal-700 h-12 text-base"
       >

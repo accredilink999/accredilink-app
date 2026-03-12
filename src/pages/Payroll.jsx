@@ -20,9 +20,12 @@ function StaffPayslips({ user }) {
 
   const { data: payrollRecords = [] } = useQuery({
     queryKey: ['my-payslips', user?.id],
-    queryFn: () => base44.entities.PayrollRecord.list('-period_end', 500),
+    queryFn: async () => {
+      // Only fetch THIS user's records server-side — never expose other staff pay data
+      const records = await base44.entities.PayrollRecord.filter({ staff_id: user?.id }, '-created_date', 500);
+      return records.filter(r => r.status === 'approved' || r.status === 'paid');
+    },
     enabled: !!user?.id,
-    select: (data) => data.filter(r => r.staff_id === user?.id && (r.status === 'approved' || r.status === 'paid')),
   });
 
   // Group by month
