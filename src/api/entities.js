@@ -68,7 +68,7 @@ const ORG_FILTERED_TABLES = new Set([
   'safeguarding_reports', 'supervision_records', 'meetings',
   'meeting_participants', 'clinical_observations', 'wound_records',
   'falls_records', 'repositioning_records', 'continence_records',
-  'archived_mar_charts',
+  'archived_mar_charts', 'payroll_settings',
 ])
 
 /** Add org filter to a query if the table supports it */
@@ -368,6 +368,7 @@ export const entities = {
   Expense:                     buildEntity('expenses'),
   PayPeriod:                   buildEntity('pay_periods'),
   PayrollRecord:               buildEntity('payroll_records'),
+  PayrollSettings:             buildEntity('payroll_settings'),
   ShiftSwapRequest:            buildEntity('shift_swap_requests'),
   ShiftClaimRequest:           buildEntity('shift_claim_requests'),
   BaseShiftTemplate:           buildEntity('base_shift_templates'),

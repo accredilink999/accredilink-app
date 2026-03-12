@@ -90,7 +90,7 @@ export default function PayslipView({ record, open, onClose, readOnly = false })
       hourly_rate: previewRecord.hourly_rate,
       overtime_rate: previewRecord.overtime_rate,
       gross_pay: previewRecord.gross_pay,
-      net_pay: previewRecord.netPay,
+      net_pay: previewRecord.net_pay,
       tax_code: previewRecord.tax_code,
       ni_category: previewRecord.ni_category,
       pension_percent: previewRecord.pension_percent,
