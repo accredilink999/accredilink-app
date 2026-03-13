@@ -47,6 +47,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
   const [combineLoading, setCombineLoading] = useState(false);
   const [generatingTemplateId, setGeneratingTemplateId] = useState(null);
   const [expandedBatches, setExpandedBatches] = useState(new Set());
+  const [editingBatchDates, setEditingBatchDates] = useState(null); // { ids, periodFrom, periodTo }
   const queryClient = useQueryClient();
 
   // Real-time invoice updates via Supabase
@@ -516,14 +517,38 @@ export default function InvoiceManager({ invoices, clients, settings }) {
   // Update recurring template
   const updateRecurringMutation = useMutation({
     mutationFn: async ({ id, updates }) => {
+      // Get old template to find matching draft invoices
+      const { data: oldTemplate } = await supabase
+        .from('recurring_invoices')
+        .select('period_from, period_to')
+        .eq('id', id)
+        .single();
+
       const { error } = await supabase
         .from('recurring_invoices')
         .update(updates)
         .eq('id', id);
       if (error) throw error;
+
+      // If period dates changed, also update all matching draft invoices
+      if (oldTemplate && (updates.period_from || updates.period_to)) {
+        const oldFrom = oldTemplate.period_from;
+        const oldTo = oldTemplate.period_to;
+        if (oldFrom && (oldFrom !== updates.period_from || oldTo !== updates.period_to)) {
+          let q = supabase
+            .from('invoices')
+            .update({ period_from: updates.period_from, period_to: updates.period_to })
+            .eq('period_from', oldFrom)
+            .eq('is_recurring', true)
+            .in('status', ['draft', 'live', 'recurring']);
+          if (oldTo) q = q.eq('period_to', oldTo);
+          await q;
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recurringInvoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
       setEditingRecurringTemplate(null);
       toast.success('Recurring template updated');
     },
@@ -2051,6 +2076,15 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                                     <CheckCircle2 className="w-4 h-4 mr-2" /> Mark All as Paid
                                   </DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => {
+                                    setEditingBatchDates({
+                                      ids: group.map(i => i.id),
+                                      periodFrom: first.period_from || '',
+                                      periodTo: first.period_to || '',
+                                    });
+                                  }}>
+                                    <Calendar className="w-4 h-4 mr-2" /> Edit Period Dates
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => {
                                     setExpandedBatches(prev => { const n = new Set(prev); n.add(batchKey); return n; });
                                   }}>
                                     <Edit2 className="w-4 h-4 mr-2" /> Expand to Edit Individual
@@ -2191,6 +2225,15 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                               <ArrowRight className="w-4 h-4 mr-2" /> Move All to Draft
                             </DropdownMenuItem>
                           )}
+                          <DropdownMenuItem onClick={() => {
+                            setEditingBatchDates({
+                              ids: grp.map(i => i.id),
+                              periodFrom: first.period_from || '',
+                              periodTo: first.period_to || '',
+                            });
+                          }}>
+                            <Calendar className="w-4 h-4 mr-2" /> Edit Period Dates
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => setExpandedBatches(prev => { const n = new Set(prev); n.add(key); return n; })}>
                             <Edit2 className="w-4 h-4 mr-2" /> Expand to Edit Individual
                           </DropdownMenuItem>
@@ -3156,6 +3199,65 @@ export default function InvoiceManager({ invoices, clients, settings }) {
               onCancel={() => setEditingRecurringTemplate(null)}
               isLoading={updateRecurringMutation.isPending}
             />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Batch Period Dates Dialog */}
+      <Dialog open={!!editingBatchDates} onOpenChange={(open) => !open && setEditingBatchDates(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Batch Period Dates</DialogTitle>
+          </DialogHeader>
+          {editingBatchDates && (
+            <div className="space-y-4 py-2">
+              <p className="text-sm text-slate-500">
+                Update period dates for all {editingBatchDates.ids.length} invoices in this batch.
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Period From</label>
+                  <Input
+                    type="date"
+                    value={editingBatchDates.periodFrom}
+                    onChange={(e) => setEditingBatchDates(prev => ({ ...prev, periodFrom: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Period To</label>
+                  <Input
+                    type="date"
+                    value={editingBatchDates.periodTo}
+                    onChange={(e) => setEditingBatchDates(prev => ({ ...prev, periodTo: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setEditingBatchDates(null)}>Cancel</Button>
+                <Button
+                  className="bg-teal-600 hover:bg-teal-700"
+                  onClick={async () => {
+                    try {
+                      const { error } = await supabase
+                        .from('invoices')
+                        .update({
+                          period_from: editingBatchDates.periodFrom || null,
+                          period_to: editingBatchDates.periodTo || null,
+                        })
+                        .in('id', editingBatchDates.ids);
+                      if (error) throw error;
+                      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+                      toast.success(`Period dates updated for ${editingBatchDates.ids.length} invoices`);
+                      setEditingBatchDates(null);
+                    } catch (err) {
+                      toast.error('Failed to update dates: ' + err.message);
+                    }
+                  }}
+                >
+                  Save Dates
+                </Button>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>
