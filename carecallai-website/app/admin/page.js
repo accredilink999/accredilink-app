@@ -334,6 +334,47 @@ export default function PlatformAdminPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </a>
+          <a
+            href="/admin/homecare"
+            className="inline-flex items-center gap-3 bg-gradient-to-r from-orange-50 to-rose-50 border border-orange-200 rounded-xl px-5 py-3 hover:shadow-md hover:border-orange-300 transition-all group"
+          >
+            <span className="text-xl">🏠</span>
+            <div>
+              <p className="font-semibold text-slate-900 text-sm group-hover:text-orange-700 transition-colors">Homecare.co.uk</p>
+              <p className="text-xs text-slate-500">Enquiries, reviews & job listings</p>
+            </div>
+            <svg className="w-4 h-4 text-slate-400 group-hover:text-orange-600 transition-colors ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </a>
+          <a
+            href="/admin/homecare-keys"
+            className="inline-flex items-center gap-3 bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-xl px-5 py-3 hover:shadow-md hover:border-blue-300 transition-all group"
+          >
+            <span className="text-xl">🔑</span>
+            <div>
+              <p className="font-semibold text-slate-900 text-sm group-hover:text-blue-700 transition-colors">Homecare.co.uk API Keys</p>
+              <p className="text-xs text-slate-500">API credentials, webhooks & integrations</p>
+            </div>
+            <svg className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </a>
+          <a
+            href="https://care-call-ai-clone.vercel.app"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-3 bg-gradient-to-r from-slate-50 to-gray-50 border border-slate-200 rounded-xl px-5 py-3 hover:shadow-md hover:border-slate-400 transition-all group"
+          >
+            <span className="text-xl">🖥️</span>
+            <div>
+              <p className="font-semibold text-slate-900 text-sm group-hover:text-slate-700 transition-colors">Staff Web App</p>
+              <p className="text-xs text-slate-500">Direct login — care management system</p>
+            </div>
+            <svg className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </a>
         </div>
 
         {/* Stats */}
