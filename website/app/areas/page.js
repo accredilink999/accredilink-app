@@ -2,8 +2,11 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 export const metadata = {
-  title: 'Areas We Cover',
+  title: 'Areas We Cover — Home Care Denbighshire, Conwy & Wrexham',
   description: 'Accredilink provides care services across Denbighshire, Conwy and Wrexham in North Wales. Find out if we cover your area.',
+  alternates: {
+    canonical: "https://accredilinkcare.co.uk/areas",
+  },
 };
 
 const areas = [

@@ -127,7 +127,7 @@ export default function VsConnecteamPage() {
 
       <CTABanner
         title="Ready to switch from Connecteam?"
-        subtitle="Start your free 7-day trial and see the difference purpose-built care software makes."
+        subtitle="Start your free 30-day trial and see the difference purpose-built care software makes."
       />
     </>
   );

@@ -30,6 +30,10 @@ export default function TrainingPortal() {
   const [testResult, setTestResult] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [loadingTest, setLoadingTest] = useState(false);
+  const [pinCode, setPinCode] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [showPinPrompt, setShowPinPrompt] = useState(false);
+  const [pendingCourse, setPendingCourse] = useState(null);
 
   // View state
   const [view, setView] = useState('courses'); // courses | test | result | certificates
@@ -122,7 +126,20 @@ export default function TrainingPortal() {
     setView('courses');
   }
 
-  async function startTest(course) {
+  function startTest(course) {
+    // If course has a pin code, show the pin prompt first
+    if (course.pin_code) {
+      setPendingCourse(course);
+      setPinCode('');
+      setPinError('');
+      setShowPinPrompt(true);
+      return;
+    }
+    loadAndStartTest(course);
+  }
+
+  async function loadAndStartTest(course) {
+    setShowPinPrompt(false);
     setLoadingTest(true);
     setActiveCourse(course);
     setAnswers({});
@@ -145,6 +162,16 @@ export default function TrainingPortal() {
     setLoadingTest(false);
   }
 
+  function submitPinCode() {
+    if (!pendingCourse) return;
+    if (pinCode.toUpperCase().trim() !== pendingCourse.pin_code.toUpperCase().trim()) {
+      setPinError('Incorrect code. Please check the video and try again.');
+      return;
+    }
+    setPinError('');
+    loadAndStartTest(pendingCourse);
+  }
+
   async function submitTest() {
     if (Object.keys(answers).length < questions.length) {
       showToast('Please answer all questions before submitting');
@@ -163,6 +190,7 @@ export default function TrainingPortal() {
         body: JSON.stringify({
           course_id: activeCourse.id,
           answers: orderedAnswers,
+          pin_code: pinCode || undefined,
         }),
       });
       const data = await res.json();
@@ -461,6 +489,51 @@ export default function TrainingPortal() {
       {toast && (
         <div className="fixed top-4 right-4 z-50 bg-teal-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm">
           {toast}
+        </div>
+      )}
+
+      {/* Pin Code Prompt Modal */}
+      {showPinPrompt && pendingCourse && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-slate-800 rounded-2xl border border-slate-700 p-6 max-w-sm w-full shadow-2xl">
+            <div className="text-center mb-4">
+              <div className="w-12 h-12 rounded-full bg-teal-600/20 flex items-center justify-center mx-auto mb-3">
+                <span className="text-2xl">🔑</span>
+              </div>
+              <h3 className="text-lg font-bold text-white mb-1">Enter Video Pin Code</h3>
+              <p className="text-sm text-slate-400">
+                A pin code is shown during the <strong className="text-white">{pendingCourse.title}</strong> video. Enter it below to start the test.
+              </p>
+            </div>
+            <input
+              type="text"
+              value={pinCode}
+              onChange={(e) => { setPinCode(e.target.value.toUpperCase()); setPinError(''); }}
+              onKeyDown={(e) => e.key === 'Enter' && submitPinCode()}
+              placeholder="Enter pin code"
+              maxLength={8}
+              autoFocus
+              className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white text-center text-xl font-mono tracking-[0.3em] focus:border-teal-400 outline-none mb-3"
+            />
+            {pinError && (
+              <p className="text-sm text-red-400 text-center mb-3">{pinError}</p>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setShowPinPrompt(false); setPendingCourse(null); }}
+                className="flex-1 px-4 py-2.5 bg-slate-700 text-slate-300 rounded-lg text-sm hover:bg-slate-600 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitPinCode}
+                disabled={!pinCode.trim()}
+                className="flex-1 px-4 py-2.5 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Start Test
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

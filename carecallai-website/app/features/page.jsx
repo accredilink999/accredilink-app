@@ -15,10 +15,10 @@ import FeatureCard from "@/components/FeatureCard";
 import CTABanner from "@/components/CTABanner";
 import BetaPromo from "@/components/BetaPromo";
 import AnimateOnScroll from "@/components/AnimateOnScroll";
-import { BreadcrumbJsonLd } from "@/components/SEO/JsonLd";
+import { BreadcrumbJsonLd, FAQJsonLd } from "@/components/SEO/JsonLd";
 
 export const metadata = {
-  title: "Features",
+  title: "Home Care Software Features — Scheduling, eMAR, GPS & More",
   description:
     "Explore all CareCallAI features: scheduling, care logging, MAR charts, staff management, compliance, invoicing, mobile app and AI assistant.",
   keywords: [
@@ -26,6 +26,7 @@ export const metadata = {
     "home care management features",
     "domiciliary care software features",
   ],
+  alternates: { canonical: "https://carecallai.co.uk/features" },
   openGraph: {
     title: "Features — CareCallAI",
     description: "Scheduling, care logging, MAR charts, compliance, invoicing, mobile app & AI — all in one platform from £99/mo.",
@@ -103,6 +104,15 @@ const allFeatures = [
   },
 ];
 
+const faqs = [
+  { question: "What features does CareCallAI include?", answer: "CareCallAI includes 9 core modules: scheduling & rota, care logging, electronic MAR charts, GPS check-in & tracking, staff management, compliance & auditing (CIW + CQC), invoicing & payroll, mobile app, and an AI assistant. Every feature is included in all plans with no add-on fees." },
+  { question: "Is there a mobile app for carers?", answer: "Yes. CareCallAI has native iOS and Android apps. Carers can view their rota, log care notes, complete MAR charts, check in/out of visits with GPS, and report incidents — all from their phone." },
+  { question: "Does CareCallAI include clinical assessments?", answer: "Yes. CareCallAI includes 7 clinical assessments: Waterlow (pressure ulcer risk), MUST (malnutrition), NEWS2 (early warning), Falls Risk, Abbey Pain Scale, Barthel Index (independence) and SALT (swallowing). Scores are calculated automatically." },
+  { question: "Can I manage multiple care areas?", answer: "Yes. CareCallAI supports unlimited rota areas (e.g. Denbigh, Llangollen, North, South). Each area has its own shift types, call types, base templates and assigned staff." },
+  { question: "Is CareCallAI compliant with CIW and CQC?", answer: "Yes. CareCallAI has dedicated CIW and CQC compliance modules with pre-populated regulation forms, 50+ automated inspection checks, RISCA Reg 36 supervision tracking, and inspection-ready reports." },
+  { question: "How much does CareCallAI cost?", answer: "Plans start from £99/month with no per-user fees. Every plan includes all features. There is a 30-day free trial with no card required." },
+];
+
 export default function FeaturesPage() {
   return (
     <>
@@ -118,7 +128,7 @@ export default function FeaturesPage() {
           <AnimateOnScroll>
             <div className="text-center mb-16">
               <h1 className="text-3xl sm:text-5xl font-bold text-slate-900 mb-4">
-                All the features your care agency needs
+                Home Care Management Software Features
               </h1>
               <p className="text-lg text-slate-600 max-w-2xl mx-auto">
                 From scheduling to compliance, CareCallAI replaces spreadsheets, paper forms and
@@ -152,6 +162,28 @@ export default function FeaturesPage() {
         </div>
       </section>
 
+      {/* FAQ */}
+      <section className="py-16 bg-white">
+        <div className="max-w-3xl mx-auto px-4">
+          <AnimateOnScroll>
+            <h2 className="text-2xl font-bold text-slate-900 text-center mb-8">
+              Care Software Features FAQ
+            </h2>
+          </AnimateOnScroll>
+          <div className="space-y-6">
+            {faqs.map((faq, i) => (
+              <AnimateOnScroll key={i} delay={i * 50}>
+                <div className="border border-slate-200 rounded-xl p-6">
+                  <h3 className="font-semibold text-slate-900 mb-2">{faq.question}</h3>
+                  <p className="text-sm text-slate-600">{faq.answer}</p>
+                </div>
+              </AnimateOnScroll>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <FAQJsonLd items={faqs} />
       <BetaPromo />
       <CTABanner />
     </>

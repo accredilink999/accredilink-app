@@ -131,7 +131,7 @@ export default function SignupPage() {
           </h1>
           <p className="text-slate-500 mt-1">
             {mode === 'owner'
-              ? '7-day free trial. Cancel anytime.'
+              ? '30-day free trial. No credit card required.'
               : 'Enter the invite code your manager gave you.'}
           </p>
         </div>
@@ -284,15 +284,15 @@ export default function SignupPage() {
             <div className="flex items-center gap-3 justify-center text-xs text-slate-400">
               <span className="flex items-center gap-1">
                 <svg className="w-3.5 h-3.5 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                7-day free trial
+                30-day free trial
               </span>
               <span className="flex items-center gap-1">
                 <svg className="w-3.5 h-3.5 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                Card required
+                No credit card
               </span>
               <span className="flex items-center gap-1">
                 <svg className="w-3.5 h-3.5 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                Cancel anytime
+                All features unlocked
               </span>
             </div>
           )}

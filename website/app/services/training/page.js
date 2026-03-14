@@ -1,7 +1,7 @@
 import ServicePageLayout from '@/components/ServicePageLayout';
 
 export const metadata = {
-  title: 'Training Services',
+  title: 'Care Training Courses — Denbighshire & North Wales',
   description: 'Care training and pre-hospital emergency care courses in Denbighshire, Conwy and Wrexham. Accredited professional development for individuals and organisations.',
   alternates: {
     canonical: 'https://accredilinkcare.co.uk/services/training',

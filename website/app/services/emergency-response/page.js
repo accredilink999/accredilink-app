@@ -1,7 +1,7 @@
 import ServicePageLayout from '@/components/ServicePageLayout';
 
 export const metadata = {
-  title: 'Emergency Response',
+  title: 'Emergency Care Response — 24/7 North Wales',
   description: 'Emergency care response services in Denbighshire, Conwy and Wrexham. Rapid response with trained emergency care responders available around the clock.',
   alternates: {
     canonical: 'https://accredilinkcare.co.uk/services/emergency-response',

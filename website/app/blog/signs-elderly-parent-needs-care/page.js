@@ -2,7 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 export const metadata = {
-  title: '10 Signs Your Elderly Parent May Need Care at Home | Accredilink',
+  title: '10 Signs Your Elderly Parent May Need Care at Home',
   description: 'How to recognise when your elderly parent might need professional care at home. 10 warning signs to look for, and practical advice on what to do next.',
   alternates: {
     canonical: 'https://accredilinkcare.co.uk/blog/signs-elderly-parent-needs-care',

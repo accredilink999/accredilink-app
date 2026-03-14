@@ -146,26 +146,15 @@ export default function YouTubeScriptsPage() {
   const [aiResult, setAiResult] = useState(null);
   const [aiError, setAiError] = useState('');
   const [saveMsg, setSaveMsg] = useState('');
-  // Video Studio (HeyGen)
-  const [selectedScriptId, setSelectedScriptId] = useState('');
-  const [avatarId, setAvatarId] = useState('');
-  const [bgColor, setBgColor] = useState('#0d9488');
-  const [videoGenerating, setVideoGenerating] = useState(false);
-  const [videoError, setVideoError] = useState('');
-  const [checkingStatus, setCheckingStatus] = useState(null);
-  // Browser Video Generator
-  const [bvScriptId, setBvScriptId] = useState('');
-  const [bvGenerating, setBvGenerating] = useState(false);
-  const [bvProgress, setBvProgress] = useState(0);
-  const [bvProgressLabel, setBvProgressLabel] = useState('');
-  const [bvVideoUrl, setBvVideoUrl] = useState(null);
-  const [bvVoices, setBvVoices] = useState([]);
-  const [bvSelectedVoice, setBvSelectedVoice] = useState('');
-  const [bvRate, setBvRate] = useState(1.0);
-  const [bvNarrate, setBvNarrate] = useState(true);
-  const [bvPreviewing, setBvPreviewing] = useState(false);
-  const [bvSlideIndex, setBvSlideIndex] = useState(0);
-  const [bvSlides, setBvSlides] = useState([]);
+  // Video Import
+  const [importScriptId, setImportScriptId] = useState('');
+  const [importUploading, setImportUploading] = useState(false);
+  const [importProgress, setImportProgress] = useState('');
+  const [copiedField, setCopiedField] = useState('');
+  // YouTube Publish
+  const [publishing, setPublishing] = useState(false);
+  const [publishResult, setPublishResult] = useState(null);
+  const [publishPrivacy, setPublishPrivacy] = useState('private');
   // Global
   const [error, setError] = useState('');
   // Toast
@@ -190,19 +179,6 @@ export default function YouTubeScriptsPage() {
     }
   }, [isLoggedIn, checking, router]);
 
-  // ---- Load browser voices ----
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return;
-    const loadVoices = () => {
-      const voices = speechSynthesis.getVoices().filter(v => v.lang.startsWith('en'));
-      if (voices.length > 0) {
-        setBvVoices(voices);
-        if (!bvSelectedVoice) setBvSelectedVoice(voices[0].name);
-      }
-    };
-    loadVoices();
-    speechSynthesis.onvoiceschanged = loadVoices;
-  }, []);
 
   // ---- Load scripts ----
   const loadScripts = useCallback(async () => {
@@ -284,7 +260,8 @@ export default function YouTubeScriptsPage() {
     if (!text) return;
     navigator.clipboard.writeText(text).then(() => {
       setToast(`${label || 'Text'} copied to clipboard`);
-      setTimeout(() => setToast(''), 2500);
+      setCopiedField(label || '');
+      setTimeout(() => { setToast(''); setCopiedField(''); }, 2500);
     }).catch(() => {
       setToast('Failed to copy');
       setTimeout(() => setToast(''), 2500);
@@ -392,39 +369,6 @@ export default function YouTubeScriptsPage() {
       setAiError('AI generation failed: ' + err.message);
     }
     setAiGenerating(false);
-  }
-
-  // ---- Video Studio ----
-  async function generateVideo(scriptId) {
-    setVideoGenerating(true);
-    setVideoError('');
-    try {
-      await apiFetch('/api/youtube/video', {
-        method: 'POST',
-        body: JSON.stringify({
-          script_id: scriptId,
-          avatar_id: avatarId,
-          background_color: bgColor,
-        }),
-      });
-      loadScripts();
-    } catch (err) {
-      setVideoError('Failed to generate video: ' + err.message);
-    }
-    setVideoGenerating(false);
-  }
-
-  async function checkVideoStatus(scriptId) {
-    setCheckingStatus(scriptId);
-    try {
-      const data = await apiFetch(`/api/youtube/video?script_id=${scriptId}`);
-      if (data.status === 'video_ready' || data.video_url) {
-        loadScripts();
-      }
-    } catch (err) {
-      setError('Failed to check status: ' + err.message);
-    }
-    setCheckingStatus(null);
   }
 
   // ---- Topic Library helper ----
@@ -667,12 +611,12 @@ export default function YouTubeScriptsPage() {
                       </button>
                       <button
                         onClick={() => {
-                          setSelectedScriptId(String(script.id));
+                          setImportScriptId(String(script.id));
                           setActiveTab(3);
                         }}
                         className="text-xs px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 font-medium transition-colors"
                       >
-                        Generate Video
+                        Video Studio
                       </button>
                       {confirmDelete === script.id ? (
                         <div className="flex items-center gap-1">
@@ -1141,773 +1085,104 @@ export default function YouTubeScriptsPage() {
   }
 
   // ==========================
-  //   BROWSER VIDEO HELPERS
+  //   VIDEO IMPORT HELPERS
   // ==========================
 
-  function extractBullets(text) {
-    if (!text) return [];
-    const sentences = text.replace(/([.!?])\s+/g, '$1|').split('|').filter(s => s.trim().length > 10);
-    return sentences.slice(0, 5).map(s => s.trim());
-  }
-
-  function buildSlides(script) {
-    const slides = [];
-    // Title / Hook
-    slides.push({
-      type: 'title',
-      text: script.youtube_title || script.title || 'CareCallAI',
-      subtitle: script.video_type ? (VIDEO_TYPE_LABELS[script.video_type] || '') : '',
-      narration: script.hook || '',
-      duration: script.hook_duration || 10,
-    });
-    // Content sections
-    const sections = script.sections || [];
-    (typeof sections === 'string' ? JSON.parse(sections) : sections).forEach(sec => {
-      slides.push({
-        type: 'section',
-        title: sec.title || '',
-        bullets: extractBullets(sec.script),
-        narration: sec.script || '',
-        duration: sec.duration || 30,
-        visualNote: sec.visualNotes || sec.visual_notes || '',
-      });
-    });
-    // CTA
-    if (script.cta) {
-      slides.push({
-        type: 'cta',
-        text: script.cta,
-        narration: script.cta,
-        duration: script.cta_duration || 15,
-      });
-    }
-    // Outro
-    slides.push({
-      type: 'outro',
-      text: 'Thanks for watching!',
-      subtitle: 'carecallai.co.uk',
-      narration: script.outro || 'Thanks for watching. Visit carecallai.co.uk to learn more.',
-      duration: 8,
-    });
-    return slides;
-  }
-
-  // ---- "Guru" Mascot — CareCallAI care worker in scrubs ----
-  function drawAvatar(ctx, x, y, scale, talking) {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.scale(scale, scale);
-
-    // Shadow
-    ctx.beginPath();
-    ctx.ellipse(0, 105, 38, 9, 0, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(0,0,0,0.15)';
-    ctx.fill();
-
-    // === SCRUBS BODY ===
-    // Scrub top — teal medical scrubs
-    ctx.beginPath();
-    ctx.fillStyle = '#0d9488';
-    roundRect(ctx, -34, 28, 68, 72, 12);
-    ctx.fill();
-    // Scrub top shadow/fold lines
-    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(-10, 55);
-    ctx.quadraticCurveTo(-5, 60, -10, 70);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(10, 55);
-    ctx.quadraticCurveTo(15, 60, 10, 70);
-    ctx.stroke();
-
-    // V-neck collar
-    ctx.beginPath();
-    ctx.moveTo(-16, 28);
-    ctx.lineTo(0, 50);
-    ctx.lineTo(16, 28);
-    ctx.strokeStyle = '#0a7c72';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    // Inner V-neck skin
-    ctx.beginPath();
-    ctx.moveTo(-13, 28);
-    ctx.lineTo(0, 46);
-    ctx.lineTo(13, 28);
-    ctx.fillStyle = '#fcd088';
-    ctx.fill();
-
-    // Sleeves (short scrub sleeves)
-    // Left sleeve
-    ctx.beginPath();
-    ctx.fillStyle = '#0d9488';
-    ctx.moveTo(-34, 32);
-    ctx.lineTo(-48, 42);
-    ctx.lineTo(-44, 58);
-    ctx.lineTo(-34, 52);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = '#0a7c72';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    // Right sleeve
-    ctx.beginPath();
-    ctx.moveTo(34, 32);
-    ctx.lineTo(48, 42);
-    ctx.lineTo(44, 58);
-    ctx.lineTo(34, 52);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    // Arms (skin)
-    ctx.fillStyle = '#fcd088';
-    // Left arm
-    ctx.beginPath();
-    ctx.ellipse(-46, 62, 7, 10, 0.1, 0, Math.PI * 2);
-    ctx.fill();
-    // Right arm
-    ctx.beginPath();
-    ctx.ellipse(46, 62, 7, 10, -0.1, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Scrub pocket (left chest)
-    ctx.strokeStyle = '#0a7c72';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    roundRect(ctx, -28, 52, 20, 16, 3);
-    ctx.stroke();
-    // Pen in pocket
-    ctx.strokeStyle = '#2563eb';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(-22, 50);
-    ctx.lineTo(-22, 42);
-    ctx.stroke();
-    ctx.fillStyle = '#2563eb';
-    ctx.beginPath();
-    ctx.arc(-22, 41, 2, 0, Math.PI * 2);
-    ctx.fill();
-
-    // "CareCallAI" text on scrub top (right side)
-    ctx.save();
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.font = 'bold 8px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('CareCall', 14, 60);
-    ctx.fillStyle = 'rgba(255,255,255,0.95)';
-    ctx.font = 'bold 9px sans-serif';
-    ctx.fillText('AI', 14, 70);
-    ctx.restore();
-
-    // Stethoscope
-    ctx.strokeStyle = '#64748b';
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(-8, 35);
-    ctx.quadraticCurveTo(-25, 30, -28, 15);
-    ctx.quadraticCurveTo(-30, 5, -20, -5);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(8, 35);
-    ctx.quadraticCurveTo(25, 30, 28, 15);
-    ctx.quadraticCurveTo(30, 5, 20, -5);
-    ctx.stroke();
-    // Earpieces
-    ctx.fillStyle = '#94a3b8';
-    ctx.beginPath();
-    ctx.arc(-20, -6, 3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(20, -6, 3, 0, Math.PI * 2);
-    ctx.fill();
-    // Chest piece
-    ctx.fillStyle = '#64748b';
-    ctx.beginPath();
-    ctx.arc(0, 38, 5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#94a3b8';
-    ctx.beginPath();
-    ctx.arc(0, 38, 3, 0, Math.PI * 2);
-    ctx.fill();
-
-    // === NECK ===
-    ctx.fillStyle = '#fbbf6a';
-    ctx.fillRect(-9, 18, 18, 14);
-
-    // === HEAD ===
-    ctx.beginPath();
-    ctx.arc(0, -5, 34, 0, Math.PI * 2);
-    ctx.fillStyle = '#fcd088';
-    ctx.fill();
-    ctx.strokeStyle = '#e5a84b';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    // Hair (neat, professional)
-    ctx.beginPath();
-    ctx.ellipse(0, -30, 36, 18, 0, Math.PI, Math.PI * 2);
-    ctx.fillStyle = '#4a3728';
-    ctx.fill();
-    // Side hair
-    ctx.beginPath();
-    ctx.ellipse(-32, -10, 7, 16, 0.2, 0, Math.PI * 2);
-    ctx.fillStyle = '#4a3728';
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(32, -10, 7, 16, -0.2, 0, Math.PI * 2);
-    ctx.fill();
-    // Fringe
-    ctx.beginPath();
-    ctx.moveTo(-20, -30);
-    ctx.quadraticCurveTo(-10, -38, 0, -34);
-    ctx.quadraticCurveTo(10, -38, 20, -30);
-    ctx.fillStyle = '#4a3728';
-    ctx.fill();
-
-    // Eyes (friendly, slightly larger)
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.ellipse(-12, -8, 7, 8, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(12, -8, 7, 8, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // Iris
-    ctx.fillStyle = '#2563eb';
-    ctx.beginPath();
-    ctx.ellipse(-12, -7, 4.5, 5.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(12, -7, 4.5, 5.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // Pupils
-    ctx.fillStyle = '#1e293b';
-    ctx.beginPath();
-    ctx.arc(-12, -7, 2.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(12, -7, 2.5, 0, Math.PI * 2);
-    ctx.fill();
-    // Eye shine
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(-10, -9, 2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(14, -9, 2, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Eyebrows (friendly, slightly raised)
-    ctx.strokeStyle = '#4a3728';
-    ctx.lineWidth = 2.8;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(-19, -20);
-    ctx.quadraticCurveTo(-12, -25, -5, -20);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(5, -20);
-    ctx.quadraticCurveTo(12, -25, 19, -20);
-    ctx.stroke();
-
-    // Mouth
-    if (talking) {
-      // Open mouth (talking animation)
-      ctx.beginPath();
-      ctx.ellipse(0, 10, 9, 7, 0, 0, Math.PI * 2);
-      ctx.fillStyle = '#c0392b';
-      ctx.fill();
-      // Teeth
-      ctx.beginPath();
-      ctx.ellipse(0, 8, 7, 3.5, 0, 0, Math.PI);
-      ctx.fillStyle = '#ffffff';
-      ctx.fill();
-      // Tongue
-      ctx.beginPath();
-      ctx.ellipse(0, 14, 4, 3, 0, Math.PI, Math.PI * 2);
-      ctx.fillStyle = '#e74c3c';
-      ctx.fill();
-    } else {
-      // Friendly warm smile
-      ctx.beginPath();
-      ctx.arc(0, 6, 13, 0.2, Math.PI - 0.2);
-      ctx.strokeStyle = '#c0392b';
-      ctx.lineWidth = 2.8;
-      ctx.lineCap = 'round';
-      ctx.stroke();
-      // Dimples
-      ctx.beginPath();
-      ctx.arc(-14, 10, 2, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(251,146,60,0.2)';
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(14, 10, 2, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Blush cheeks
-    ctx.beginPath();
-    ctx.ellipse(-22, 4, 8, 4, 0, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(251,146,60,0.2)';
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(22, 4, 8, 4, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // ID Badge (lanyard + badge)
-    // Lanyard
-    ctx.strokeStyle = '#0d9488';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(-5, 20);
-    ctx.quadraticCurveTo(0, 35, 18, 75);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(5, 20);
-    ctx.quadraticCurveTo(8, 40, 18, 75);
-    ctx.stroke();
-    // Badge
-    ctx.fillStyle = '#ffffff';
-    ctx.shadowColor = 'rgba(0,0,0,0.15)';
-    ctx.shadowBlur = 4;
-    ctx.shadowOffsetY = 2;
-    roundRect(ctx, 8, 72, 30, 22, 4);
-    ctx.fill();
-    ctx.shadowColor = 'transparent';
-    // Badge text
-    ctx.fillStyle = '#0d9488';
-    ctx.font = 'bold 8px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('GURU', 23, 84);
-    ctx.fillStyle = '#64748b';
-    ctx.font = '5px sans-serif';
-    ctx.fillText('CareCallAI', 23, 91);
-
-    ctx.restore();
-  }
-
-  // ---- Speech Bubble ----
-  function drawSpeechBubble(ctx, x, y, w, h, tailX, tailY) {
-    ctx.save();
-    ctx.fillStyle = 'rgba(255,255,255,0.95)';
-    ctx.shadowColor = 'rgba(0,0,0,0.1)';
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetY = 3;
-    // Bubble
-    ctx.beginPath();
-    roundRect(ctx, x, y, w, h, 16);
-    ctx.fill();
-    // Tail
-    ctx.shadowColor = 'transparent';
-    ctx.beginPath();
-    ctx.moveTo(tailX - 10, y + h);
-    ctx.lineTo(tailX, tailY);
-    ctx.lineTo(tailX + 10, y + h);
-    ctx.fill();
-    ctx.restore();
-  }
-
-  function renderSlideToCanvas(ctx, slide, w, h) {
-    ctx.clearRect(0, 0, w, h);
-
-    if (slide.type === 'title') {
-      // Teal-blue gradient
-      const grad = ctx.createLinearGradient(0, 0, w, h);
-      grad.addColorStop(0, '#0d9488');
-      grad.addColorStop(1, '#2563eb');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, w, h);
-      // Subtle pattern circles
-      for (let i = 0; i < 8; i++) {
-        ctx.beginPath();
-        ctx.arc(Math.random() * w, Math.random() * h, 30 + Math.random() * 80, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255,255,255,0.03)';
-        ctx.fill();
-      }
-      // Title
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 48px sans-serif';
-      ctx.textAlign = 'center';
-      wrapText(ctx, slide.text, w / 2, h / 2 - 60, w - 200, 58);
-      // Subtitle
-      if (slide.subtitle) {
-        ctx.font = '24px sans-serif';
-        ctx.fillStyle = 'rgba(255,255,255,0.8)';
-        ctx.fillText(slide.subtitle, w / 2, h / 2 + 40);
-      }
-      // Avatar in bottom right
-      drawAvatar(ctx, w - 100, h - 130, 0.9, false);
-      // Branding
-      ctx.font = 'bold 18px sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.4)';
-      ctx.textAlign = 'left';
-      ctx.fillText('CareCallAI Guru', 30, h - 25);
-
-    } else if (slide.type === 'section') {
-      // Dark background
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(0, 0, w, h);
-      // Teal accent bar
-      const barGrad = ctx.createLinearGradient(0, 0, w, 0);
-      barGrad.addColorStop(0, '#0d9488');
-      barGrad.addColorStop(1, '#2563eb');
-      ctx.fillStyle = barGrad;
-      ctx.fillRect(0, 0, w, 6);
-      // Section number pill
-      ctx.fillStyle = '#0d9488';
-      roundRect(ctx, 50, 30, 50, 28, 14);
-      ctx.fill();
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 14px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(slide.title ? 'TIP' : 'INFO', 75, 49);
-      // Section title
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 36px sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText(slide.title, 115, 55);
-      // Divider line
-      ctx.strokeStyle = 'rgba(13,148,136,0.4)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(50, 75);
-      ctx.lineTo(w - 200, 75);
-      ctx.stroke();
-      // Bullets with better styling
-      slide.bullets.forEach((bullet, i) => {
-        const y = 120 + i * 55;
-        // Numbered circle
-        ctx.beginPath();
-        ctx.arc(70, y - 5, 14, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(13,148,136,0.3)';
-        ctx.fill();
-        ctx.fillStyle = '#0d9488';
-        ctx.font = 'bold 14px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(String(i + 1), 70, y);
-        // Text
-        ctx.fillStyle = '#e2e8f0';
-        ctx.font = '22px sans-serif';
-        ctx.textAlign = 'left';
-        wrapText(ctx, bullet, 95, y, w - 280, 30);
-      });
-      // Avatar on right side (talking)
-      drawAvatar(ctx, w - 90, h - 140, 0.85, true);
-      // Visual note
-      if (slide.visualNote) {
-        ctx.font = 'italic 16px sans-serif';
-        ctx.fillStyle = '#94a3b8';
-        ctx.textAlign = 'left';
-        ctx.fillText(slide.visualNote, 50, h - 25);
-      }
-      // Branding
-      ctx.font = '14px sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.2)';
-      ctx.textAlign = 'right';
-      ctx.fillText('CareCallAI Guru', w - 30, h - 10);
-
-    } else if (slide.type === 'cta') {
-      // Emerald gradient
-      const grad = ctx.createLinearGradient(0, 0, w, h);
-      grad.addColorStop(0, '#10b981');
-      grad.addColorStop(1, '#0d9488');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, w, h);
-      // Decorative circles
-      ctx.beginPath();
-      ctx.arc(w * 0.8, h * 0.2, 150, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255,255,255,0.05)';
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(w * 0.15, h * 0.8, 100, 0, Math.PI * 2);
-      ctx.fill();
-      // Avatar with speech bubble
-      drawAvatar(ctx, 180, h / 2 - 20, 1.1, true);
-      drawSpeechBubble(ctx, 260, h / 2 - 120, w - 340, 100, 280, h / 2 - 10);
-      // CTA text inside bubble
-      ctx.fillStyle = '#1e293b';
-      ctx.font = 'bold 26px sans-serif';
-      ctx.textAlign = 'center';
-      wrapText(ctx, slide.text, 260 + (w - 340) / 2, h / 2 - 80, w - 400, 34);
-      // Button mockup
-      ctx.fillStyle = '#ffffff';
-      roundRect(ctx, w / 2 - 120, h / 2 + 60, 280, 55, 28);
-      ctx.fill();
-      ctx.fillStyle = '#0d9488';
-      ctx.font = 'bold 22px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('Visit carecallai.co.uk', w / 2 + 20, h / 2 + 94);
-      // Subscribe button
-      ctx.fillStyle = '#ef4444';
-      roundRect(ctx, w / 2 - 80, h / 2 + 135, 200, 45, 22);
-      ctx.fill();
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 18px sans-serif';
-      ctx.fillText('SUBSCRIBE', w / 2 + 20, h / 2 + 163);
-
-    } else if (slide.type === 'outro') {
-      // Teal gradient
-      const grad = ctx.createLinearGradient(0, 0, w, h);
-      grad.addColorStop(0, '#0d9488');
-      grad.addColorStop(1, '#0f766e');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, w, h);
-      // Decorative circles
-      for (let i = 0; i < 5; i++) {
-        ctx.beginPath();
-        ctx.arc(w * (0.2 + i * 0.15), h * 0.3, 40 + i * 20, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255,255,255,0.03)';
-        ctx.fill();
-      }
-      // Thanks text
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 48px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(slide.text, w / 2, h / 2 - 50);
-      // Subtitle
-      ctx.font = '28px sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.8)';
-      ctx.fillText(slide.subtitle || '', w / 2, h / 2 + 10);
-      // Social row
-      ctx.font = '18px sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.6)';
-      ctx.fillText('Like | Subscribe | Share', w / 2, h / 2 + 60);
-      // Avatar waving (smiling)
-      drawAvatar(ctx, w / 2, h - 130, 1.0, false);
-      // Branding
-      ctx.font = 'bold 18px sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.4)';
-      ctx.fillText('CareCallAI Guru', w / 2, h - 20);
-    }
-  }
-
-  function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
-    const words = text.split(' ');
-    let line = '';
-    let yPos = y;
-    for (let i = 0; i < words.length; i++) {
-      const testLine = line + words[i] + ' ';
-      const metrics = ctx.measureText(testLine);
-      if (metrics.width > maxWidth && i > 0) {
-        ctx.fillText(line.trim(), x, yPos);
-        line = words[i] + ' ';
-        yPos += lineHeight;
-      } else {
-        line = testLine;
-      }
-    }
-    ctx.fillText(line.trim(), x, yPos);
-  }
-
-  function roundRect(ctx, x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + w - r, y);
-    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-    ctx.lineTo(x + w, y + h - r);
-    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-    ctx.lineTo(x + r, y + h);
-    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-    ctx.lineTo(x, y + r);
-    ctx.quadraticCurveTo(x, y, x + r, y);
-    ctx.closePath();
-  }
-
-  function waitMs(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  // Fetch TTS audio from our API (Google TTS with proper pronunciation)
-  async function fetchTTSAudio(text) {
-    const token = getToken();
-    const res = await fetch('/api/youtube/tts', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
-      },
-      body: JSON.stringify({ text, lang: 'en-GB' }),
-    });
-    if (!res.ok) throw new Error('TTS generation failed');
-    return await res.arrayBuffer();
-  }
-
-  async function generateBrowserVideo() {
-    const script = scripts.find(s => String(s.id) === String(bvScriptId));
-    if (!script) return;
-
-    setBvGenerating(true);
-    setBvProgress(0);
-    setBvProgressLabel('Building slides...');
-    setBvVideoUrl(null);
-
+  // Upload video file and link to script
+  async function uploadVideo(file, scriptId) {
+    setImportUploading(true);
+    setImportProgress('Uploading video...');
     try {
-      const slides = buildSlides(script);
-      const W = 1280, H = 720;
-      const canvas = document.createElement('canvas');
-      canvas.width = W;
-      canvas.height = H;
-      const ctx = canvas.getContext('2d');
+      const formData = new FormData();
+      formData.append('video', file);
+      if (scriptId) formData.append('script_id', scriptId);
 
-      // Audio context for mixing TTS audio into recording
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const audioDest = audioCtx.createMediaStreamDestination();
-
-      // Combine canvas video + audio streams
-      const canvasStream = canvas.captureStream(30);
-      const combinedStream = new MediaStream([
-        ...canvasStream.getVideoTracks(),
-        ...audioDest.stream.getAudioTracks(),
-      ]);
-
-      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
-        ? 'video/webm;codecs=vp9,opus'
-        : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
-          ? 'video/webm;codecs=vp8,opus'
-          : 'video/webm';
-      const recorder = new MediaRecorder(combinedStream, { mimeType });
-      const chunks = [];
-      recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-
-      // Pre-fetch all TTS audio
-      setBvProgressLabel('Generating narration audio...');
-      const audioBuffers = [];
-      for (let i = 0; i < slides.length; i++) {
-        if (slides[i].narration && slides[i].narration.trim().length > 2) {
-          try {
-            const arrayBuf = await fetchTTSAudio(slides[i].narration);
-            const audioBuf = await audioCtx.decodeAudioData(arrayBuf);
-            audioBuffers.push(audioBuf);
-          } catch (err) {
-            console.warn(`TTS failed for slide ${i}:`, err.message);
-            audioBuffers.push(null);
-          }
-        } else {
-          audioBuffers.push(null);
-        }
-        setBvProgress(Math.round(((i + 1) / slides.length) * 25));
-      }
-
-      recorder.start(100); // collect data every 100ms
-      await waitMs(300); // let recorder stabilize
-
-      // Render each slide with audio
-      for (let i = 0; i < slides.length; i++) {
-        const slide = slides[i];
-        const pct = 25 + Math.round(((i) / slides.length) * 70);
-        setBvProgress(pct);
-        setBvProgressLabel(`Slide ${i + 1}/${slides.length}: ${slide.type === 'section' ? slide.title : slide.type}`);
-
-        // Render slide (with avatar in non-talking state)
-        renderSlideToCanvas(ctx, slide, W, H);
-
-        if (audioBuffers[i]) {
-          // Play TTS audio through AudioContext → captured by MediaRecorder
-          const source = audioCtx.createBufferSource();
-          source.buffer = audioBuffers[i];
-          source.connect(audioDest);
-          source.start();
-
-          // Animate talking avatar while audio plays
-          const audioDuration = audioBuffers[i].duration * 1000;
-          const talkStart = Date.now();
-          let talkFrame;
-          const animateTalk = () => {
-            const elapsed = Date.now() - talkStart;
-            if (elapsed < audioDuration) {
-              // Re-render slide to animate mouth
-              renderSlideToCanvas(ctx, slide, W, H);
-              talkFrame = requestAnimationFrame(animateTalk);
-            }
-          };
-          animateTalk();
-
-          // Wait for audio to finish
-          await new Promise(resolve => {
-            source.onended = resolve;
-            setTimeout(resolve, audioDuration + 500);
-          });
-          if (talkFrame) cancelAnimationFrame(talkFrame);
-
-          // Brief pause between slides
-          await waitMs(600);
-        } else {
-          // No audio — hold slide for its duration
-          await waitMs(Math.max(slide.duration * 1000, 3000));
-        }
-      }
-
-      // Hold final slide
-      await waitMs(1500);
-      setBvProgress(100);
-      setBvProgressLabel('Finalising video...');
-
-      // Stop recording
-      await new Promise(resolve => {
-        recorder.onstop = resolve;
-        recorder.stop();
+      const token = getToken();
+      const res = await fetch('/api/youtube/upload', {
+        method: 'POST',
+        headers: { ...(token && { Authorization: `Bearer ${token}` }) },
+        body: formData,
       });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
 
-      audioCtx.close();
-
-      const blob = new Blob(chunks, { type: mimeType });
-      const url = URL.createObjectURL(blob);
-      setBvVideoUrl(url);
-      setBvProgressLabel('Video ready!');
-      setToast('Video generated successfully!');
+      setImportProgress('Upload complete!');
+      setToast('Video uploaded successfully!');
       setTimeout(() => setToast(''), 3000);
+      loadScripts();
+      return data;
     } catch (err) {
-      console.error('Video generation error:', err);
-      setBvProgressLabel('Error: ' + err.message);
+      setImportProgress('Error: ' + err.message);
+      throw err;
+    } finally {
+      setImportUploading(false);
     }
-    setBvGenerating(false);
   }
 
-  function previewSlides() {
-    const script = scripts.find(s => String(s.id) === String(bvScriptId));
-    if (!script) return;
-    const slides = buildSlides(script);
-    setBvSlides(slides);
-    setBvSlideIndex(0);
-    setBvPreviewing(true);
+  // ---- Publish to YouTube ----
+  async function publishToYouTube(scriptId) {
+    setPublishing(true);
+    setPublishResult(null);
+    try {
+      const data = await apiFetch('/api/youtube/publish', {
+        method: 'POST',
+        body: JSON.stringify({ script_id: scriptId, privacy: publishPrivacy }),
+      });
+      setPublishResult({ success: true, url: data.youtube_url });
+      setToast('Video published to YouTube!');
+      setTimeout(() => setToast(''), 4000);
+      loadScripts();
+    } catch (err) {
+      setPublishResult({ success: false, error: err.message });
+    } finally {
+      setPublishing(false);
+    }
   }
 
   // ==========================
   //   TAB 3: VIDEO STUDIO
   // ==========================
   function renderVideoStudioTab() {
-    const selectedScript = scripts.find((s) => String(s.id) === String(selectedScriptId));
-    const generatingScripts = scripts.filter((s) => s.status === 'generating_video');
     const completedScripts = scripts.filter((s) => s.video_url);
     const availableScripts = scripts.filter((s) => s.status !== 'published');
+    const importScript = importScriptId ? scripts.find((s) => String(s.id) === String(importScriptId)) : null;
 
     return (
       <div>
-        <h2 className="text-lg font-bold text-slate-900 mb-4">Video Studio</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-slate-900">Video Studio</h2>
+          <a
+            href="https://app.heygen.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+            Open HeyGen
+          </a>
+        </div>
 
-        {/* ===== BROWSER VIDEO GENERATOR (FREE) ===== */}
+        {/* ===== IMPORT VIDEO ===== */}
         <div className="bg-white rounded-xl shadow-sm border p-5 mb-6 space-y-4">
           <div className="flex items-center gap-2">
             <svg className="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
-            <h3 className="text-sm font-semibold text-slate-800">Browser Video Generator (Free)</h3>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">No API needed</span>
+            <h3 className="text-sm font-semibold text-slate-800">Import Video</h3>
           </div>
-          <p className="text-xs text-slate-500">Create branded slide videos with text-to-speech narration directly in your browser. No external services required.</p>
+          <p className="text-xs text-slate-500">Upload a video from HeyGen (or anywhere else) and link it to a script for YouTube metadata.</p>
 
-          {/* Script selector */}
+          {/* Link to script */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Select Script</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Link to Script (optional)</label>
             <select
-              value={bvScriptId}
-              onChange={(e) => { setBvScriptId(e.target.value); setBvPreviewing(false); setBvVideoUrl(null); }}
+              value={importScriptId}
+              onChange={(e) => setImportScriptId(e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
             >
-              <option value="">-- Select a script --</option>
+              <option value="">-- No script (upload only) --</option>
               {availableScripts.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.title || 'Untitled'} ({STATUS_LABELS[s.status] || 'Draft'})
@@ -1916,294 +1191,278 @@ export default function YouTubeScriptsPage() {
             </select>
           </div>
 
-          {/* Options & actions */}
-          {bvScriptId && (
-            <>
-              <div className="bg-teal-50 border border-teal-200 rounded-lg p-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <svg className="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                  </svg>
-                  <span className="text-sm font-medium text-teal-800">Natural UK English voice</span>
-                </div>
-                <p className="text-xs text-teal-600">Audio generated server-side with natural pronunciation. CareCallAI, CIW, CQC all pronounced correctly.</p>
-              </div>
-
-              {/* Action buttons */}
-              <div className="flex gap-3">
-                <button
-                  onClick={previewSlides}
-                  disabled={bvGenerating}
-                  className="flex-1 px-4 py-2.5 border border-teal-300 text-teal-700 rounded-lg text-sm font-medium hover:bg-teal-50 disabled:opacity-50 transition-colors"
-                >
-                  Preview Slides
-                </button>
-                <button
-                  onClick={generateBrowserVideo}
-                  disabled={bvGenerating}
-                  className="flex-1 px-4 py-2.5 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-                >
-                  {bvGenerating ? (
-                    <>
-                      <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Generating...
-                    </>
-                  ) : 'Generate Video'}
-                </button>
-              </div>
-            </>
-          )}
-
-          {/* Slide Preview */}
-          {bvPreviewing && bvSlides.length > 0 && (
-            <div className="border border-slate-200 rounded-lg p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-medium text-slate-700">Slide Preview</h4>
-                <span className="text-xs text-slate-500">Slide {bvSlideIndex + 1} of {bvSlides.length}</span>
-              </div>
-              <canvas
-                ref={(el) => {
-                  if (el) {
-                    const ctx = el.getContext('2d');
-                    renderSlideToCanvas(ctx, bvSlides[bvSlideIndex], 640, 360);
-                  }
-                }}
-                width={640}
-                height={360}
-                className="w-full rounded-lg border border-slate-200"
-              />
-              <div className="flex items-center justify-between">
-                <button
-                  onClick={() => setBvSlideIndex(Math.max(0, bvSlideIndex - 1))}
-                  disabled={bvSlideIndex === 0}
-                  className="px-3 py-1.5 text-sm border border-slate-300 rounded-lg disabled:opacity-30 hover:bg-slate-50 transition-colors"
-                >
-                  &#9664; Prev
-                </button>
-                <span className="text-xs font-medium text-slate-600 px-3 py-1 rounded-full bg-slate-100">
-                  {bvSlides[bvSlideIndex].type === 'section' ? bvSlides[bvSlideIndex].title : bvSlides[bvSlideIndex].type}
-                </span>
-                <button
-                  onClick={() => setBvSlideIndex(Math.min(bvSlides.length - 1, bvSlideIndex + 1))}
-                  disabled={bvSlideIndex === bvSlides.length - 1}
-                  className="px-3 py-1.5 text-sm border border-slate-300 rounded-lg disabled:opacity-30 hover:bg-slate-50 transition-colors"
-                >
-                  Next &#9654;
-                </button>
-              </div>
-              {/* Narration text */}
-              <div className="bg-slate-50 rounded-lg p-3">
-                <p className="text-xs font-medium text-slate-500 mb-1">Narration:</p>
-                <p className="text-sm text-slate-700 leading-relaxed">{bvSlides[bvSlideIndex].narration || '(no narration)'}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Progress */}
-          {bvGenerating && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs text-slate-600">
-                <span>{bvProgressLabel}</span>
-                <span>{bvProgress}%</span>
-              </div>
-              <div className="w-full bg-slate-200 rounded-full h-2.5">
-                <div
-                  className="bg-teal-600 h-2.5 rounded-full transition-all duration-300"
-                  style={{ width: `${bvProgress}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Download */}
-          {bvVideoUrl && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <p className="text-sm font-semibold text-green-800">Video ready!</p>
-              </div>
-              <video src={bvVideoUrl} controls className="w-full rounded-lg border border-green-200" />
-              <a
-                href={bvVideoUrl}
-                download={`carecallai-video-${Date.now()}.webm`}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                Download WebM
-              </a>
-            </div>
-          )}
-        </div>
-
-        {/* ===== HEYGEN VIDEO GENERATOR ===== */}
-        <div className="bg-white rounded-xl shadow-sm border p-5 mb-6 space-y-4">
-          <div className="flex items-center gap-2">
-            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-            <h3 className="text-sm font-semibold text-slate-800">HeyGen Avatar Video (Paid)</h3>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">API required</span>
-          </div>
-          <h3 className="text-sm font-semibold text-slate-800">Generate Video from Script</h3>
-
-          {/* Select Script */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Select Script</label>
-            <select
-              value={selectedScriptId}
-              onChange={(e) => setSelectedScriptId(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
-            >
-              <option value="">-- Select a script --</option>
-              {availableScripts.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.title || 'Untitled'} ({STATUS_LABELS[s.status] || 'Draft'})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Selected script info */}
-          {selectedScript && (
-            <div className="bg-slate-50 rounded-lg p-3">
-              <p className="text-sm font-semibold text-slate-900">{selectedScript.title}</p>
-              {selectedScript.youtube_title && (
-                <p className="text-xs text-slate-500 mt-0.5">YT: {selectedScript.youtube_title}</p>
-              )}
-              <div className="flex gap-3 mt-1 text-xs text-slate-500">
-                {selectedScript.estimated_duration > 0 && (
-                  <span>Duration: {formatDuration(selectedScript.estimated_duration)}</span>
-                )}
-                {selectedScript.word_count > 0 && (
-                  <span>Words: {selectedScript.word_count.toLocaleString()}</span>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Avatar ID */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Avatar ID</label>
-            <input
-              type="text"
-              value={avatarId}
-              onChange={(e) => setAvatarId(e.target.value)}
-              placeholder="Enter HeyGen avatar ID"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
-            />
-          </div>
-
-          {/* Background colour */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Background Colour</label>
-            <div className="flex items-center gap-3">
-              <input
-                type="color"
-                value={bgColor}
-                onChange={(e) => setBgColor(e.target.value)}
-                className="w-10 h-10 rounded-lg border border-slate-300 cursor-pointer"
-              />
-              <input
-                type="text"
-                value={bgColor}
-                onChange={(e) => setBgColor(e.target.value)}
-                className="px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 w-32"
-              />
-            </div>
-          </div>
-
-          {/* Generate Button */}
-          <button
-            onClick={() => {
-              if (selectedScriptId) generateVideo(selectedScriptId);
+          {/* Drop zone / upload */}
+          <div
+            className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-teal-400 transition-colors cursor-pointer"
+            onClick={() => document.getElementById('videoFileInput')?.click()}
+            onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-teal-400', 'bg-teal-50'); }}
+            onDragLeave={(e) => { e.currentTarget.classList.remove('border-teal-400', 'bg-teal-50'); }}
+            onDrop={async (e) => {
+              e.preventDefault();
+              e.currentTarget.classList.remove('border-teal-400', 'bg-teal-50');
+              const file = e.dataTransfer.files[0];
+              if (file) await uploadVideo(file, importScriptId || null);
             }}
-            disabled={videoGenerating || !selectedScriptId}
-            className="w-full px-5 py-2.5 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
           >
-            {videoGenerating ? (
-              <>
-                <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Generating Video...
-              </>
-            ) : (
-              <>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-                Generate Video
-              </>
-            )}
-          </button>
+            <svg className="w-10 h-10 text-slate-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <p className="text-sm font-medium text-slate-600">Drop video file here or click to browse</p>
+            <p className="text-xs text-slate-400 mt-1">MP4, WebM, MOV up to 500MB</p>
+          </div>
+          <input
+            id="videoFileInput"
+            type="file"
+            accept="video/mp4,video/webm,video/quicktime,video/x-msvideo"
+            className="hidden"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (file) await uploadVideo(file, importScriptId || null);
+              e.target.value = '';
+            }}
+          />
 
-          {/* Video Error */}
-          {videoError && (
-            <div className="p-3 rounded-lg bg-red-50 text-red-700 text-sm">{videoError}</div>
+          {/* Upload progress */}
+          {importUploading && (
+            <div className="flex items-center gap-3 p-3 bg-teal-50 rounded-lg">
+              <div className="w-5 h-5 border-2 border-teal-300 border-t-teal-600 rounded-full animate-spin" />
+              <span className="text-sm text-teal-700">{importProgress}</span>
+            </div>
           )}
-
-          {/* Note */}
-          <p className="text-xs text-slate-400">
-            You need a HeyGen API key configured. Videos take 5-15 minutes to generate.
-          </p>
+          {!importUploading && importProgress && (
+            <p className="text-sm text-slate-600">{importProgress}</p>
+          )}
         </div>
 
-        {/* Video Queue */}
-        <div className="bg-white rounded-xl shadow-sm border p-5 mb-6">
-          <h3 className="text-sm font-semibold text-slate-800 mb-3">Video Queue</h3>
-          {generatingScripts.length === 0 ? (
-            <p className="text-sm text-slate-400">No videos currently generating.</p>
-          ) : (
-            <div className="space-y-3">
-              {generatingScripts.map((script) => (
-                <div key={script.id} className="flex items-center justify-between bg-blue-50 rounded-lg p-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-5 h-5 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" />
-                    <div>
-                      <p className="text-sm font-medium text-slate-800">{script.title || 'Untitled'}</p>
-                      <p className="text-xs text-blue-600">Generating...</p>
-                    </div>
-                  </div>
+        {/* ===== YOUTUBE METADATA (when script selected) ===== */}
+        {importScript && (
+          <div className="bg-white rounded-xl shadow-sm border p-5 mb-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+              </svg>
+              <h3 className="text-sm font-semibold text-slate-800">YouTube Metadata</h3>
+              <span className="text-xs text-slate-500">Copy these into YouTube Studio when uploading</span>
+            </div>
+
+            {/* Title */}
+            {importScript.youtube_title && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-medium text-slate-500">Title</label>
                   <button
-                    onClick={() => checkVideoStatus(script.id)}
-                    disabled={checkingStatus === script.id}
-                    className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 font-medium transition-colors"
+                    onClick={() => copyToClipboard(importScript.youtube_title, 'Title')}
+                    className={`text-xs px-2 py-1 rounded font-medium transition-colors ${copiedField === 'Title' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                   >
-                    {checkingStatus === script.id ? 'Checking...' : 'Check Status'}
+                    {copiedField === 'Title' ? 'Copied!' : 'Copy'}
                   </button>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+                <p className="text-sm font-semibold text-slate-900 bg-slate-50 rounded-lg p-3">{importScript.youtube_title}</p>
+              </div>
+            )}
 
-        {/* Completed Videos */}
+            {/* Description */}
+            {importScript.youtube_description && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-medium text-slate-500">Description</label>
+                  <button
+                    onClick={() => copyToClipboard(importScript.youtube_description, 'Description')}
+                    className={`text-xs px-2 py-1 rounded font-medium transition-colors ${copiedField === 'Description' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                  >
+                    {copiedField === 'Description' ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+                <textarea readOnly value={importScript.youtube_description} rows={5} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:outline-none" />
+              </div>
+            )}
+
+            {/* Tags */}
+            {importScript.tags && importScript.tags.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-medium text-slate-500">Tags</label>
+                  <button
+                    onClick={() => copyToClipboard(importScript.tags.join(', '), 'Tags')}
+                    className={`text-xs px-2 py-1 rounded font-medium transition-colors ${copiedField === 'Tags' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                  >
+                    {copiedField === 'Tags' ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {importScript.tags.map((tag, i) => (
+                    <span key={i} className="px-2.5 py-1 rounded-full bg-teal-100 text-teal-700 text-xs font-medium">{tag}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Thumbnail text */}
+            {importScript.thumbnail_text && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-medium text-slate-500">Thumbnail Text</label>
+                  <button
+                    onClick={() => copyToClipboard(importScript.thumbnail_text, 'Thumbnail')}
+                    className={`text-xs px-2 py-1 rounded font-medium transition-colors ${copiedField === 'Thumbnail' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                  >
+                    {copiedField === 'Thumbnail' ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+                <div className="bg-slate-900 rounded-lg p-4 text-center">
+                  <p className="text-white font-bold text-lg uppercase tracking-wide">{importScript.thumbnail_text}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Copy All button */}
+            <button
+              onClick={() => {
+                const all = [
+                  `TITLE:\n${importScript.youtube_title || importScript.title || ''}`,
+                  `\nDESCRIPTION:\n${importScript.youtube_description || ''}`,
+                  `\nTAGS:\n${(importScript.tags || []).join(', ')}`,
+                  importScript.thumbnail_text ? `\nTHUMBNAIL TEXT:\n${importScript.thumbnail_text}` : '',
+                ].join('\n');
+                copyToClipboard(all, 'All metadata');
+              }}
+              className={`w-full px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${copiedField === 'All metadata' ? 'bg-green-600 text-white' : 'bg-teal-600 text-white hover:bg-teal-700'}`}
+            >
+              {copiedField === 'All metadata' ? 'All Metadata Copied!' : 'Copy All Metadata'}
+            </button>
+          </div>
+        )}
+
+        {/* ===== PUBLISH TO YOUTUBE ===== */}
+        {importScript && importScript.video_url && (
+          <div className="bg-white rounded-xl shadow-sm border p-5">
+            <h3 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2">
+              <svg className="w-5 h-5 text-red-600" viewBox="0 0 24 24" fill="currentColor"><path d="M23.5 6.19a3.02 3.02 0 00-2.12-2.14C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.38.55A3.02 3.02 0 00.5 6.19 31.64 31.64 0 000 12a31.64 31.64 0 00.5 5.81 3.02 3.02 0 002.12 2.14c1.88.55 9.38.55 9.38.55s7.5 0 9.38-.55a3.02 3.02 0 002.12-2.14A31.64 31.64 0 0024 12a31.64 31.64 0 00-.5-5.81zM9.75 15.02V8.98L15.5 12l-5.75 3.02z"/></svg>
+              Publish to YouTube
+            </h3>
+
+            {importScript.youtube_video_id ? (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                <p className="text-sm font-medium text-green-800 mb-2">Already published to YouTube</p>
+                <a
+                  href={importScript.youtube_url || `https://www.youtube.com/watch?v=${importScript.youtube_video_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M23.5 6.19a3.02 3.02 0 00-2.12-2.14C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.38.55A3.02 3.02 0 00.5 6.19 31.64 31.64 0 000 12a31.64 31.64 0 00.5 5.81 3.02 3.02 0 002.12 2.14c1.88.55 9.38.55 9.38.55s7.5 0 9.38-.55a3.02 3.02 0 002.12-2.14A31.64 31.64 0 0024 12a31.64 31.64 0 00-.5-5.81zM9.75 15.02V8.98L15.5 12l-5.75 3.02z"/></svg>
+                  View on YouTube
+                </a>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-500 mb-1 block">Privacy Setting</label>
+                  <select
+                    value={publishPrivacy}
+                    onChange={(e) => setPublishPrivacy(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                  >
+                    <option value="private">Private (only you can see it)</option>
+                    <option value="unlisted">Unlisted (anyone with the link)</option>
+                    <option value="public">Public (visible to everyone)</option>
+                  </select>
+                </div>
+
+                <button
+                  onClick={() => publishToYouTube(importScript.id)}
+                  disabled={publishing}
+                  className="w-full px-4 py-3 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2 bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {publishing ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                      Publishing to YouTube...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M23.5 6.19a3.02 3.02 0 00-2.12-2.14C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.38.55A3.02 3.02 0 00.5 6.19 31.64 31.64 0 000 12a31.64 31.64 0 00.5 5.81 3.02 3.02 0 002.12 2.14c1.88.55 9.38.55 9.38.55s7.5 0 9.38-.55a3.02 3.02 0 002.12-2.14A31.64 31.64 0 0024 12a31.64 31.64 0 00-.5-5.81zM9.75 15.02V8.98L15.5 12l-5.75 3.02z"/></svg>
+                      Publish to YouTube
+                    </>
+                  )}
+                </button>
+
+                {publishResult && !publishResult.success && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <p className="text-sm text-red-700">{publishResult.error}</p>
+                  </div>
+                )}
+                {publishResult && publishResult.success && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+                    <p className="text-sm font-medium text-green-800 mb-2">Published successfully!</p>
+                    <a
+                      href={publishResult.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-red-600 font-medium hover:underline"
+                    >
+                      View on YouTube &rarr;
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ===== VIDEO LIBRARY ===== */}
         <div className="bg-white rounded-xl shadow-sm border p-5">
-          <h3 className="text-sm font-semibold text-slate-800 mb-3">Completed Videos</h3>
+          <h3 className="text-sm font-semibold text-slate-800 mb-3">Video Library</h3>
           {completedScripts.length === 0 ? (
-            <p className="text-sm text-slate-400">No completed videos yet.</p>
+            <div className="text-center py-8">
+              <svg className="w-12 h-12 text-slate-200 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              <p className="text-sm text-slate-400">No videos yet. Create one in HeyGen and import it above.</p>
+            </div>
           ) : (
             <div className="space-y-4">
               {completedScripts.map((script) => (
                 <div key={script.id} className="border border-slate-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">{script.title || 'Untitled'}</p>
+                  <div className="flex items-start justify-between mb-3 gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="text-sm font-semibold text-slate-900">{script.title || 'Untitled'}</p>
+                        {script.youtube_video_id && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">Published</span>
+                        )}
+                      </div>
                       {script.youtube_title && (
-                        <p className="text-xs text-slate-500">{script.youtube_title}</p>
+                        <p className="text-xs text-slate-500 truncate">{script.youtube_title}</p>
                       )}
                     </div>
-                    <a
-                      href={script.video_url}
-                      download
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 font-medium transition-colors"
-                    >
-                      Download
-                    </a>
+                    <div className="flex gap-2 shrink-0">
+                      {script.youtube_video_id && (
+                        <a
+                          href={script.youtube_url || `https://www.youtube.com/watch?v=${script.youtube_video_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 font-medium transition-colors"
+                        >
+                          YouTube
+                        </a>
+                      )}
+                      <button
+                        onClick={() => { setImportScriptId(String(script.id)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                        className="text-xs px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 font-medium transition-colors"
+                      >
+                        YouTube Metadata
+                      </button>
+                      <a
+                        href={script.video_url}
+                        download
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 font-medium transition-colors"
+                      >
+                        Download
+                      </a>
+                    </div>
                   </div>
                   <video
                     src={script.video_url}
@@ -2212,9 +1471,6 @@ export default function YouTubeScriptsPage() {
                   />
                 </div>
               ))}
-              <p className="text-xs text-slate-400 mt-2">
-                Video URLs expire after 7 days. Download videos promptly.
-              </p>
             </div>
           )}
         </div>

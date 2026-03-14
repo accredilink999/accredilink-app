@@ -1,6 +1,31 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import AnimateOnScroll from '@/components/AnimateOnScroll';
+import HomecareReviews from '@/components/HomecareReviews';
+
+export const metadata = {
+  alternates: {
+    canonical: "https://accredilinkcare.co.uk",
+  },
+  openGraph: {
+    title: "Home Care Denbighshire, Conwy & Wrexham | Accredilink CRT",
+    description: "CIW-regulated domiciliary care, emergency response, respite and palliative care across Denbighshire, Conwy & Wrexham. Not-for-profit care provider.",
+    url: "https://accredilinkcare.co.uk",
+    images: [
+      {
+        url: "/images/hero-home.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Accredilink Community Response Taskforce - Compassionate Care in North Wales",
+      },
+    ],
+  },
+  twitter: {
+    title: "Home Care Denbighshire, Conwy & Wrexham | Accredilink CRT",
+    description: "CIW-regulated domiciliary care, emergency response, respite and palliative care across North Wales.",
+    images: ["/images/hero-home.jpg"],
+  },
+};
 
 const websiteSchema = {
   "@context": "https://schema.org",
@@ -206,6 +231,15 @@ export default function Home() {
                   >
                     Our Services
                   </Link>
+                  <Link
+                    href="/brochure/care"
+                    className="inline-flex items-center justify-center px-6 py-3.5 bg-white/10 backdrop-blur text-white font-semibold rounded-xl hover:bg-white/20 transition-all duration-300 text-base border border-white/20"
+                  >
+                    <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Our Brochure
+                  </Link>
                 </div>
               </AnimateOnScroll>
             </div>
@@ -255,6 +289,9 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Client Reviews from homecare.co.uk */}
+      <HomecareReviews />
 
       {/* Services Grid */}
       <section className="py-16 sm:py-24 bg-gradient-to-b from-white to-slate-50">

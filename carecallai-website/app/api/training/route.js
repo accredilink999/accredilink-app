@@ -45,6 +45,7 @@ export async function POST(request) {
       pass_mark: body.pass_mark || 80,
       status: body.status || 'draft',
       sort_order: body.sort_order || 0,
+      pin_code: body.pin_code || null,
     })
     .select()
     .single();

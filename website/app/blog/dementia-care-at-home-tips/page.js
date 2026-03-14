@@ -2,7 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 export const metadata = {
-  title: 'Caring for Someone with Dementia at Home: Practical Tips | Accredilink',
+  title: 'Caring for Someone with Dementia at Home: Practical Tips',
   description: 'Practical advice for families caring for someone with dementia at home. Tips on daily routines, communication, home safety, when to seek professional help, and local dementia services in Wales.',
   alternates: {
     canonical: 'https://accredilinkcare.co.uk/blog/dementia-care-at-home-tips',

@@ -113,12 +113,8 @@ export function checkOrgAccess() {
     return { active: true }
   }
 
-  // Trial user — must have completed Stripe checkout (card on file) to access
+  // Trial user — 30-day free trial, no credit card required
   if (plan === 'trial') {
-    if (!stripe_subscription_id) {
-      return { active: false, reason: 'no_subscription' }
-    }
-    // Has subscription — check if trial still active
     if (trial_ends_at) {
       const trialEnd = new Date(trial_ends_at)
       if (trialEnd > new Date()) {
@@ -126,7 +122,7 @@ export function checkOrgAccess() {
       }
       return { active: false, reason: 'trial_expired' }
     }
-    // Has subscription but no trial end date — allow
+    // No trial end date set — allow (legacy user or setup in progress)
     return { active: true, trial: true }
   }
 

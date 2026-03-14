@@ -2,7 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 export const metadata = {
-  title: 'How to Arrange Domiciliary Care in Wales: A Complete Guide | Accredilink',
+  title: 'How to Arrange Domiciliary Care in Wales: A Complete Guide',
   description: 'A step-by-step guide to arranging domiciliary care in Wales. Learn how to organise home care, navigate local authority assessments, and find the right provider in Denbighshire, Conwy, and Wrexham.',
   alternates: {
     canonical: 'https://accredilinkcare.co.uk/blog/how-to-arrange-domiciliary-care-in-wales',

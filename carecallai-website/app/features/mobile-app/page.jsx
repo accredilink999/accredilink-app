@@ -6,6 +6,7 @@ export const metadata = {
   description:
     "CareCallAI mobile app for iOS and Android. Care workers view rotas, log visits, complete MAR charts, report incidents and receive push notifications.",
   keywords: ["care worker mobile app", "home care app", "carer scheduling app", "mobile care logging app UK"],
+  alternates: { canonical: "https://carecallai.co.uk/features/mobile-app" },
   openGraph: {
     title: "Mobile App for Care Workers — CareCallAI",
     description: "iOS & Android app. View rotas, log visits, complete MAR charts, report incidents and get push notifications.",

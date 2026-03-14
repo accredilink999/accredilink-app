@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function CTABanner({
   title = "Ready to transform your care agency?",
-  subtitle = "Start your free 7-day trial today. No credit card required.",
+  subtitle = "Start your free 30-day trial today. No credit card required.",
   primaryText = "Start Free Trial",
   primaryHref = "/demo",
   secondaryText = "Book a Demo",

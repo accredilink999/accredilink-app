@@ -143,7 +143,7 @@ export default function PricingTable() {
                     : "bg-slate-100 text-slate-900 hover:bg-slate-200"
                 }`}
               >
-                Start 7-Day Free Trial
+                Start 30-Day Free Trial
               </Link>
 
               <ul className="space-y-3 flex-1">

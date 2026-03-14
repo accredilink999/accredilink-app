@@ -2,7 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 export const metadata = {
-  title: 'Hospital Discharge and Home Care in Wales: What Happens Next? | Accredilink',
+  title: 'Hospital Discharge and Home Care in Wales: What Happens Next?',
   description: 'What to expect when a loved one is discharged from hospital in Wales. Learn about reablement, domiciliary care after hospital, discharge planning, and support available in Denbighshire, Conwy, and Wrexham.',
   alternates: {
     canonical: 'https://accredilinkcare.co.uk/blog/hospital-discharge-care-wales',

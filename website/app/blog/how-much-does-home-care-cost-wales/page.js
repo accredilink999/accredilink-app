@@ -2,8 +2,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 export const metadata = {
-  title: 'How Much Does Home Care Cost in Wales? A 2026 Guide | Accredilink',
-  description: 'Home care costs in Wales typically range from £28 to £35 per hour in 2026. Learn about local authority funding, the Welsh £100/week charge cap, Attendance Allowance, direct payments, and NHS Continuing Healthcare.',
+  title: 'How Much Does Home Care Cost in Wales? A 2026 Guide',
+  description: 'Home care in Wales costs £28–£35/hour in 2026. Learn about the Welsh £100/week cap, Attendance Allowance, direct payments & NHS Continuing Healthcare.',
   alternates: {
     canonical: 'https://accredilinkcare.co.uk/blog/how-much-does-home-care-cost-wales',
   },

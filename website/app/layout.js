@@ -13,7 +13,7 @@ const geistSans = Geist({
 export const metadata = {
   metadataBase: new URL('https://accredilinkcare.co.uk'),
   title: {
-    default: "Accredilink Community Response Taskforce | Home Care Services in Denbighshire, Conwy & Wrexham",
+    default: "Home Care Denbighshire, Conwy & Wrexham | Accredilink CRT",
     template: "%s | Accredilink CRT",
   },
   description:
@@ -39,33 +39,22 @@ export const metadata = {
     "CIW",
   ],
   openGraph: {
-    title: "Accredilink Community Response Taskforce | Home Care in North Wales",
-    description: "CIW-regulated domiciliary care, emergency response, respite and palliative care across Denbighshire, Conwy & Wrexham. Not-for-profit care provider.",
     type: "website",
     locale: "en_GB",
-    url: "https://accredilinkcare.co.uk",
     siteName: "Accredilink Community Response Taskforce",
-    images: [
-      {
-        url: "/images/hero-home.jpg",
-        width: 1200,
-        height: 630,
-        alt: "Accredilink Community Response Taskforce - Compassionate Care in North Wales",
-      },
-    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Accredilink CRT | Home Care Services in North Wales",
-    description: "CIW-regulated domiciliary care, emergency response and specialist support across Denbighshire, Conwy & Wrexham.",
-    images: ["/images/hero-home.jpg"],
+    site: "@AccredilinkCare",
+    creator: "@AccredilinkCare",
   },
   alternates: {
-    canonical: "https://accredilinkcare.co.uk",
+    languages: {
+      "en-GB": "https://accredilinkcare.co.uk",
+    },
   },
   verification: {
-    // Add your Google Search Console verification code here
-    // google: 'your-verification-code',
+    google: 'google3b98beac371438cf',
   },
 };
 
@@ -88,9 +77,11 @@ const organizationSchema = {
     addressCountry: "GB",
   },
   sameAs: [
-    "https://facebook.com/accredilinkcare",
-    "https://instagram.com/accredilinkcare",
-    "https://linkedin.com/company/accredilinkcare",
+    "https://www.facebook.com/profile.php?id=61585016304011",
+    "https://www.instagram.com/accredicare999",
+    "https://www.linkedin.com/company/accredilink",
+    "https://x.com/AccredilinkCare",
+    "https://uk.trustpilot.com/review/accredilinkcare.co.uk",
   ],
   contactPoint: [
     {
@@ -169,7 +160,7 @@ const localBusinessSchema = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
+    <html lang="en-GB">
       <head>
         <script
           type="application/ld+json"

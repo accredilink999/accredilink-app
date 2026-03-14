@@ -6,6 +6,7 @@ export const metadata = {
   description:
     "Electronic MAR chart software for care agencies. PRN, pill pouch, refused & destroyed tracking with full audit trail. CIW & CQC compliant.",
   keywords: ["electronic MAR chart software", "medication management care", "care home MAR chart", "digital MAR chart UK"],
+  alternates: { canonical: "https://carecallai.co.uk/features/medication-management" },
   openGraph: {
     title: "Electronic MAR Charts — CareCallAI",
     description: "PRN, pill pouch, refused & destroyed tracking with full audit trail. CIW & CQC compliant eMAR software.",

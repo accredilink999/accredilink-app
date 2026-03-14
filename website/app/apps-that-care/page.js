@@ -4,6 +4,9 @@ import AnimateOnScroll from '@/components/AnimateOnScroll';
 export const metadata = {
   title: 'Apps That Care | Software Built by Carers, for Carers',
   description: 'Innovative care technology developed by experienced carers. Our flagship app CareCall AI is transforming how domiciliary care agencies manage staff, shifts, and compliance across Wales.',
+  alternates: {
+    canonical: "https://accredilinkcare.co.uk/apps-that-care",
+  },
 };
 
 const values = [

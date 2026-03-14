@@ -3,6 +3,9 @@ import Link from 'next/link';
 export const metadata = {
   title: 'Dementia Care Denbigh | Specialist Home Support',
   description: 'Expert dementia care at home in Denbigh. Person-centred support from trained local carers. CIW regulated. Call Accredilink on 01824 538688.',
+  alternates: {
+    canonical: "https://accredilinkcare.co.uk/areas/denbigh/dementia-care",
+  },
 };
 
 export default function DementiaCareInDenbigh() {

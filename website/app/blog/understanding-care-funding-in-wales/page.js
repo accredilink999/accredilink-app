@@ -2,7 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 export const metadata = {
-  title: 'Understanding Care Funding in Wales: What You Need to Know | Accredilink',
+  title: 'Understanding Care Funding in Wales: What You Need to Know',
   description: 'A clear guide to care funding in Wales, including local authority funding, financial assessments, direct payments, NHS Continuing Healthcare, Attendance Allowance, and the Welsh cap on care charges.',
   alternates: {
     canonical: 'https://accredilinkcare.co.uk/blog/understanding-care-funding-in-wales',

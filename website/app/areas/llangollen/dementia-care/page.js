@@ -3,6 +3,9 @@ import Link from 'next/link';
 export const metadata = {
   title: 'Dementia Care Llangollen | Home Support Dee Valley',
   description: 'Specialist dementia care at home in Llangollen and the Dee Valley. Trained local carers, Welsh language support. CIW regulated. Call 01824 538688.',
+  alternates: {
+    canonical: "https://accredilinkcare.co.uk/areas/llangollen/dementia-care",
+  },
 };
 
 const jsonLd = {

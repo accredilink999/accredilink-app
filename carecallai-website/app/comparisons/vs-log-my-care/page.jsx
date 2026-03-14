@@ -39,7 +39,7 @@ const features = [
   { feature: "AI assistant", carecall: true, competitor: false },
   { feature: "Leave management", carecall: true, competitor: false },
   { feature: "Training tracking", carecall: true, competitor: "Basic" },
-  { feature: "Free tier", carecall: "7-day trial", competitor: "Up to 10 users" },
+  { feature: "Free tier", carecall: "30-day trial", competitor: "Up to 10 users" },
   { feature: "Starting paid price", carecall: "£99/mo", competitor: "Contact sales" },
 ];
 

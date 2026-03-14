@@ -1,7 +1,7 @@
 import ServicePageLayout from '@/components/ServicePageLayout';
 
 export const metadata = {
-  title: 'Palliative Care',
+  title: 'Palliative & End-of-Life Care North Wales',
   description: 'Palliative and end-of-life care services in Denbighshire, Conwy and Wrexham. Compassionate, CIW-regulated support ensuring dignity, comfort, and personal choice.',
   alternates: {
     canonical: 'https://accredilinkcare.co.uk/services/palliative-care',

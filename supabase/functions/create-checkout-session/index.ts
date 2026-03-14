@@ -161,12 +161,12 @@ Deno.serve(async (req) => {
     });
     const hadPreviousSubscription = !!existingOrg?.stripe_subscription_id || cancelledSubs.data.length > 0;
 
-    // Create Stripe Checkout Session — 7-day trial with card upfront
+    // Create Stripe Checkout Session — 30-day trial, no card required
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
-      payment_method_collection: 'always',
+      payment_method_collection: 'if_required',
       success_url: `${appUrl}/Settings?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/Settings?checkout=cancelled`,
       metadata: {
@@ -180,8 +180,8 @@ Deno.serve(async (req) => {
           plan,
           billing: billingPeriod,
         },
-        // 7-day free trial for new customers only
-        ...(hadPreviousSubscription ? {} : { trial_period_days: 7 }),
+        // 30-day free trial for new customers only
+        ...(hadPreviousSubscription ? {} : { trial_period_days: 30 }),
       },
     });
 

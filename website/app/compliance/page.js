@@ -2,8 +2,11 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 export const metadata = {
-  title: 'Compliance, Safeguarding & Funding | Standards We Work To',
+  title: 'CIW Compliance, Safeguarding & Funding Guidance',
   description: 'CIW registration, safeguarding procedures, Welsh legislation compliance, care funding guidance, staff registration, data protection, and quality assurance at Accredilink.',
+  alternates: {
+    canonical: "https://accredilinkcare.co.uk/compliance",
+  },
 };
 
 const sections = [

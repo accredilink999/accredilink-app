@@ -3,6 +3,9 @@ import Link from 'next/link';
 export const metadata = {
   title: 'Overnight Care Denbigh | Waking Night & Sleep-In',
   description: 'Overnight home care in Denbigh — waking night and sleep-in support for safety and peace of mind. CIW regulated. Call Accredilink on 01824 538688.',
+  alternates: {
+    canonical: "https://accredilinkcare.co.uk/areas/denbigh/overnight-care",
+  },
 };
 
 export default function OvernightCareInDenbigh() {

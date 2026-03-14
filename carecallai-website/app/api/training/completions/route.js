@@ -36,20 +36,27 @@ export async function POST(request) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await request.json();
-  const { course_id, answers } = body;
+  const { course_id, answers, pin_code } = body;
 
   if (!course_id || !answers) {
     return NextResponse.json({ error: 'course_id and answers are required' }, { status: 400 });
   }
 
-  // Get course pass mark
+  // Get course pass mark and pin code
   const { data: course } = await supabase
     .from('training_courses')
-    .select('pass_mark, title')
+    .select('pass_mark, title, pin_code')
     .eq('id', course_id)
     .single();
 
   if (!course) return NextResponse.json({ error: 'Course not found' }, { status: 404 });
+
+  // Validate pin code if course requires one
+  if (course.pin_code) {
+    if (!pin_code || pin_code.toUpperCase().trim() !== course.pin_code.toUpperCase().trim()) {
+      return NextResponse.json({ error: 'Incorrect video pin code. Please watch the video and enter the code shown.' }, { status: 403 });
+    }
+  }
 
   // Get questions and calculate score
   const { data: questions } = await supabase

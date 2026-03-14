@@ -32,6 +32,7 @@ export default function TrainingAdmin() {
   const [formPassMark, setFormPassMark] = useState(80);
   const [formStatus, setFormStatus] = useState('draft');
   const [formSortOrder, setFormSortOrder] = useState(0);
+  const [formPinCode, setFormPinCode] = useState('');
 
   // Question form state
   const [qQuestion, setQQuestion] = useState('');
@@ -128,7 +129,7 @@ export default function TrainingAdmin() {
     setFormTitle(''); setFormSlug(''); setFormCategory('mandatory');
     setFormDescription(''); setFormDuration(15); setFormYoutubeUrl('');
     setFormPassMark(80); setFormStatus('draft'); setFormSortOrder(0);
-    setEditingCourse(null);
+    setFormPinCode(''); setEditingCourse(null);
   }
 
   function editCourse(c) {
@@ -136,7 +137,7 @@ export default function TrainingAdmin() {
     setFormDescription(c.description || ''); setFormDuration(c.duration_minutes);
     setFormYoutubeUrl(c.youtube_url || ''); setFormPassMark(c.pass_mark);
     setFormStatus(c.status); setFormSortOrder(c.sort_order);
-    setEditingCourse(c); setShowCourseForm(true);
+    setFormPinCode(c.pin_code || ''); setEditingCourse(c); setShowCourseForm(true);
   }
 
   async function saveCourse() {
@@ -144,7 +145,7 @@ export default function TrainingAdmin() {
       title: formTitle, slug: formSlug, category: formCategory,
       description: formDescription, duration_minutes: formDuration,
       youtube_url: formYoutubeUrl || null, pass_mark: formPassMark,
-      status: formStatus, sort_order: formSortOrder,
+      status: formStatus, sort_order: formSortOrder, pin_code: formPinCode || null,
     };
     try {
       if (editingCourse) {
@@ -402,6 +403,7 @@ export default function TrainingAdmin() {
                           <span>📊 Pass: {c.pass_mark}%</span>
                           <span>🔗 {c.slug}</span>
                           {c.youtube_url && <span>▶️ YouTube linked</span>}
+                          {c.pin_code && <span className="font-mono text-teal-400">🔑 {c.pin_code}</span>}
                           <span>📋 #{c.sort_order}</span>
                         </div>
                       </div>
@@ -531,6 +533,31 @@ export default function TrainingAdmin() {
                           className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white text-sm focus:border-teal-400 outline-none"
                           placeholder="https://youtube.com/watch?v=..."
                         />
+                      </div>
+                      <div>
+                        <label className="block text-sm text-slate-400 mb-1">Video Pin Code</label>
+                        <p className="text-xs text-slate-500 mb-1">Place this code in the video. Learners must enter it before taking the test.</p>
+                        <div className="flex gap-2">
+                          <input
+                            value={formPinCode}
+                            onChange={e => setFormPinCode(e.target.value.toUpperCase())}
+                            className="flex-1 px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white text-sm focus:border-teal-400 outline-none font-mono tracking-widest"
+                            placeholder="e.g. A7K3M2"
+                            maxLength={8}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+                              let code = '';
+                              for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+                              setFormPinCode(code);
+                            }}
+                            className="px-3 py-2 bg-teal-600/20 text-teal-400 rounded-lg text-xs hover:bg-teal-600/30 transition-colors whitespace-nowrap"
+                          >
+                            Generate
+                          </button>
+                        </div>
                       </div>
                     </div>
                     <div className="flex justify-end gap-2 mt-6">

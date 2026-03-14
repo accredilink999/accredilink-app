@@ -3,6 +3,9 @@ import Link from 'next/link';
 export const metadata = {
   title: 'Home Care in Denbigh | Local Carers You Can Trust',
   description: 'Professional home care in Denbigh from your local CIW-regulated provider. Personal care, dementia support & emergency response. Call 01824 538688.',
+  alternates: {
+    canonical: "https://accredilinkcare.co.uk/areas/denbigh/home-care",
+  },
 };
 
 export default function HomeCareInDenbigh() {

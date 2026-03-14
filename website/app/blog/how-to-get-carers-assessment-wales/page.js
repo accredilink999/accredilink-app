@@ -2,7 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 export const metadata = {
-  title: 'How to Get a Carer\u2019s Assessment in Wales: Your Complete Guide | Accredilink',
+  title: 'How to Get a Carer\u2019s Assessment in Wales: Your Complete Guide',
   description: 'A step-by-step guide to getting a carer\u2019s assessment in Wales under the Social Services and Well-being (Wales) Act 2014. Who qualifies, how to request one, and what support you can get in Denbighshire, Conwy, and Wrexham.',
   alternates: {
     canonical: 'https://accredilinkcare.co.uk/blog/how-to-get-carers-assessment-wales',

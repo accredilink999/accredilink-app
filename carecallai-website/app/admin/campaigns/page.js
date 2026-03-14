@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { MARKETING_TEMPLATE_HTML, MARKETING_TEMPLATE_SUBJECT, MARKETING_TEMPLATE_PREVIEW, MARKETING_TEMPLATE_NAME } from '@/lib/marketingTemplate';
 
 function getToken() {
   return typeof window !== 'undefined' ? sessionStorage.getItem('admin_token') : null;
@@ -938,6 +939,21 @@ export default function EmailCampaignsPage() {
                 <option key={t.id} value={t.id}>{t.name}{t.category ? ` (${t.category})` : ''}</option>
               ))}
             </select>
+            <button
+              type="button"
+              onClick={() => {
+                setCampaignForm((prev) => ({
+                  ...prev,
+                  name: prev.name || MARKETING_TEMPLATE_NAME,
+                  subject: prev.subject || MARKETING_TEMPLATE_SUBJECT,
+                  preview_text: prev.preview_text || MARKETING_TEMPLATE_PREVIEW,
+                  html_content: MARKETING_TEMPLATE_HTML,
+                }));
+              }}
+              className="mt-2 w-full px-3 py-2 bg-teal-50 border border-teal-200 text-teal-700 text-sm font-medium rounded-lg hover:bg-teal-100 transition-colors"
+            >
+              Load Built-in Marketing Blast Template
+            </button>
           </div>
 
           {/* HTML Content */}

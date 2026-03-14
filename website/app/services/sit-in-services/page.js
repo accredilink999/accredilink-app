@@ -1,7 +1,7 @@
 import ServicePageLayout from '@/components/ServicePageLayout';
 
 export const metadata = {
-  title: 'Sit-in Services',
+  title: 'Sit-in Care & Companionship — North Wales',
   description: 'Sit-in care services in Denbighshire, Conwy and Wrexham. Professional companionship and supervision so family carers can take a break with peace of mind.',
   alternates: {
     canonical: 'https://accredilinkcare.co.uk/services/sit-in-services',

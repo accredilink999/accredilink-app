@@ -4,6 +4,9 @@ import AnimateOnScroll from '@/components/AnimateOnScroll';
 export const metadata = {
   title: 'CareCall AI | All-in-One Domiciliary Care Management Platform',
   description: 'CareCall AI is a comprehensive staff management and care operations platform built specifically for domiciliary care agencies. GPS tracking, rota management, care documentation, incident reporting, training, automatic payroll & payslips, invoicing, fuel & expense tracking, and CIW compliance — all in one app.',
+  alternates: {
+    canonical: "https://accredilinkcare.co.uk/apps-that-care/carecall-ai",
+  },
 };
 
 const features = [

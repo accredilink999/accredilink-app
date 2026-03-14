@@ -2,8 +2,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 export const metadata = {
-  title: 'Care Home vs Home Care: What Is the Difference? | Accredilink',
-  description: 'Understanding the difference between care homes and home care (domiciliary care) in Wales. Compare costs, benefits, regulation, and find out which option is right for your family in Denbighshire, Conwy, and Wrexham.',
+  title: 'Care Home vs Home Care: What Is the Difference?',
+  description: 'Care home vs home care in Wales — compare costs, benefits, and regulation. Find the right option for your family in Denbighshire, Conwy & Wrexham.',
   alternates: {
     canonical: 'https://accredilinkcare.co.uk/blog/care-home-vs-home-care',
   },

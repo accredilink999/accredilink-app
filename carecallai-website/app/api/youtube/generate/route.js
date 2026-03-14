@@ -79,11 +79,15 @@ SCRIPT STRUCTURE REQUIREMENTS:
 SCRIPT STYLE RULES:
 - Write for SPEAKING, not reading. Use contractions, short sentences, conversational language.
 - Use UK English spelling (organisation, optimise, colour).
-- Include [PAUSE] markers for dramatic pauses.
+- CRITICAL: DO NOT repeat the same phrases, words, or sentence structures across sections. Each section must feel fresh and distinct. Vary your vocabulary, sentence length, and rhythm throughout.
+- DO NOT overuse the channel name, product name, or filler phrases like "let's dive in", "here's the thing", "so what does this mean". Use each transition phrase ONCE maximum.
+- Include [PAUSE] markers for dramatic pauses (max 2-3 per script).
 - Include [CUT TO SCREEN RECORDING] or [B-ROLL] or [TEXT ON SCREEN] markers for visual transitions.
-- Each section's script should flow naturally into the next.
+- Each section should approach the topic from a different angle — don't just list points, tell mini-stories, use examples, ask rhetorical questions, and share practical tips.
 - Reference specific regulations (RISCA, CQC, Reg 36, etc.) when relevant.
 - Include 1-2 real statistics or data points where possible.
+- Mention that more video courses and training content are coming to the CareCallAI Guru YouTube channel — encourage viewers to subscribe so they don't miss new content.
+- The channel mascot is called "Guru" — you can reference him naturally (e.g. "Guru here to walk you through...", "as Guru always says...").
 
 SEO REQUIREMENTS:
 - YouTube title: max 66 characters, include primary keyword near the start, create curiosity

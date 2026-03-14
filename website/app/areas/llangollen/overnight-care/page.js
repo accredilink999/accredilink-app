@@ -3,6 +3,9 @@ import Link from 'next/link';
 export const metadata = {
   title: 'Overnight Care Llangollen | Night Care Dee Valley',
   description: 'Overnight home care in Llangollen — waking night and sleep-in care for safety and peace of mind in the Dee Valley. Call 01824 538688.',
+  alternates: {
+    canonical: "https://accredilinkcare.co.uk/areas/llangollen/overnight-care",
+  },
 };
 
 const jsonLd = {

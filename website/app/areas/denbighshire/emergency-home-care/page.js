@@ -3,6 +3,9 @@ import Link from 'next/link';
 export const metadata = {
   title: 'Emergency Home Care Denbighshire | Same-Day Care',
   description: 'Need urgent home care in Denbighshire? Accredilink provides same-day emergency care across Denbigh, Llangollen & all of Denbighshire. Call 01824 538688.',
+  alternates: {
+    canonical: "https://accredilinkcare.co.uk/areas/denbighshire/emergency-home-care",
+  },
 };
 
 export default function EmergencyHomeCareDenbighshire() {

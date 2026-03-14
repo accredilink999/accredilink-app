@@ -5,6 +5,8 @@ const PrintablePayslip = React.forwardRef(({ record, settings }, ref) => {
     ? JSON.parse(record.deductions)
     : (record.deductions || {});
 
+  const companyName = record.company_name || settings?.company_name || 'Company Name';
+  const payeRef = record.employer_paye_ref || settings?.tax_id || '';
   const brandColor = '#0f766e';
   const periodStart = record.period_start ? new Date(record.period_start).toLocaleDateString('en-GB') : '';
   const periodEnd = record.period_end ? new Date(record.period_end).toLocaleDateString('en-GB') : '';
@@ -40,11 +42,11 @@ const PrintablePayslip = React.forwardRef(({ record, settings }, ref) => {
           )}
           <div>
             <h1 style={{ margin: '0', fontSize: '22px', fontWeight: 'bold', color: brandColor }}>
-              {record.company_name || settings?.company_name || 'Company Name'}
+              {companyName}
             </h1>
-            {(record.employer_paye_ref || settings?.tax_id) && (
+            {payeRef && (
               <p style={{ margin: '3px 0 0', fontSize: '11px', color: '#6b7280' }}>
-                PAYE Ref: {record.employer_paye_ref || settings?.tax_id}
+                PAYE Ref: {payeRef}
               </p>
             )}
           </div>
@@ -246,8 +248,8 @@ const PrintablePayslip = React.forwardRef(({ record, settings }, ref) => {
       {/* Footer */}
       <div style={{ marginTop: '40px', paddingTop: '15px', borderTop: `2px solid ${brandColor}`, fontSize: '10px', color: '#6b7280', textAlign: 'center' }}>
         <p style={{ margin: '3px 0' }}>
-          {record.company_name || settings?.company_name || ''}
-          {(record.employer_paye_ref || settings?.tax_id) && ` | PAYE Ref: ${record.employer_paye_ref || settings?.tax_id}`}
+          {companyName}
+          {payeRef && ` | PAYE Ref: ${payeRef}`}
         </p>
         <p style={{ margin: '3px 0', fontStyle: 'italic' }}>
           This payslip is for information purposes. Please retain for your records.

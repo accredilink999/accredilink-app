@@ -55,6 +55,9 @@ export default function PayslipView({ record, open, onClose, readOnly = false })
         other_label: deductions.other_label || '',
         payment_method: record.payment_method || 'bank_transfer',
         ni_number: record.ni_number || '',
+        period_start: record.period_start || '',
+        period_end: record.period_end || '',
+        payment_date: record.payment_date || '',
       });
     }
   }, [record]);
@@ -84,6 +87,9 @@ export default function PayslipView({ record, open, onClose, readOnly = false })
     pension_percent: parseFloat(form.pension_percent) || 0,
     ni_number: form.ni_number,
     payment_method: form.payment_method,
+    period_start: form.period_start || record?.period_start,
+    period_end: form.period_end || record?.period_end,
+    payment_date: form.payment_date || record?.payment_date,
     deductions: {
       tax: calculated.tax,
       ni: calculated.ni,
@@ -106,6 +112,9 @@ export default function PayslipView({ record, open, onClose, readOnly = false })
       pension_percent: previewRecord.pension_percent,
       ni_number: previewRecord.ni_number,
       payment_method: previewRecord.payment_method,
+      period_start: previewRecord.period_start,
+      period_end: previewRecord.period_end,
+      payment_date: previewRecord.payment_date,
       deductions: previewRecord.deductions,
     }),
     onSuccess: () => {
@@ -154,6 +163,30 @@ export default function PayslipView({ record, open, onClose, readOnly = false })
             </Badge>
           </div>
         </DialogHeader>
+
+        {/* Period dates — always editable by admin */}
+        {!readOnly && (
+          <div className="grid grid-cols-3 gap-3 border-b pb-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Period Start</Label>
+              <Input type="date" value={form.period_start || ''}
+                onChange={(e) => setForm({ ...form, period_start: e.target.value })}
+                className="h-8 text-sm" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Period End</Label>
+              <Input type="date" value={form.period_end || ''}
+                onChange={(e) => setForm({ ...form, period_end: e.target.value })}
+                className="h-8 text-sm" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Payment Date</Label>
+              <Input type="date" value={form.payment_date || ''}
+                onChange={(e) => setForm({ ...form, payment_date: e.target.value })}
+                className="h-8 text-sm" />
+            </div>
+          </div>
+        )}
 
         {!readOnly && (
           <div className="space-y-4 border-b pb-4">

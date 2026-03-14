@@ -60,7 +60,7 @@ export default async function BlogPage() {
 
       <CTABanner
         title="Ready to simplify your care agency?"
-        subtitle="Start your free 7-day trial today."
+        subtitle="Start your free 30-day trial today."
       />
     </>
   );

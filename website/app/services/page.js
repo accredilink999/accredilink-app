@@ -3,8 +3,11 @@ import Image from 'next/image';
 import AnimateOnScroll from '@/components/AnimateOnScroll';
 
 export const metadata = {
-  title: 'Our Services',
+  title: 'Home Care Services Denbighshire, Conwy & North Wales',
   description: 'Domiciliary care, emergency response, respite, palliative care, sit-in services, social care, and training across Denbighshire, Conwy and Wrexham.',
+  alternates: {
+    canonical: "https://accredilinkcare.co.uk/services",
+  },
 };
 
 const services = [

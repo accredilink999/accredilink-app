@@ -6,7 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Download, FileText, Eye, Pencil, CheckCircle, Trash2, MoreVertical, ArrowRight, Loader } from 'lucide-react';
+import { Download, FileText, Eye, Pencil, CheckCircle, Trash2, MoreVertical, ArrowRight, Loader, Calendar } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from 'sonner';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import PayslipView from './PayslipView';
 import PrintablePayslip from './PrintablePayslip';
@@ -21,6 +25,7 @@ export default function PayrollRecords() {
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [viewMode, setViewMode] = useState('edit');
   const [selectedIds, setSelectedIds] = useState([]);
+  const [editingDates, setEditingDates] = useState(null); // { id, period_start, period_end, payment_date }
 
   const { data: payrollRecords = [] } = useQuery({
     queryKey: ['payroll-records'],
@@ -128,6 +133,17 @@ export default function PayrollRecords() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payroll-records'] });
       setSelectedIds([]);
+    },
+  });
+
+  const updateDatesMutation = useMutation({
+    mutationFn: async ({ id, period_start, period_end, payment_date }) => {
+      await base44.entities.PayrollRecord.update(id, { period_start, period_end, payment_date });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payroll-records'] });
+      setEditingDates(null);
+      toast.success('Payslip dates updated');
     },
   });
 
@@ -310,6 +326,9 @@ export default function PayrollRecords() {
                             <DropdownMenuItem onClick={() => { setSelectedRecord(record); setViewMode('readonly'); }}>
                               <Eye className="w-4 h-4 mr-2" /> Quick View
                             </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setEditingDates({ id: record.id, period_start: record.period_start || '', period_end: record.period_end || '', payment_date: record.payment_date || '' })}>
+                              <Calendar className="w-4 h-4 mr-2" /> Edit Dates
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             {record.status === 'draft' && (
                               <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ ids: [record.id], status: 'approved' })}>
@@ -360,6 +379,42 @@ export default function PayrollRecords() {
           readOnly={viewMode === 'readonly'}
         />
       )}
+
+      {/* Edit Dates Dialog */}
+      <Dialog open={!!editingDates} onOpenChange={() => setEditingDates(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Payslip Dates</DialogTitle>
+          </DialogHeader>
+          {editingDates && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Period Start</Label>
+                <Input type="date" value={editingDates.period_start}
+                  onChange={(e) => setEditingDates({ ...editingDates, period_start: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Period End</Label>
+                <Input type="date" value={editingDates.period_end}
+                  onChange={(e) => setEditingDates({ ...editingDates, period_end: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Payment Date</Label>
+                <Input type="date" value={editingDates.payment_date}
+                  onChange={(e) => setEditingDates({ ...editingDates, payment_date: e.target.value })} />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => setEditingDates(null)}>Cancel</Button>
+                <Button className="bg-teal-600 hover:bg-teal-700"
+                  disabled={updateDatesMutation.isPending}
+                  onClick={() => updateDatesMutation.mutate(editingDates)}>
+                  {updateDatesMutation.isPending ? 'Saving...' : 'Save Dates'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

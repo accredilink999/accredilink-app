@@ -26,7 +26,7 @@ export default function ServicePageLayout({ title, description, features, whoIsI
     itemListElement: [
       { "@type": "ListItem", position: 1, name: "Home", item: "https://accredilinkcare.co.uk" },
       { "@type": "ListItem", position: 2, name: "Services", item: "https://accredilinkcare.co.uk/services" },
-      { "@type": "ListItem", position: 3, name: title },
+      { "@type": "ListItem", position: 3, name: title, ...(slug ? { item: `https://accredilinkcare.co.uk/services/${slug}` } : {}) },
     ],
   };
 

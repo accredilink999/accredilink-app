@@ -1,7 +1,7 @@
 import ServicePageLayout from '@/components/ServicePageLayout';
 
 export const metadata = {
-  title: 'Social Care',
+  title: 'Social Care & Community Support North Wales',
   description: 'Social care services in Denbighshire, Conwy and Wrexham. Community-based support to maintain independence, build connections, and improve wellbeing.',
   alternates: {
     canonical: 'https://accredilinkcare.co.uk/services/social-care',

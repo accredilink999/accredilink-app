@@ -2,8 +2,11 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 export const metadata = {
-  title: 'Frequently Asked Questions',
+  title: 'Home Care FAQ — Common Questions Answered',
   description: 'Common questions about domiciliary care, funding, emergency response, and our services in Denbighshire, Conwy and Wrexham.',
+  alternates: {
+    canonical: "https://accredilinkcare.co.uk/faq",
+  },
 };
 
 const faqs = [

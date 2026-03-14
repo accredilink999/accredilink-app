@@ -6,34 +6,35 @@ import AnimateOnScroll from "@/components/AnimateOnScroll";
 import { BreadcrumbJsonLd, FAQJsonLd } from "@/components/SEO/JsonLd";
 
 export const metadata = {
-  title: "Pricing",
+  title: "Care Management Software Pricing — Plans From £99/mo",
   description:
-    "CareCallAI pricing plans from £99/month. Up to 50% cheaper than competitors. 7-day free trial. Plans for care agencies of every size.",
+    "CareCallAI pricing plans from £99/month. Up to 50% cheaper than competitors. 30-day free trial, no credit card required. Plans for care agencies of every size.",
   keywords: [
     "care management software pricing",
     "home care software cost",
     "cheapest care software UK",
     "domiciliary care software pricing",
   ],
+  alternates: { canonical: "https://carecallai.co.uk/pricing" },
   openGraph: {
     title: "Pricing — From £99/mo | CareCallAI",
-    description: "Care management software from £99/mo. Up to 50% cheaper than competitors. 7-day free trial, no credit card required.",
+    description: "Care management software from £99/mo. Up to 50% cheaper than competitors. 30-day free trial, no credit card required.",
   },
   twitter: {
     card: "summary_large_image",
     title: "Pricing — From £99/mo | CareCallAI",
-    description: "Care management software from £99/mo. Up to 50% cheaper than competitors. 7-day free trial, no credit card required.",
+    description: "Care management software from £99/mo. Up to 50% cheaper than competitors. 30-day free trial, no credit card required.",
   },
 };
 
 const faqs = [
   {
     question: "Is there a free trial?",
-    answer: "Yes. Every plan comes with a 7-day free trial. You'll need to add a card at signup, but you won't be charged until the trial ends. Cancel anytime within the 7 days — no charge.",
+    answer: "Yes. Every plan comes with a 30-day free trial. No credit card required — just sign up and start using CareCallAI with all features unlocked. After 30 days, choose a plan to continue.",
   },
   {
     question: "What happens after the trial?",
-    answer: "If you don't cancel within the 7-day trial, your chosen plan will automatically start billing. If you cancel before the trial ends, you won't be charged at all.",
+    answer: "After 30 days, you'll need to choose a plan to continue using CareCallAI. If you don't subscribe, your account will be paused until you pick a plan. No charges are ever made without your consent.",
   },
   {
     question: "Can I change plans later?",
@@ -63,16 +64,61 @@ export default function PricingPage() {
         ]}
       />
       <FAQJsonLd items={faqs} />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Product",
+            name: "CareCallAI",
+            description: "All-in-one home care management software for UK domiciliary care agencies.",
+            brand: { "@type": "Brand", name: "CareCallAI" },
+            url: "https://carecallai.co.uk/pricing",
+            offers: [
+              {
+                "@type": "Offer",
+                name: "Starter",
+                price: "99",
+                priceCurrency: "GBP",
+                priceValidUntil: "2026-12-31",
+                availability: "https://schema.org/InStock",
+                url: "https://carecallai.co.uk/pricing",
+                description: "Up to 15 staff members. All features included.",
+              },
+              {
+                "@type": "Offer",
+                name: "Professional",
+                price: "179",
+                priceCurrency: "GBP",
+                priceValidUntil: "2026-12-31",
+                availability: "https://schema.org/InStock",
+                url: "https://carecallai.co.uk/pricing",
+                description: "Up to 50 staff members. All features included.",
+              },
+              {
+                "@type": "Offer",
+                name: "Enterprise",
+                price: "299",
+                priceCurrency: "GBP",
+                priceValidUntil: "2026-12-31",
+                availability: "https://schema.org/InStock",
+                url: "https://carecallai.co.uk/pricing",
+                description: "Unlimited staff members. All features included. Priority support.",
+              },
+            ],
+          }),
+        }}
+      />
 
       <section className="py-16 sm:py-24 bg-gradient-to-b from-teal-50 to-white">
         <div className="max-w-7xl mx-auto px-4">
           <AnimateOnScroll>
             <div className="text-center mb-12">
               <h1 className="text-3xl sm:text-5xl font-bold text-slate-900 mb-4">
-                Simple, transparent pricing
+                Care Management Software Pricing
               </h1>
               <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-                Up to 50% cheaper than leading competitors. No hidden fees. Every plan includes a 7-day free trial.
+                Up to 50% cheaper than leading competitors. No hidden fees. Every plan includes a 30-day free trial — no credit card required.
               </p>
             </div>
           </AnimateOnScroll>

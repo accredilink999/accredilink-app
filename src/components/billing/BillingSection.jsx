@@ -207,7 +207,7 @@ export default function BillingSection() {
                 Free trial — {trialDaysLeft} day{trialDaysLeft !== 1 ? 's' : ''} remaining
               </p>
               <p className="text-xs text-yellow-600 mt-0.5">
-                Trial ends {trialEnds.toLocaleDateString('en-GB')}. Your card will be charged automatically unless you cancel before then.
+                Trial ends {trialEnds.toLocaleDateString('en-GB')}. Choose a plan before then to keep using CareCallAI.
               </p>
             </div>
           </div>
@@ -307,14 +307,14 @@ export default function BillingSection() {
                 >
                   {upgrading === p.key ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : showUpgrade ? 'Start 7-Day Trial' : 'Upgrade'}
+                  ) : showUpgrade ? 'Start 30-Day Trial' : 'Upgrade'}
                 </Button>
               </div>
             );
           })}
           </div>
           <p className="text-xs text-slate-400 mt-3 text-center">
-            7-day free trial. Card required. Cancel anytime via Stripe. Auto-charges after trial.
+            30-day free trial. No credit card required. Cancel anytime.
           </p>
         </Card>
       )}

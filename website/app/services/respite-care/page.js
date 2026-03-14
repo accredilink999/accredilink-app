@@ -1,7 +1,7 @@
 import ServicePageLayout from '@/components/ServicePageLayout';
 
 export const metadata = {
-  title: 'Respite Care',
+  title: 'Respite Care at Home — Denbighshire & North Wales',
   description: 'Respite care services in Denbighshire, Conwy and Wrexham. CIW-regulated short-term relief for family carers while your loved one receives professional, person-centred care.',
   alternates: {
     canonical: 'https://accredilinkcare.co.uk/services/respite-care',

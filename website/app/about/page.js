@@ -2,8 +2,11 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 export const metadata = {
-  title: 'About Us',
+  title: 'About Us — CIW-Registered Care Provider in North Wales',
   description: 'Learn about Accredilink Community Response Taskforce — a Welsh care provider regulated by Care Inspectorate Wales, serving Denbighshire, Conwy and Wrexham.',
+  alternates: {
+    canonical: "https://accredilinkcare.co.uk/about",
+  },
 };
 
 const values = [

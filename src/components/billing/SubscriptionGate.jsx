@@ -64,7 +64,7 @@ export default function SubscriptionGate() {
 
         <p className="text-slate-600 mb-6">
           {isExpiredTrial
-            ? 'Your 7-day free trial has expired. Subscribe to continue using CareCall AI with all features.'
+            ? 'Your 30-day free trial has expired. Subscribe to continue using CareCall AI with all features.'
             : 'Your subscription has been cancelled or payment failed. Reactivate to regain access.'
           }
         </p>

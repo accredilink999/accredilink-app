@@ -1,7 +1,7 @@
 import ServicePageLayout from '@/components/ServicePageLayout';
 
 export const metadata = {
-  title: 'Domiciliary Care',
+  title: 'Domiciliary Care Denbighshire & North Wales',
   description: 'Professional domiciliary care services in Denbighshire, Conwy and Wrexham. CIW-regulated personal care, medication support, and daily living assistance in your own home.',
   alternates: {
     canonical: 'https://accredilinkcare.co.uk/services/domiciliary-care',

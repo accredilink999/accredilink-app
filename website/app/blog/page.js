@@ -2,7 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 export const metadata = {
-  title: 'Blog | Care Guides, Advice & News',
+  title: 'Care Blog — Guides, Advice & News for Wales',
   description: 'Expert advice on domiciliary care, funding guidance, dementia support, hospital discharge, and care in Wales. From the Accredilink team.',
   alternates: {
     canonical: 'https://accredilinkcare.co.uk/blog',

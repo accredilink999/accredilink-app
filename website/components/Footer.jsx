@@ -16,6 +16,7 @@ const quickLinks = [
   { href: '/faq', label: 'FAQ' },
   { href: '/compliance', label: 'Compliance & Funding' },
   { href: '/apps-that-care', label: 'Apps That Care' },
+  { href: '/brochure/care', label: 'Download Brochure' },
   { href: '/careers', label: 'Careers' },
   { href: '/contact', label: 'Contact Us' },
 ];

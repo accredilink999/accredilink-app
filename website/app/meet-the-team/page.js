@@ -2,8 +2,11 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 export const metadata = {
-  title: 'Meet the Team',
+  title: 'Meet Our Care Team in North Wales',
   description: 'Meet the team behind Accredilink Community Response Taskforce. Local, qualified, and passionate about care in North Wales.',
+  alternates: {
+    canonical: "https://accredilinkcare.co.uk/meet-the-team",
+  },
 };
 
 export default function MeetTheTeamPage() {

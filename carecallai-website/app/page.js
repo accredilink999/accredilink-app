@@ -67,7 +67,7 @@ const faqs = [
   { question: "What does the Virtual Care Inspector do?", answer: "The Virtual Care Inspector runs a full automated inspection across 8 categories: staff compliance (DBS, ID, references), supervisions, training certificates, service users (care plans, assessments), medication (MAR charts), care delivery, incidents and governance. It gives you a live compliance score and flags every gap before a real inspector finds it." },
   { question: "How long does it take to set up?", answer: "Most agencies are fully set up within a day. You can import your existing staff and client data, and our team is available to help with onboarding if needed." },
   { question: "Can my carers use it on their phones?", answer: "Yes. CareCallAI has native iOS and Android apps that carers use to view their rota, log care visits, complete MAR charts and report incidents — all from their phone." },
-  { question: "Is there a free trial?", answer: "Yes. We offer a free 7-day trial on all plans with no credit card required. You get full access to every feature during the trial." },
+  { question: "Is there a free trial?", answer: "Yes. We offer a free 30-day trial on all plans with no credit card required. You get full access to every feature during the trial." },
   { question: "How does pricing work?", answer: "CareCallAI is priced per month based on your team size. Plans start from £99/month for up to 15 staff. Annual billing saves 20%. See our pricing page for full details." },
   { question: "Does it support Welsh language?", answer: "Yes. CareCallAI is built in Wales and includes full bilingual Welsh/English compliance support. All CIW regulations, guidance and forms are available in both languages — essential for Welsh-registered care providers." },
   { question: "Does it connect to my accounting software?", answer: "Yes. CareCallAI integrates with QuickBooks, Sage and Xero for seamless invoice and payroll export. You can also invoice councils and private clients directly from the platform." },
@@ -102,7 +102,7 @@ const comparisonFeatures = [
 export const metadata = {
   title: "Home Care Management Software UK — CareCallAI",
   description:
-    "All-in-one care management software for UK domiciliary care agencies. Scheduling, care logging, eMAR, GPS tracking, CIW & CQC compliance, invoicing and AI assistant. From £99/mo. Free 7-day trial.",
+    "All-in-one care management software for UK domiciliary care agencies. Scheduling, care logging, eMAR, GPS tracking, CIW & CQC compliance, invoicing and AI assistant. From £99/mo. Free 30-day trial.",
   alternates: { canonical: "https://carecallai.co.uk" },
   openGraph: {
     title: "Home Care Management Software UK — CareCallAI",
@@ -158,13 +158,13 @@ export default function HomePage() {
               <AnimateOnScroll animation="fade-up" delay={300}>
                 <div className="flex flex-col sm:flex-row gap-4 mb-6">
                   <Link href="/signup" className="px-8 py-3.5 bg-teal-500 text-white font-semibold rounded-xl hover:bg-teal-400 transition-all shadow-lg shadow-teal-500/30 text-lg animate-pulse-glow">
-                    Start Free 7-Day Trial
+                    Start Free 30-Day Trial
                   </Link>
                   <Link href="/features" className="px-8 py-3.5 border border-white/20 text-white font-semibold rounded-xl hover:bg-white/10 transition-all flex items-center gap-2 text-lg backdrop-blur">
                     See All Features <ArrowRight className="w-5 h-5" />
                   </Link>
                 </div>
-                <p className="text-sm text-slate-500">No credit card required &middot; Free 7-day trial &middot; Cancel anytime</p>
+                <p className="text-sm text-slate-500">No credit card required &middot; Free 30-day trial &middot; Cancel anytime</p>
               </AnimateOnScroll>
             </div>
 
@@ -460,7 +460,7 @@ export default function HomePage() {
               <Link href="/signup" className="inline-flex items-center gap-2 px-8 py-4 bg-teal-500 text-white font-bold text-lg rounded-xl hover:bg-teal-400 transition-all shadow-lg shadow-teal-500/30 animate-pulse-glow">
                 Start Free Trial — See Your Compliance Score <ArrowRight className="w-5 h-5" />
               </Link>
-              <p className="text-sm text-slate-500 mt-3">No credit card required &middot; Full access for 7 days</p>
+              <p className="text-sm text-slate-500 mt-3">No credit card required &middot; Full access for 30 days</p>
             </div>
           </AnimateOnScroll>
         </div>

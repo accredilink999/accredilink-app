@@ -2,7 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 export const metadata = {
-  title: 'What Is Respite Care and How Can It Help Your Family? | Accredilink',
+  title: 'What Is Respite Care and How Can It Help Your Family?',
   description: 'Understanding respite care in Wales: what it is, the different types available, who it is for, the benefits, how to arrange it, and funding options in Denbighshire, Conwy, and Wrexham.',
   alternates: {
     canonical: 'https://accredilinkcare.co.uk/blog/what-is-respite-care',

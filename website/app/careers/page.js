@@ -2,8 +2,11 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 export const metadata = {
-  title: 'Careers',
+  title: 'Care Jobs North Wales — Join Our Team',
   description: 'Join the Accredilink team. Care worker, emergency responder, and training roles across Denbighshire, Conwy and Wrexham.',
+  alternates: {
+    canonical: "https://accredilinkcare.co.uk/careers",
+  },
 };
 
 const benefits = [
