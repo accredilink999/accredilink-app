@@ -34,6 +34,13 @@ export default function AdminPortal() {
   const [usersLoading, setUsersLoading] = useState(false);
   const [removeConfirm, setRemoveConfirm] = useState(null);
 
+  // Radio Handsets state
+  const [handsetsOpen, setHandsetsOpen] = useState(false);
+  const [handsets, setHandsets] = useState([]);
+  const [showAddHandset, setShowAddHandset] = useState(false);
+  const [handsetForm, setHandsetForm] = useState({ callsign: '', phone: '', email: '', emailPassword: '' });
+  const [showPasswords, setShowPasswords] = useState({});
+
   useEffect(() => {
     const token = sessionStorage.getItem('admin_token');
     const userStr = sessionStorage.getItem('admin_user');
@@ -44,6 +51,11 @@ export default function AdminPortal() {
       }
     }
     setCheckingSession(false);
+    // Load handsets
+    try {
+      const saved = localStorage.getItem('accredilink_handsets');
+      if (saved) setHandsets(JSON.parse(saved));
+    } catch { /* ignore */ }
   }, []);
 
   const fetchUsers = useCallback(async () => {
@@ -65,6 +77,27 @@ export default function AdminPortal() {
       fetchUsers();
     }
   }, [isLoggedIn, currentUser, fetchUsers]);
+
+  const saveHandsets = (list) => {
+    setHandsets(list);
+    localStorage.setItem('accredilink_handsets', JSON.stringify(list));
+  };
+
+  const addHandset = () => {
+    if (!handsetForm.callsign) return;
+    const newHandset = { ...handsetForm, id: Date.now().toString() };
+    saveHandsets([...handsets, newHandset]);
+    setHandsetForm({ callsign: '', phone: '', email: '', emailPassword: '' });
+    setShowAddHandset(false);
+  };
+
+  const removeHandset = (id) => {
+    saveHandsets(handsets.filter(h => h.id !== id));
+  };
+
+  const togglePassword = (id) => {
+    setShowPasswords(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -398,6 +431,159 @@ export default function AdminPortal() {
           <p className="text-xs text-slate-400 mt-3">All email links open Ionos Webmail. Log in with the relevant email address and password.</p>
         </div>
 
+        {/* Radio Handsets */}
+        <div className="mb-8">
+          <button
+            onClick={() => setHandsetsOpen(!handsetsOpen)}
+            className="w-full flex items-center justify-between bg-white rounded-2xl border border-slate-200 p-6 hover:shadow-md transition-all"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-yellow-100 flex items-center justify-center text-2xl">
+                <svg className="w-6 h-6 text-yellow-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              </div>
+              <div className="text-left">
+                <h3 className="font-semibold text-slate-900 text-lg">Radio Handsets</h3>
+                <p className="text-sm text-slate-500">{handsets.length} handset{handsets.length !== 1 ? 's' : ''} registered</p>
+              </div>
+            </div>
+            <svg className={`w-5 h-5 text-slate-400 transition-transform ${handsetsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {handsetsOpen && (
+            <div className="mt-3 bg-white rounded-2xl border border-slate-200 overflow-hidden">
+              {/* Header with Add + Top Up */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                <p className="text-sm font-medium text-slate-700">Handset Register</p>
+                <div className="flex gap-2">
+                  <a
+                    href="https://www.giffgaff.com/dashboard"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-500 transition-colors flex items-center gap-1.5"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Top Up
+                  </a>
+                  <button
+                    onClick={() => setShowAddHandset(!showAddHandset)}
+                    className="px-4 py-2 bg-[#B91C1C] text-white rounded-lg text-sm font-medium hover:bg-[#DC2626] transition-colors flex items-center gap-1.5"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add Handset
+                  </button>
+                </div>
+              </div>
+
+              {/* Add Handset Form */}
+              {showAddHandset && (
+                <div className="px-6 py-4 bg-slate-50 border-b border-slate-100">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Callsign *</label>
+                      <input
+                        value={handsetForm.callsign}
+                        onChange={e => setHandsetForm({ ...handsetForm, callsign: e.target.value })}
+                        placeholder="e.g. Alpha 1"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#B91C1C]/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Phone Number</label>
+                      <input
+                        value={handsetForm.phone}
+                        onChange={e => setHandsetForm({ ...handsetForm, phone: e.target.value })}
+                        placeholder="e.g. 07700 900000"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#B91C1C]/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Handset Email</label>
+                      <input
+                        type="email"
+                        value={handsetForm.email}
+                        onChange={e => setHandsetForm({ ...handsetForm, email: e.target.value })}
+                        placeholder="e.g. handset1@gmail.com"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#B91C1C]/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Email Password</label>
+                      <input
+                        type="password"
+                        value={handsetForm.emailPassword}
+                        onChange={e => setHandsetForm({ ...handsetForm, emailPassword: e.target.value })}
+                        placeholder="Email password"
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#B91C1C]/50"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button onClick={() => setShowAddHandset(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">Cancel</button>
+                    <button onClick={addHandset} disabled={!handsetForm.callsign} className="px-4 py-2 bg-[#B91C1C] text-white rounded-lg text-sm font-medium hover:bg-[#DC2626] transition-colors disabled:opacity-50">Save Handset</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Handset List */}
+              {handsets.length === 0 ? (
+                <div className="text-center py-8 px-6">
+                  <svg className="w-10 h-10 text-slate-300 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  <p className="text-sm text-slate-400">No handsets registered yet.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {handsets.map(h => (
+                    <div key={h.id} className="px-6 py-4">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1.5">
+                          <p className="font-semibold text-slate-900">{h.callsign}</p>
+                          {h.phone && (
+                            <p className="text-sm text-slate-600 flex items-center gap-1.5">
+                              <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                              {h.phone}
+                            </p>
+                          )}
+                          {h.email && (
+                            <p className="text-sm text-slate-600 flex items-center gap-1.5">
+                              <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                              {h.email}
+                            </p>
+                          )}
+                          {h.emailPassword && (
+                            <p className="text-sm text-slate-600 flex items-center gap-1.5">
+                              <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                              <span className="font-mono text-xs">{showPasswords[h.id] ? h.emailPassword : '••••••••'}</span>
+                              <button onClick={() => togglePassword(h.id)} className="text-xs text-[#B91C1C] hover:underline ml-1">
+                                {showPasswords[h.id] ? 'Hide' : 'Show'}
+                              </button>
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => removeHandset(h.id)}
+                          className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Social Media Hub */}
         <div className="mb-8">
           <a
@@ -417,6 +603,47 @@ export default function AdminPortal() {
               </svg>
             </div>
           </a>
+        </div>
+
+        {/* Homecare.co.uk */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold text-slate-900 mb-4">Homecare.co.uk</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <a
+              href="/admin/homecare"
+              className="group bg-gradient-to-r from-orange-50 to-amber-50 rounded-2xl border border-orange-200 p-6 hover:shadow-lg hover:border-orange-300 transition-all"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center text-2xl group-hover:bg-orange-200 transition-colors">
+                  🏠
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-slate-900 text-lg">Homecare.co.uk</h3>
+                  <p className="text-sm text-slate-500">Enquiries, reviews & job listings</p>
+                </div>
+                <svg className="w-5 h-5 text-slate-400 group-hover:text-orange-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            </a>
+            <a
+              href="/admin/homecare-keys"
+              className="group bg-gradient-to-r from-blue-50 to-cyan-50 rounded-2xl border border-blue-200 p-6 hover:shadow-lg hover:border-blue-300 transition-all"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center text-2xl group-hover:bg-blue-200 transition-colors">
+                  🔑
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-slate-900 text-lg">API Keys</h3>
+                  <p className="text-sm text-slate-500">API credentials, webhooks & integrations</p>
+                </div>
+                <svg className="w-5 h-5 text-slate-400 group-hover:text-blue-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            </a>
+          </div>
         </div>
 
         {/* Admin Tools */}
