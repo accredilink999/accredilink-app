@@ -94,15 +94,30 @@ export async function POST(request) {
   if (contactErr) return NextResponse.json({ error: contactErr.message }, { status: 500 });
   if (!contacts || contacts.length === 0) return NextResponse.json({ error: 'No matching contacts found' }, { status: 400 });
 
+  // Exclude contacts who already received ANY previous campaign
+  const { data: alreadySent } = await supabase
+    .from('email_sends')
+    .select('contact_id')
+    .eq('status', 'sent');
+  const sentIds = new Set((alreadySent || []).map(s => s.contact_id));
+  const freshContacts = contacts.filter(c => !sentIds.has(c.id));
+
+  if (freshContacts.length === 0) {
+    return NextResponse.json({ error: 'All matching contacts have already been emailed in previous campaigns' }, { status: 400 });
+  }
+
+  // Use freshContacts from here on (replace contacts reference)
+  const targetContacts = freshContacts;
+
   // Mark campaign as sending
   await supabase.from('email_campaigns').update({
     status: 'sending',
-    total_recipients: contacts.length,
+    total_recipients: targetContacts.length,
     updated_at: new Date().toISOString(),
   }).eq('id', campaign_id);
 
   // Create send records with pre-generated UUIDs so tracking links work
-  const sendRecords = contacts.map(c => ({
+  const sendRecords = targetContacts.map(c => ({
     id: crypto.randomUUID(),
     campaign_id,
     contact_id: c.id,
@@ -122,8 +137,8 @@ export async function POST(request) {
   let totalSent = 0;
   let totalFailed = 0;
 
-  for (let i = 0; i < contacts.length; i += BATCH_SIZE) {
-    const batch = contacts.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < targetContacts.length; i += BATCH_SIZE) {
+    const batch = targetContacts.slice(i, i + BATCH_SIZE);
 
     for (const contact of batch) {
       const sendRecord = sendMap.get(contact.id);
@@ -152,7 +167,7 @@ export async function POST(request) {
     }
 
     // Rate limit delay between batches
-    if (i + BATCH_SIZE < contacts.length) {
+    if (i + BATCH_SIZE < targetContacts.length) {
       await sleep(BATCH_DELAY_MS);
     }
   }
@@ -167,7 +182,7 @@ export async function POST(request) {
 
   return NextResponse.json({
     success: true,
-    total_recipients: contacts.length,
+    total_recipients: targetContacts.length,
     total_sent: totalSent,
     total_failed: totalFailed,
   });
@@ -178,10 +193,11 @@ function finaliseHtml(html, sendId, baseUrl) {
   const unsubLink = `${baseUrl}/api/campaigns/track?type=unsubscribe&sid=${sendId}`;
   const companyAddress = 'CareCallAI, The Hummingbird, 27-29 High St, Denbigh LL16 3HY';
 
+  const subscribeLink = `${baseUrl}/subscribe`;
+
   let finalHtml = html
-    .replace('{{UNSUBSCRIBE_LINK}}', unsubLink)
     .replace(/\{\{UNSUBSCRIBE_LINK\}\}/g, unsubLink)
-    .replace('{{COMPANY_ADDRESS}}', companyAddress)
+    .replace(/\{\{SUBSCRIBE_LINK\}\}/g, subscribeLink)
     .replace(/\{\{COMPANY_ADDRESS\}\}/g, companyAddress);
 
   // Insert tracking pixel before closing body/html
