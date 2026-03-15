@@ -11,6 +11,17 @@ import { supabase } from '@/api/supabaseClient';
 
 let _messaging = null;
 
+// Shared Firebase config — same project for all orgs
+const DEFAULT_FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyAWIolTENHggZDwPPflpGbppM7VnyhflLo',
+  authDomain: 'carecallai-notifications.firebaseapp.com',
+  projectId: 'carecallai-notifications',
+  storageBucket: 'carecallai-notifications.firebasestorage.app',
+  messagingSenderId: '505721252763',
+  appId: '1:505721252763:web:30028baf5f7440aa194f3e',
+};
+const DEFAULT_VAPID_KEY = 'BGA066-pu69vh4ongiQk9JzgT4-0lFbL-JAdWlB9YhnDzxhUzeop_QkVyDYz_q3UZ4xBxEbdxx3mx_vLaHzSSHg';
+
 // ---------------------------------------------------------------------------
 // IndexedDB helpers — share config with firebase-messaging-sw.js
 // ---------------------------------------------------------------------------
@@ -52,30 +63,34 @@ async function clearConfigFromIDB() {
 // ---------------------------------------------------------------------------
 
 async function loadFirebaseWebConfig() {
-  const { data, error } = await supabase
-    .from('system_settings')
-    .select('setting_value')
-    .eq('setting_key', 'firebase_web_config')
-    .maybeSingle();
-
-  if (error || !data?.setting_value) return null;
-
   try {
-    return typeof data.setting_value === 'string'
-      ? JSON.parse(data.setting_value)
-      : data.setting_value;
-  } catch {
-    return null;
-  }
+    const { data, error } = await supabase
+      .from('system_settings')
+      .select('setting_value')
+      .eq('setting_key', 'firebase_web_config')
+      .maybeSingle();
+
+    if (!error && data?.setting_value) {
+      return typeof data.setting_value === 'string'
+        ? JSON.parse(data.setting_value)
+        : data.setting_value;
+    }
+  } catch {}
+  // Fallback to shared default config
+  return DEFAULT_FIREBASE_CONFIG;
 }
 
 async function loadVapidKey() {
-  const { data } = await supabase
-    .from('system_settings')
-    .select('setting_value')
-    .eq('setting_key', 'firebase_vapid_key')
-    .maybeSingle();
-  return data?.setting_value || null;
+  try {
+    const { data } = await supabase
+      .from('system_settings')
+      .select('setting_value')
+      .eq('setting_key', 'firebase_vapid_key')
+      .maybeSingle();
+    if (data?.setting_value) return data.setting_value;
+  } catch {}
+  // Fallback to shared default VAPID key
+  return DEFAULT_VAPID_KEY;
 }
 
 // ---------------------------------------------------------------------------
