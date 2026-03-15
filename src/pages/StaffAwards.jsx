@@ -221,6 +221,7 @@ export default function StaffAwards() {
           message: `${currentUser?.full_name || 'Admin'} gave you a "${selectedType.name}" award`,
           link: '/Dashboard',
           is_read: false,
+          send_push: true,
         });
       } catch {}
     },

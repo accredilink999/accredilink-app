@@ -288,15 +288,16 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
       });
       if (error) throw error;
 
-      // Create a notification for the recipient
+      // Create a notification + push for the recipient
       try {
         await base44.entities.Notification.create({
           recipient_id: staffId,
           type: 'award',
-          title: 'You received a Staff Award!',
+          title: `${award.emoji || '⭐'} You received a Staff Award!`,
           message: `${currentUser?.full_name || 'Admin'} gave you a "${award.title}" award`,
           link: '/Dashboard',
           is_read: false,
+          send_push: true,
         });
       } catch {}
     },
