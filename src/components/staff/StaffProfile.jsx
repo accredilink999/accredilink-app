@@ -287,6 +287,18 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
         message: award.message || null,
       });
       if (error) throw error;
+
+      // Create a notification for the recipient
+      try {
+        await base44.entities.Notification.create({
+          recipient_id: staffId,
+          type: 'award',
+          title: 'You received a Staff Award!',
+          message: `${currentUser?.full_name || 'Admin'} gave you a "${award.title}" award`,
+          link: '/Dashboard',
+          is_read: false,
+        });
+      } catch {}
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['staffAwards', staffId] });
@@ -294,16 +306,6 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
       setShowAwardDialog(false);
       setAwardData({ title: '', message: '' });
       toast.success(`Award given to ${staff?.full_name}!`);
-
-      // Create a notification for the recipient
-      base44.entities.Notification.create({
-        recipient_id: staffId,
-        type: 'award',
-        title: 'You received a Staff Award!',
-        message: `${currentUser?.full_name || 'Admin'} gave you a "${award.title}" award`,
-        link: '/Dashboard',
-        is_read: false,
-      }).catch(() => {});
     },
     onError: (err) => toast.error(err.message || 'Failed to give award'),
   });
