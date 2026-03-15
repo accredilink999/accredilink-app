@@ -116,23 +116,32 @@ Deno.serve(async (req) => {
       return json({ error: `Failed to create membership: ${memErr.message}` }, 500);
     }
 
-    // Ensure profile exists with admin role for org owner
+    // Ensure profile exists with super_admin role for org owner
+    const fullName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
     await admin
       .from('profiles')
       .upsert({
         id: user.id,
         email: user.email,
-        full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+        full_name: fullName,
         role: 'super_admin',
         job_title: 'admin',
         onboarding_complete: true,
       }, { onConflict: 'id' });
 
-    // Ensure user record has org_id
+    // Ensure user record exists with super_admin role and org_id
     await admin
       .from('users')
-      .update({ organization_id: org.id })
-      .eq('id', user.id);
+      .upsert({
+        id: user.id,
+        email: user.email,
+        full_name: fullName,
+        staff_full_name: fullName,
+        role: 'super_admin',
+        job_title: 'admin',
+        organization_id: org.id,
+        is_active: true,
+      }, { onConflict: 'id' });
 
     return json({
       organizationId: org.id,

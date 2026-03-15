@@ -12,6 +12,7 @@ export default function OnboardingPage() {
   const [user, setUser] = useState(null);
   const [inviteCode, setInviteCode] = useState(null);
   const [error, setError] = useState(null);
+  const [authTokens, setAuthTokens] = useState(null);
 
   useEffect(() => {
     const init = async () => {
@@ -44,6 +45,7 @@ export default function OnboardingPage() {
         }
 
         setUser(sessionData.user);
+        setAuthTokens({ at, rt });
 
         // Call edge function to set up organization (30-day trial, no card needed)
         const setupRes = await fetch(`${SUPABASE_URL}/functions/v1/setup-organization`, {
@@ -64,9 +66,9 @@ export default function OnboardingPage() {
         setInviteCode(setupData.inviteCode || null);
         setStep('success');
 
-        // Auto-redirect to app after 4 seconds
+        // Auto-redirect to app after 4 seconds — pass tokens so app picks up correct session
         setTimeout(() => {
-          window.location.href = APP_URL;
+          window.location.href = `${APP_URL}/login#access_token=${at}&refresh_token=${rt}&type=signup`;
         }, 4000);
       } catch (err) {
         console.error('Onboarding init error:', err);
@@ -176,7 +178,7 @@ export default function OnboardingPage() {
         )}
 
         <a
-          href={APP_URL}
+          href={authTokens ? `${APP_URL}/login#access_token=${authTokens.at}&refresh_token=${authTokens.rt}&type=signup` : APP_URL}
           className="inline-flex items-center justify-center w-full max-w-xs px-6 py-3 bg-teal-600 text-white font-semibold rounded-lg hover:bg-teal-700 transition-colors mb-3"
         >
           Go to Dashboard
