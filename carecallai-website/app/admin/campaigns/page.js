@@ -56,7 +56,15 @@ const CAMPAIGN_TYPE_LABELS = {
   promotional: 'Promotional',
 };
 
-const TABS = ['Campaigns', 'Create Campaign', 'AI Generator', 'Contacts', 'Templates'];
+const TABS = ['Campaigns', 'Create Campaign', 'AI Generator', 'Contacts', 'Templates', 'Send Results'];
+
+const SEND_STATUS_COLORS = {
+  queued: 'bg-slate-100 text-slate-700',
+  sent: 'bg-blue-100 text-blue-700',
+  opened: 'bg-green-100 text-green-700',
+  clicked: 'bg-teal-100 text-teal-700',
+  failed: 'bg-red-100 text-red-700',
+};
 
 export default function EmailCampaignsPage() {
   // Auth
@@ -133,6 +141,13 @@ export default function EmailCampaignsPage() {
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [templatePreviewId, setTemplatePreviewId] = useState(null);
   const [confirmDeleteTemplate, setConfirmDeleteTemplate] = useState(null);
+
+  // Send Results tab
+  const [sendResultsCampaignId, setSendResultsCampaignId] = useState('');
+  const [sendResults, setSendResults] = useState([]);
+  const [sendResultsStats, setSendResultsStats] = useState(null);
+  const [sendResultsLoading, setSendResultsLoading] = useState(false);
+  const [sendResultsStatusFilter, setSendResultsStatusFilter] = useState('all');
 
   // Global
   const [error, setError] = useState('');
@@ -240,6 +255,21 @@ export default function EmailCampaignsPage() {
     setAudienceLoading(false);
   }, []);
 
+  // ---- Load send results ----
+  const loadSendResults = useCallback(async (campaignId) => {
+    if (!campaignId) { setSendResults([]); setSendResultsStats(null); return; }
+    setSendResultsLoading(true);
+    setError('');
+    try {
+      const data = await apiFetch(`/api/campaigns/sends?campaign_id=${campaignId}`);
+      setSendResults(data.sends || []);
+      setSendResultsStats(data.stats || null);
+    } catch (err) {
+      setError('Failed to load send results: ' + err.message);
+    }
+    setSendResultsLoading(false);
+  }, []);
+
   // ---- Data loading on tab change ----
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -247,6 +277,7 @@ export default function EmailCampaignsPage() {
     if (activeTab === 3) { loadContacts(); loadContactsCount(); }
     if (activeTab === 4) loadTemplates();
     if (activeTab === 1) loadTemplates(); // for "Load Template" dropdown
+    if (activeTab === 5) loadCampaigns(); // need campaign list for dropdown
   }, [activeTab, isLoggedIn, loadCampaigns, loadContacts, loadContactsCount, loadTemplates]);
 
   // ---- Reload contacts on filter/page change ----
@@ -336,11 +367,45 @@ export default function EmailCampaignsPage() {
 
   async function sendCampaign(id) {
     setSendingCampaign(id);
+    setError('');
     try {
-      await apiFetch('/api/campaigns/send', {
+      // Step 1: Set up queued send records
+      const setup = await apiFetch('/api/campaigns/send', {
         method: 'POST',
         body: JSON.stringify({ campaign_id: id }),
       });
+      const totalRecipients = setup.total_recipients || 0;
+
+      // Step 2: Process batches from the frontend (avoids Vercel timeout)
+      let totalSent = 0;
+      let totalFailed = 0;
+      let batchCount = 0;
+      const MAX_BATCHES = 50;
+
+      while (batchCount < MAX_BATCHES) {
+        setError(`Sending batch ${batchCount + 1}... (${totalSent} sent, ${totalFailed} failed of ${totalRecipients})`);
+        const result = await apiFetch('/api/campaigns/send', {
+          method: 'POST',
+          body: JSON.stringify({ campaign_id: id, batch_mode: true }),
+        });
+        totalSent += result.batch_sent || 0;
+        totalFailed += result.batch_failed || 0;
+        batchCount++;
+
+        if (result.errors && result.errors.length > 0) {
+          console.log('Batch errors:', result.errors);
+        }
+
+        if (result.done) {
+          setError('');
+          alert(`Campaign complete! ${result.total_sent || totalSent} delivered, ${totalFailed} failed.`);
+          break;
+        }
+
+        // Small delay between batches
+        await new Promise((r) => setTimeout(r, 300));
+      }
+
       setConfirmSendCampaign(null);
       loadCampaigns();
     } catch (err) {
@@ -745,14 +810,20 @@ export default function EmailCampaignsPage() {
                   >
                     Send Test
                   </button>
-                  {campaign.status === 'draft' || campaign.status === 'scheduled' ? (
+                  <button
+                    onClick={() => { setSendResultsCampaignId(campaign.id); loadSendResults(campaign.id); setActiveTab(5); }}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100 font-medium transition-colors"
+                  >
+                    View Results
+                  </button>
+                  {campaign.status === 'draft' || campaign.status === 'scheduled' || campaign.status === 'sent' ? (
                     confirmSendCampaign === campaign.id ? (
                       <div className="flex items-center gap-1">
-                        <span className="text-xs text-amber-600 font-medium">Send now?</span>
+                        <span className="text-xs text-amber-600 font-medium">{campaign.status === 'sent' ? 'Send to new contacts?' : 'Send now?'}</span>
                         <button
                           onClick={() => sendCampaign(campaign.id)}
                           disabled={sendingCampaign === campaign.id}
-                          className="text-xs px-3 py-1.5 rounded-lg bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50 font-medium"
+                          className={`text-xs px-3 py-1.5 rounded-lg text-white disabled:opacity-50 font-medium ${campaign.status === 'sent' ? 'bg-green-600 hover:bg-green-700' : 'bg-teal-600 hover:bg-teal-700'}`}
                         >
                           {sendingCampaign === campaign.id ? 'Sending...' : 'Confirm'}
                         </button>
@@ -763,9 +834,9 @@ export default function EmailCampaignsPage() {
                     ) : (
                       <button
                         onClick={() => setConfirmSendCampaign(campaign.id)}
-                        className="text-xs px-3 py-1.5 rounded-lg bg-teal-600 text-white hover:bg-teal-700 font-medium transition-colors"
+                        className={`text-xs px-3 py-1.5 rounded-lg text-white font-medium transition-colors ${campaign.status === 'sent' ? 'bg-green-600 hover:bg-green-700' : 'bg-teal-600 hover:bg-teal-700'}`}
                       >
-                        Send
+                        {campaign.status === 'sent' ? 'Send to New Contacts' : 'Send'}
                       </button>
                     )
                   ) : null}
@@ -1661,6 +1732,177 @@ export default function EmailCampaignsPage() {
     );
   }
 
+  // ---- TAB 5: Send Results ----
+  function renderSendResultsTab() {
+    const sentCampaigns = campaigns.filter((c) => ['sent', 'sending', 'draft'].includes(c.status));
+    const filteredSends = sendResultsStatusFilter === 'all'
+      ? sendResults
+      : sendResults.filter((s) => s.status === sendResultsStatusFilter);
+
+    return (
+      <div>
+        <h2 className="text-lg font-bold text-slate-900 mb-4">Send Results</h2>
+
+        {/* Campaign selector */}
+        <div className="bg-white rounded-xl shadow-sm border p-4 mb-4">
+          <label className="block text-sm font-medium text-slate-700 mb-2">Select Campaign</label>
+          <select
+            value={sendResultsCampaignId}
+            onChange={(e) => { setSendResultsCampaignId(e.target.value); loadSendResults(e.target.value); setSendResultsStatusFilter('all'); }}
+            className="w-full sm:w-96 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
+          >
+            <option value="">-- Choose a campaign --</option>
+            {sentCampaigns.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name || 'Untitled'} ({c.status})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* No campaign selected */}
+        {!sendResultsCampaignId && (
+          <div className="bg-white rounded-xl shadow-sm border p-8 text-center">
+            <svg className="w-12 h-12 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <p className="text-sm text-slate-500">Select a campaign above to view send results.</p>
+          </div>
+        )}
+
+        {/* Loading */}
+        {sendResultsCampaignId && sendResultsLoading && (
+          <div className="bg-white rounded-xl shadow-sm border p-8 text-center">
+            <div className="w-6 h-6 border-4 border-slate-300 border-t-teal-600 rounded-full animate-spin mx-auto mb-2" />
+            <p className="text-sm text-slate-500">Loading results...</p>
+          </div>
+        )}
+
+        {/* Stats summary */}
+        {sendResultsCampaignId && !sendResultsLoading && sendResultsStats && (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+              {[
+                { label: 'Total', value: sendResultsStats.total, color: 'bg-slate-50 text-slate-900 border-slate-200' },
+                { label: 'Queued', value: sendResultsStats.queued, color: 'bg-slate-50 text-slate-700 border-slate-200' },
+                { label: 'Sent', value: sendResultsStats.sent, color: 'bg-blue-50 text-blue-700 border-blue-200' },
+                { label: 'Opened', value: sendResultsStats.opened, color: 'bg-green-50 text-green-700 border-green-200' },
+                { label: 'Clicked', value: sendResultsStats.clicked, color: 'bg-teal-50 text-teal-700 border-teal-200' },
+                { label: 'Failed', value: sendResultsStats.failed, color: 'bg-red-50 text-red-700 border-red-200' },
+              ].map((stat) => (
+                <div key={stat.label} className={`rounded-xl border p-3 text-center ${stat.color}`}>
+                  <p className="text-2xl font-bold">{stat.value}</p>
+                  <p className="text-xs font-medium mt-1">{stat.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Open rate */}
+            {sendResultsStats.total > 0 && sendResultsStats.queued < sendResultsStats.total && (
+              <div className="bg-white rounded-xl shadow-sm border p-4 mb-4">
+                <div className="flex items-center gap-4 flex-wrap">
+                  <div>
+                    <span className="text-sm font-medium text-slate-600">Open Rate: </span>
+                    <span className="text-lg font-bold text-green-600">
+                      {sendResultsStats.total - sendResultsStats.queued > 0
+                        ? Math.round(((sendResultsStats.opened + sendResultsStats.clicked) / (sendResultsStats.total - sendResultsStats.queued)) * 100)
+                        : 0}%
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium text-slate-600">Delivery Rate: </span>
+                    <span className="text-lg font-bold text-blue-600">
+                      {sendResultsStats.total > 0
+                        ? Math.round(((sendResultsStats.sent + sendResultsStats.opened + sendResultsStats.clicked) / sendResultsStats.total) * 100)
+                        : 0}%
+                    </span>
+                  </div>
+                  {sendResultsStats.failed > 0 && (
+                    <div>
+                      <span className="text-sm font-medium text-slate-600">Failure Rate: </span>
+                      <span className="text-lg font-bold text-red-600">
+                        {Math.round((sendResultsStats.failed / sendResultsStats.total) * 100)}%
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Status filter */}
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              <label className="text-sm font-medium text-slate-600">Filter:</label>
+              {['all', 'queued', 'sent', 'opened', 'clicked', 'failed'].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setSendResultsStatusFilter(s)}
+                  className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                    sendResultsStatusFilter === s
+                      ? 'bg-teal-600 text-white'
+                      : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {s.charAt(0).toUpperCase() + s.slice(1)}
+                  {s !== 'all' && ` (${sendResultsStats[s] || 0})`}
+                </button>
+              ))}
+            </div>
+
+            {/* Results table */}
+            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 border-b">
+                      <th className="text-left px-4 py-3 font-medium text-slate-600">Email</th>
+                      <th className="text-left px-4 py-3 font-medium text-slate-600">Status</th>
+                      <th className="text-left px-4 py-3 font-medium text-slate-600 hidden sm:table-cell">Sent At</th>
+                      <th className="text-left px-4 py-3 font-medium text-slate-600 hidden md:table-cell">Opened At</th>
+                      <th className="text-left px-4 py-3 font-medium text-slate-600 hidden lg:table-cell">Error</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredSends.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                          No results for this filter.
+                        </td>
+                      </tr>
+                    )}
+                    {filteredSends.map((send) => (
+                      <tr key={send.id} className="border-b last:border-0 hover:bg-slate-50">
+                        <td className="px-4 py-3 font-mono text-xs break-all">{send.email}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${SEND_STATUS_COLORS[send.status] || 'bg-slate-100 text-slate-700'}`}>
+                            {(send.status || 'unknown').charAt(0).toUpperCase() + (send.status || 'unknown').slice(1)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-500 hidden sm:table-cell">
+                          {send.sent_at ? formatDate(send.sent_at) : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">
+                          {send.opened_at ? formatDate(send.opened_at) : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-red-500 hidden lg:table-cell max-w-[200px] truncate">
+                          {send.error_message || '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {filteredSends.length > 0 && (
+                <div className="px-4 py-3 border-t bg-slate-50 text-xs text-slate-500">
+                  Showing {filteredSends.length} of {sendResults.length} records
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
   // ==========================
   //       MAIN RENDER
   // ==========================
@@ -1733,6 +1975,7 @@ export default function EmailCampaignsPage() {
         {activeTab === 2 && renderAiGeneratorTab()}
         {activeTab === 3 && renderContactsTab()}
         {activeTab === 4 && renderTemplatesTab()}
+        {activeTab === 5 && renderSendResultsTab()}
       </div>
 
       {/* Hide scrollbar utility */}

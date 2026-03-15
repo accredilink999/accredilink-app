@@ -221,9 +221,12 @@ Deno.serve(async (req) => {
       }
 
       // Clean up using direct SQL to bypass RLS
+      // Delete user-referenced records first (locations FK → profiles)
+      try { await sql`DELETE FROM locations WHERE user_id = ${testUser.id}`; } catch {}
+      try { await sql`DELETE FROM care_logs WHERE created_by = ${testUser.id}`; } catch {}
       await sql`DELETE FROM organization_members WHERE user_id = ${testUser.id}`;
-      await sql`DELETE FROM profiles WHERE id = ${testUser.id}`;
-      await sql`DELETE FROM users WHERE id = ${testUser.id}`;
+      try { await sql`DELETE FROM profiles WHERE id = ${testUser.id}`; } catch {}
+      try { await sql`DELETE FROM users WHERE id = ${testUser.id}`; } catch {}
 
       // Find and clean up orphaned orgs they created
       const orphanOrgs = await sql`
@@ -235,6 +238,17 @@ Deno.serve(async (req) => {
       `;
 
       for (const org of orphanOrgs) {
+        // Delete all dependent records before removing the org (no CASCADE on these FKs)
+        const depTables = [
+          'locations', 'shifts', 'shift_calls', 'shift_patterns', 'shift_types',
+          'care_logs', 'healthcare_logs', 'rota_areas', 'service_users',
+          'invoices', 'invoicing_settings', 'clients', 'recurring_invoices',
+          'payments', 'messages', 'conversations', 'payroll_records',
+          'payroll_settings', 'meal_prep_logs',
+        ];
+        for (const t of depTables) {
+          await sql.unsafe(`DELETE FROM ${t} WHERE organization_id = $1`, [org.id]).catch(() => {});
+        }
         await sql`DELETE FROM organizations WHERE id = ${org.id}`;
       }
 

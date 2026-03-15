@@ -83,6 +83,7 @@ export default function Layout({ children, currentPageName }) {
   const visitedPagesRef = useRef(new Set());
   const [ownerWelcomeDismissed, setOwnerWelcomeDismissed] = useState(false);
   const [showAdminPointer, setShowAdminPointer] = useState(false);
+  const [showNotifBanner, setShowNotifBanner] = useState(false);
   const { helpMode, setHelpMode } = useHelpMode();
 
 
@@ -203,12 +204,19 @@ export default function Layout({ children, currentPageName }) {
   });
 
 
-  // Request all permissions early (notifications, GPS, camera)
+  // Show permissions banner after a delay (needs user gesture in modern browsers)
   React.useEffect(() => {
-    // Notifications
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
+    if (localStorage.getItem('carecall_permissions_done')) return;
+    const needsAny =
+      ('Notification' in window && Notification.permission === 'default') ||
+      (navigator.permissions && true); // camera/mic/location need gesture
+    if (!needsAny) return;
+    const timer = setTimeout(() => setShowNotifBanner(true), 4000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Request all permissions early (GPS, camera)
+  React.useEffect(() => {
 
     // GPS — request permission immediately so tracking can start
     if (navigator.geolocation) {
@@ -815,6 +823,59 @@ export default function Layout({ children, currentPageName }) {
 
       {/* PWA Install Prompt */}
       <PWAInstallPrompt />
+
+      {/* Permissions Banner — requests all permissions via user click */}
+      {showNotifBanner && (
+        <div className="fixed inset-0 z-[9999] bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
+            <div className="text-center mb-4">
+              <div className="w-12 h-12 bg-teal-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                <Shield className="w-6 h-6 text-teal-600" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900">Enable Permissions</h3>
+              <p className="text-xs text-slate-500 mt-1">CareCall needs these to work properly</p>
+            </div>
+            <div className="space-y-2 mb-5">
+              {[
+                { icon: '🔔', label: 'Notifications', desc: 'Shift alerts & messages' },
+                { icon: '📍', label: 'Location', desc: 'GPS check-in & tracking' },
+                { icon: '📷', label: 'Camera', desc: 'Photos & document scanning' },
+                { icon: '🎙️', label: 'Microphone', desc: 'Voice notes & calls' },
+              ].map(p => (
+                <div key={p.label} className="flex items-center gap-3 p-2 rounded-lg bg-slate-50">
+                  <span className="text-lg">{p.icon}</span>
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">{p.label}</p>
+                    <p className="text-xs text-slate-400">{p.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={async () => {
+                // Request all permissions (each triggers browser prompt)
+                try { if ('Notification' in window) await Notification.requestPermission(); } catch {}
+                try { await navigator.mediaDevices.getUserMedia({ video: true, audio: true }); } catch {}
+                try { navigator.geolocation.getCurrentPosition(() => {}, () => {}, { enableHighAccuracy: true }); } catch {}
+                setShowNotifBanner(false);
+                localStorage.setItem('carecall_permissions_done', 'true');
+              }}
+              className="w-full py-2.5 bg-teal-600 text-white font-semibold rounded-lg hover:bg-teal-700 transition-colors"
+            >
+              Allow All Permissions
+            </button>
+            <button
+              onClick={() => {
+                setShowNotifBanner(false);
+                localStorage.setItem('carecall_permissions_done', 'true');
+              }}
+              className="w-full mt-2 py-2 text-slate-400 text-xs hover:text-slate-600"
+            >
+              Skip for now
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Content — scrolls internally to prevent browser chrome from appearing */}
                    <main

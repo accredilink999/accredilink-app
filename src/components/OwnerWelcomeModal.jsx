@@ -23,10 +23,10 @@ const SETUP_STEPS = [
       <div className="space-y-4">
         <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
           <p className="text-sm font-medium text-teal-800">
-            Your 7-day free trial is active — {trialDaysLeft} days remaining
+            Your 30-day free trial is active — {trialDaysLeft} days remaining
           </p>
           <p className="text-xs text-teal-600 mt-1">
-            You won't be charged until your trial ends. Cancel anytime from Settings.
+            All features unlocked. No credit card required. Cancel anytime from Settings.
           </p>
         </div>
         <p className="text-sm text-slate-600">

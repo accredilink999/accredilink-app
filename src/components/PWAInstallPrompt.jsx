@@ -32,17 +32,18 @@ export default function PWAInstallPrompt() {
   const hasNativePrompt = canPrompt || browser === 'chrome' || browser === 'edge';
 
   useEffect(() => {
-    if (isInstalled || hasNativePrompt) return;
+    if (isInstalled) return;
+    if (sessionStorage.getItem('pwa_prompt_dismissed')) return;
 
-    // Show manual instructions after a short delay for non-Chromium browsers
+    // Show after a short delay — for both Chromium (native prompt) and non-Chromium (manual instructions)
     const timer = setTimeout(() => {
-      if (!isInstalled && !sessionStorage.getItem('pwa_prompt_dismissed')) {
+      if (!isInstalled) {
         setShowPrompt(true);
       }
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [isInstalled, hasNativePrompt]);
+  }, [isInstalled, canPrompt]);
 
   const handleInstall = async () => {
     const outcome = await promptInstall();
@@ -56,7 +57,7 @@ export default function PWAInstallPrompt() {
     sessionStorage.setItem('pwa_prompt_dismissed', 'true');
   };
 
-  if (!showPrompt || isInstalled) return null;
+  if ((!showPrompt && !canPrompt) || isInstalled) return null;
 
   // If native prompt is still available (user might have dismissed auto-prompt),
   // show a simple install button
