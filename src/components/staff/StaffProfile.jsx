@@ -258,6 +258,7 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
 
   const [showAwardDialog, setShowAwardDialog] = useState(false);
   const [awardData, setAwardData] = useState({ title: '', message: '' });
+  const [selectedAwardType, setSelectedAwardType] = useState(null);
 
   const { data: staffAwards = [] } = useQuery({
     queryKey: ['staffAwards', staffId],
@@ -274,17 +275,49 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
     enabled: !!staffId,
   });
 
+  // Org award types for the give-award dialog
+  const { data: awardTypes = [] } = useQuery({
+    queryKey: ['awardTypes'],
+    queryFn: async () => {
+      const orgId = getCurrentOrgId();
+      let q = supabase.from('award_types').select('*').order('created_at', { ascending: true });
+      if (orgId) q = q.eq('organization_id', orgId);
+      const { data, error } = await q;
+      if (error) return [];
+      return data || [];
+    },
+  });
+
+  const AWARD_COLORS = {
+    amber: 'from-amber-400 to-yellow-500',
+    blue: 'from-blue-400 to-blue-600',
+    emerald: 'from-emerald-400 to-emerald-600',
+    rose: 'from-rose-400 to-rose-600',
+    purple: 'from-purple-400 to-purple-600',
+    cyan: 'from-cyan-400 to-cyan-600',
+    orange: 'from-orange-400 to-orange-600',
+    pink: 'from-pink-400 to-pink-600',
+  };
+
   const giveAwardMutation = useMutation({
-    mutationFn: async (award) => {
+    mutationFn: async ({ awardType, message }) => {
+      const title = awardType?.name || awardData.title;
+      const emoji = awardType?.emoji || '⭐';
+      const color = awardType?.color || 'amber';
+
+      if (!title) throw new Error('Select an award type');
+
       const { error } = await supabase.from('staff_awards').insert({
         organization_id: getCurrentOrgId(),
         recipient_id: staffId,
         recipient_name: staff?.full_name || 'Staff',
         awarded_by_id: currentUser?.id,
         awarded_by_name: currentUser?.full_name || currentUser?.email,
-        award_type: 'star',
-        title: award.title,
-        message: award.message || null,
+        award_type: 'custom',
+        title,
+        emoji,
+        color,
+        message: message || null,
       });
       if (error) throw error;
 
@@ -293,8 +326,8 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
         await base44.entities.Notification.create({
           recipient_id: staffId,
           type: 'award',
-          title: `${award.emoji || '⭐'} You received a Staff Award!`,
-          message: `${currentUser?.full_name || 'Admin'} gave you a "${award.title}" award`,
+          title: `${emoji} You received a Staff Award!`,
+          message: `${currentUser?.full_name || 'Admin'} gave you a "${title}" award`,
           link: '/Dashboard',
           is_read: false,
           send_push: true,
@@ -304,8 +337,10 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['staffAwards', staffId] });
       queryClient.invalidateQueries({ queryKey: ['todayAwards'] });
+      queryClient.invalidateQueries({ queryKey: ['allStaffAwards'] });
       setShowAwardDialog(false);
       setAwardData({ title: '', message: '' });
+      setSelectedAwardType(null);
       toast.success(`Award given to ${staff?.full_name}!`);
     },
     onError: (err) => toast.error(err.message || 'Failed to give award'),
@@ -609,8 +644,8 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
       )}
 
       {/* Give Award Dialog */}
-      <Dialog open={showAwardDialog} onOpenChange={setShowAwardDialog}>
-        <DialogContent className="w-[95vw] sm:max-w-md">
+      <Dialog open={showAwardDialog} onOpenChange={(open) => { setShowAwardDialog(open); if (!open) { setSelectedAwardType(null); setAwardData({ title: '', message: '' }); } }}>
+        <DialogContent className="w-[95vw] sm:max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Trophy className="w-5 h-5 text-amber-500" />
@@ -618,34 +653,72 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {/* Award type grid */}
+            {awardTypes.length > 0 && (
+              <div>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">Select Award</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {awardTypes.map(type => {
+                    const isSelected = selectedAwardType?.id === type.id;
+                    const gradientClass = AWARD_COLORS[type.color] || AWARD_COLORS.amber;
+                    return (
+                      <button
+                        key={type.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedAwardType(isSelected ? null : type);
+                          if (!isSelected) setAwardData(d => ({ ...d, title: type.name }));
+                        }}
+                        className={`flex flex-col items-center justify-center rounded-xl border-2 p-2.5 min-h-[80px] transition-all active:scale-95 ${
+                          isSelected
+                            ? 'border-amber-400 ring-2 ring-amber-400 bg-amber-50 dark:bg-amber-950/30 shadow-md'
+                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:shadow-sm'
+                        }`}
+                      >
+                        <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${gradientClass} flex items-center justify-center mb-1 shadow-sm`}>
+                          <span className="text-xl">{type.emoji}</span>
+                        </div>
+                        <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 text-center leading-tight line-clamp-2">{type.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Fallback: custom title if no award types */}
+            {awardTypes.length === 0 && (
+              <div>
+                <label className="text-sm font-medium text-slate-700">Award Title *</label>
+                <Input
+                  value={awardData.title}
+                  onChange={(e) => setAwardData({ ...awardData, title: e.target.value })}
+                  placeholder="e.g. Star Performer, Team Player..."
+                  className="mt-1"
+                />
+              </div>
+            )}
+
+            {/* Message */}
             <div>
-              <label className="text-sm font-medium text-slate-700">Award Title *</label>
-              <Input
-                value={awardData.title}
-                onChange={(e) => setAwardData({ ...awardData, title: e.target.value })}
-                placeholder="e.g. Employee of the Month, Outstanding Care, Team Player..."
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700">Message (optional)</label>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Message (optional)</label>
               <Textarea
                 value={awardData.message}
                 onChange={(e) => setAwardData({ ...awardData, message: e.target.value })}
                 placeholder="Tell them why they're receiving this award..."
                 className="mt-1"
-                rows={3}
+                rows={2}
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAwardDialog(false)}>Cancel</Button>
             <Button
-              onClick={() => giveAwardMutation.mutate(awardData)}
-              disabled={!awardData.title.trim() || giveAwardMutation.isPending}
-              className="bg-amber-500 hover:bg-amber-600 text-white"
+              onClick={() => giveAwardMutation.mutate({ awardType: selectedAwardType, message: awardData.message })}
+              disabled={(!selectedAwardType && !awardData.title.trim()) || giveAwardMutation.isPending}
+              className={`text-white ${selectedAwardType ? `bg-gradient-to-r ${AWARD_COLORS[selectedAwardType.color] || AWARD_COLORS.amber} hover:opacity-90` : 'bg-amber-500 hover:bg-amber-600'}`}
             >
-              {giveAwardMutation.isPending ? 'Giving...' : 'Give Award'}
+              {giveAwardMutation.isPending ? 'Giving...' : `Give ${selectedAwardType?.emoji || '⭐'} Award`}
             </Button>
           </DialogFooter>
         </DialogContent>
