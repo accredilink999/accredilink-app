@@ -77,9 +77,19 @@ const AppShell = () => {
         // Owner path — create new org if they provided a company name during signup
         if (companyName) {
           const slug = companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
+          const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+          let invCode = '';
+          for (let i = 0; i < 8; i++) invCode += chars.charAt(Math.floor(Math.random() * chars.length));
           const { data: org, error: orgErr } = await supabase
             .from('organizations')
-            .insert({ name: companyName, slug, plan: 'trial' })
+            .insert({
+              name: companyName,
+              slug,
+              plan: 'trial',
+              invite_code: invCode,
+              trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+              is_active: true,
+            })
             .select()
             .single();
           if (!orgErr && org) {

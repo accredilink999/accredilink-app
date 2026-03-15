@@ -65,6 +65,12 @@ export default function PhotoGallery() {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
 
+    const orgId = getCurrentOrgId();
+    if (!orgId) {
+      toast.error('Organisation not loaded yet. Please refresh and try again.');
+      return;
+    }
+
     setUploading(true);
     let successCount = 0;
 
@@ -72,31 +78,41 @@ export default function PhotoGallery() {
       try {
         // Upload to Supabase storage
         const ext = file.name.split('.').pop();
-        const path = `org-photos/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+        const path = `org-photos/${orgId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
         const { error: uploadErr } = await supabase.storage
           .from('uploads')
-          .upload(path, file, { contentType: file.type });
+          .upload(path, file, { contentType: file.type, upsert: false });
 
-        if (uploadErr) throw uploadErr;
+        if (uploadErr) {
+          console.error('Storage upload error:', uploadErr);
+          throw new Error(uploadErr.message || 'Storage upload failed');
+        }
 
         const { data: urlData } = supabase.storage.from('uploads').getPublicUrl(path);
 
+        // Get current user for uploaded_by
+        const { data: { user } } = await supabase.auth.getUser();
+
         // Save record
         const { error: insertErr } = await supabase.from('org_photos').insert({
-          organization_id: getCurrentOrgId(),
+          organization_id: orgId,
           file_name: file.name,
           file_url: urlData.publicUrl,
           file_size: file.size,
           mime_type: file.type,
           folder: selectedFolder || null,
           storage_path: path,
+          uploaded_by: user?.id || null,
         });
 
-        if (insertErr) throw insertErr;
+        if (insertErr) {
+          console.error('DB insert error:', insertErr);
+          throw new Error(insertErr.message || 'Failed to save photo record');
+        }
         successCount++;
       } catch (err) {
         console.error('Upload error:', err);
-        toast.error(`Failed to upload ${file.name}`);
+        toast.error(`Failed to upload ${file.name}: ${err.message}`);
       }
     }
 

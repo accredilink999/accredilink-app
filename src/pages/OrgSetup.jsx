@@ -20,6 +20,13 @@ export default function OrgSetup({ onComplete }) {
   const generateSlug = (name) =>
     name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60)
 
+  const generateInviteCode = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    let code = ''
+    for (let i = 0; i < 8; i++) code += chars.charAt(Math.floor(Math.random() * chars.length))
+    return code
+  }
+
   const handleCreate = async (e) => {
     e.preventDefault()
     if (!name.trim()) return
@@ -32,10 +39,18 @@ export default function OrgSetup({ onComplete }) {
       if (!user) throw new Error('Not authenticated')
 
       const slug = generateSlug(name.trim())
+      const inviteCodeVal = generateInviteCode()
 
       const { data: org, error: orgErr } = await supabase
         .from('organizations')
-        .insert({ name: name.trim(), slug, plan: 'trial' })
+        .insert({
+          name: name.trim(),
+          slug,
+          plan: 'trial',
+          invite_code: inviteCodeVal,
+          trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          is_active: true,
+        })
         .select()
         .single()
 
@@ -252,7 +267,7 @@ export default function OrgSetup({ onComplete }) {
           </button>
 
           <p className={`text-xs text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            14-day free trial. No credit card required.
+            30-day free trial. No credit card required.
           </p>
 
           <p className={`text-xs text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
