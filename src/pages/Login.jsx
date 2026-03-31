@@ -4,7 +4,7 @@ import PWAInstallPrompt from '@/components/PWAInstallPrompt'
 import { isBiometricEnabled, authenticateBiometric, getStoredCredential, getBiometricRefreshToken, storeBiometricRefreshToken } from '@/utils/biometric'
 
 export default function Login() {
-  const [mode, setMode] = useState('signin') // 'signin' | 'signup'
+  const [mode, setMode] = useState('signin') // 'signin' | 'signup' | 'forgot-password'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
@@ -247,6 +247,30 @@ export default function Login() {
     }
   }
 
+  const handleForgotPassword = async (e) => {
+    e.preventDefault()
+    if (!email) return
+    setStatus('Sending reset link...')
+    setError('')
+    setSuccessMsg('')
+    try {
+      const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: 'https://app.carecallai.co.uk',
+      })
+      if (resetErr) {
+        setError(resetErr.message || 'Failed to send reset email')
+        setStatus('')
+        return
+      }
+      setSuccessMsg('Password reset email sent! Check your inbox and follow the link to set a new password.')
+      setStatus('')
+      setMode('signin')
+    } catch (err) {
+      setError(err.message || 'Network error — check your connection')
+      setStatus('')
+    }
+  }
+
   const switchMode = () => {
     setMode(mode === 'signin' ? 'signup' : 'signin')
     setError('')
@@ -264,9 +288,11 @@ export default function Login() {
 
   const subtitle = mustChangePassword
     ? 'Please set a new password'
-    : mode === 'signin'
-      ? 'Sign in to your account'
-      : 'Create a new account'
+    : mode === 'forgot-password'
+      ? 'Enter your email to reset your password'
+      : mode === 'signin'
+        ? 'Sign in to your account'
+        : 'Create a new account'
 
   return (
     <div style={{
@@ -491,6 +517,16 @@ export default function Login() {
               />
             </div>
 
+            <div style={{ textAlign: 'right', marginTop: -8, marginBottom: 16 }}>
+              <button
+                type="button"
+                onClick={() => { setMode('forgot-password'); setError(''); setSuccessMsg(''); setStatus(''); }}
+                style={{ background: 'none', border: 'none', color: '#0d9488', cursor: 'pointer', fontSize: 13, padding: 0 }}
+              >
+                Forgot your password?
+              </button>
+            </div>
+
             <button
               type="submit"
               disabled={!!status}
@@ -514,6 +550,50 @@ export default function Login() {
                 }}
               >
                 Sign up
+              </button>
+            </p>
+          </form>
+        ) : mode === 'forgot-password' ? (
+          <form onSubmit={handleForgotPassword}>
+            <div style={{ marginBottom: 20 }}>
+              <label htmlFor="reset-email" style={{ display: 'block', fontSize: 14, fontWeight: 500, color: isDark ? '#cbd5e1' : '#334155', marginBottom: 6 }}>
+                Email Address
+              </label>
+              <input
+                id="reset-email"
+                name="email"
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+                autoComplete="email"
+                style={inputStyle}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={!!status}
+              style={{
+                width: '100%', padding: '12px 0', borderRadius: 8,
+                background: status ? '#94a3b8' : '#0d9488', color: '#fff',
+                fontSize: 16, fontWeight: 600, border: 'none', cursor: status ? 'wait' : 'pointer',
+              }}
+            >
+              {status || 'Send Reset Link'}
+            </button>
+
+            <p style={{ textAlign: 'center', marginTop: 16, fontSize: 14, color: '#64748b' }}>
+              <button
+                type="button"
+                onClick={() => { setMode('signin'); setError(''); setSuccessMsg(''); setStatus(''); }}
+                style={{
+                  background: 'none', border: 'none', color: '#0d9488',
+                  fontWeight: 600, cursor: 'pointer', fontSize: 14, padding: 0,
+                }}
+              >
+                Back to Sign In
               </button>
             </p>
           </form>

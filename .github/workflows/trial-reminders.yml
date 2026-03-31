@@ -1,0 +1,20 @@
+name: Send Trial Reminder Emails
+
+on:
+  schedule:
+    - cron: '0 9 * * *'  # 9am UTC daily
+  workflow_dispatch:       # Allow manual trigger from GitHub Actions
+
+jobs:
+  send-reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send trial reminder emails
+        run: |
+          curl -s -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            "https://edaifkkkqwgavxkgozwi.supabase.co/functions/v1/sendTrialReminders" \
+            -o response.json -w "\nHTTP Status: %{http_code}\n"
+          cat response.json
