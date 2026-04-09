@@ -171,7 +171,8 @@ Deno.serve(async (req) => {
         console.error('[notifyNewSignup] Welcome email failed:', e);
       }
 
-      // 3. Add to email_contacts list
+      // 3. Add to email_contacts list with both 'trial' and 'customer' tags
+      // so they appear in the admin customers/email campaigns area.
       try {
         const { data: existing } = await supabase
           .from('email_contacts')
@@ -181,11 +182,21 @@ Deno.serve(async (req) => {
         if (existing) {
           const tags = existing.tags || [];
           if (!tags.includes('trial')) tags.push('trial');
-          await supabase.from('email_contacts').update({ tags, name: userName, organisation: orgName }).eq('id', existing.id);
+          if (!tags.includes('customer')) tags.push('customer');
+          await supabase.from('email_contacts').update({
+            tags,
+            name: userName,
+            organisation: orgName,
+            status: 'subscribed',
+          }).eq('id', existing.id);
         } else {
           await supabase.from('email_contacts').insert({
-            email: userEmail, name: userName, organisation: orgName,
-            tags: ['trial'], data_source: 'app_signup', status: 'subscribed',
+            email: userEmail,
+            name: userName,
+            organisation: orgName,
+            tags: ['trial', 'customer'],
+            data_source: 'app_signup',
+            status: 'subscribed',
             metadata: { plan: 'trial', org_id: orgId },
           });
         }

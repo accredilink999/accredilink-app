@@ -206,7 +206,19 @@ export default function PlatformAdmin() {
                       <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">INACTIVE</span>
                     )}
                   </div>
-                  <div className="flex items-center gap-4 text-xs text-slate-500 mt-1">
+                  {org.owner_email && (
+                    <div className="text-xs text-slate-700 mt-0.5 truncate">
+                      <span className="font-medium">{org.owner_name || 'Owner'}:</span>{' '}
+                      <a
+                        href={`mailto:${org.owner_email}`}
+                        className="text-teal-600 hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {org.owner_email}
+                      </a>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-4 text-xs text-slate-500 mt-1 flex-wrap">
                     <span className="flex items-center gap-1">
                       <Users className="w-3 h-3" />
                       {org.member_count} member{org.member_count !== 1 ? 's' : ''}

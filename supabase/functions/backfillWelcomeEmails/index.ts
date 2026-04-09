@@ -102,6 +102,15 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+  // Optional body params:
+  //   skipEmails: true → don't send welcome emails, just backfill email_contacts
+  //   contactsOnly:  alias for skipEmails
+  let skipEmails = false;
+  try {
+    const body = await req.json();
+    skipEmails = !!(body?.skipEmails || body?.contactsOnly);
+  } catch { /* no body */ }
+
   try {
     // Get all trial org owners with email from the users table (which has email stored)
     const { data: members, error: membersErr } = await supabase
@@ -116,7 +125,7 @@ Deno.serve(async (req) => {
 
     if (membersErr) throw membersErr;
 
-    const results: { email: string; org: string; status: string }[] = [];
+    const results: { email: string; org: string; status: string; contact: string }[] = [];
 
     for (const member of members || []) {
       // Get user's email from auth admin API
@@ -124,25 +133,73 @@ Deno.serve(async (req) => {
       const email = userData?.user?.email;
       const name = userData?.user?.user_metadata?.full_name || '';
       const org = (member as any).organizations;
+      const orgName = org?.name || '';
+      const orgId = org?.id || '';
 
       if (!email) continue;
 
       const firstName = (name || 'there').split(' ')[0];
 
+      // ─── Backfill into email_contacts ───
+      let contactStatus = 'skipped';
       try {
-        await sendWelcomeEmail(email, firstName);
-        results.push({ email, org: org?.name || '', status: 'sent' });
-        console.log(`[backfill] Sent welcome email to ${email} (${org?.name})`);
+        const { data: existing } = await supabase
+          .from('email_contacts')
+          .select('id, tags')
+          .eq('email', email)
+          .maybeSingle();
+        if (existing) {
+          const tags: string[] = existing.tags || [];
+          if (!tags.includes('trial')) tags.push('trial');
+          if (!tags.includes('customer')) tags.push('customer');
+          await supabase.from('email_contacts').update({
+            tags,
+            name: name || null,
+            organisation: orgName || null,
+            status: 'subscribed',
+          }).eq('id', existing.id);
+          contactStatus = 'updated';
+        } else {
+          await supabase.from('email_contacts').insert({
+            email,
+            name: name || null,
+            organisation: orgName || null,
+            tags: ['trial', 'customer'],
+            data_source: 'app_signup_backfill',
+            status: 'subscribed',
+            metadata: { plan: 'trial', org_id: orgId },
+          });
+          contactStatus = 'inserted';
+        }
       } catch (e) {
-        results.push({ email, org: org?.name || '', status: `failed: ${(e as Error).message}` });
-        console.error(`[backfill] Failed for ${email}:`, e);
+        contactStatus = `failed: ${(e as Error).message}`;
+        console.error(`[backfill] Contact insert failed for ${email}:`, e);
       }
 
-      // Small delay to avoid SMTP rate limits
-      await new Promise(r => setTimeout(r, 600));
+      // ─── Optionally send welcome email ───
+      let emailStatus = 'skipped';
+      if (!skipEmails) {
+        try {
+          await sendWelcomeEmail(email, firstName);
+          emailStatus = 'sent';
+          console.log(`[backfill] Sent welcome email to ${email} (${orgName})`);
+        } catch (e) {
+          emailStatus = `failed: ${(e as Error).message}`;
+          console.error(`[backfill] Email send failed for ${email}:`, e);
+        }
+        // Small delay to avoid SMTP rate limits
+        await new Promise(r => setTimeout(r, 600));
+      }
+
+      results.push({ email, org: orgName, status: emailStatus, contact: contactStatus });
     }
 
-    return Response.json({ ok: true, sent: results.length, results }, { headers: corsHeaders });
+    return Response.json({
+      ok: true,
+      processed: results.length,
+      skipEmails,
+      results,
+    }, { headers: corsHeaders });
   } catch (err) {
     console.error('[backfillWelcomeEmails] Error:', (err as Error).message);
     return Response.json({ error: (err as Error).message }, { status: 500, headers: corsHeaders });

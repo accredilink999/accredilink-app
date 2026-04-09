@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
 
   try {
     switch (action) {
-      // ─── List all organizations with member counts ───
+      // ─── List all organizations with member counts and owner emails ───
       case 'list-orgs': {
         const { data: orgs, error } = await supabase
           .from('organizations')
@@ -67,10 +67,58 @@ Deno.serve(async (req) => {
           countMap[c.organization_id] = c.count;
         });
 
-        const result = (orgs || []).map(org => ({
-          ...org,
-          member_count: countMap[org.id] || 0,
-        }));
+        // Get owners for each org so we can display their email on the row
+        const orgIds = (orgs || []).map(o => o.id);
+        const { data: owners } = await supabase
+          .from('organization_members')
+          .select('organization_id, user_id, role')
+          .in('organization_id', orgIds)
+          .eq('role', 'owner');
+
+        // Map of org_id → owner user_id
+        const ownerMap: Record<string, string> = {};
+        (owners || []).forEach(o => { ownerMap[o.organization_id] = o.user_id; });
+
+        // Fetch profile data from public users table for those owners
+        const ownerUserIds = (owners || []).map(o => o.user_id);
+        const { data: ownerProfiles } = await supabase
+          .from('users')
+          .select('id, full_name, email')
+          .in('id', ownerUserIds);
+
+        const profileMap: Record<string, { email: string | null; full_name: string | null }> = {};
+        (ownerProfiles || []).forEach(p => {
+          profileMap[p.id] = { email: p.email, full_name: p.full_name };
+        });
+
+        // Fall back to auth.users for any owner missing email in the public users table
+        for (const userId of ownerUserIds) {
+          if (!profileMap[userId] || !profileMap[userId].email) {
+            try {
+              const { data: authData } = await supabase.auth.admin.getUserById(userId);
+              const authUser = authData?.user;
+              if (authUser) {
+                profileMap[userId] = {
+                  email: authUser.email || profileMap[userId]?.email || null,
+                  full_name: authUser.user_metadata?.full_name || profileMap[userId]?.full_name || null,
+                };
+              }
+            } catch (e) {
+              console.error(`[platform-admin] Failed to fetch auth user ${userId}:`, e);
+            }
+          }
+        }
+
+        const result = (orgs || []).map(org => {
+          const ownerId = ownerMap[org.id];
+          const ownerProfile = ownerId ? profileMap[ownerId] : null;
+          return {
+            ...org,
+            member_count: countMap[org.id] || 0,
+            owner_email: ownerProfile?.email || null,
+            owner_name: ownerProfile?.full_name || null,
+          };
+        });
 
         return json({ orgs: result });
       }
@@ -80,7 +128,7 @@ Deno.serve(async (req) => {
         const { organizationId } = params;
         if (!organizationId) return json({ error: 'Missing organizationId' }, 400);
 
-        // Get members with profile info
+        // Get members
         const { data: members, error } = await supabase
           .from('organization_members')
           .select('id, role, created_at, user_id')
@@ -88,7 +136,7 @@ Deno.serve(async (req) => {
 
         if (error) throw error;
 
-        // Fetch user details for each member
+        // Fetch profile data from public users table (may be missing for trial signups)
         const userIds = (members || []).map(m => m.user_id);
         const { data: profiles } = await supabase
           .from('users')
@@ -97,6 +145,31 @@ Deno.serve(async (req) => {
 
         const profileMap: Record<string, any> = {};
         (profiles || []).forEach(p => { profileMap[p.id] = p; });
+
+        // Fall back to auth.users for any member missing or without an email.
+        // Trial signups often only exist in auth.users until full onboarding.
+        for (const m of (members || [])) {
+          if (!profileMap[m.user_id] || !profileMap[m.user_id].email) {
+            try {
+              const { data: authData } = await supabase.auth.admin.getUserById(m.user_id);
+              const authUser = authData?.user;
+              if (authUser) {
+                profileMap[m.user_id] = {
+                  id: m.user_id,
+                  email: authUser.email || profileMap[m.user_id]?.email || null,
+                  full_name: authUser.user_metadata?.full_name
+                    || profileMap[m.user_id]?.full_name
+                    || null,
+                  role: profileMap[m.user_id]?.role || null,
+                  is_active: profileMap[m.user_id]?.is_active ?? true,
+                  last_sign_in_at: authUser.last_sign_in_at || profileMap[m.user_id]?.last_sign_in_at || null,
+                };
+              }
+            } catch (e) {
+              console.error(`[platform-admin] Failed to fetch auth user ${m.user_id}:`, e);
+            }
+          }
+        }
 
         const result = (members || []).map(m => ({
           ...m,
