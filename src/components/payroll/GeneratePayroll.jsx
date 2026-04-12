@@ -13,9 +13,9 @@ import { Calculator, Loader, CheckCircle, Users, PoundSterling, Clock, ChevronDo
 import { format, startOfMonth, endOfMonth, parseISO, differenceInDays } from 'date-fns';
 import { calculatePayslip, TAX_CODES, NI_CATEGORIES } from '@/config/ukPayroll';
 
-// Calculate hours from shift start/end times
+// Calculate hours from scheduled shift start/end times only
+// Staff are paid for the scheduled shift duration — early clock-in or late clock-out does not affect pay
 function getShiftHours(shift) {
-  if (shift.total_hours_worked && shift.total_hours_worked > 0) return shift.total_hours_worked;
   if (shift.start_time && shift.end_time) {
     const [sh, sm] = shift.start_time.split(':').map(Number);
     const [eh, em] = shift.end_time.split(':').map(Number);
@@ -24,6 +24,12 @@ function getShiftHours(shift) {
     return mins / 60;
   }
   return 0;
+}
+
+// Check if a shift counts for payroll — staff must have booked on (clocked in)
+// Hours are always based on the scheduled shift times, not actual clock times
+function isShiftWorked(shift) {
+  return !!(shift.clock_in_time || shift.actual_start_time || shift.status === 'completed' || shift.status === 'in_progress');
 }
 
 export default function GeneratePayroll() {
@@ -104,7 +110,10 @@ export default function GeneratePayroll() {
   // Build staff payroll data
   const staffPayrollData = useMemo(() => {
     return activeStaff.map(member => {
-      const staffShifts = shifts.filter(s => s.staff_id === member.id);
+      const allStaffShifts = shifts.filter(s => s.staff_id === member.id);
+      // Only count completed shifts (booked off) for payroll hours
+      const staffShifts = allStaffShifts.filter(isShiftWorked);
+      const incompleteShifts = allStaffShifts.filter(s => !isShiftWorked(s));
       const totalHours = staffShifts.reduce((sum, shift) => sum + getShiftHours(shift), 0);
       const ov = overrides[member.id] || {};
 
@@ -153,8 +162,10 @@ export default function GeneratePayroll() {
       return {
         ...member,
         staffShifts,
+        incompleteShifts,
         leaveDaysInPeriod, leaveHours, holidayPay,
         shiftCount: staffShifts.length,
+        incompleteCount: incompleteShifts.length,
         calculatedHours: totalHours,
         payType, isSalaried, monthlySalary,
         regularHours, overtimeHours, hourlyRate,
@@ -164,7 +175,7 @@ export default function GeneratePayroll() {
         ...result,
       };
     });
-  }, [activeStaff, shifts, overrides]);
+  }, [activeStaff, shifts, overrides, approvedLeave, periodStart, periodEnd]);
 
   const selectedPayrollData = staffPayrollData.filter(s => selectedStaff.includes(s.id));
 
@@ -205,6 +216,20 @@ export default function GeneratePayroll() {
 
   const generatePayrollMutation = useMutation({
     mutationFn: async ({ start, end }) => {
+      // Check for existing payroll records in this period to prevent duplicates
+      const staffIds = selectedPayrollData.map(s => s.id);
+      const { data: existing } = await supabase
+        .from('payroll_records')
+        .select('staff_id, staff_name')
+        .eq('period_start', start)
+        .eq('period_end', end)
+        .in('staff_id', staffIds);
+
+      if (existing && existing.length > 0) {
+        const names = [...new Set(existing.map(e => e.staff_name))].join(', ');
+        throw new Error(`Payroll already exists for this period for: ${names}. Delete existing records first or change the period dates.`);
+      }
+
       const records = selectedPayrollData.map(s => ({
         staff_id: s.id,
         staff_name: s.full_name,
@@ -363,10 +388,16 @@ export default function GeneratePayroll() {
                             <span className="text-xs text-slate-500">£{(member.salary || 0).toLocaleString()}/yr</span>
                           )}
                           {member.shiftCount > 0 && (
-                            <span className="text-xs text-slate-400">({member.shiftCount} shifts auto)</span>
+                            <span className="text-xs text-slate-400">({member.shiftCount} shifts booked on)</span>
                           )}
-                          {member.shiftCount === 0 && !overrides[member.id]?.regularHours && (
+                          {member.incompleteCount > 0 && (
+                            <span className="text-xs text-amber-600">({member.incompleteCount} not booked on)</span>
+                          )}
+                          {member.shiftCount === 0 && member.incompleteCount === 0 && !overrides[member.id]?.regularHours && (
                             <span className="text-xs text-amber-600">No shifts — enter hours manually</span>
+                          )}
+                          {member.shiftCount === 0 && member.incompleteCount > 0 && !overrides[member.id]?.regularHours && (
+                            <span className="text-xs text-red-600">{member.incompleteCount} shifts not booked on — 0 hrs</span>
                           )}
                         </div>
                       </div>
@@ -500,6 +531,36 @@ export default function GeneratePayroll() {
                         </div>
                       </div>
 
+                      {/* Shift Breakdown */}
+                      {member.staffShifts.length > 0 && (
+                        <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                          <p className="text-xs font-semibold text-slate-600 mb-2">Shifts (booked on — {member.shiftCount} shifts, {member.calculatedHours.toFixed(2)} hrs)</p>
+                          <div className="max-h-32 overflow-y-auto space-y-0.5">
+                            {member.staffShifts.map((shift, idx) => (
+                              <div key={idx} className="flex items-center justify-between text-xs">
+                                <span className="text-slate-500">{shift.date}</span>
+                                <span className="text-slate-600">{(shift.start_time || '').slice(0, 5)} – {(shift.end_time || '').slice(0, 5)}</span>
+                                <span className="font-medium text-slate-700">{getShiftHours(shift).toFixed(2)} hrs</span>
+                              </div>
+                            ))}
+                          </div>
+                          {member.incompleteCount > 0 && (
+                            <div className="mt-2 pt-2 border-t border-slate-200">
+                              <p className="text-xs text-amber-600 font-medium">Not booked on ({member.incompleteCount} shifts — not included):</p>
+                              <div className="max-h-20 overflow-y-auto space-y-0.5 mt-1">
+                                {member.incompleteShifts.map((shift, idx) => (
+                                  <div key={idx} className="flex items-center justify-between text-xs text-amber-500">
+                                    <span>{shift.date}</span>
+                                    <span>{(shift.start_time || '').slice(0, 5)} – {(shift.end_time || '').slice(0, 5)}</span>
+                                    <span className="line-through">{getShiftHours(shift).toFixed(2)} hrs</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {/* Calculation Preview */}
                       <div className="mt-3 p-3 bg-white rounded-lg border border-slate-200">
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
@@ -580,6 +641,13 @@ export default function GeneratePayroll() {
             <p className="text-lg font-bold text-green-700">£{totals.netPay.toFixed(2)}</p>
           </Card>
         </div>
+      )}
+
+      {/* Error Display */}
+      {generatePayrollMutation.isError && (
+        <Card className="border-red-300 bg-red-50 p-4">
+          <p className="text-sm text-red-700 font-medium">{generatePayrollMutation.error?.message || 'Failed to generate payroll'}</p>
+        </Card>
       )}
 
       {/* Generate Button */}
