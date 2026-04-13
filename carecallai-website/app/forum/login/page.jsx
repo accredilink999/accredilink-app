@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForum } from '@/lib/forumContext'
-import { LogIn, AlertCircle, ShieldAlert, Loader2 } from 'lucide-react'
+import { LogIn, AlertCircle, ShieldAlert, Loader2, MessageSquare, Users, Shield } from 'lucide-react'
 
 export default function ForumLogin() {
   const [email, setEmail] = useState('')
@@ -15,7 +15,6 @@ export default function ForumLogin() {
   const router = useRouter()
   const { user, profile, loading: contextLoading, login } = useForum()
 
-  // Auto-redirect if already logged in (existing session)
   useEffect(() => {
     if (!contextLoading && user && profile) {
       router.push('/forum')
@@ -23,7 +22,6 @@ export default function ForumLogin() {
     }
     if (!contextLoading) {
       setAutoLogging(false)
-      // Pre-fill saved email
       try {
         const saved = localStorage.getItem('forum-saved-email')
         if (saved) setEmail(saved)
@@ -38,7 +36,6 @@ export default function ForumLogin() {
     setLoading(true)
     try {
       await login(email, password, rememberMe)
-      // Save email for next time
       try {
         if (rememberMe) {
           localStorage.setItem('forum-saved-email', email)
@@ -58,51 +55,72 @@ export default function ForumLogin() {
     }
   }
 
-  // Show spinner while checking existing session
   if (autoLogging) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
-        <Loader2 className="w-8 h-8 text-teal-600 animate-spin mb-3" />
-        <p className="text-sm text-slate-500">Checking login status...</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900 flex flex-col items-center justify-center p-4">
+        <Loader2 className="w-10 h-10 text-teal-400 animate-spin mb-4" />
+        <p className="text-slate-400 text-sm">Checking login status...</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900 flex items-center justify-center p-4">
+      <div className="w-full max-w-lg">
+        {/* Branding */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-br from-teal-500 to-teal-700 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <span className="text-white font-bold text-2xl">CC</span>
+          <div className="relative inline-block mb-6">
+            <div className="w-24 h-24 bg-gradient-to-br from-teal-400 to-teal-600 rounded-3xl flex items-center justify-center shadow-2xl shadow-teal-500/30 mx-auto">
+              <img src="/logo-icon.png" alt="CareCall AI" className="w-16 h-16 rounded-xl" />
+            </div>
+            <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-gradient-to-br from-amber-400 to-amber-500 rounded-lg flex items-center justify-center shadow-lg">
+              <MessageSquare className="w-4 h-4 text-white" />
+            </div>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">CareCall AI Support Forum</h1>
-          <p className="text-slate-500 mt-2">Sign in with your CareCall AI admin account</p>
+          <h1 className="text-3xl font-bold text-white">
+            CareCall<span className="text-teal-400">AI</span> <span className="text-slate-300 font-normal">Forum</span>
+          </h1>
+          <p className="text-slate-400 mt-2 text-sm max-w-xs mx-auto">
+            The exclusive community hub for care sector administrators
+          </p>
         </div>
 
-        {/* Admin-only notice */}
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
-          <div className="flex items-start gap-3">
-            <ShieldAlert className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-medium text-amber-800">Organisation Admins Only</p>
-              <p className="text-xs text-amber-700 mt-1">
-                This forum is exclusively for CareCall AI organisation administrators and owners.
-                Regular staff accounts do not have access. If you believe you should have access,
-                please ask your organisation admin to upgrade your role.
+        {/* Feature pills */}
+        <div className="flex items-center justify-center gap-3 mb-6 flex-wrap">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/60 backdrop-blur border border-slate-700/50 rounded-full">
+            <Users className="w-3.5 h-3.5 text-teal-400" />
+            <span className="text-xs text-slate-300">Peer Support</span>
+          </div>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/60 backdrop-blur border border-slate-700/50 rounded-full">
+            <Shield className="w-3.5 h-3.5 text-teal-400" />
+            <span className="text-xs text-slate-300">CIW & CQC Compliance</span>
+          </div>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/60 backdrop-blur border border-slate-700/50 rounded-full">
+            <MessageSquare className="w-3.5 h-3.5 text-teal-400" />
+            <span className="text-xs text-slate-300">Best Practices</span>
+          </div>
+        </div>
+
+        {/* Login card */}
+        <div className="bg-white/[0.07] backdrop-blur-xl rounded-2xl border border-white/10 p-6 shadow-2xl">
+          {/* Admin-only notice */}
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 mb-5">
+            <div className="flex items-start gap-2.5">
+              <ShieldAlert className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-200/90 leading-relaxed">
+                <span className="font-semibold text-amber-300">Admin access only.</span> This forum is exclusively for organisation administrators and owners. Regular staff accounts cannot access the forum.
               </p>
             </div>
           </div>
-        </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
           {error && (
-            <div className={`flex items-start gap-2 p-3 mb-4 rounded-lg text-sm ${isAccessDenied ? 'bg-red-50 border border-red-200 text-red-800' : 'bg-red-50 text-red-700'}`}>
+            <div className={`flex items-start gap-2 p-3 mb-4 rounded-xl text-sm ${isAccessDenied ? 'bg-red-500/15 border border-red-500/20 text-red-300' : 'bg-red-500/10 text-red-300'}`}>
               <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
               <div>
                 <p>{error}</p>
                 {isAccessDenied && (
-                  <p className="text-xs mt-1 text-red-600">
-                    Only organisation admins and owners can access the forum. Contact your organisation administrator if you need access.
+                  <p className="text-xs mt-1 text-red-400/80">
+                    Contact your organisation administrator to get your role upgraded.
                   </p>
                 )}
               </div>
@@ -111,58 +129,64 @@ export default function ForumLogin() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-colors"
                 placeholder="your@email.com"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">Password</label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-colors"
                 placeholder="Your password"
               />
             </div>
 
-            {/* Remember me */}
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label className="flex items-center gap-2.5 cursor-pointer">
               <input
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="w-4 h-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-teal-500 focus:ring-teal-500/50"
               />
-              <span className="text-sm text-slate-600">Stay logged in</span>
+              <span className="text-sm text-slate-400">Stay logged in</span>
             </label>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-600 text-white font-semibold rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-teal-500 to-teal-600 text-white font-semibold rounded-xl hover:from-teal-600 hover:to-teal-700 disabled:opacity-50 transition-all shadow-lg shadow-teal-500/20"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading ? 'Signing in...' : 'Sign In to Forum'}
             </button>
           </form>
 
-          <div className="mt-4 pt-4 border-t border-slate-100 text-center">
-            <p className="text-sm text-slate-500">
-              Use the same email and password from your CareCall AI app.
+          <div className="mt-4 pt-4 border-t border-white/5 text-center">
+            <p className="text-xs text-slate-500">
+              Use the same credentials from your CareCall AI app
             </p>
           </div>
         </div>
 
-        <div className="text-center mt-4">
-          <a href="/" className="text-sm text-teal-600 hover:text-teal-700">Back to CareCall AI</a>
+        <div className="text-center mt-5 space-y-2">
+          <div>
+            <a href="/forum/faq" className="text-sm text-amber-400 hover:text-amber-300 transition-colors font-medium">
+              Not an admin? View our Customer FAQ
+            </a>
+          </div>
+          <div>
+            <a href="/" className="text-sm text-teal-400 hover:text-teal-300 transition-colors">Back to CareCall AI</a>
+          </div>
         </div>
       </div>
     </div>
