@@ -5,7 +5,7 @@ import { useForum } from '@/lib/forumContext'
 import ForumHeader from '@/components/forum/ForumHeader'
 import StarRank from '@/components/forum/StarRank'
 import { timeAgo, canModerate, getRoleBadge } from '@/lib/forumAuth'
-import { Users, Search, MessageSquare, Heart, Mail, Shield, Trash2, Ban, ChevronDown } from 'lucide-react'
+import { Users, Search, MessageSquare, Heart, Mail, Shield, Trash2, Ban, ChevronDown, AlertTriangle, UserCheck } from 'lucide-react'
 import Link from 'next/link'
 
 export default function MembersPage() {
@@ -18,6 +18,7 @@ export default function MembersPage() {
   const [actionLoading, setActionLoading] = useState(false)
 
   const isFounder = profile?.forum_role === 'founder'
+  const isAdmin = ['founder', 'admin'].includes(profile?.forum_role)
   const isMod = canModerate(profile?.forum_role)
 
   useEffect(() => {
@@ -60,8 +61,14 @@ export default function MembersPage() {
     handleAction('ban', memberId, { reason })
   }
 
+  const handleWarn = (memberId) => {
+    const message = prompt('Warning message to send:')
+    if (!message) return
+    handleAction('warn', memberId, { message })
+  }
+
   const handleDelete = (memberId, name) => {
-    if (!confirm(`Are you sure you want to permanently remove ${name} from the forum? This will delete all their posts and cannot be undone.`)) return
+    if (!confirm(`Permanently remove ${name} from the forum? This deletes all their posts and cannot be undone.`)) return
     handleAction('delete-member', memberId)
   }
 
@@ -103,6 +110,10 @@ export default function MembersPage() {
           </div>
         </div>
 
+        {isMod && (
+          <p className="text-xs text-slate-500 mb-4">Click on a member to see management options</p>
+        )}
+
         {loadingMembers ? (
           <div className="flex justify-center py-12">
             <div className="animate-spin w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full"></div>
@@ -113,16 +124,18 @@ export default function MembersPage() {
               const isMe = user?.id === member.id
               const isSelected = selectedMember === member.id
               const badge = getRoleBadge(member.forum_role)
-              const roleGradient = member.forum_role === 'founder' ? 'from-amber-400 to-amber-600'
+              const isBanned = member.is_banned
+              const roleGradient = isBanned ? 'from-red-400 to-red-600'
+                : member.forum_role === 'founder' ? 'from-amber-400 to-amber-600'
                 : member.forum_role === 'admin' ? 'from-teal-400 to-teal-600'
                 : member.forum_role === 'moderator' ? 'from-purple-400 to-purple-600'
                 : 'from-slate-400 to-slate-500'
 
               return (
-                <div key={member.id} className="relative">
+                <div key={member.id}>
                   <div
-                    className={`bg-white/[0.06] backdrop-blur rounded-2xl border p-5 transition-all cursor-pointer ${isSelected ? 'border-teal-500/50 bg-white/[0.1]' : 'border-white/10 hover:border-white/20 hover:bg-white/[0.08]'}`}
-                    onClick={() => setSelectedMember(isSelected ? null : member.id)}
+                    className={`bg-white/[0.06] backdrop-blur rounded-2xl border p-5 transition-all ${isMod && !isMe ? 'cursor-pointer' : ''} ${isSelected ? 'border-teal-500/50 bg-white/[0.1] ring-1 ring-teal-500/20' : 'border-white/10 hover:border-white/20 hover:bg-white/[0.08]'} ${isBanned ? 'opacity-60' : ''}`}
+                    onClick={() => { if (isMod && !isMe) setSelectedMember(isSelected ? null : member.id) }}
                   >
                     <div className="flex items-start gap-4">
                       <Link href={`/forum/profile/${member.username}`} onClick={e => e.stopPropagation()}>
@@ -144,6 +157,11 @@ export default function MembersPage() {
                               {badge.label}
                             </span>
                           )}
+                          {isBanned && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-red-500/20 text-red-400 border border-red-500/30">
+                              Banned
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs text-slate-500">@{member.username}</p>
                         <StarRank role={member.forum_role} postCount={member.post_count || 0} />
@@ -162,67 +180,97 @@ export default function MembersPage() {
                       </div>
                     </div>
 
-                    {/* Action panel — shown when selected */}
-                    {isSelected && !isMe && (
-                      <div className="mt-4 pt-4 border-t border-white/10 flex flex-wrap gap-2" onClick={e => e.stopPropagation()}>
-                        <Link
-                          href={`/forum/messages/new?to=${member.username}`}
-                          className="flex items-center gap-1.5 text-xs px-3 py-2 bg-teal-500/20 text-teal-400 rounded-lg hover:bg-teal-500/30 transition-colors"
-                        >
-                          <Mail className="w-3.5 h-3.5" /> Message
-                        </Link>
+                    {/* Action panel — shown when member is selected by founder/mod/admin */}
+                    {isSelected && (
+                      <div className="mt-4 pt-4 border-t border-white/10" onClick={e => e.stopPropagation()}>
+                        <p className="text-[10px] text-slate-500 mb-2 uppercase tracking-wider font-semibold">Actions</p>
+                        <div className="flex flex-wrap gap-2">
+                          {/* Message — always available */}
+                          <Link
+                            href={`/forum/messages/new?to=${member.username}`}
+                            className="flex items-center gap-1.5 text-xs px-3 py-2 bg-teal-500/20 text-teal-400 rounded-lg hover:bg-teal-500/30 transition-colors font-medium"
+                          >
+                            <Mail className="w-3.5 h-3.5" /> Message
+                          </Link>
 
-                        {isFounder && member.forum_role !== 'founder' && (
-                          <>
-                            {member.forum_role !== 'moderator' && (
-                              <button
-                                onClick={() => handleAction('set-role', member.id, { role: 'moderator' })}
-                                disabled={actionLoading}
-                                className="flex items-center gap-1.5 text-xs px-3 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors disabled:opacity-50"
-                              >
-                                <Shield className="w-3.5 h-3.5" /> Make Moderator
-                              </button>
-                            )}
-                            {member.forum_role !== 'admin' && (
-                              <button
-                                onClick={() => handleAction('set-role', member.id, { role: 'admin' })}
-                                disabled={actionLoading}
-                                className="flex items-center gap-1.5 text-xs px-3 py-2 bg-teal-500/20 text-teal-300 rounded-lg hover:bg-teal-500/30 transition-colors disabled:opacity-50"
-                              >
-                                <Shield className="w-3.5 h-3.5" /> Make Admin
-                              </button>
-                            )}
-                            {member.forum_role !== 'user' && (
+                          {/* Warn — mods, admins, founder */}
+                          {member.forum_role !== 'founder' && (
+                            <button
+                              onClick={() => handleWarn(member.id)}
+                              disabled={actionLoading}
+                              className="flex items-center gap-1.5 text-xs px-3 py-2 bg-amber-500/20 text-amber-400 rounded-lg hover:bg-amber-500/30 transition-colors disabled:opacity-50 font-medium"
+                            >
+                              <AlertTriangle className="w-3.5 h-3.5" /> Warn
+                            </button>
+                          )}
+
+                          {/* Make Moderator — founder + admins can promote users to mod */}
+                          {isAdmin && member.forum_role === 'user' && (
+                            <button
+                              onClick={() => handleAction('set-role', member.id, { role: 'moderator' })}
+                              disabled={actionLoading}
+                              className="flex items-center gap-1.5 text-xs px-3 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors disabled:opacity-50 font-medium"
+                            >
+                              <Shield className="w-3.5 h-3.5" /> Make Moderator
+                            </button>
+                          )}
+
+                          {/* Make Admin — founder only */}
+                          {isFounder && member.forum_role !== 'founder' && member.forum_role !== 'admin' && (
+                            <button
+                              onClick={() => handleAction('set-role', member.id, { role: 'admin' })}
+                              disabled={actionLoading}
+                              className="flex items-center gap-1.5 text-xs px-3 py-2 bg-teal-500/20 text-teal-300 rounded-lg hover:bg-teal-500/30 transition-colors disabled:opacity-50 font-medium"
+                            >
+                              <Shield className="w-3.5 h-3.5" /> Make Admin
+                            </button>
+                          )}
+
+                          {/* Demote — founder can demote anyone, admins can demote mods */}
+                          {member.forum_role !== 'user' && member.forum_role !== 'founder' && (
+                            (isFounder || (isAdmin && member.forum_role === 'moderator')) ? (
                               <button
                                 onClick={() => handleAction('set-role', member.id, { role: 'user' })}
                                 disabled={actionLoading}
-                                className="flex items-center gap-1.5 text-xs px-3 py-2 bg-slate-500/20 text-slate-400 rounded-lg hover:bg-slate-500/30 transition-colors disabled:opacity-50"
+                                className="flex items-center gap-1.5 text-xs px-3 py-2 bg-slate-500/20 text-slate-400 rounded-lg hover:bg-slate-500/30 transition-colors disabled:opacity-50 font-medium"
                               >
-                                <ChevronDown className="w-3.5 h-3.5" /> Demote to User
+                                <ChevronDown className="w-3.5 h-3.5" /> Demote
                               </button>
-                            )}
-                          </>
-                        )}
+                            ) : null
+                          )}
 
-                        {isMod && member.forum_role !== 'founder' && (
-                          <button
-                            onClick={() => handleBan(member.id)}
-                            disabled={actionLoading}
-                            className="flex items-center gap-1.5 text-xs px-3 py-2 bg-orange-500/20 text-orange-400 rounded-lg hover:bg-orange-500/30 transition-colors disabled:opacity-50"
-                          >
-                            <Ban className="w-3.5 h-3.5" /> Ban
-                          </button>
-                        )}
+                          {/* Ban / Unban — mods can ban users, admins can ban users+mods, founder can ban anyone */}
+                          {member.forum_role !== 'founder' && (
+                            isBanned ? (
+                              <button
+                                onClick={() => handleAction('unban', member.id)}
+                                disabled={actionLoading}
+                                className="flex items-center gap-1.5 text-xs px-3 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors disabled:opacity-50 font-medium"
+                              >
+                                <UserCheck className="w-3.5 h-3.5" /> Unban
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleBan(member.id)}
+                                disabled={actionLoading}
+                                className="flex items-center gap-1.5 text-xs px-3 py-2 bg-orange-500/20 text-orange-400 rounded-lg hover:bg-orange-500/30 transition-colors disabled:opacity-50 font-medium"
+                              >
+                                <Ban className="w-3.5 h-3.5" /> Ban
+                              </button>
+                            )
+                          )}
 
-                        {isFounder && member.forum_role !== 'founder' && (
-                          <button
-                            onClick={() => handleDelete(member.id, member.display_name || member.username)}
-                            disabled={actionLoading}
-                            className="flex items-center gap-1.5 text-xs px-3 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors disabled:opacity-50"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" /> Remove
-                          </button>
-                        )}
+                          {/* Delete — founder only */}
+                          {isFounder && member.forum_role !== 'founder' && (
+                            <button
+                              onClick={() => handleDelete(member.id, member.display_name || member.username)}
+                              disabled={actionLoading}
+                              className="flex items-center gap-1.5 text-xs px-3 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors disabled:opacity-50 font-medium"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> Delete
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>

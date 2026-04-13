@@ -100,11 +100,15 @@ export async function GET(req) {
       }
     }
 
-    const { data: members, error } = await supabase
+    // Mods/admins/founder see all members including banned; regular users don't see banned
+    const canSeeAll = ['founder', 'admin', 'moderator'].includes(viewerRole)
+    let query = supabase
       .from('forum_profiles')
-      .select('id, username, display_name, avatar_url, bio, forum_role, thread_count, post_count, reputation, created_at, last_seen_at, profile_customized')
-      .eq('is_banned', false)
+      .select('id, username, display_name, avatar_url, bio, forum_role, is_banned, thread_count, post_count, reputation, created_at, last_seen_at, profile_customized')
       .order('created_at', { ascending: true })
+    if (!canSeeAll) query = query.eq('is_banned', false)
+
+    const { data: members, error } = await query
 
     if (error) return json({ error: error.message }, 500)
 

@@ -148,6 +148,22 @@ export async function POST(req) {
         return json({ success: true })
       }
 
+      case 'warn': {
+        if (!isMod) return json({ error: 'Not authorized' }, 403)
+        if (!userId) return json({ error: 'userId required' }, 400)
+        const { message } = body
+        const warnMsg = message || 'You have received an official warning from the forum moderators. Please review our community guidelines.'
+        // Send warning as a notification
+        await supabase.from('forum_notifications').insert({
+          user_id: userId,
+          type: 'mod_action',
+          actor_id: user.id,
+          message: `⚠️ Warning: ${warnMsg}`,
+          is_read: false,
+        })
+        return json({ success: true })
+      }
+
       case 'set-role': {
         if (!isAdmin) return json({ error: 'Only admins can set roles' }, 403)
         if (!userId || !role) return json({ error: 'userId and role required' }, 400)
