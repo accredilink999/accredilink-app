@@ -2,12 +2,13 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForum } from '@/lib/forumContext'
-import { LogIn, AlertCircle } from 'lucide-react'
+import { LogIn, AlertCircle, ShieldAlert } from 'lucide-react'
 
 export default function ForumLogin() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [isAccessDenied, setIsAccessDenied] = useState(false)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const { login } = useForum()
@@ -15,12 +16,17 @@ export default function ForumLogin() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    setIsAccessDenied(false)
     setLoading(true)
     try {
       await login(email, password)
       router.push('/forum')
     } catch (err) {
-      setError(err.message || 'Invalid email or password')
+      const msg = err.message || 'Invalid email or password'
+      if (msg.toLowerCase().includes('only available to') || msg.toLowerCase().includes('administrator')) {
+        setIsAccessDenied(true)
+      }
+      setError(msg)
     } finally {
       setLoading(false)
     }
@@ -33,15 +39,37 @@ export default function ForumLogin() {
           <div className="w-16 h-16 bg-gradient-to-br from-teal-500 to-teal-700 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <span className="text-white font-bold text-2xl">CC</span>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">CareCall AI Forum</h1>
+          <h1 className="text-2xl font-bold text-slate-900">CareCall AI Support Forum</h1>
           <p className="text-slate-500 mt-2">Sign in with your CareCall AI admin account</p>
+        </div>
+
+        {/* Admin-only notice */}
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+          <div className="flex items-start gap-3">
+            <ShieldAlert className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-amber-800">Organisation Admins Only</p>
+              <p className="text-xs text-amber-700 mt-1">
+                This forum is exclusively for CareCall AI organisation administrators and owners.
+                Regular staff accounts do not have access. If you believe you should have access,
+                please ask your organisation admin to upgrade your role.
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
           {error && (
-            <div className="flex items-center gap-2 p-3 mb-4 bg-red-50 text-red-700 rounded-lg text-sm">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              {error}
+            <div className={`flex items-start gap-2 p-3 mb-4 rounded-lg text-sm ${isAccessDenied ? 'bg-red-50 border border-red-200 text-red-800' : 'bg-red-50 text-red-700'}`}>
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <div>
+                <p>{error}</p>
+                {isAccessDenied && (
+                  <p className="text-xs mt-1 text-red-600">
+                    Only organisation admins and owners can access the forum. Contact your organisation administrator if you need access.
+                  </p>
+                )}
+              </div>
             </div>
           )}
 
@@ -80,7 +108,7 @@ export default function ForumLogin() {
 
           <div className="mt-4 pt-4 border-t border-slate-100 text-center">
             <p className="text-sm text-slate-500">
-              Admin and organisation owner accounts only. Use the same email and password from CareCall AI.
+              Use the same email and password from your CareCall AI app.
             </p>
           </div>
         </div>
