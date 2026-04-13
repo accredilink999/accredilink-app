@@ -5,7 +5,7 @@
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-const FROM_EMAIL = 'CareCall AI Forum <hello@carecallai.co.uk>'
+const FROM_EMAIL = 'CareCall AI Forum <support@carecallai.co.uk>'
 const FORUM_URL = 'https://carecallai.co.uk/forum'
 
 async function sendEmail({ to, subject, html }) {

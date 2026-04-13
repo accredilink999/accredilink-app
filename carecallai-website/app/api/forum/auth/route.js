@@ -92,6 +92,19 @@ export async function POST(req) {
           profileRole: profile?.role,
           orgRole: orgMember?.role,
         })
+      } else {
+        // Auto-correct forum_role if it doesn't match (e.g. founder was set as admin)
+        const correctRole = isFounder ? 'founder' : (isAdmin ? 'admin' : forumProfile.forum_role)
+        if (forumProfile.forum_role !== correctRole || (isFounder && forumProfile.username !== 'carecallai-founder')) {
+          const updates = { forum_role: correctRole }
+          if (isFounder) {
+            updates.username = 'carecallai-founder'
+            updates.display_name = 'CareCallAI Founder'
+            updates.bio = 'Founder & Creator of CareCallAI. Building the future of intelligent care management — one feature at a time. Passionate about empowering care professionals with technology that actually works.'
+          }
+          await supabase.from('forum_profiles').update(updates).eq('id', userId)
+          Object.assign(forumProfile, updates)
+        }
       }
 
       return json({
@@ -130,9 +143,22 @@ export async function POST(req) {
         })
       }
 
-      // Update last_seen
+      // Auto-correct forum_role + update last_seen
       if (forumProfile) {
-        await supabase.from('forum_profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', user.id)
+        const isFounder = user.id === FOUNDER_ID
+        const isAdmin = profile?.role === 'super_admin' || profile?.role === 'admin' || orgMember?.role === 'owner' || orgMember?.role === 'admin'
+        const correctRole = isFounder ? 'founder' : (isAdmin ? 'admin' : forumProfile.forum_role)
+        const updates = { last_seen_at: new Date().toISOString() }
+        if (forumProfile.forum_role !== correctRole || (isFounder && forumProfile.username !== 'carecallai-founder')) {
+          updates.forum_role = correctRole
+          if (isFounder) {
+            updates.username = 'carecallai-founder'
+            updates.display_name = 'CareCallAI Founder'
+            updates.bio = 'Founder & Creator of CareCallAI. Building the future of intelligent care management — one feature at a time. Passionate about empowering care professionals with technology that actually works.'
+          }
+          Object.assign(forumProfile, updates)
+        }
+        await supabase.from('forum_profiles').update(updates).eq('id', user.id)
       }
 
       return json({

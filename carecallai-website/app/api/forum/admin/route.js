@@ -226,6 +226,17 @@ export async function POST(req) {
         return json({ success: true })
       }
 
+      case 'fix-founder': {
+        if (!isFounder) return json({ error: 'Only founder' }, 403)
+        const { username: newUsername, display_name, bio: newBio } = body
+        const updates = { forum_role: 'founder' }
+        if (newUsername) updates.username = newUsername.toLowerCase()
+        if (display_name) updates.display_name = display_name
+        if (newBio) updates.bio = newBio
+        await supabase.from('forum_profiles').update(updates).eq('id', user.id)
+        return json({ success: true })
+      }
+
       default:
         return json({ error: 'Unknown action' }, 400)
     }
