@@ -565,7 +565,7 @@ export default function GeneratePayroll() {
                       <div className="mt-3 p-3 bg-white rounded-lg border border-slate-200">
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
                           <div>
-                            <p className="text-xs text-slate-500">Regular Pay</p>
+                            <p className="text-xs text-slate-500">Basic Pay</p>
                             <p className="font-medium">£{member.regularPay.toFixed(2)}</p>
                           </div>
                           {member.overtimePay > 0 && (

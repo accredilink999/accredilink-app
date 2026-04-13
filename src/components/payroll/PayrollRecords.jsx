@@ -266,6 +266,15 @@ export default function PayrollRecords() {
                     Mark All Paid ({group.approvedCount})
                   </Button>
                 )}
+                <Button size="sm" variant="destructive" className="h-7 text-xs"
+                  disabled={deleteMutation.isPending}
+                  onClick={() => {
+                    if (confirm(`Delete all ${group.records.length} payslips for this period?`)) {
+                      deleteMutation.mutate(group.records.map(r => r.id));
+                    }
+                  }}>
+                  <Trash2 className="w-3 h-3 mr-1" /> Delete Period
+                </Button>
               </div>
             </div>
 
