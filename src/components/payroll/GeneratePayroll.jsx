@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Calculator, Loader, CheckCircle, Users, PoundSterling, Clock, ChevronDown, ChevronUp, Pencil, Plus, X } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, parseISO, differenceInDays, eachDayOfInterval } from 'date-fns';
-import { calculatePayslip, TAX_CODES, NI_CATEGORIES } from '@/config/ukPayroll';
+import { calculatePayslip, calculateMonthlyTax, calculateMonthlyNI, TAX_CODES, NI_CATEGORIES } from '@/config/ukPayroll';
 
 // Calculate hours from scheduled shift start/end times only
 // Staff are paid for the scheduled shift duration — early clock-in or late clock-out does not affect pay
@@ -158,21 +158,33 @@ export default function GeneratePayroll() {
       const otherDeductions = ov.otherDeductions !== undefined ? parseFloat(ov.otherDeductions) : 0;
       const otherDeductionsLabel = ov.otherDeductionsLabel || '';
 
-      // For hourly staff, holiday pay = leave hours x hourly rate (added to gross)
+      // Holiday pay = leave hours x hourly rate (separate from basic pay)
       const holidayPay = !isSalaried ? Math.round(leaveHours * hourlyRate * 100) / 100 : 0;
 
+      // Calculate pay on WORK hours only — holiday pay added separately to gross
       const result = isSalaried
         ? calculatePayslip({
             regularHours: 1, overtimeHours: 0, hourlyRate: monthlySalary, overtimeRate: 0,
             taxCode, niCategory, pensionPercent, otherDeductions
           })
         : calculatePayslip({
-            regularHours: regularHours + leaveHours, overtimeHours, hourlyRate, overtimeRate,
+            regularHours, overtimeHours, hourlyRate, overtimeRate,
             taxCode, niCategory, pensionPercent, otherDeductions
           });
 
+      // Add holiday pay to gross, then recalculate tax/NI on the total
+      const basicPay = result.regularPay;
+      const grossPay = Math.round((result.grossPay + holidayPay) * 100) / 100;
+      const { tax } = calculateMonthlyTax(grossPay, taxCode);
+      const { ni } = calculateMonthlyNI(grossPay, niCategory);
+      const pension = Math.round(grossPay * (pensionPercent / 100) * 100) / 100;
+      const totalDeductions = Math.round((tax + ni + pension + otherDeductions) * 100) / 100;
+      const netPay = Math.round((grossPay - totalDeductions) * 100) / 100;
+
       return {
         ...member,
+        ...result,
+        // Override with correct values (result only had work hours)
         staffShifts,
         incompleteShifts,
         leaveDaysInPeriod, leaveHours, holidayPay,
@@ -181,10 +193,10 @@ export default function GeneratePayroll() {
         calculatedHours: totalHours,
         payType, isSalaried, monthlySalary,
         regularHours, overtimeHours, hourlyRate,
+        basicPay, grossPay, tax, ni, pension, totalDeductions, netPay,
         overtimeRate: result.overtimeRate,
         taxCode, niCategory, pensionPercent,
         otherDeductions, otherDeductionsLabel,
-        ...result,
       };
     });
   }, [activeStaff, shifts, overrides, approvedLeave, periodStart, periodEnd, includedShifts]);
@@ -620,9 +632,15 @@ export default function GeneratePayroll() {
                       <div className="mt-3 p-3 bg-white rounded-lg border border-slate-200">
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
                           <div>
-                            <p className="text-xs text-slate-500">Basic Pay</p>
-                            <p className="font-medium">£{member.regularPay.toFixed(2)}</p>
+                            <p className="text-xs text-slate-500">Basic Pay ({member.regularHours}h × £{member.hourlyRate})</p>
+                            <p className="font-medium">£{member.basicPay.toFixed(2)}</p>
                           </div>
+                          {member.holidayPay > 0 && (
+                            <div>
+                              <p className="text-xs text-slate-500">Holiday Pay ({member.leaveHours}h)</p>
+                              <p className="font-medium text-blue-700">£{member.holidayPay.toFixed(2)}</p>
+                            </div>
+                          )}
                           {member.overtimePay > 0 && (
                             <div>
                               <p className="text-xs text-slate-500">Overtime Pay</p>
