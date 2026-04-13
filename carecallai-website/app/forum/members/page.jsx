@@ -3,10 +3,9 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForum } from '@/lib/forumContext'
 import ForumHeader from '@/components/forum/ForumHeader'
-import UserBadge from '@/components/forum/UserBadge'
 import StarRank from '@/components/forum/StarRank'
-import { timeAgo } from '@/lib/forumAuth'
-import { Users, Search, MessageSquare, Heart, Mail } from 'lucide-react'
+import { timeAgo, canModerate, getRoleBadge } from '@/lib/forumAuth'
+import { Users, Search, MessageSquare, Heart, Mail, Shield, Trash2, Ban, ChevronDown } from 'lucide-react'
 import Link from 'next/link'
 
 export default function MembersPage() {
@@ -15,18 +14,55 @@ export default function MembersPage() {
   const [members, setMembers] = useState([])
   const [loadingMembers, setLoadingMembers] = useState(true)
   const [search, setSearch] = useState('')
+  const [selectedMember, setSelectedMember] = useState(null)
+  const [actionLoading, setActionLoading] = useState(false)
+
+  const isFounder = profile?.forum_role === 'founder'
+  const isMod = canModerate(profile?.forum_role)
 
   useEffect(() => {
     if (!loading && !user) { router.push('/forum/login'); return }
-    if (user) fetchMembers()
-  }, [loading, user])
+    if (user && token) fetchMembers()
+  }, [loading, user, token])
 
   const fetchMembers = async () => {
     try {
-      const res = await fetch('/api/forum/members')
+      const url = token ? `/api/forum/members?token=${token}` : '/api/forum/members'
+      const res = await fetch(url)
       const data = await res.json()
       if (data.members) setMembers(data.members)
     } catch {} finally { setLoadingMembers(false) }
+  }
+
+  const handleAction = async (action, memberId, extra = {}) => {
+    setActionLoading(true)
+    try {
+      const res = await fetch('/api/forum/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, action, userId: memberId, ...extra }),
+      })
+      const data = await res.json()
+      if (data.error) {
+        alert(data.error)
+      } else {
+        setSelectedMember(null)
+        fetchMembers()
+      }
+    } catch {
+      alert('Action failed')
+    } finally { setActionLoading(false) }
+  }
+
+  const handleBan = (memberId) => {
+    const reason = prompt('Ban reason:')
+    if (!reason) return
+    handleAction('ban', memberId, { reason })
+  }
+
+  const handleDelete = (memberId, name) => {
+    if (!confirm(`Are you sure you want to permanently remove ${name} from the forum? This will delete all their posts and cannot be undone.`)) return
+    handleAction('delete-member', memberId)
   }
 
   const filtered = search
@@ -46,7 +82,7 @@ export default function MembersPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900">
-      <ForumHeader user={user} profile={profile} token={token} onLogout={logout} />
+      <ForumHeader profile={profile} token={token} onLogout={logout} />
 
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
@@ -73,52 +109,126 @@ export default function MembersPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {filtered.map(member => (
-              <div key={member.id} className="bg-white rounded-2xl border border-slate-200 p-5 hover:shadow-lg transition-all">
-                <div className="flex items-start gap-4">
-                  <Link href={`/forum/profile/${member.username}`}>
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-white font-bold text-lg overflow-hidden shadow-sm flex-shrink-0">
-                      {member.avatar_url ? (
-                        <img src={member.avatar_url} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        (member.display_name || member.username || '?')[0].toUpperCase()
-                      )}
-                    </div>
-                  </Link>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Link href={`/forum/profile/${member.username}`} className="font-semibold text-slate-900 hover:text-teal-700 transition-colors">
-                        {member.display_name || member.username}
+            {filtered.map(member => {
+              const isMe = user?.id === member.id
+              const isSelected = selectedMember === member.id
+              const badge = getRoleBadge(member.forum_role)
+              const roleGradient = member.forum_role === 'founder' ? 'from-amber-400 to-amber-600'
+                : member.forum_role === 'admin' ? 'from-teal-400 to-teal-600'
+                : member.forum_role === 'moderator' ? 'from-purple-400 to-purple-600'
+                : 'from-slate-400 to-slate-500'
+
+              return (
+                <div key={member.id} className="relative">
+                  <div
+                    className={`bg-white/[0.06] backdrop-blur rounded-2xl border p-5 transition-all cursor-pointer ${isSelected ? 'border-teal-500/50 bg-white/[0.1]' : 'border-white/10 hover:border-white/20 hover:bg-white/[0.08]'}`}
+                    onClick={() => setSelectedMember(isSelected ? null : member.id)}
+                  >
+                    <div className="flex items-start gap-4">
+                      <Link href={`/forum/profile/${member.username}`} onClick={e => e.stopPropagation()}>
+                        <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${roleGradient} flex items-center justify-center text-white font-bold text-lg overflow-hidden shadow-sm flex-shrink-0`}>
+                          {member.avatar_url ? (
+                            <img src={member.avatar_url} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            (member.display_name || member.username || '?')[0].toUpperCase()
+                          )}
+                        </div>
                       </Link>
-                      <UserBadge username={member.username} role={member.forum_role} showName={false} showStars={false} linkToProfile={false} size="xs" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Link href={`/forum/profile/${member.username}`} onClick={e => e.stopPropagation()} className="font-semibold text-white hover:text-teal-400 transition-colors">
+                            {member.display_name || member.username}
+                          </Link>
+                          {badge && (
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${badge.color}`}>
+                              {badge.label}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500">@{member.username}</p>
+                        <StarRank role={member.forum_role} postCount={member.post_count || 0} />
+                        {member.bio && <p className="text-xs text-slate-400 mt-1 line-clamp-2">{member.bio}</p>}
+                        <div className="flex items-center gap-3 mt-2">
+                          <span className="flex items-center gap-1 text-xs text-slate-500">
+                            <MessageSquare className="w-3 h-3" /> {member.thread_count || 0}
+                          </span>
+                          <span className="flex items-center gap-1 text-xs text-slate-500">
+                            <Heart className="w-3 h-3" /> {member.reputation || 0}
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            Joined {timeAgo(member.created_at)}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-xs text-slate-500">@{member.username}</p>
-                    <StarRank role={member.forum_role} postCount={member.post_count || 0} />
-                    {member.bio && <p className="text-xs text-slate-500 mt-1 line-clamp-2">{member.bio}</p>}
-                    <div className="flex items-center gap-3 mt-2">
-                      <span className="flex items-center gap-1 text-xs text-slate-400">
-                        <MessageSquare className="w-3 h-3" /> {member.thread_count || 0}
-                      </span>
-                      <span className="flex items-center gap-1 text-xs text-slate-400">
-                        <Heart className="w-3 h-3" /> {member.reputation || 0}
-                      </span>
-                      <span className="text-xs text-slate-400">
-                        Joined {timeAgo(member.created_at)}
-                      </span>
-                    </div>
+
+                    {/* Action panel — shown when selected */}
+                    {isSelected && !isMe && (
+                      <div className="mt-4 pt-4 border-t border-white/10 flex flex-wrap gap-2" onClick={e => e.stopPropagation()}>
+                        <Link
+                          href={`/forum/messages/new?to=${member.username}`}
+                          className="flex items-center gap-1.5 text-xs px-3 py-2 bg-teal-500/20 text-teal-400 rounded-lg hover:bg-teal-500/30 transition-colors"
+                        >
+                          <Mail className="w-3.5 h-3.5" /> Message
+                        </Link>
+
+                        {isFounder && member.forum_role !== 'founder' && (
+                          <>
+                            {member.forum_role !== 'moderator' && (
+                              <button
+                                onClick={() => handleAction('set-role', member.id, { role: 'moderator' })}
+                                disabled={actionLoading}
+                                className="flex items-center gap-1.5 text-xs px-3 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors disabled:opacity-50"
+                              >
+                                <Shield className="w-3.5 h-3.5" /> Make Moderator
+                              </button>
+                            )}
+                            {member.forum_role !== 'admin' && (
+                              <button
+                                onClick={() => handleAction('set-role', member.id, { role: 'admin' })}
+                                disabled={actionLoading}
+                                className="flex items-center gap-1.5 text-xs px-3 py-2 bg-teal-500/20 text-teal-300 rounded-lg hover:bg-teal-500/30 transition-colors disabled:opacity-50"
+                              >
+                                <Shield className="w-3.5 h-3.5" /> Make Admin
+                              </button>
+                            )}
+                            {member.forum_role !== 'user' && (
+                              <button
+                                onClick={() => handleAction('set-role', member.id, { role: 'user' })}
+                                disabled={actionLoading}
+                                className="flex items-center gap-1.5 text-xs px-3 py-2 bg-slate-500/20 text-slate-400 rounded-lg hover:bg-slate-500/30 transition-colors disabled:opacity-50"
+                              >
+                                <ChevronDown className="w-3.5 h-3.5" /> Demote to User
+                              </button>
+                            )}
+                          </>
+                        )}
+
+                        {isMod && member.forum_role !== 'founder' && (
+                          <button
+                            onClick={() => handleBan(member.id)}
+                            disabled={actionLoading}
+                            className="flex items-center gap-1.5 text-xs px-3 py-2 bg-orange-500/20 text-orange-400 rounded-lg hover:bg-orange-500/30 transition-colors disabled:opacity-50"
+                          >
+                            <Ban className="w-3.5 h-3.5" /> Ban
+                          </button>
+                        )}
+
+                        {isFounder && member.forum_role !== 'founder' && (
+                          <button
+                            onClick={() => handleDelete(member.id, member.display_name || member.username)}
+                            disabled={actionLoading}
+                            className="flex items-center gap-1.5 text-xs px-3 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors disabled:opacity-50"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" /> Remove
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  {user?.id !== member.id && (
-                    <Link
-                      href={`/forum/messages/new?to=${member.username}`}
-                      className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors flex-shrink-0"
-                      title="Send message"
-                    >
-                      <Mail className="w-4 h-4" />
-                    </Link>
-                  )}
                 </div>
-              </div>
-            ))}
+              )
+            })}
             {filtered.length === 0 && (
               <div className="col-span-2 text-center py-12 bg-white/[0.06] rounded-2xl border border-white/10">
                 <Users className="w-8 h-8 text-slate-500 mx-auto mb-2" />

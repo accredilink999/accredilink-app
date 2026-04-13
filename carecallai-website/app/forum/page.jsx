@@ -6,10 +6,11 @@ import ForumHeader from '@/components/forum/ForumHeader'
 import ForumSidebar from '@/components/forum/ForumSidebar'
 import CategoryCard from '@/components/forum/CategoryCard'
 import ThreadCard from '@/components/forum/ThreadCard'
+import UsernameSetupModal from '@/components/forum/UsernameSetupModal'
 import { MessageSquare, TrendingUp, Users, Layers } from 'lucide-react'
 
 export default function ForumHome() {
-  const { user, profile, token, loading, categories, logout } = useForum()
+  const { user, profile, token, loading, categories, needsSetup, logout } = useForum()
   const router = useRouter()
   const [recentThreads, setRecentThreads] = useState([])
   const [stats, setStats] = useState(null)
@@ -61,7 +62,8 @@ export default function ForumHome() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900">
-      <ForumHeader user={user} profile={profile} token={token} onLogout={logout} />
+      <ForumHeader profile={profile} token={token} onLogout={logout} />
+      {needsSetup && <UsernameSetupModal />}
 
       {/* Hero Banner */}
       <div className="relative overflow-hidden border-b border-white/5">

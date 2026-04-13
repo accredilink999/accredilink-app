@@ -8,10 +8,10 @@ const FOUNDER_ID = '1f5d9e8a-ab4b-4c00-813a-8af23f79fb82'
 
 /**
  * Auto-provision forum profiles for all org admins/owners who don't have one yet.
+ * They get 'user' role on the forum — only the founder can promote to admin/mod.
  */
 async function autoProvisionAdmins() {
   try {
-    // Get all org admins/owners
     const { data: orgMembers } = await supabase
       .from('organization_members')
       .select('user_id, role')
@@ -19,18 +19,15 @@ async function autoProvisionAdmins() {
 
     if (!orgMembers?.length) return
 
-    // Get all profile admins too
     const { data: profileAdmins } = await supabase
       .from('profiles')
       .select('id, role, full_name, photo_url')
       .in('role', ['super_admin', 'admin'])
 
-    // Combine unique user IDs
     const adminIds = new Set()
     orgMembers.forEach(m => adminIds.add(m.user_id))
     profileAdmins?.forEach(p => adminIds.add(p.id))
 
-    // Check which ones already have forum profiles
     const { data: existingProfiles } = await supabase
       .from('forum_profiles')
       .select('id')
@@ -41,7 +38,6 @@ async function autoProvisionAdmins() {
 
     if (!needsProvisioning.length) return
 
-    // Get auth user emails for username generation
     for (const userId of needsProvisioning) {
       try {
         const { data: { user: authUser } } = await supabase.auth.admin.getUserById(userId)
@@ -50,7 +46,6 @@ async function autoProvisionAdmins() {
         const profile = profileAdmins?.find(p => p.id === userId)
         const isFounder = userId === FOUNDER_ID
 
-        // Generate unique username from email
         let baseUsername = (authUser.email || '').split('@')[0].toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 20)
         if (!baseUsername || baseUsername.length < 3) baseUsername = 'user'
 
@@ -64,7 +59,8 @@ async function autoProvisionAdmins() {
           if (attempt > 20) break
         }
 
-        const forumRole = isFounder ? 'founder' : 'admin'
+        // App admins get 'user' role on forum — only founder can promote
+        const forumRole = isFounder ? 'founder' : 'user'
         const displayName = profile?.full_name || authUser.email?.split('@')[0] || username
 
         await supabase.from('forum_profiles').insert({
@@ -75,6 +71,7 @@ async function autoProvisionAdmins() {
           forum_role: forumRole,
           accepted_terms: true,
           terms_accepted_at: new Date().toISOString(),
+          profile_customized: false,
         })
       } catch (innerErr) {
         console.error(`[Forum] Failed to provision profile for ${userId}:`, innerErr.message)
@@ -85,22 +82,53 @@ async function autoProvisionAdmins() {
   }
 }
 
-export async function GET() {
+export async function GET(req) {
   try {
-    // Auto-provision any org admins who don't have forum profiles yet
     await autoProvisionAdmins()
+
+    // Check viewer's role via optional token
+    const { searchParams } = new URL(req.url)
+    const token = searchParams.get('token')
+    let viewerRole = 'user'
+
+    if (token) {
+      const anonClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+      const { data: { user } } = await anonClient.auth.getUser(token)
+      if (user) {
+        const { data: fp } = await supabase.from('forum_profiles').select('forum_role').eq('id', user.id).single()
+        if (fp) viewerRole = fp.forum_role
+      }
+    }
 
     const { data: members, error } = await supabase
       .from('forum_profiles')
-      .select('id, username, display_name, avatar_url, bio, forum_role, thread_count, post_count, reputation, created_at, last_seen_at')
+      .select('id, username, display_name, avatar_url, bio, forum_role, thread_count, post_count, reputation, created_at, last_seen_at, profile_customized')
       .eq('is_banned', false)
       .order('created_at', { ascending: true })
 
     if (error) return json({ error: error.message }, 500)
 
-    // Sort: founder first, then admins, then by name
+    // Mask uncustomized members for regular users — founder/mods/admins see real names
+    const canSeeRealNames = ['founder', 'admin', 'moderator'].includes(viewerRole)
+    let memberNum = 0
+    const processed = (members || []).map(m => {
+      if (!canSeeRealNames && !m.profile_customized && m.forum_role === 'user') {
+        memberNum++
+        return {
+          ...m,
+          display_name: `Member ${memberNum}`,
+          username: `member-${memberNum}`,
+          avatar_url: null,
+          bio: null,
+          profile_customized: m.profile_customized,
+        }
+      }
+      return m
+    })
+
+    // Sort: founder first, then admins, mods, users
     const roleOrder = { founder: 0, admin: 1, moderator: 2, user: 3 }
-    const sorted = (members || []).sort((a, b) => {
+    const sorted = processed.sort((a, b) => {
       const ra = roleOrder[a.forum_role] ?? 9
       const rb = roleOrder[b.forum_role] ?? 9
       if (ra !== rb) return ra - rb

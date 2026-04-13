@@ -10,6 +10,7 @@ export function ForumProvider({ children }) {
   const [token, setToken] = useState(null)
   const [loading, setLoading] = useState(true)
   const [categories, setCategories] = useState([])
+  const [needsSetup, setNeedsSetup] = useState(false)
 
   const fetchProfile = useCallback(async (accessToken) => {
     try {
@@ -23,6 +24,7 @@ export function ForumProvider({ children }) {
       const fp = data.profile || data.forumProfile
       if (fp) {
         setProfile(fp)
+        setNeedsSetup(!!data.needsSetup)
         return fp
       }
       return null
@@ -106,7 +108,8 @@ export function ForumProvider({ children }) {
     setToken(accessToken)
     const fp = data.profile || data.forumProfile
     if (fp) setProfile(fp)
-    return { user: data.user, profile: fp }
+    setNeedsSetup(!!data.needsSetup)
+    return { user: data.user, profile: fp, needsSetup: !!data.needsSetup }
   }
 
   const logout = async () => {
@@ -126,7 +129,7 @@ export function ForumProvider({ children }) {
   }
 
   return (
-    <ForumContext.Provider value={{ user, profile, token, loading, categories, login, logout, refreshProfile, fetchCategories }}>
+    <ForumContext.Provider value={{ user, profile, token, loading, categories, needsSetup, setNeedsSetup, login, logout, refreshProfile, fetchCategories }}>
       {children}
     </ForumContext.Provider>
   )

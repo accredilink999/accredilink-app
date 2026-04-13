@@ -12,19 +12,16 @@ const FOUNDER_ID = '1f5d9e8a-ab4b-4c00-813a-8af23f79fb82'
 
 /**
  * Auto-provision a forum profile for admin/owner users on first login.
- * Generates a unique username from their email prefix or name.
+ * App admins get 'user' forum role — only founder can promote.
  */
 async function autoProvisionAdmin(supabase, { userId, email, fullName, photoUrl, profileRole, orgRole }) {
-  // Determine if they qualify for auto-provisioning
   const isFounder = userId === FOUNDER_ID
   const isAdmin = profileRole === 'super_admin' || profileRole === 'admin' || orgRole === 'owner' || orgRole === 'admin'
   if (!isFounder && !isAdmin) return null
 
-  // Generate username from email prefix
   let baseUsername = (email || '').split('@')[0].toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 20)
   if (!baseUsername || baseUsername.length < 3) baseUsername = 'user'
 
-  // Ensure uniqueness — try base, then base-1, base-2, etc.
   let username = baseUsername
   let attempt = 0
   while (true) {
@@ -32,10 +29,11 @@ async function autoProvisionAdmin(supabase, { userId, email, fullName, photoUrl,
     if (!existing) break
     attempt++
     username = `${baseUsername}-${attempt}`
-    if (attempt > 20) return null // safety
+    if (attempt > 20) return null
   }
 
-  const forumRole = isFounder ? 'founder' : 'admin'
+  // App admins get 'user' forum role, only founder gets 'founder'
+  const forumRole = isFounder ? 'founder' : 'user'
   const displayName = fullName || username
 
   const { data: forumProfile, error } = await supabase.from('forum_profiles').insert({
@@ -46,6 +44,7 @@ async function autoProvisionAdmin(supabase, { userId, email, fullName, photoUrl,
     forum_role: forumRole,
     accepted_terms: true,
     terms_accepted_at: new Date().toISOString(),
+    profile_customized: false,
   }).select().single()
 
   if (error) return null
@@ -68,19 +67,17 @@ export async function POST(req) {
       const { data, error } = await anonClient.auth.signInWithPassword({ email, password })
       if (error) return json({ error: error.message }, 401)
 
-      // Get profile role + org role
       const userId = data.user.id
       const { data: profile } = await supabase.from('profiles').select('role, full_name, photo_url').eq('id', userId).single()
       const { data: orgMember } = await supabase.from('organization_members').select('role, organization_id').eq('user_id', userId).limit(1).single()
 
-      // Admin-only forum — reject regular staff
+      // Admin-only forum
       const isFounder = userId === FOUNDER_ID
       const isAdmin = profile?.role === 'super_admin' || profile?.role === 'admin' || orgMember?.role === 'owner' || orgMember?.role === 'admin'
       if (!isFounder && !isAdmin) {
         return json({ error: 'The forum is only available to organisation administrators.' }, 403)
       }
 
-      // Auto-create forum profile for admins
       let { data: forumProfile } = await supabase.from('forum_profiles').select('*').eq('id', userId).single()
 
       if (!forumProfile) {
@@ -93,19 +90,22 @@ export async function POST(req) {
           orgRole: orgMember?.role,
         })
       } else {
-        // Auto-correct forum_role if it doesn't match (e.g. founder was set as admin)
-        const correctRole = isFounder ? 'founder' : (isAdmin ? 'admin' : forumProfile.forum_role)
-        if (forumProfile.forum_role !== correctRole || (isFounder && forumProfile.username !== 'carecallai-founder')) {
-          const updates = { forum_role: correctRole }
-          if (isFounder) {
-            updates.username = 'carecallai-founder'
-            updates.display_name = 'CareCallAI Founder'
-            updates.bio = 'Founder & Creator of CareCallAI. Building the future of intelligent care management — one feature at a time. Passionate about empowering care professionals with technology that actually works.'
+        // Auto-correct founder only
+        if (isFounder && (forumProfile.forum_role !== 'founder' || forumProfile.username !== 'carecallai-founder')) {
+          const updates = {
+            forum_role: 'founder',
+            username: 'carecallai-founder',
+            display_name: 'CareCallAI Founder',
+            bio: 'Founder & Creator of CareCallAI. Building the future of intelligent care management — one feature at a time. Passionate about empowering care professionals with technology that actually works.',
+            profile_customized: true,
           }
           await supabase.from('forum_profiles').update(updates).eq('id', userId)
           Object.assign(forumProfile, updates)
         }
       }
+
+      // Check if first login (needs username setup)
+      const needsSetup = forumProfile && !forumProfile.profile_customized && forumProfile.forum_role !== 'founder'
 
       return json({
         success: true,
@@ -115,7 +115,7 @@ export async function POST(req) {
         profileRole: profile?.role || 'user',
         orgRole: orgMember?.role || 'member',
         forumProfile,
-        needsSetup: false,
+        needsSetup,
       })
     }
 
@@ -131,7 +131,6 @@ export async function POST(req) {
       const { data: orgMember } = await supabase.from('organization_members').select('role').eq('user_id', user.id).limit(1).single()
       let { data: forumProfile } = await supabase.from('forum_profiles').select('*').eq('id', user.id).single()
 
-      // Auto-create for admins who don't have a forum profile yet
       if (!forumProfile) {
         forumProfile = await autoProvisionAdmin(supabase, {
           userId: user.id,
@@ -143,23 +142,21 @@ export async function POST(req) {
         })
       }
 
-      // Auto-correct forum_role + update last_seen
       if (forumProfile) {
         const isFounder = user.id === FOUNDER_ID
-        const isAdmin = profile?.role === 'super_admin' || profile?.role === 'admin' || orgMember?.role === 'owner' || orgMember?.role === 'admin'
-        const correctRole = isFounder ? 'founder' : (isAdmin ? 'admin' : forumProfile.forum_role)
         const updates = { last_seen_at: new Date().toISOString() }
-        if (forumProfile.forum_role !== correctRole || (isFounder && forumProfile.username !== 'carecallai-founder')) {
-          updates.forum_role = correctRole
-          if (isFounder) {
-            updates.username = 'carecallai-founder'
-            updates.display_name = 'CareCallAI Founder'
-            updates.bio = 'Founder & Creator of CareCallAI. Building the future of intelligent care management — one feature at a time. Passionate about empowering care professionals with technology that actually works.'
-          }
+        // Only auto-correct for founder
+        if (isFounder && (forumProfile.forum_role !== 'founder' || forumProfile.username !== 'carecallai-founder')) {
+          updates.forum_role = 'founder'
+          updates.username = 'carecallai-founder'
+          updates.display_name = 'CareCallAI Founder'
+          updates.profile_customized = true
           Object.assign(forumProfile, updates)
         }
         await supabase.from('forum_profiles').update(updates).eq('id', user.id)
       }
+
+      const needsSetup = forumProfile && !forumProfile.profile_customized && forumProfile.forum_role !== 'founder'
 
       return json({
         user: { id: user.id, email: user.email, full_name: profile?.full_name, photo_url: profile?.photo_url },
@@ -167,7 +164,7 @@ export async function POST(req) {
         profileRole: profile?.role || 'user',
         orgRole: orgMember?.role || 'member',
         forumProfile,
-        needsSetup: !forumProfile,
+        needsSetup,
       })
     }
 
@@ -179,30 +176,47 @@ export async function POST(req) {
       const { data: { user }, error } = await anonClient.auth.getUser(token)
       if (error || !user) return json({ error: 'Invalid token' }, 401)
 
-      // Check username uniqueness
-      const { data: existing } = await supabase.from('forum_profiles').select('id').eq('username', username.toLowerCase()).single()
-      if (existing) return json({ error: 'Username already taken' }, 409)
+      const cleanUsername = username.toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 30)
+      if (cleanUsername.length < 3) return json({ error: 'Username must be at least 3 characters' }, 400)
 
-      // Determine forum role
-      const { data: profile } = await supabase.from('profiles').select('role, full_name, photo_url').eq('id', user.id).single()
-      const { data: orgMember } = await supabase.from('organization_members').select('role').eq('user_id', user.id).limit(1).single()
+      // Check if user already has a forum profile (update it) or needs a new one
+      let { data: existingProfile } = await supabase.from('forum_profiles').select('id').eq('id', user.id).single()
 
-      let forumRole = 'user'
-      if (user.id === FOUNDER_ID) forumRole = 'founder'
-      else if (profile?.role === 'super_admin' || profile?.role === 'admin' || orgMember?.role === 'owner' || orgMember?.role === 'admin') forumRole = 'admin'
+      // Check username uniqueness (exclude own profile)
+      const { data: taken } = await supabase.from('forum_profiles').select('id').eq('username', cleanUsername).neq('id', user.id).single()
+      if (taken) return json({ error: 'Username already taken' }, 409)
 
-      const { data: forumProfile, error: insertErr } = await supabase.from('forum_profiles').insert({
-        id: user.id,
-        username: username.toLowerCase(),
-        display_name: displayName || profile?.full_name || username,
-        avatar_url: profile?.photo_url || null,
-        forum_role: forumRole,
-        accepted_terms: true,
-        terms_accepted_at: new Date().toISOString(),
-      }).select().single()
+      const { data: appProfile } = await supabase.from('profiles').select('role, full_name, photo_url').eq('id', user.id).single()
 
-      if (insertErr) return json({ error: insertErr.message }, 500)
-      return json({ success: true, profile: forumProfile, forumProfile })
+      if (existingProfile) {
+        // Update existing profile with chosen username
+        const { data: forumProfile, error: updateErr } = await supabase.from('forum_profiles').update({
+          username: cleanUsername,
+          display_name: displayName || appProfile?.full_name || cleanUsername,
+          profile_customized: true,
+        }).eq('id', user.id).select().single()
+
+        if (updateErr) return json({ error: updateErr.message }, 500)
+        return json({ success: true, profile: forumProfile, forumProfile })
+      } else {
+        // Create new profile
+        let forumRole = 'user'
+        if (user.id === FOUNDER_ID) forumRole = 'founder'
+
+        const { data: forumProfile, error: insertErr } = await supabase.from('forum_profiles').insert({
+          id: user.id,
+          username: cleanUsername,
+          display_name: displayName || appProfile?.full_name || cleanUsername,
+          avatar_url: appProfile?.photo_url || null,
+          forum_role: forumRole,
+          accepted_terms: true,
+          terms_accepted_at: new Date().toISOString(),
+          profile_customized: true,
+        }).select().single()
+
+        if (insertErr) return json({ error: insertErr.message }, 500)
+        return json({ success: true, profile: forumProfile, forumProfile })
+      }
     }
 
     if (action === 'get-public-profile') {
@@ -210,7 +224,7 @@ export async function POST(req) {
       if (!username) return json({ error: 'Username required' }, 400)
 
       const { data: forumProfile } = await supabase.from('forum_profiles')
-        .select('id, username, display_name, avatar_url, bio, forum_role, post_count, thread_count, reputation, created_at, last_seen_at')
+        .select('id, username, display_name, avatar_url, bio, forum_role, post_count, thread_count, reputation, created_at, last_seen_at, profile_customized')
         .eq('username', username.toLowerCase())
         .single()
 

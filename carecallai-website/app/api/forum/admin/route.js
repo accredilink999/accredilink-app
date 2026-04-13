@@ -256,6 +256,21 @@ export async function POST(req) {
         return json({ success: true })
       }
 
+      case 'delete-member': {
+        if (!isFounder) return json({ error: 'Only founder can delete members' }, 403)
+        if (!userId) return json({ error: 'userId required' }, 400)
+        // Cannot delete yourself
+        if (userId === user.id) return json({ error: 'Cannot delete your own profile' }, 400)
+        // Delete their replies, threads, likes, notifications, then profile
+        await supabase.from('forum_likes').delete().eq('user_id', userId)
+        await supabase.from('forum_notifications').delete().eq('user_id', userId)
+        await supabase.from('forum_notifications').delete().eq('actor_id', userId)
+        await supabase.from('forum_replies').delete().eq('author_id', userId)
+        await supabase.from('forum_threads').delete().eq('author_id', userId)
+        await supabase.from('forum_profiles').delete().eq('id', userId)
+        return json({ success: true })
+      }
+
       case 'fix-founder': {
         if (!isFounder) return json({ error: 'Only founder' }, 403)
         const { username: newUsername, display_name, bio: newBio } = body
