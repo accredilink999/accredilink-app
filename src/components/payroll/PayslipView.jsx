@@ -294,6 +294,80 @@ export default function PayslipView({ record, open, onClose, readOnly = false })
                 <p className="font-bold text-green-700 text-lg">£{calculated.netPay.toFixed(2)}</p>
               </div>
             </div>
+
+            {/* Stored Record Info — holiday, pay type, etc. */}
+            {(record.holiday_days > 0 || record.holiday_hours > 0 || record.holiday_pay > 0 || record.pay_type) && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-1">
+                <p className="text-xs font-semibold text-blue-800 uppercase">Additional Pay Info</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+                  {record.pay_type && (
+                    <div>
+                      <p className="text-xs text-slate-500">Pay Type</p>
+                      <p className="font-medium capitalize">{record.pay_type}</p>
+                    </div>
+                  )}
+                  {record.holiday_days > 0 && (
+                    <div>
+                      <p className="text-xs text-slate-500">Holiday Days</p>
+                      <p className="font-medium">{record.holiday_days}</p>
+                    </div>
+                  )}
+                  {record.holiday_hours > 0 && (
+                    <div>
+                      <p className="text-xs text-slate-500">Holiday Hours</p>
+                      <p className="font-medium">{(record.holiday_hours || 0).toFixed(2)}</p>
+                    </div>
+                  )}
+                  {record.holiday_pay > 0 && (
+                    <div>
+                      <p className="text-xs text-slate-500">Holiday Pay</p>
+                      <p className="font-medium text-blue-700">£{(record.holiday_pay || 0).toFixed(2)}</p>
+                    </div>
+                  )}
+                  {record.pay_type === 'salaried' && record.annual_salary > 0 && (
+                    <div>
+                      <p className="text-xs text-slate-500">Annual Salary</p>
+                      <p className="font-medium">£{(record.annual_salary || 0).toLocaleString()}</p>
+                    </div>
+                  )}
+                  {record.pay_type === 'salaried' && record.monthly_salary > 0 && (
+                    <div>
+                      <p className="text-xs text-slate-500">Monthly Salary</p>
+                      <p className="font-medium">£{(record.monthly_salary || 0).toFixed(2)}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Shift Breakdown from stored record */}
+            {(() => {
+              const shifts = typeof record.shift_details === 'string'
+                ? JSON.parse(record.shift_details)
+                : (record.shift_details || []);
+              if (shifts.length === 0) return null;
+              const sorted = [...shifts].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+              return (
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                  <p className="text-xs font-semibold text-slate-600 uppercase mb-2">
+                    Shifts Paid — {sorted.length} shifts, {sorted.reduce((s, sh) => s + (sh.hours || 0), 0).toFixed(2)} hrs
+                  </p>
+                  <div className="max-h-48 overflow-y-auto space-y-0.5">
+                    {sorted.map((shift, i) => {
+                      const d = new Date(shift.date + 'T00:00:00');
+                      const dateStr = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+                      return (
+                        <div key={i} className="flex justify-between text-xs py-0.5 border-b border-slate-100 last:border-0">
+                          <span className="text-slate-600">{dateStr}</span>
+                          <span className="text-slate-500">{shift.start_time || '—'} – {shift.end_time || '—'}</span>
+                          <span className="font-medium text-slate-700">{(shift.hours || 0).toFixed(2)} hrs</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 

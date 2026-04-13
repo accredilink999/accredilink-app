@@ -301,6 +301,15 @@ export default function GeneratePayroll() {
         company_name: settings?.company_name || companySettings?.company_name || '',
         company_logo: companySettings?.company_logo || '',
         payment_method: 'bank_transfer',
+        shift_details: s.staffShifts.map(shift => ({
+          date: shift.date,
+          start_time: (shift.start_time || '').slice(0, 5),
+          end_time: (shift.end_time || '').slice(0, 5),
+          hours: getShiftHours(shift),
+          shift_type: shift.shift_type || '',
+          area: shift.rota_area_id || '',
+          client: shift.client_name || '',
+        })),
       }));
 
       return Promise.all(records.map(record => base44.entities.PayrollRecord.create(record)));

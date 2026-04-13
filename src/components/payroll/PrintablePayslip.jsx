@@ -5,6 +5,10 @@ const PrintablePayslip = React.forwardRef(({ record, settings }, ref) => {
     ? JSON.parse(record.deductions)
     : (record.deductions || {});
 
+  const shiftDetails = typeof record.shift_details === 'string'
+    ? JSON.parse(record.shift_details)
+    : (record.shift_details || []);
+
   const companyName = record.company_name || settings?.company_name || 'Company Name';
   const payeRef = record.employer_paye_ref || settings?.tax_id || '';
   const brandColor = '#0f766e';
@@ -13,6 +17,8 @@ const PrintablePayslip = React.forwardRef(({ record, settings }, ref) => {
   const paymentDate = record.payment_date ? new Date(record.payment_date).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB');
 
   const totalDeductions = (deductions.tax || 0) + (deductions.ni || 0) + (deductions.pension || 0) + (deductions.other || 0);
+
+  const sortedShifts = [...shiftDetails].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
   return (
     <div
@@ -171,6 +177,45 @@ const PrintablePayslip = React.forwardRef(({ record, settings }, ref) => {
           </tbody>
         </table>
       </div>
+
+      {/* Shifts Worked Breakdown */}
+      {sortedShifts.length > 0 && (
+        <div style={{ marginBottom: '20px' }}>
+          <h3 style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 'bold', color: brandColor, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Shifts Worked ({sortedShifts.length} shifts)
+          </h3>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f1f5f9' }}>
+                <th style={{ padding: '5px 8px', textAlign: 'left', fontWeight: 'bold', color: '#475569', borderBottom: '1px solid #e2e8f0' }}>Date</th>
+                <th style={{ padding: '5px 8px', textAlign: 'center', fontWeight: 'bold', color: '#475569', borderBottom: '1px solid #e2e8f0' }}>Start</th>
+                <th style={{ padding: '5px 8px', textAlign: 'center', fontWeight: 'bold', color: '#475569', borderBottom: '1px solid #e2e8f0' }}>End</th>
+                <th style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 'bold', color: '#475569', borderBottom: '1px solid #e2e8f0' }}>Hours</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedShifts.map((shift, i) => {
+                const d = new Date(shift.date + 'T00:00:00');
+                const dateStr = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+                return (
+                  <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '4px 8px' }}>{dateStr}</td>
+                    <td style={{ padding: '4px 8px', textAlign: 'center' }}>{shift.start_time || '—'}</td>
+                    <td style={{ padding: '4px 8px', textAlign: 'center' }}>{shift.end_time || '—'}</td>
+                    <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 'bold' }}>{(shift.hours || 0).toFixed(2)}</td>
+                  </tr>
+                );
+              })}
+              <tr style={{ borderTop: '2px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+                <td colSpan={3} style={{ padding: '5px 8px', fontWeight: 'bold', textAlign: 'right', fontSize: '11px' }}>Total Shift Hours</td>
+                <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 'bold', fontSize: '11px' }}>
+                  {sortedShifts.reduce((sum, s) => sum + (s.hours || 0), 0).toFixed(2)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Deductions Table */}
       <div style={{ marginBottom: '20px' }}>
