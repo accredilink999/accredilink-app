@@ -72,7 +72,7 @@ export function ForumProvider({ children }) {
     init()
   }, [fetchProfile, fetchCategories])
 
-  const login = async (email, password) => {
+  const login = async (email, password, rememberMe = true) => {
     // Use the forum API which checks admin status server-side
     const res = await fetch('/api/forum/auth', {
       method: 'POST',
@@ -92,6 +92,16 @@ export function ForumProvider({ children }) {
       await client.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
     }
 
+    // Save remember-me preference
+    try {
+      if (rememberMe) {
+        localStorage.setItem('forum-remember', '1')
+      } else {
+        localStorage.removeItem('forum-remember')
+        // For non-remember, session will only last this browser tab via state
+      }
+    } catch {}
+
     setUser(data.user)
     setToken(accessToken)
     const fp = data.profile || data.forumProfile
@@ -105,6 +115,10 @@ export function ForumProvider({ children }) {
     setUser(null)
     setProfile(null)
     setToken(null)
+    try {
+      localStorage.removeItem('forum-remember')
+      localStorage.removeItem('forum-saved-email')
+    } catch {}
   }
 
   const refreshProfile = async () => {

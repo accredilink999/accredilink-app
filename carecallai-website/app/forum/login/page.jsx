@@ -1,17 +1,35 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForum } from '@/lib/forumContext'
-import { LogIn, AlertCircle, ShieldAlert } from 'lucide-react'
+import { LogIn, AlertCircle, ShieldAlert, Loader2 } from 'lucide-react'
 
 export default function ForumLogin() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(true)
   const [error, setError] = useState('')
   const [isAccessDenied, setIsAccessDenied] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [autoLogging, setAutoLogging] = useState(true)
   const router = useRouter()
-  const { login } = useForum()
+  const { user, profile, loading: contextLoading, login } = useForum()
+
+  // Auto-redirect if already logged in (existing session)
+  useEffect(() => {
+    if (!contextLoading && user && profile) {
+      router.push('/forum')
+      return
+    }
+    if (!contextLoading) {
+      setAutoLogging(false)
+      // Pre-fill saved email
+      try {
+        const saved = localStorage.getItem('forum-saved-email')
+        if (saved) setEmail(saved)
+      } catch {}
+    }
+  }, [contextLoading, user, profile])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -19,7 +37,15 @@ export default function ForumLogin() {
     setIsAccessDenied(false)
     setLoading(true)
     try {
-      await login(email, password)
+      await login(email, password, rememberMe)
+      // Save email for next time
+      try {
+        if (rememberMe) {
+          localStorage.setItem('forum-saved-email', email)
+        } else {
+          localStorage.removeItem('forum-saved-email')
+        }
+      } catch {}
       router.push('/forum')
     } catch (err) {
       const msg = err.message || 'Invalid email or password'
@@ -30,6 +56,16 @@ export default function ForumLogin() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Show spinner while checking existing session
+  if (autoLogging) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+        <Loader2 className="w-8 h-8 text-teal-600 animate-spin mb-3" />
+        <p className="text-sm text-slate-500">Checking login status...</p>
+      </div>
+    )
   }
 
   return (
@@ -96,12 +132,24 @@ export default function ForumLogin() {
                 placeholder="Your password"
               />
             </div>
+
+            {/* Remember me */}
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+              />
+              <span className="text-sm text-slate-600">Stay logged in</span>
+            </label>
+
             <button
               type="submit"
               disabled={loading}
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-600 text-white font-semibold rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
             >
-              <LogIn className="w-4 h-4" />
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
