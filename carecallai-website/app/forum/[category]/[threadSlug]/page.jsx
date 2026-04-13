@@ -27,8 +27,9 @@ export default function ThreadPage({ params }) {
   const [editContent, setEditContent] = useState('')
 
   useEffect(() => {
-    fetchThread()
-  }, [threadSlug])
+    if (!loading && !user) { router.push('/forum/login'); return }
+    if (user) fetchThread()
+  }, [loading, user, threadSlug])
 
   useEffect(() => {
     if (thread && token) fetchLikes()

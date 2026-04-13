@@ -19,9 +19,11 @@ export function ForumProvider({ children }) {
         body: JSON.stringify({ action: 'get-profile', token: accessToken }),
       })
       const data = await res.json()
-      if (data.profile) {
-        setProfile(data.profile)
-        return data.profile
+      if (data.user) setUser(prev => prev || { id: data.user.id, email: data.user.email })
+      const fp = data.profile || data.forumProfile
+      if (fp) {
+        setProfile(fp)
+        return fp
       }
       return null
     } catch {
@@ -71,14 +73,29 @@ export function ForumProvider({ children }) {
   }, [fetchProfile, fetchCategories])
 
   const login = async (email, password) => {
+    // Use the forum API which checks admin status server-side
+    const res = await fetch('/api/forum/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'login', email, password }),
+    })
+    const data = await res.json()
+    if (!res.ok || data.error) throw new Error(data.error || 'Login failed')
+
+    // Set session on the client for persistence
     const client = getForumClient()
-    if (!client) throw new Error('Forum client not available')
-    const { data, error } = await client.auth.signInWithPassword({ email, password })
-    if (error) throw error
+    if (client && data.session) {
+      await client.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      })
+    }
+
     setUser(data.user)
     setToken(data.session.access_token)
-    const prof = await fetchProfile(data.session.access_token)
-    return { user: data.user, profile: prof }
+    const fp = data.profile || data.forumProfile
+    if (fp) setProfile(fp)
+    return { user: data.user, profile: fp }
   }
 
   const logout = async () => {

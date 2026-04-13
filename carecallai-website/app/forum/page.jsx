@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useForum } from '@/lib/forumContext'
 import ForumHeader from '@/components/forum/ForumHeader'
 import ForumSidebar from '@/components/forum/ForumSidebar'
@@ -9,14 +10,21 @@ import { Flame, Clock, MessageSquare } from 'lucide-react'
 
 export default function ForumHome() {
   const { user, profile, token, loading, categories, logout } = useForum()
+  const router = useRouter()
   const [recentThreads, setRecentThreads] = useState([])
   const [stats, setStats] = useState(null)
   const [loadingThreads, setLoadingThreads] = useState(true)
 
   useEffect(() => {
-    fetchRecentThreads()
-    fetchStats()
-  }, [])
+    if (!loading && !user) {
+      router.push('/forum/login')
+      return
+    }
+    if (user) {
+      fetchRecentThreads()
+      fetchStats()
+    }
+  }, [loading, user])
 
   const fetchRecentThreads = async () => {
     try {
@@ -43,7 +51,7 @@ export default function ForumHome() {
     } catch {}
   }
 
-  if (loading) {
+  if (loading || !user) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full"></div>

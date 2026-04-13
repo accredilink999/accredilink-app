@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, use } from 'react'
+import { useRouter } from 'next/navigation'
 import { useForum } from '@/lib/forumContext'
 import ForumHeader from '@/components/forum/ForumHeader'
 import ForumSidebar from '@/components/forum/ForumSidebar'
@@ -11,6 +12,7 @@ import Link from 'next/link'
 export default function CategoryPage({ params }) {
   const { category: categorySlug } = use(params)
   const { user, profile, token, loading, categories, logout } = useForum()
+  const router = useRouter()
   const [threads, setThreads] = useState([])
   const [loadingThreads, setLoadingThreads] = useState(true)
   const [page, setPage] = useState(1)
@@ -20,8 +22,9 @@ export default function CategoryPage({ params }) {
   const category = categories.find(c => c.slug === categorySlug)
 
   useEffect(() => {
-    fetchThreads()
-  }, [categorySlug, page, sort])
+    if (!loading && !user) { router.push('/forum/login'); return }
+    if (user) fetchThreads()
+  }, [loading, user, categorySlug, page, sort])
 
   const fetchThreads = async () => {
     setLoadingThreads(true)
@@ -33,7 +36,7 @@ export default function CategoryPage({ params }) {
     } catch {} finally { setLoadingThreads(false) }
   }
 
-  if (loading) {
+  if (loading || !user) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full"></div>
