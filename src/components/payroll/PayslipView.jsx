@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Save, Download, Loader, X } from 'lucide-react';
-import { calculatePayslip, TAX_CODES, NI_CATEGORIES } from '@/config/ukPayroll';
+import { calculatePayslip, calculateMonthlyTax, calculateMonthlyNI, TAX_CODES, NI_CATEGORIES } from '@/config/ukPayroll';
 import PrintablePayslip from './PrintablePayslip';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -58,12 +58,16 @@ export default function PayslipView({ record, open, onClose, readOnly = false })
         period_start: record.period_start || '',
         period_end: record.period_end || '',
         payment_date: record.payment_date || '',
+        // Holiday fields
+        holiday_days: record.holiday_days || 0,
+        holiday_hours: record.holiday_hours || 0,
+        holiday_pay: record.holiday_pay || 0,
       });
     }
   }, [record]);
 
-  // Calculate live preview
-  const calculated = calculatePayslip({
+  // Calculate live preview — include holiday pay in gross
+  const basePay = calculatePayslip({
     regularHours: parseFloat(form.regular_hours) || 0,
     overtimeHours: parseFloat(form.overtime_hours) || 0,
     hourlyRate: parseFloat(form.hourly_rate) || 0,
@@ -74,14 +78,26 @@ export default function PayslipView({ record, open, onClose, readOnly = false })
     otherDeductions: parseFloat(form.other_deductions) || 0,
   });
 
+  // Add holiday pay to gross, then recalculate tax/NI on full amount
+  const holidayPay = parseFloat(form.holiday_pay) || 0;
+  const grossPay = Math.round((basePay.grossPay + holidayPay) * 100) / 100;
+  const { tax } = calculateMonthlyTax(grossPay, form.tax_code || '1257L');
+  const { ni } = calculateMonthlyNI(grossPay, form.ni_category || 'A');
+  const pensionAmt = Math.round(grossPay * ((parseFloat(form.pension_percent) || 0) / 100) * 100) / 100;
+  const otherDed = parseFloat(form.other_deductions) || 0;
+  const totalDeductions = Math.round((tax + ni + pensionAmt + otherDed) * 100) / 100;
+  const netPay = Math.round((grossPay - totalDeductions) * 100) / 100;
+
+  const slipSettings = { ...settings, company_logo: companySettings?.company_logo, company_name: companySettings?.company_name || settings?.company_name };
+
   const previewRecord = {
     ...record,
     regular_hours: parseFloat(form.regular_hours) || 0,
     overtime_hours: parseFloat(form.overtime_hours) || 0,
     hourly_rate: parseFloat(form.hourly_rate) || 0,
-    overtime_rate: calculated.overtimeRate,
-    gross_pay: calculated.grossPay,
-    net_pay: calculated.netPay,
+    overtime_rate: basePay.overtimeRate,
+    gross_pay: grossPay,
+    net_pay: netPay,
     tax_code: form.tax_code,
     ni_category: form.ni_category,
     pension_percent: parseFloat(form.pension_percent) || 0,
@@ -90,11 +106,14 @@ export default function PayslipView({ record, open, onClose, readOnly = false })
     period_start: form.period_start || record?.period_start,
     period_end: form.period_end || record?.period_end,
     payment_date: form.payment_date || record?.payment_date,
+    holiday_days: parseFloat(form.holiday_days) || 0,
+    holiday_hours: parseFloat(form.holiday_hours) || 0,
+    holiday_pay: holidayPay,
     deductions: {
-      tax: calculated.tax,
-      ni: calculated.ni,
-      pension: calculated.pension,
-      other: parseFloat(form.other_deductions) || 0,
+      tax,
+      ni,
+      pension: pensionAmt,
+      other: otherDed,
       other_label: form.other_label,
     },
   };
@@ -115,6 +134,9 @@ export default function PayslipView({ record, open, onClose, readOnly = false })
       period_start: previewRecord.period_start,
       period_end: previewRecord.period_end,
       payment_date: previewRecord.payment_date,
+      holiday_days: previewRecord.holiday_days,
+      holiday_hours: previewRecord.holiday_hours,
+      holiday_pay: previewRecord.holiday_pay,
       deductions: previewRecord.deductions,
     }),
     onSuccess: () => {
@@ -164,34 +186,34 @@ export default function PayslipView({ record, open, onClose, readOnly = false })
           </div>
         </DialogHeader>
 
-        {/* Period dates — always editable by admin */}
-        {!readOnly && (
-          <div className="grid grid-cols-3 gap-3 border-b pb-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Period Start</Label>
-              <Input type="date" value={form.period_start || ''}
-                onChange={(e) => setForm({ ...form, period_start: e.target.value })}
-                className="h-8 text-sm" />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Period End</Label>
-              <Input type="date" value={form.period_end || ''}
-                onChange={(e) => setForm({ ...form, period_end: e.target.value })}
-                className="h-8 text-sm" />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Payment Date</Label>
-              <Input type="date" value={form.payment_date || ''}
-                onChange={(e) => setForm({ ...form, payment_date: e.target.value })}
-                className="h-8 text-sm" />
-            </div>
-          </div>
-        )}
-
+        {/* Admin edit fields */}
         {!readOnly && (
           <div className="space-y-4 border-b pb-4">
             <p className="text-sm text-slate-500">Edit values below — payslip recalculates automatically.</p>
 
+            {/* Period dates */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Period Start</Label>
+                <Input type="date" value={form.period_start || ''}
+                  onChange={(e) => setForm({ ...form, period_start: e.target.value })}
+                  className="h-8 text-sm" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Period End</Label>
+                <Input type="date" value={form.period_end || ''}
+                  onChange={(e) => setForm({ ...form, period_end: e.target.value })}
+                  className="h-8 text-sm" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Payment Date</Label>
+                <Input type="date" value={form.payment_date || ''}
+                  onChange={(e) => setForm({ ...form, payment_date: e.target.value })}
+                  className="h-8 text-sm" />
+              </div>
+            </div>
+
+            {/* Pay fields */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">Regular Hours</Label>
@@ -217,6 +239,28 @@ export default function PayslipView({ record, open, onClose, readOnly = false })
                   value={form.overtime_rate || ''}
                   onChange={(e) => setForm({ ...form, overtime_rate: e.target.value })}
                   className="h-8 text-sm" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Holiday Days</Label>
+                <Input type="number" step="1" value={form.holiday_days}
+                  onChange={(e) => setForm({ ...form, holiday_days: e.target.value })}
+                  className="h-8 text-sm" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Holiday Hours</Label>
+                <Input type="number" step="0.5" value={form.holiday_hours}
+                  onChange={(e) => {
+                    const hrs = parseFloat(e.target.value) || 0;
+                    const rate = parseFloat(form.hourly_rate) || 0;
+                    setForm({ ...form, holiday_hours: e.target.value, holiday_pay: (hrs * rate).toFixed(2) });
+                  }}
+                  className="h-8 text-sm" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Holiday Pay (£)</Label>
+                <Input type="number" step="0.01" value={form.holiday_pay}
+                  onChange={(e) => setForm({ ...form, holiday_pay: e.target.value })}
+                  className="h-8 text-sm bg-blue-50" />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Tax Code</Label>
@@ -272,117 +316,47 @@ export default function PayslipView({ record, open, onClose, readOnly = false })
             </div>
 
             {/* Live Calculation Summary */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-3 bg-slate-50 rounded-lg">
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 p-3 bg-slate-50 rounded-lg">
+              <div className="text-center">
+                <p className="text-xs text-slate-500">Basic</p>
+                <p className="font-bold text-slate-900">£{basePay.grossPay.toFixed(2)}</p>
+              </div>
+              {holidayPay > 0 && (
+                <div className="text-center">
+                  <p className="text-xs text-slate-500">Holiday</p>
+                  <p className="font-bold text-blue-700">+£{holidayPay.toFixed(2)}</p>
+                </div>
+              )}
               <div className="text-center">
                 <p className="text-xs text-slate-500">Gross</p>
-                <p className="font-bold text-slate-900">£{calculated.grossPay.toFixed(2)}</p>
+                <p className="font-bold text-slate-900">£{grossPay.toFixed(2)}</p>
               </div>
               <div className="text-center">
                 <p className="text-xs text-slate-500">Tax</p>
-                <p className="font-bold text-red-600">-£{calculated.tax.toFixed(2)}</p>
+                <p className="font-bold text-red-600">-£{tax.toFixed(2)}</p>
               </div>
               <div className="text-center">
                 <p className="text-xs text-slate-500">NI</p>
-                <p className="font-bold text-red-600">-£{calculated.ni.toFixed(2)}</p>
+                <p className="font-bold text-red-600">-£{ni.toFixed(2)}</p>
               </div>
               <div className="text-center">
-                <p className="text-xs text-slate-500">Pension</p>
-                <p className="font-bold text-red-600">-£{calculated.pension.toFixed(2)}</p>
-              </div>
-              <div className="text-center col-span-2 sm:col-span-1">
                 <p className="text-xs text-slate-500">Net Pay</p>
-                <p className="font-bold text-green-700 text-lg">£{calculated.netPay.toFixed(2)}</p>
+                <p className="font-bold text-green-700 text-lg">£{netPay.toFixed(2)}</p>
               </div>
             </div>
-
-            {/* Stored Record Info — holiday, pay type, etc. */}
-            {(record.holiday_days > 0 || record.holiday_hours > 0 || record.holiday_pay > 0 || record.pay_type) && (
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-1">
-                <p className="text-xs font-semibold text-blue-800 uppercase">Additional Pay Info</p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
-                  {record.pay_type && (
-                    <div>
-                      <p className="text-xs text-slate-500">Pay Type</p>
-                      <p className="font-medium capitalize">{record.pay_type}</p>
-                    </div>
-                  )}
-                  {record.holiday_days > 0 && (
-                    <div>
-                      <p className="text-xs text-slate-500">Holiday Days</p>
-                      <p className="font-medium">{record.holiday_days}</p>
-                    </div>
-                  )}
-                  {record.holiday_hours > 0 && (
-                    <div>
-                      <p className="text-xs text-slate-500">Holiday Hours</p>
-                      <p className="font-medium">{(record.holiday_hours || 0).toFixed(2)}</p>
-                    </div>
-                  )}
-                  {record.holiday_pay > 0 && (
-                    <div>
-                      <p className="text-xs text-slate-500">Holiday Pay</p>
-                      <p className="font-medium text-blue-700">£{(record.holiday_pay || 0).toFixed(2)}</p>
-                    </div>
-                  )}
-                  {record.pay_type === 'salaried' && record.annual_salary > 0 && (
-                    <div>
-                      <p className="text-xs text-slate-500">Annual Salary</p>
-                      <p className="font-medium">£{(record.annual_salary || 0).toLocaleString()}</p>
-                    </div>
-                  )}
-                  {record.pay_type === 'salaried' && record.monthly_salary > 0 && (
-                    <div>
-                      <p className="text-xs text-slate-500">Monthly Salary</p>
-                      <p className="font-medium">£{(record.monthly_salary || 0).toFixed(2)}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Shift Breakdown from stored record */}
-            {(() => {
-              const shifts = typeof record.shift_details === 'string'
-                ? JSON.parse(record.shift_details)
-                : (record.shift_details || []);
-              if (shifts.length === 0) return null;
-              const sorted = [...shifts].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-              return (
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                  <p className="text-xs font-semibold text-slate-600 uppercase mb-2">
-                    Shifts Paid — {sorted.length} shifts, {sorted.reduce((s, sh) => s + (sh.hours || 0), 0).toFixed(2)} hrs
-                  </p>
-                  <div className="max-h-48 overflow-y-auto space-y-0.5">
-                    {sorted.map((shift, i) => {
-                      const d = new Date(shift.date + 'T00:00:00');
-                      const dateStr = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
-                      return (
-                        <div key={i} className="flex justify-between text-xs py-0.5 border-b border-slate-100 last:border-0">
-                          <span className="text-slate-600">{dateStr}</span>
-                          <span className="text-slate-500">{shift.start_time || '—'} – {shift.end_time || '—'}</span>
-                          <span className="font-medium text-slate-700">{(shift.hours || 0).toFixed(2)} hrs</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })()}
           </div>
         )}
 
-        {/* Visible Payslip Preview in read-only mode */}
-        {readOnly && (
-          <div className="border rounded-lg overflow-hidden bg-white">
-            <div style={{ transform: 'scale(0.55)', transformOrigin: 'top left', width: '182%', maxHeight: '500px', overflow: 'auto' }}>
-              <PrintablePayslip record={previewRecord} settings={{ ...settings, company_logo: companySettings?.company_logo, company_name: companySettings?.company_name || settings?.company_name }} />
-            </div>
+        {/* Payslip PDF Preview — shown in BOTH edit and read-only modes */}
+        <div className="border rounded-lg overflow-hidden bg-white">
+          <div style={{ transform: 'scale(0.55)', transformOrigin: 'top left', width: '182%', maxHeight: '600px', overflow: 'auto' }}>
+            <PrintablePayslip record={previewRecord} settings={slipSettings} />
           </div>
-        )}
+        </div>
 
         {/* Hidden Payslip for PDF generation */}
         <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
-          <PrintablePayslip ref={printRef} record={previewRecord} settings={{ ...settings, company_logo: companySettings?.company_logo, company_name: companySettings?.company_name || settings?.company_name }} />
+          <PrintablePayslip ref={printRef} record={previewRecord} settings={slipSettings} />
         </div>
 
         {/* Actions */}
