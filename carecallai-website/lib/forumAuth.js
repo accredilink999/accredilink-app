@@ -1,12 +1,11 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-
 // Forum client WITH session persistence (unlike the main site client)
 let _forumClient = null
 export function getForumClient() {
   if (_forumClient) return _forumClient
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
   if (!supabaseUrl || !supabaseAnonKey) return null
   _forumClient = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {

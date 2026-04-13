@@ -82,17 +82,18 @@ export function ForumProvider({ children }) {
     const data = await res.json()
     if (!res.ok || data.error) throw new Error(data.error || 'Login failed')
 
+    const accessToken = data.session?.access_token
+    const refreshToken = data.session?.refresh_token
+    if (!accessToken) throw new Error('No session returned from server')
+
     // Set session on the client for persistence
     const client = getForumClient()
-    if (client && data.session) {
-      await client.auth.setSession({
-        access_token: data.session.access_token,
-        refresh_token: data.session.refresh_token,
-      })
+    if (client) {
+      await client.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
     }
 
     setUser(data.user)
-    setToken(data.session.access_token)
+    setToken(accessToken)
     const fp = data.profile || data.forumProfile
     if (fp) setProfile(fp)
     return { user: data.user, profile: fp }
