@@ -4,16 +4,20 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
-function getSundayOfWeek(date: Date): Date {
+// Week runs Friday to Thursday
+function getFridayOfWeek(date: Date): Date {
   const d = new Date(date)
-  d.setDate(d.getDate() - d.getDay())
+  const day = d.getDay() // 0=Sun, 5=Fri
+  const diff = (day + 2) % 7 // Fri=0, Sat=1, Sun=2, Mon=3, Tue=4, Wed=5, Thu=6
+  d.setDate(d.getDate() - diff)
   d.setHours(0, 0, 0, 0)
   return d
 }
 
-function getFollowingThursday(weekStart: Date): Date {
-  const d = new Date(weekStart)
-  d.setDate(d.getDate() + 11)
+// Payment due on the Thursday that ends the period (Friday + 6)
+function getPaymentThursday(weekStartFriday: Date): Date {
+  const d = new Date(weekStartFriday)
+  d.setDate(d.getDate() + 6)
   d.setHours(0, 0, 0, 0)
   return d
 }
@@ -42,17 +46,19 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Admin access required' }, { status: 403 })
     }
 
-    // Calculate last week's Sunday-Saturday range
+    // Calculate the most recent completed Friday-Thursday period
     const today = new Date()
-    const thisSunday = getSundayOfWeek(today)
-    const lastSunday = new Date(thisSunday)
-    lastSunday.setDate(thisSunday.getDate() - 7)
-    const lastSaturday = new Date(lastSunday)
-    lastSaturday.setDate(lastSunday.getDate() + 6)
+    const thisFriday = getFridayOfWeek(today)
+    // If today is before this Thursday (period not complete), use last week's period
+    const thisThursday = new Date(thisFriday)
+    thisThursday.setDate(thisFriday.getDate() + 6)
+    const periodEnd = today >= thisThursday ? thisThursday : new Date(thisFriday.getTime() - 24*60*60*1000) // yesterday's Thursday
+    const periodStart = new Date(periodEnd)
+    periodStart.setDate(periodEnd.getDate() - 6) // Friday = Thursday - 6
 
-    const weekStartStr = lastSunday.toISOString().split('T')[0]
-    const weekEndStr = lastSaturday.toISOString().split('T')[0]
-    const paymentDue = getFollowingThursday(lastSunday)
+    const weekStartStr = periodStart.toISOString().split('T')[0]
+    const weekEndStr = periodEnd.toISOString().split('T')[0]
+    const paymentDue = getPaymentThursday(periodStart)
 
     // Read configured mileage rate from system_settings
     const { data: rateSetting } = await supabaseAdmin

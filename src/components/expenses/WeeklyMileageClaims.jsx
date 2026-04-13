@@ -8,9 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Check, X, Calendar, Car, PoundSterling, Clock, TrendingUp } from 'lucide-react';
 import { format, parseISO, startOfWeek, endOfWeek, isAfter, isSameWeek } from 'date-fns';
 
-function getFollowingThursday(weekStartDate) {
-  const d = new Date(weekStartDate);
-  d.setDate(d.getDate() + 11); // Sunday + 11 = following Thursday
+// Week runs Friday to Thursday — payment due on the Thursday (end of period)
+function getPaymentThursday(weekStartFriday) {
+  const d = new Date(weekStartFriday);
+  d.setDate(d.getDate() + 6); // Friday + 6 = Thursday
   return d;
 }
 
@@ -53,25 +54,25 @@ export default function WeeklyMileageClaims({ userId, isAdmin }) {
   const mileageRatePpm = rateSettings[0]?.setting_value ? parseInt(rateSettings[0].setting_value, 10) : 45;
   const mileageRate = mileageRatePpm / 100;
 
-  // Group daily expenses by week (Sun-Sat) and by staff
+  // Group daily expenses by week (Fri-Thu) and by staff
   const weeklyGroups = {};
   expenses.forEach(exp => {
     const expDate = new Date(exp.date || exp.expense_date || exp.created_at);
     if (isNaN(expDate.getTime())) return;
-    const weekStart = startOfWeek(expDate, { weekStartsOn: 0 }); // Sunday
+    const weekStart = startOfWeek(expDate, { weekStartsOn: 5 }); // Sunday
     const staffKey = isAdmin ? exp.staff_id : 'me';
     const key = `${format(weekStart, 'yyyy-MM-dd')}_${staffKey}`;
     if (!weeklyGroups[key]) {
       weeklyGroups[key] = {
         weekStart,
-        weekEnd: endOfWeek(expDate, { weekStartsOn: 0 }),
+        weekEnd: endOfWeek(expDate, { weekStartsOn: 5 }),
         weekStartStr: format(weekStart, 'yyyy-MM-dd'),
         staffId: exp.staff_id,
         staffName: exp.staff_name,
         expenses: [],
         totalMiles: 0,
         totalAmount: 0,
-        paymentDue: getFollowingThursday(weekStart),
+        paymentDue: getPaymentThursday(weekStart),
       };
     }
     weeklyGroups[key].expenses.push(exp);
@@ -81,8 +82,8 @@ export default function WeeklyMileageClaims({ userId, isAdmin }) {
 
   // Current week accrual for staff view
   const now = new Date();
-  const currentWeekStart = startOfWeek(now, { weekStartsOn: 0 });
-  const currentWeekEnd = endOfWeek(now, { weekStartsOn: 0 });
+  const currentWeekStart = startOfWeek(now, { weekStartsOn: 5 });
+  const currentWeekEnd = endOfWeek(now, { weekStartsOn: 5 });
   const currentWeekKey = Object.keys(weeklyGroups).find(k =>
     weeklyGroups[k].weekStartStr === format(currentWeekStart, 'yyyy-MM-dd') &&
     (!isAdmin || weeklyGroups[k].staffId === userId)

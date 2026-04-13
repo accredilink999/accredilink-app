@@ -55,16 +55,19 @@ async function bulkLookupPostcodes(postcodes: string[]): Promise<void> {
   }
 }
 
-function getSundayOfWeek(date: Date): Date {
+// Week runs Friday to Thursday
+function getFridayOfWeek(date: Date): Date {
   const d = new Date(date)
-  d.setDate(d.getDate() - d.getDay())
+  const day = d.getDay()
+  const diff = (day + 2) % 7
+  d.setDate(d.getDate() - diff)
   d.setHours(0, 0, 0, 0)
   return d
 }
 
-function getFollowingThursday(weekStart: Date): Date {
-  const d = new Date(weekStart)
-  d.setDate(d.getDate() + 11)
+function getPaymentThursday(weekStartFriday: Date): Date {
+  const d = new Date(weekStartFriday)
+  d.setDate(d.getDate() + 6)
   d.setHours(0, 0, 0, 0)
   return d
 }
@@ -93,7 +96,7 @@ Deno.serve(async (req) => {
 
     const today = new Date()
     const todayStr = today.toISOString().split('T')[0]
-    const weekStart = getSundayOfWeek(today)
+    const weekStart = getFridayOfWeek(today)
     const weekStartStr = weekStart.toISOString().split('T')[0]
 
     // Get configured mileage rate
@@ -295,9 +298,9 @@ Deno.serve(async (req) => {
       if (totalMiles <= 0) continue
 
       const dateObj = new Date(shiftDate)
-      const wStart = getSundayOfWeek(dateObj)
+      const wStart = getFridayOfWeek(dateObj)
       const wEnd = new Date(wStart); wEnd.setDate(wEnd.getDate() + 6)
-      const paymentDue = getFollowingThursday(wStart)
+      const paymentDue = getPaymentThursday(wStart)
       const desc = `Mileage: ${totalMiles} mi @ ${ratePpm}p/mi\n${legs.join('\n')}`
 
       const { error: insertErr } = await supabaseAdmin.from('expenses').insert({

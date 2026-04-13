@@ -16,16 +16,20 @@ function jsonResponse(body: any, status = 200) {
   })
 }
 
-function getSundayOfWeek(date: Date): Date {
+// Week runs Friday to Thursday
+function getFridayOfWeek(date: Date): Date {
   const d = new Date(date)
-  d.setDate(d.getDate() - d.getDay())
+  const day = d.getDay() // 0=Sun, 5=Fri
+  const diff = (day + 2) % 7 // Fri=0, Sat=1, Sun=2, Mon=3, Tue=4, Wed=5, Thu=6
+  d.setDate(d.getDate() - diff)
   d.setHours(0, 0, 0, 0)
   return d
 }
 
-function getFollowingThursday(weekStart: Date): Date {
-  const d = new Date(weekStart)
-  d.setDate(d.getDate() + 11) // Sunday + 11 = following Thursday
+// Payment due on the Thursday that ends the period (Friday + 6)
+function getPaymentThursday(weekStartFriday: Date): Date {
+  const d = new Date(weekStartFriday)
+  d.setDate(d.getDate() + 6)
   d.setHours(0, 0, 0, 0)
   return d
 }
@@ -65,10 +69,10 @@ Deno.serve(async (req) => {
 
     const expenseDate = shift?.date || new Date().toISOString().split('T')[0]
     const shiftDate = new Date(expenseDate)
-    const weekStart = getSundayOfWeek(shiftDate)
+    const weekStart = getFridayOfWeek(shiftDate)
     const weekEnd = new Date(weekStart)
-    weekEnd.setDate(weekEnd.getDate() + 6)
-    const paymentDue = getFollowingThursday(weekStart)
+    weekEnd.setDate(weekEnd.getDate() + 6) // Thursday
+    const paymentDue = getPaymentThursday(weekStart)
 
     // Read configured mileage rate from system_settings (pence per mile)
     const { data: rateSetting } = await supabaseAdmin
