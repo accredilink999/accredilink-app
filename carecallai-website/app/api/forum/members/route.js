@@ -76,9 +76,13 @@ async function autoProvisionAdmins() {
           accepted_terms: true,
           terms_accepted_at: new Date().toISOString(),
         })
-      } catch {}
+      } catch (innerErr) {
+        console.error(`[Forum] Failed to provision profile for ${userId}:`, innerErr.message)
+      }
     }
-  } catch {}
+  } catch (outerErr) {
+    console.error('[Forum] autoProvisionAdmins error:', outerErr.message)
+  }
 }
 
 export async function GET() {
@@ -93,7 +97,17 @@ export async function GET() {
       .order('created_at', { ascending: true })
 
     if (error) return json({ error: error.message }, 500)
-    return json({ members: members || [] })
+
+    // Sort: founder first, then admins, then by name
+    const roleOrder = { founder: 0, admin: 1, moderator: 2, user: 3 }
+    const sorted = (members || []).sort((a, b) => {
+      const ra = roleOrder[a.forum_role] ?? 9
+      const rb = roleOrder[b.forum_role] ?? 9
+      if (ra !== rb) return ra - rb
+      return (a.display_name || '').localeCompare(b.display_name || '')
+    })
+
+    return json({ members: sorted })
   } catch (err) {
     return json({ error: err.message }, 500)
   }
