@@ -8,6 +8,7 @@ const footerLinks = {
     { name: "Mobile App", href: "/features/mobile-app" },
     { name: "AI Assistant", href: "/features/ai-assistant" },
     { name: "Book a Demo", href: "/demo" },
+    { name: "Community Forum", href: "/forum" },
   ],
   Solutions: [
     { name: "Scheduling & Rota", href: "/features/scheduling" },
