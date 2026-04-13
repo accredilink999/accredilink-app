@@ -9,8 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Calculator, Loader, CheckCircle, Users, PoundSterling, Clock, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, parseISO, differenceInDays } from 'date-fns';
+import { Calculator, Loader, CheckCircle, Users, PoundSterling, Clock, ChevronDown, ChevronUp, Pencil, Plus, X } from 'lucide-react';
+import { format, startOfMonth, endOfMonth, parseISO, differenceInDays, eachDayOfInterval } from 'date-fns';
 import { calculatePayslip, TAX_CODES, NI_CATEGORIES } from '@/config/ukPayroll';
 
 // Calculate hours from scheduled shift start/end times only
@@ -39,6 +39,7 @@ export default function GeneratePayroll() {
   const [selectedStaff, setSelectedStaff] = useState([]);
   const [overrides, setOverrides] = useState({});
   const [expandedStaff, setExpandedStaff] = useState({});
+  const [includedShifts, setIncludedShifts] = useState({}); // { staffId: [shiftId, ...] }
   const [generated, setGenerated] = useState(false);
 
   const { data: staff = [] } = useQuery({
@@ -111,23 +112,34 @@ export default function GeneratePayroll() {
   const staffPayrollData = useMemo(() => {
     return activeStaff.map(member => {
       const allStaffShifts = shifts.filter(s => s.staff_id === member.id);
-      // Only count completed shifts (booked off) for payroll hours
-      const staffShifts = allStaffShifts.filter(isShiftWorked);
-      const incompleteShifts = allStaffShifts.filter(s => !isShiftWorked(s));
+      const manuallyIncluded = includedShifts[member.id] || [];
+      // Booked-on shifts + any manually included unbooked shifts
+      const staffShifts = allStaffShifts.filter(s => isShiftWorked(s) || manuallyIncluded.includes(s.id));
+      const incompleteShifts = allStaffShifts.filter(s => !isShiftWorked(s) && !manuallyIncluded.includes(s.id));
       const totalHours = staffShifts.reduce((sum, shift) => sum + getShiftHours(shift), 0);
       const ov = overrides[member.id] || {};
 
-      // Calculate approved leave days in this period for this staff member
+      // Calculate approved leave days and holiday hours from actual shifts on those days
       const staffLeave = approvedLeave.filter(lr => lr.staff_id === member.id && lr.type === 'annual_leave');
       let leaveDaysInPeriod = 0;
+      let leaveHours = 0;
+      const leaveDates = new Set();
       staffLeave.forEach(lr => {
         const leaveStart = lr.start_date > periodStart ? lr.start_date : periodStart;
         const leaveEnd = lr.end_date < periodEnd ? lr.end_date : periodEnd;
         if (leaveStart <= leaveEnd) {
-          leaveDaysInPeriod += differenceInDays(parseISO(leaveEnd), parseISO(leaveStart)) + 1;
+          const days = eachDayOfInterval({ start: parseISO(leaveStart), end: parseISO(leaveEnd) });
+          days.forEach(d => leaveDates.add(format(d, 'yyyy-MM-dd')));
+          leaveDaysInPeriod += days.length;
         }
       });
-      const leaveHours = leaveDaysInPeriod * 7.5; // standard day = 7.5 hours
+      // Use actual scheduled shift hours on leave days; fallback to 7.5 if no shift
+      if (leaveDates.size > 0) {
+        leaveDates.forEach(dateStr => {
+          const shiftOnLeave = allStaffShifts.find(s => s.date === dateStr);
+          leaveHours += shiftOnLeave ? getShiftHours(shiftOnLeave) : 7.5;
+        });
+      }
 
       // Determine pay type: salaried staff get monthly salary, hourly staff get hours x rate
       const payType = ov.payType || member.pay_type || (member.salary && !member.hourly_rate ? 'salaried' : 'hourly');
@@ -175,7 +187,7 @@ export default function GeneratePayroll() {
         ...result,
       };
     });
-  }, [activeStaff, shifts, overrides, approvedLeave, periodStart, periodEnd]);
+  }, [activeStaff, shifts, overrides, approvedLeave, periodStart, periodEnd, includedShifts]);
 
   const selectedPayrollData = staffPayrollData.filter(s => selectedStaff.includes(s.id));
 
@@ -212,6 +224,20 @@ export default function GeneratePayroll() {
 
   const toggleExpand = (staffId) => {
     setExpandedStaff(prev => ({ ...prev, [staffId]: !prev[staffId] }));
+  };
+
+  const toggleIncludeShift = (staffId, shiftId) => {
+    setIncludedShifts(prev => {
+      const current = prev[staffId] || [];
+      const updated = current.includes(shiftId)
+        ? current.filter(id => id !== shiftId)
+        : [...current, shiftId];
+      return { ...prev, [staffId]: updated };
+    });
+  };
+
+  const includeAllShifts = (staffId, shiftIds) => {
+    setIncludedShifts(prev => ({ ...prev, [staffId]: [...new Set([...(prev[staffId] || []), ...shiftIds])] }));
   };
 
   const generatePayrollMutation = useMutation({
@@ -534,25 +560,54 @@ export default function GeneratePayroll() {
                       {/* Shift Breakdown */}
                       {member.staffShifts.length > 0 && (
                         <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                          <p className="text-xs font-semibold text-slate-600 mb-2">Shifts (booked on — {member.shiftCount} shifts, {member.calculatedHours.toFixed(2)} hrs)</p>
+                          <p className="text-xs font-semibold text-slate-600 mb-2">Included shifts — {member.shiftCount} shifts, {member.calculatedHours.toFixed(2)} hrs</p>
                           <div className="max-h-32 overflow-y-auto space-y-0.5">
-                            {member.staffShifts.map((shift, idx) => (
-                              <div key={idx} className="flex items-center justify-between text-xs">
-                                <span className="text-slate-500">{shift.date}</span>
-                                <span className="text-slate-600">{(shift.start_time || '').slice(0, 5)} – {(shift.end_time || '').slice(0, 5)}</span>
-                                <span className="font-medium text-slate-700">{getShiftHours(shift).toFixed(2)} hrs</span>
-                              </div>
-                            ))}
+                            {member.staffShifts.map((shift, idx) => {
+                              const wasManuallyAdded = (includedShifts[member.id] || []).includes(shift.id);
+                              return (
+                                <div key={idx} className="flex items-center justify-between text-xs">
+                                  <span className="text-slate-500">{shift.date}</span>
+                                  <span className="text-slate-600">{(shift.start_time || '').slice(0, 5)} – {(shift.end_time || '').slice(0, 5)}</span>
+                                  <span className="font-medium text-slate-700">{getShiftHours(shift).toFixed(2)} hrs</span>
+                                  {wasManuallyAdded && (
+                                    <button
+                                      onClick={() => toggleIncludeShift(member.id, shift.id)}
+                                      className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-600 hover:bg-red-200"
+                                      title="Remove from pay"
+                                    >
+                                      <X className="w-3 h-3 inline" /> Remove
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                           {member.incompleteCount > 0 && (
                             <div className="mt-2 pt-2 border-t border-slate-200">
-                              <p className="text-xs text-amber-600 font-medium">Not booked on ({member.incompleteCount} shifts — not included):</p>
-                              <div className="max-h-20 overflow-y-auto space-y-0.5 mt-1">
+                              <div className="flex items-center justify-between mb-1">
+                                <p className="text-xs text-amber-600 font-medium">Not booked on ({member.incompleteCount} shifts — not included):</p>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-5 text-[10px] px-2 text-teal-700 border-teal-300"
+                                  onClick={() => includeAllShifts(member.id, member.incompleteShifts.map(s => s.id))}
+                                >
+                                  <Plus className="w-3 h-3 mr-0.5" /> Include All
+                                </Button>
+                              </div>
+                              <div className="max-h-28 overflow-y-auto space-y-0.5 mt-1">
                                 {member.incompleteShifts.map((shift, idx) => (
-                                  <div key={idx} className="flex items-center justify-between text-xs text-amber-500">
+                                  <div key={idx} className="flex items-center justify-between text-xs text-amber-500 group">
                                     <span>{shift.date}</span>
                                     <span>{(shift.start_time || '').slice(0, 5)} – {(shift.end_time || '').slice(0, 5)}</span>
                                     <span className="line-through">{getShiftHours(shift).toFixed(2)} hrs</span>
+                                    <button
+                                      onClick={() => toggleIncludeShift(member.id, shift.id)}
+                                      className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-teal-100 text-teal-700 hover:bg-teal-200"
+                                      title="Include this shift in pay"
+                                    >
+                                      + Add
+                                    </button>
                                   </div>
                                 ))}
                               </div>
