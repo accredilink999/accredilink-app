@@ -103,15 +103,9 @@ export default function Header() {
             </Link>
             <Link
               href="/forum"
-              className="text-sm font-medium text-slate-700 hover:text-teal-600 transition-colors"
-            >
-              Forum
-            </Link>
-            <Link
-              href="/training"
               className="text-sm font-semibold text-teal-600 hover:text-teal-700 transition-colors"
             >
-              Free Training
+              Support Forum
             </Link>
           </nav>
 
@@ -208,17 +202,10 @@ export default function Header() {
             </Link>
             <Link
               href="/forum"
-              className="block px-3 py-2 text-sm font-medium text-slate-700 hover:bg-teal-50 rounded-lg"
-              onClick={() => setMobileOpen(false)}
-            >
-              Forum
-            </Link>
-            <Link
-              href="/training"
               className="block px-3 py-2 text-sm font-semibold text-teal-600 hover:bg-teal-50 rounded-lg"
               onClick={() => setMobileOpen(false)}
             >
-              🎓 Free Training
+              Support Forum
             </Link>
             <div className="pt-3 border-t border-slate-200 flex flex-col gap-2">
               <Link
