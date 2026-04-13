@@ -61,6 +61,22 @@ export default function PayrollRecords() {
     return matchesStatus && matchesStaff && matchesArea;
   });
 
+  // Month label from period dates e.g. "March 2026 Pay"
+  const getMonthLabel = (startDate, endDate) => {
+    const s = new Date(startDate);
+    const e = new Date(endDate);
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    // If period spans a single month, show "March 2026 Pay"
+    if (s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear()) {
+      return `${months[s.getMonth()]} ${s.getFullYear()} Pay`;
+    }
+    // Cross-month: "March – April 2026 Pay"
+    if (s.getFullYear() === e.getFullYear()) {
+      return `${months[s.getMonth()]} – ${months[e.getMonth()]} ${s.getFullYear()} Pay`;
+    }
+    return `${months[s.getMonth()]} ${s.getFullYear()} – ${months[e.getMonth()]} ${e.getFullYear()} Pay`;
+  };
+
   // Group by period
   const groupedRecords = useMemo(() => {
     const groups = {};
@@ -73,13 +89,21 @@ export default function PayrollRecords() {
       .sort(([a], [b]) => b.localeCompare(a))
       .map(([key, records]) => {
         const [start, end] = key.split('|');
+        const deductions = records.map(r => {
+          const d = typeof r.deductions === 'string' ? JSON.parse(r.deductions) : (r.deductions || {});
+          return d;
+        });
         return {
           key,
           periodStart: start,
           periodEnd: end,
+          monthLabel: getMonthLabel(start, end),
           records,
           totalGross: records.reduce((s, r) => s + (r.gross_pay || 0), 0),
           totalNet: records.reduce((s, r) => s + (r.net_pay || 0), 0),
+          totalTax: deductions.reduce((s, d) => s + (d.tax || 0), 0),
+          totalNI: deductions.reduce((s, d) => s + (d.ni || 0), 0),
+          totalHours: records.reduce((s, r) => s + (r.regular_hours || 0) + (r.overtime_hours || 0), 0),
           draftCount: records.filter(r => r.status === 'draft').length,
           approvedCount: records.filter(r => r.status === 'approved').length,
           paidCount: records.filter(r => r.status === 'paid').length,
@@ -231,20 +255,32 @@ export default function PayrollRecords() {
         {groupedRecords.map((group) => (
           <div key={group.key}>
             {/* Period Header */}
-            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-              <div className="flex items-center gap-3">
-                <Checkbox
-                  checked={group.records.every(r => selectedIds.includes(r.id))}
-                  onCheckedChange={() => toggleGroupSelect(group.records)}
-                />
-                <h3 className="font-semibold text-slate-900 text-sm sm:text-base">
-                  {new Date(group.periodStart).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} – {new Date(group.periodEnd).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                </h3>
-                <Badge variant="outline">{group.records.length} payslips</Badge>
-              </div>
-              <div className="flex items-center gap-3 text-sm flex-wrap">
-                <span className="text-slate-500">Gross: <strong className="text-slate-900">£{group.totalGross.toFixed(2)}</strong></span>
-                <span className="text-slate-500">Net: <strong className="text-green-700">£{group.totalNet.toFixed(2)}</strong></span>
+            <div className="mb-2">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-3">
+                  <Checkbox
+                    checked={group.records.every(r => selectedIds.includes(r.id))}
+                    onCheckedChange={() => toggleGroupSelect(group.records)}
+                  />
+                  <div>
+                    <h3 className="font-semibold text-slate-900 text-sm sm:text-base">
+                      {group.monthLabel}
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      {new Date(group.periodStart).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – {new Date(group.periodEnd).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </p>
+                  </div>
+                  <Badge variant="outline">{group.records.length} payslips</Badge>
+                  {group.paidCount === group.records.length && (
+                    <Badge className="bg-green-100 text-green-800 text-xs">Paid</Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 text-sm flex-wrap">
+                  <span className="text-slate-500">Hours: <strong className="text-slate-900">{group.totalHours.toFixed(1)}</strong></span>
+                  <span className="text-slate-500">Gross: <strong className="text-slate-900">£{group.totalGross.toFixed(2)}</strong></span>
+                  <span className="text-slate-500">Tax: <strong className="text-red-600">£{group.totalTax.toFixed(2)}</strong></span>
+                  <span className="text-slate-500">NI: <strong className="text-red-600">£{group.totalNI.toFixed(2)}</strong></span>
+                  <span className="text-slate-500">Net: <strong className="text-green-700">£{group.totalNet.toFixed(2)}</strong></span>
                 {/* Quick group actions */}
                 {group.draftCount > 0 && (
                   <Button size="sm" variant="outline" className="h-7 text-xs"
@@ -275,6 +311,7 @@ export default function PayrollRecords() {
                   }}>
                   <Trash2 className="w-3 h-3 mr-1" /> Delete Period
                 </Button>
+              </div>
               </div>
             </div>
 
