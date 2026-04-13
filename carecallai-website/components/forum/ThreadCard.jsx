@@ -1,23 +1,49 @@
 'use client'
 import Link from 'next/link'
-import { MessageSquare, Eye, Heart, Pin, Lock } from 'lucide-react'
+import { MessageSquare, Eye, Heart, Pin, Lock, Flame } from 'lucide-react'
 import UserBadge from './UserBadge'
 import { timeAgo } from '@/lib/forumAuth'
+
+function isHotTopic(thread) {
+  const replies = thread.reply_count || 0
+  const views = thread.view_count || 0
+  const likes = thread.like_count || 0
+  // Hot if: 5+ replies, or 50+ views, or 10+ likes, or active in last 24h with 3+ replies
+  if (replies >= 10 || views >= 100 || likes >= 10) return true
+  if (replies >= 5) {
+    const lastReply = thread.last_reply_at ? new Date(thread.last_reply_at) : null
+    if (lastReply && (Date.now() - lastReply.getTime()) < 24 * 60 * 60 * 1000) return true
+  }
+  return false
+}
 
 export default function ThreadCard({ thread, showCategory = false }) {
   const author = thread.forum_profiles || {}
   const category = thread.forum_categories || {}
+  const hot = isHotTopic(thread)
 
   return (
     <Link href={`/forum/${category.slug || 'thread'}/${thread.slug}`}>
-      <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 hover:border-teal-300 hover:shadow-md transition-all group">
+      <div className={`relative bg-white rounded-2xl border p-4 sm:p-5 hover:shadow-md transition-all group overflow-hidden ${hot ? 'border-orange-300 hover:border-orange-400' : 'border-slate-200 hover:border-teal-300'}`}>
+        {/* Fire overlay for hot topics */}
+        {hot && (
+          <div className="absolute top-0 right-0 pointer-events-none">
+            <div className="relative">
+              <div className="absolute -top-1 -right-1 w-20 h-20 bg-gradient-to-bl from-orange-500/15 via-red-500/8 to-transparent rounded-bl-full" />
+              <div className="absolute top-1.5 right-1.5 flex items-center gap-0.5 bg-gradient-to-r from-orange-500 to-red-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-sm shadow-orange-500/30">
+                <Flame className="w-3 h-3" fill="currentColor" /> HOT
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-start gap-3">
           {/* Author avatar */}
           <div className="hidden sm:block flex-shrink-0">
             {author.avatar_url ? (
               <img src={author.avatar_url} alt="" className="w-10 h-10 rounded-xl object-cover" />
             ) : (
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-white font-bold text-sm">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm ${hot ? 'bg-gradient-to-br from-orange-400 to-red-500' : 'bg-gradient-to-br from-teal-400 to-teal-600'}`}>
                 {(author.display_name || author.username || '?')[0].toUpperCase()}
               </div>
             )}
@@ -40,7 +66,7 @@ export default function ThreadCard({ thread, showCategory = false }) {
               )}
             </div>
 
-            <h3 className="font-semibold text-slate-900 group-hover:text-teal-700 transition-colors line-clamp-1">
+            <h3 className={`font-semibold transition-colors line-clamp-1 ${hot ? 'text-slate-900 group-hover:text-orange-600' : 'text-slate-900 group-hover:text-teal-700'}`}>
               {thread.title}
             </h3>
 
@@ -59,10 +85,10 @@ export default function ThreadCard({ thread, showCategory = false }) {
               />
               <span className="text-xs text-slate-400">{timeAgo(thread.created_at)}</span>
 
-              {/* Stats inline on mobile */}
+              {/* Stats inline */}
               <div className="flex items-center gap-3 ml-auto">
-                <span className="flex items-center gap-1 text-xs text-slate-400">
-                  <MessageSquare className="w-3.5 h-3.5" />
+                <span className={`flex items-center gap-1 text-xs ${hot && (thread.reply_count || 0) >= 5 ? 'text-orange-500 font-semibold' : 'text-slate-400'}`}>
+                  {hot && (thread.reply_count || 0) >= 5 ? <Flame className="w-3.5 h-3.5" /> : <MessageSquare className="w-3.5 h-3.5" />}
                   {thread.reply_count || 0}
                 </span>
                 <span className="flex items-center gap-1 text-xs text-slate-400">

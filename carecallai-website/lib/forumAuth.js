@@ -48,6 +48,53 @@ export function getRoleBadge(role) {
   }
 }
 
+// Permission labels for the admin permissions panel
+export const PERMISSION_LABELS = {
+  pin_threads:       { label: 'Pin Threads',        desc: 'Pin and unpin threads to the top of categories' },
+  lock_threads:      { label: 'Lock Threads',       desc: 'Lock and unlock threads to prevent new replies' },
+  delete_threads:    { label: 'Delete Threads',     desc: 'Delete any thread regardless of author' },
+  edit_any_post:     { label: 'Edit Any Post',      desc: 'Edit thread content and replies from any user' },
+  delete_any_reply:  { label: 'Delete Any Reply',   desc: 'Delete replies from any user' },
+  bump_threads:      { label: 'Bump Threads',       desc: 'Bump threads to the top of the listing' },
+  move_threads:      { label: 'Move Threads',       desc: 'Move threads between categories' },
+  ban_users:         { label: 'Ban Users',           desc: 'Ban and unban regular users from the forum' },
+  ban_mods:          { label: 'Ban Moderators',      desc: 'Ban and unban moderators' },
+  mark_solution:     { label: 'Mark Solution',       desc: 'Mark replies as the accepted solution' },
+  post_in_locked:    { label: 'Post in Locked',      desc: 'Reply to threads that are locked' },
+  manage_categories: { label: 'Manage Categories',   desc: 'Edit existing category names and descriptions' },
+  create_categories: { label: 'Create Categories',   desc: 'Create new forum categories/sections' },
+  set_roles:         { label: 'Set User Roles',      desc: 'Promote or demote user roles' },
+  view_admin_panel:  { label: 'View Admin Panel',    desc: 'Access the forum admin dashboard' },
+}
+
+// Default permissions if DB settings not loaded yet
+export const DEFAULT_PERMISSIONS = {
+  moderator: {
+    pin_threads: true, lock_threads: true, delete_threads: true,
+    edit_any_post: true, delete_any_reply: true, bump_threads: true,
+    move_threads: true, ban_users: true, mark_solution: true,
+    post_in_locked: true, manage_categories: false, create_categories: true,
+    view_admin_panel: true, ban_mods: false, set_roles: false,
+  },
+  admin: {
+    pin_threads: true, lock_threads: true, delete_threads: true,
+    edit_any_post: true, delete_any_reply: true, bump_threads: true,
+    move_threads: true, ban_users: true, ban_mods: true, mark_solution: true,
+    post_in_locked: true, manage_categories: true, create_categories: true,
+    set_roles: true, view_admin_panel: true,
+  },
+}
+
+/**
+ * Check if a role has a specific permission.
+ * Founder always has all permissions.
+ */
+export function hasPermission(role, permissions, key) {
+  if (role === 'founder') return true
+  const perms = permissions || DEFAULT_PERMISSIONS
+  return !!(perms[role]?.[key])
+}
+
 export function slugify(text) {
   return text
     .toLowerCase()

@@ -1,7 +1,8 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
-import { Search, LogOut, Settings, Menu, X, Mail, Users, MessageSquare } from 'lucide-react'
+import { useRouter, usePathname } from 'next/navigation'
+import { Search, LogOut, Settings, Menu, X, Mail, Users, Home, ArrowLeft, Shield } from 'lucide-react'
 import NotificationBell from './NotificationBell'
 import UserBadge from './UserBadge'
 import { canModerate } from '@/lib/forumAuth'
@@ -9,6 +10,10 @@ import { canModerate } from '@/lib/forumAuth'
 export default function ForumHeader({ user, profile, token, onLogout }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const router = useRouter()
+  const pathname = usePathname()
+
+  const isForumHome = pathname === '/forum'
 
   const handleSearch = (e) => {
     e.preventDefault()
@@ -20,12 +25,24 @@ export default function ForumHeader({ user, profile, token, onLogout }) {
   return (
     <header className="bg-white/[0.06] backdrop-blur-xl border-b border-white/10 sticky top-0 z-40">
       <div className="max-w-6xl mx-auto px-4 py-2.5">
-        <div className="flex items-center justify-between gap-4">
-          {/* Logo + Nav */}
-          <div className="flex items-center gap-4">
-            <Link href="/forum" className="flex items-center gap-2.5">
-              <div className="w-9 h-9 bg-gradient-to-br from-teal-500 to-teal-700 rounded-xl flex items-center justify-center shadow-sm">
-                <img src="/logo-icon.png" alt="CareCall AI" className="w-6 h-6 rounded-md" />
+        <div className="flex items-center justify-between gap-3">
+          {/* Back + Logo + Nav */}
+          <div className="flex items-center gap-2">
+            {/* Back button — visible when not on forum home */}
+            {!isForumHome && (
+              <button
+                onClick={() => router.back()}
+                className="p-2 text-slate-400 hover:text-teal-400 hover:bg-white/[0.06] rounded-lg transition-colors"
+                title="Go back"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+            )}
+
+            {/* Home logo — always prominent */}
+            <Link href="/forum" className="flex items-center gap-2.5 px-2 py-1 rounded-xl hover:bg-white/[0.06] transition-colors">
+              <div className="w-9 h-9 bg-gradient-to-br from-teal-500 to-teal-700 rounded-xl flex items-center justify-center shadow-sm shadow-teal-500/20">
+                <Home className="w-5 h-5 text-white" />
               </div>
               <div className="hidden sm:block">
                 <span className="font-bold text-white text-sm">
@@ -34,15 +51,16 @@ export default function ForumHeader({ user, profile, token, onLogout }) {
                 <span className="text-[10px] text-slate-400 block -mt-0.5">Community Forum</span>
               </div>
             </Link>
-            <nav className="hidden md:flex items-center gap-1 ml-2">
-              <Link href="/forum" className="px-3 py-1.5 text-sm text-slate-300 hover:text-teal-400 hover:bg-white/[0.06] rounded-lg transition-colors font-medium">
+
+            <nav className="hidden md:flex items-center gap-1 ml-1">
+              <Link href="/forum" className={`px-3 py-1.5 text-sm rounded-lg transition-colors font-medium ${isForumHome ? 'text-teal-400 bg-teal-500/10' : 'text-slate-300 hover:text-teal-400 hover:bg-white/[0.06]'}`}>
                 Home
               </Link>
               <Link href="/forum/members" className="px-3 py-1.5 text-sm text-slate-400 hover:text-teal-400 hover:bg-white/[0.06] rounded-lg transition-colors flex items-center gap-1.5">
                 <Users className="w-3.5 h-3.5" /> Members
               </Link>
-              <Link href="/" className="px-3 py-1.5 text-sm text-slate-400 hover:text-teal-400 hover:bg-white/[0.06] rounded-lg transition-colors">
-                Back to Site
+              <Link href="/" className="px-3 py-1.5 text-sm text-slate-500 hover:text-slate-300 hover:bg-white/[0.06] rounded-lg transition-colors">
+                Main Site
               </Link>
             </nav>
           </div>
@@ -73,8 +91,8 @@ export default function ForumHeader({ user, profile, token, onLogout }) {
                   <Settings className="w-4 h-4" />
                 </Link>
                 {canModerate(profile.forum_role) && (
-                  <Link href="/forum/admin" className="p-2 text-amber-400/70 hover:text-amber-400 hover:bg-white/[0.06] rounded-lg transition-colors hidden sm:flex" title="Admin">
-                    <MessageSquare className="w-4 h-4" />
+                  <Link href="/forum/admin" className="p-2 text-amber-400/80 hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors hidden sm:flex" title="Admin Panel">
+                    <Shield className="w-4.5 h-4.5" />
                   </Link>
                 )}
                 <Link href={`/forum/profile/${profile.username}`} className="hidden sm:block ml-1">
@@ -119,13 +137,13 @@ export default function ForumHeader({ user, profile, token, onLogout }) {
               </div>
             </form>
             <div className="flex flex-col gap-1 pb-2">
-              <Link href="/forum" className="px-3 py-2 text-sm text-slate-300 hover:bg-white/[0.06] rounded-lg font-medium">Home</Link>
+              <Link href="/forum" className="px-3 py-2 text-sm text-slate-300 hover:bg-white/[0.06] rounded-lg font-medium flex items-center gap-2"><Home className="w-4 h-4" /> Home</Link>
               <Link href="/forum/members" className="px-3 py-2 text-sm text-slate-300 hover:bg-white/[0.06] rounded-lg flex items-center gap-2"><Users className="w-4 h-4" /> Members</Link>
               <Link href="/forum/messages" className="px-3 py-2 text-sm text-slate-300 hover:bg-white/[0.06] rounded-lg flex items-center gap-2"><Mail className="w-4 h-4" /> Messages</Link>
               <Link href="/forum/settings" className="px-3 py-2 text-sm text-slate-300 hover:bg-white/[0.06] rounded-lg flex items-center gap-2"><Settings className="w-4 h-4" /> Settings</Link>
-              <Link href="/" className="px-3 py-2 text-sm text-slate-400 hover:bg-white/[0.06] rounded-lg">Back to Site</Link>
+              <Link href="/" className="px-3 py-2 text-sm text-slate-400 hover:bg-white/[0.06] rounded-lg">Main Site</Link>
               {profile && canModerate(profile.forum_role) && (
-                <Link href="/forum/admin" className="px-3 py-2 text-sm text-amber-400 hover:bg-white/[0.06] rounded-lg">Admin</Link>
+                <Link href="/forum/admin" className="px-3 py-2 text-sm text-amber-400 hover:bg-amber-500/10 rounded-lg flex items-center gap-2"><Shield className="w-4 h-4" /> Admin</Link>
               )}
             </div>
           </div>

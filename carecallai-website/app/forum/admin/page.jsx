@@ -2,11 +2,10 @@
 import { useState, useEffect } from 'react'
 import { useForum } from '@/lib/forumContext'
 import ForumHeader from '@/components/forum/ForumHeader'
-import UserBadge from '@/components/forum/UserBadge'
 import StarRank from '@/components/forum/StarRank'
-import { canModerate, timeAgo } from '@/lib/forumAuth'
+import { canModerate, timeAgo, PERMISSION_LABELS, DEFAULT_PERMISSIONS, getRoleBadge, slugify } from '@/lib/forumAuth'
 import { useRouter } from 'next/navigation'
-import { Users, MessageSquare, BarChart3, Ban, UserCheck, ArrowLeft, Mail, CheckCircle, Loader2, Send, UserPlus } from 'lucide-react'
+import { Users, MessageSquare, BarChart3, Ban, UserCheck, ArrowLeft, Mail, CheckCircle, Loader2, Send, UserPlus, Shield, ChevronDown, FolderPlus, Save, Search } from 'lucide-react'
 import Link from 'next/link'
 
 export default function ForumAdmin() {
@@ -17,6 +16,22 @@ export default function ForumAdmin() {
   const [tab, setTab] = useState('overview')
   const [inviting, setInviting] = useState(null)
   const [invited, setInvited] = useState([])
+  // Permissions state
+  const [permissions, setPermissions] = useState(null)
+  const [permsDirty, setPermsDirty] = useState(false)
+  const [savingPerms, setSavingPerms] = useState(false)
+  // Roles search
+  const [roleSearch, setRoleSearch] = useState('')
+  // Create category
+  const [newCatName, setNewCatName] = useState('')
+  const [newCatIcon, setNewCatIcon] = useState('MessageSquare')
+  const [newCatColor, setNewCatColor] = useState('text-teal-500')
+  const [creatingCat, setCreatingCat] = useState(false)
+  // Edit category
+  const [editingCat, setEditingCat] = useState(null)
+  const [editCatName, setEditCatName] = useState('')
+  const [editCatDesc, setEditCatDesc] = useState('')
+  const [savingCat, setSavingCat] = useState(false)
 
   useEffect(() => {
     if (!loading && (!profile || !canModerate(profile.forum_role))) {
@@ -30,7 +45,10 @@ export default function ForumAdmin() {
     try {
       const res = await fetch(`/api/forum/admin?token=${token}`)
       const data = await res.json()
-      if (!data.error) setAdminData(data)
+      if (!data.error) {
+        setAdminData(data)
+        setPermissions(data.permissions || DEFAULT_PERMISSIONS)
+      }
     } catch {} finally { setLoadingAdmin(false) }
   }
 
@@ -75,6 +93,82 @@ export default function ForumAdmin() {
     }
   }
 
+  const handleTogglePerm = (role, key) => {
+    setPermissions(prev => ({
+      ...prev,
+      [role]: { ...prev[role], [key]: !prev[role]?.[key] }
+    }))
+    setPermsDirty(true)
+  }
+
+  const handleSavePerms = async () => {
+    setSavingPerms(true)
+    try {
+      const res = await fetch('/api/forum/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, action: 'update-permissions', permissions }),
+      })
+      const data = await res.json()
+      if (data.success) setPermsDirty(false)
+      else alert(data.error || 'Failed to save')
+    } catch { alert('Failed to save permissions') }
+    finally { setSavingPerms(false) }
+  }
+
+  const handleCreateCategory = async () => {
+    if (!newCatName.trim()) return
+    setCreatingCat(true)
+    try {
+      const res = await fetch('/api/forum/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          action: 'create-category',
+          categoryData: {
+            name: newCatName.trim(),
+            slug: slugify(newCatName.trim()),
+            icon: newCatIcon,
+            color: newCatColor,
+            sort_order: (adminData?.categories?.length || 0) + 1,
+          },
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setNewCatName('')
+        fetchAdmin()
+      } else {
+        alert(data.error || 'Failed to create category')
+      }
+    } catch { alert('Failed to create category') }
+    finally { setCreatingCat(false) }
+  }
+
+  const handleEditCategory = (cat) => {
+    setEditingCat(cat.id)
+    setEditCatName(cat.name)
+    setEditCatDesc(cat.description || '')
+  }
+
+  const handleSaveCategory = async (catId) => {
+    setSavingCat(true)
+    try {
+      const res = await fetch('/api/forum/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, action: 'update-category', categoryId: catId, categoryData: { name: editCatName, description: editCatDesc } }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setEditingCat(null)
+        fetchAdmin()
+      } else alert(data.error || 'Failed to save')
+    } catch { alert('Failed to save category') }
+    finally { setSavingCat(false) }
+  }
+
   if (loading || loadingAdmin) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900">
@@ -89,8 +183,46 @@ export default function ForumAdmin() {
   if (!adminData) return null
 
   const isFounder = profile?.forum_role === 'founder'
-  const allTabs = ['overview', 'users', 'banned']
+  const isAdmin = ['founder', 'admin'].includes(profile?.forum_role)
+  const allTabs = ['overview', 'roles', 'permissions', 'banned', 'categories']
   if (isFounder) allTabs.push('invite')
+
+  const tabLabels = {
+    overview: 'Overview',
+    roles: 'Roles',
+    permissions: 'Permissions',
+    banned: 'Banned',
+    categories: 'Categories',
+    invite: 'Invite Admins',
+  }
+
+  const iconOptions = [
+    'MessageSquare', 'HelpCircle', 'Bug', 'Lightbulb', 'Coffee',
+    'Shield', 'BookOpen', 'Heart', 'Star', 'Zap', 'Award',
+    'Megaphone', 'FileText', 'Settings', 'Users', 'Globe',
+  ]
+
+  const colorOptions = [
+    { value: 'text-teal-500', label: 'Teal' },
+    { value: 'text-blue-500', label: 'Blue' },
+    { value: 'text-purple-500', label: 'Purple' },
+    { value: 'text-amber-500', label: 'Amber' },
+    { value: 'text-red-500', label: 'Red' },
+    { value: 'text-green-500', label: 'Green' },
+    { value: 'text-pink-500', label: 'Pink' },
+    { value: 'text-orange-500', label: 'Orange' },
+  ]
+
+  // Filter users for roles tab
+  const filteredUsers = (adminData.allUsers || adminData.recentUsers || []).filter(u => {
+    if (!roleSearch) return true
+    const q = roleSearch.toLowerCase()
+    return (u.username || '').toLowerCase().includes(q) || (u.display_name || '').toLowerCase().includes(q)
+  })
+
+  // Sort: founder first, then admin, moderator, user
+  const roleOrder = { founder: 0, admin: 1, moderator: 2, user: 3 }
+  const sortedUsers = [...filteredUsers].sort((a, b) => (roleOrder[a.forum_role] || 3) - (roleOrder[b.forum_role] || 3))
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900">
@@ -100,10 +232,13 @@ export default function ForumAdmin() {
           <ArrowLeft className="w-4 h-4" /> Back to forum
         </Link>
 
-        <h1 className="text-2xl font-bold text-white mb-6">Forum Admin</h1>
+        <h1 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+          <Shield className="w-7 h-7 text-teal-400" />
+          Forum Admin
+        </h1>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-3 gap-4 mb-6">
           <div className="bg-white/[0.06] backdrop-blur rounded-xl border border-white/10 p-4 text-center">
             <Users className="w-6 h-6 text-teal-400 mx-auto mb-1" />
             <p className="text-2xl font-bold text-white">{adminData.stats.users}</p>
@@ -122,81 +257,358 @@ export default function ForumAdmin() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 mb-4 bg-white/[0.04] rounded-xl p-1 border border-white/10">
+        <div className="flex gap-1 mb-4 bg-white/[0.04] rounded-xl p-1 border border-white/10 overflow-x-auto">
           {allTabs.map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex-1 ${tab === t ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : 'text-slate-400 hover:text-slate-300 hover:bg-white/[0.04]'}`}
+              className={`px-3 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${tab === t ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : 'text-slate-400 hover:text-slate-300 hover:bg-white/[0.04]'}`}
             >
-              {t === 'invite' ? 'Invite Admins' : t.charAt(0).toUpperCase() + t.slice(1)}
+              {tabLabels[t]}
             </button>
           ))}
         </div>
 
-        {/* Users tab */}
-        {(tab === 'overview' || tab === 'users') && (
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-lg">
-            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-              <h2 className="font-semibold text-sm text-slate-900">{tab === 'overview' ? 'Recent Members' : 'All Members'}</h2>
+        {/* Overview tab */}
+        {tab === 'overview' && (
+          <div className="bg-white/[0.06] backdrop-blur rounded-2xl border border-white/10 overflow-hidden">
+            <div className="px-4 py-3 border-b border-white/10">
+              <h2 className="font-semibold text-sm text-white">Recent Members</h2>
             </div>
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-white/5">
               {(adminData.recentUsers || []).map(u => (
-                <div key={u.id} className="flex items-center justify-between px-4 py-3 hover:bg-slate-50">
+                <div key={u.id} className="flex items-center justify-between px-4 py-3 hover:bg-white/[0.03]">
                   <div className="flex items-center gap-3">
-                    <UserBadge username={u.username} displayName={u.display_name} role={u.forum_role} postCount={u.post_count || 0} size="sm" />
-                    <div className="text-xs text-slate-400">
-                      {u.post_count || 0} posts &middot; Joined {timeAgo(u.created_at)}
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                      {(u.display_name || u.username || '?')[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-white">{u.display_name || u.username}</span>
+                        {getRoleBadge(u.forum_role) && (
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${getRoleBadge(u.forum_role).color}`}>
+                            {getRoleBadge(u.forum_role).label}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-xs text-slate-400">@{u.username}</span>
+                        <span className="text-xs text-slate-500">&middot; {u.post_count || 0} posts &middot; {timeAgo(u.created_at)}</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {isFounder && u.forum_role !== 'founder' && (
-                      <select
-                        value={u.forum_role}
-                        onChange={(e) => handleSetRole(u.id, e.target.value)}
-                        className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white"
-                      >
-                        <option value="user">User</option>
-                        <option value="moderator">Moderator</option>
-                        <option value="admin">Admin</option>
-                      </select>
-                    )}
-                    {u.forum_role !== 'founder' && (
-                      <button
-                        onClick={() => handleBan(u.id, !u.is_banned)}
-                        className={`text-xs px-2.5 py-1.5 rounded-lg ${u.is_banned ? 'bg-green-50 text-green-700 hover:bg-green-100' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
-                      >
-                        {u.is_banned ? 'Unban' : 'Ban'}
-                      </button>
-                    )}
-                  </div>
+                  <StarRank role={u.forum_role} postCount={u.post_count || 0} />
                 </div>
               ))}
             </div>
           </div>
         )}
 
+        {/* Roles tab */}
+        {tab === 'roles' && (
+          <div className="space-y-4">
+            <div className="bg-white/[0.06] backdrop-blur rounded-2xl border border-white/10 p-4">
+              <div className="flex items-center gap-3 mb-3">
+                <Shield className="w-5 h-5 text-teal-400" />
+                <h2 className="font-semibold text-white">User Roles</h2>
+              </div>
+              <p className="text-xs text-slate-400 mb-4">Promote or demote users. Founder can assign admin roles. Admins can assign moderator roles.</p>
+
+              {/* Search */}
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <input
+                  type="text"
+                  value={roleSearch}
+                  onChange={(e) => setRoleSearch(e.target.value)}
+                  placeholder="Search members..."
+                  className="w-full pl-10 pr-4 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                />
+              </div>
+
+              <div className="space-y-2">
+                {sortedUsers.map(u => {
+                  const badge = getRoleBadge(u.forum_role)
+                  const canChangeRole = isFounder && u.forum_role !== 'founder'
+                  const canAdminChange = isAdmin && !isFounder && u.forum_role === 'user'
+
+                  return (
+                    <div key={u.id} className="flex items-center justify-between px-4 py-3 bg-white/[0.04] rounded-xl hover:bg-white/[0.06] transition-colors">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                          {(u.display_name || u.username || '?')[0].toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-semibold text-white">{u.display_name || u.username}</span>
+                            {badge && (
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${badge.color}`}>
+                                {badge.label}
+                              </span>
+                            )}
+                            {u.is_banned && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-red-100 text-red-700 border border-red-200">Banned</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-xs text-slate-400">@{u.username}</span>
+                            <StarRank role={u.forum_role} postCount={u.post_count || 0} />
+                          </div>
+                          <span className="text-[10px] text-slate-500">{u.post_count || 0} posts &middot; {u.thread_count || 0} threads &middot; Joined {timeAgo(u.created_at)}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                        {(canChangeRole || canAdminChange) && (
+                          <div className="relative">
+                            <select
+                              value={u.forum_role}
+                              onChange={(e) => handleSetRole(u.id, e.target.value)}
+                              className="appearance-none text-xs bg-white/[0.08] border border-white/20 text-white rounded-lg pl-3 pr-8 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500/30 cursor-pointer"
+                            >
+                              <option value="user" className="bg-slate-800">User</option>
+                              <option value="moderator" className="bg-slate-800">Moderator</option>
+                              {isFounder && <option value="admin" className="bg-slate-800">Admin</option>}
+                            </select>
+                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                          </div>
+                        )}
+                        {u.forum_role !== 'founder' && (
+                          <button
+                            onClick={() => handleBan(u.id, !u.is_banned)}
+                            className={`text-xs px-2.5 py-2 rounded-lg font-medium transition-colors ${u.is_banned ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'}`}
+                          >
+                            {u.is_banned ? 'Unban' : 'Ban'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Permissions tab */}
+        {tab === 'permissions' && (
+          <div className="space-y-4">
+            <div className="bg-white/[0.06] backdrop-blur rounded-2xl border border-white/10 overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-teal-400" />
+                  <h2 className="font-semibold text-white">Role Permissions</h2>
+                </div>
+                {isFounder && permsDirty && (
+                  <button
+                    onClick={handleSavePerms}
+                    disabled={savingPerms}
+                    className="flex items-center gap-1.5 text-xs px-4 py-2 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-lg hover:from-teal-600 hover:to-teal-700 disabled:opacity-50 transition-all shadow-sm"
+                  >
+                    {savingPerms ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                    Save Changes
+                  </button>
+                )}
+              </div>
+
+              {!isFounder && (
+                <div className="px-4 py-3 bg-amber-500/10 border-b border-amber-500/20">
+                  <p className="text-xs text-amber-400">Only the founder can modify permissions. You can view the current settings.</p>
+                </div>
+              )}
+
+              {/* Permission matrix */}
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-white/10">
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-slate-300 uppercase tracking-wider">Permission</th>
+                      <th className="text-center px-4 py-3 text-xs font-semibold text-purple-400 uppercase tracking-wider w-28">
+                        <span className="flex items-center justify-center gap-1">Moderator</span>
+                      </th>
+                      <th className="text-center px-4 py-3 text-xs font-semibold text-teal-400 uppercase tracking-wider w-28">
+                        <span className="flex items-center justify-center gap-1">Admin</span>
+                      </th>
+                      <th className="text-center px-4 py-3 text-xs font-semibold text-amber-400 uppercase tracking-wider w-28">Founder</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(PERMISSION_LABELS).map(([key, { label, desc }]) => (
+                      <tr key={key} className="border-b border-white/5 hover:bg-white/[0.02]">
+                        <td className="px-4 py-3">
+                          <p className="text-sm text-white font-medium">{label}</p>
+                          <p className="text-[11px] text-slate-500 mt-0.5">{desc}</p>
+                        </td>
+                        <td className="text-center px-4 py-3">
+                          <button
+                            onClick={() => isFounder && handleTogglePerm('moderator', key)}
+                            disabled={!isFounder}
+                            className={`w-9 h-5 rounded-full transition-colors relative ${permissions?.moderator?.[key] ? 'bg-purple-500' : 'bg-slate-600'} ${isFounder ? 'cursor-pointer' : 'cursor-default opacity-80'}`}
+                          >
+                            <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${permissions?.moderator?.[key] ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                          </button>
+                        </td>
+                        <td className="text-center px-4 py-3">
+                          <button
+                            onClick={() => isFounder && handleTogglePerm('admin', key)}
+                            disabled={!isFounder}
+                            className={`w-9 h-5 rounded-full transition-colors relative ${permissions?.admin?.[key] ? 'bg-teal-500' : 'bg-slate-600'} ${isFounder ? 'cursor-pointer' : 'cursor-default opacity-80'}`}
+                          >
+                            <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${permissions?.admin?.[key] ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                          </button>
+                        </td>
+                        <td className="text-center px-4 py-3">
+                          <div className="w-9 h-5 rounded-full bg-amber-500 relative mx-auto">
+                            <span className="absolute top-0.5 translate-x-4 w-4 h-4 rounded-full bg-white shadow" />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {isFounder && (
+                <div className="px-4 py-3 border-t border-white/10 bg-white/[0.02]">
+                  <p className="text-xs text-slate-500">Founder always has all permissions (cannot be changed). Toggle switches to enable or disable permissions for moderators and admins.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Categories tab */}
+        {tab === 'categories' && (
+          <div className="space-y-4">
+            {/* Create new category */}
+            <div className="bg-white/[0.06] backdrop-blur rounded-2xl border border-white/10 p-5">
+              <div className="flex items-center gap-3 mb-4">
+                <FolderPlus className="w-5 h-5 text-teal-400" />
+                <h2 className="font-semibold text-white">Create New Category</h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <div className="sm:col-span-2">
+                  <input
+                    type="text"
+                    value={newCatName}
+                    onChange={(e) => setNewCatName(e.target.value)}
+                    placeholder="Category name..."
+                    className="w-full px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                  />
+                </div>
+                <select
+                  value={newCatIcon}
+                  onChange={(e) => setNewCatIcon(e.target.value)}
+                  className="px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                >
+                  {iconOptions.map(icon => (
+                    <option key={icon} value={icon} className="bg-slate-800">{icon}</option>
+                  ))}
+                </select>
+                <select
+                  value={newCatColor}
+                  onChange={(e) => setNewCatColor(e.target.value)}
+                  className="px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                >
+                  {colorOptions.map(c => (
+                    <option key={c.value} value={c.value} className="bg-slate-800">{c.label}</option>
+                  ))}
+                </select>
+              </div>
+              <button
+                onClick={handleCreateCategory}
+                disabled={creatingCat || !newCatName.trim()}
+                className="mt-3 flex items-center gap-1.5 text-sm px-4 py-2.5 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-xl hover:from-teal-600 hover:to-teal-700 disabled:opacity-50 transition-all shadow-sm"
+              >
+                {creatingCat ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderPlus className="w-4 h-4" />}
+                Create Category
+              </button>
+            </div>
+
+            {/* Existing categories */}
+            <div className="bg-white/[0.06] backdrop-blur rounded-2xl border border-white/10 overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/10">
+                <h2 className="font-semibold text-sm text-white">Existing Categories ({adminData.categories?.length || 0})</h2>
+              </div>
+              <div className="divide-y divide-white/5">
+                {(adminData.categories || []).map(cat => (
+                  <div key={cat.id} className="px-4 py-3 hover:bg-white/[0.03]">
+                    {editingCat === cat.id ? (
+                      <div className="space-y-2">
+                        <input
+                          value={editCatName}
+                          onChange={(e) => setEditCatName(e.target.value)}
+                          className="w-full px-3 py-2 bg-white/[0.06] border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                          placeholder="Category name"
+                        />
+                        <input
+                          value={editCatDesc}
+                          onChange={(e) => setEditCatDesc(e.target.value)}
+                          className="w-full px-3 py-2 bg-white/[0.06] border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                          placeholder="Description"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleSaveCategory(cat.id)}
+                            disabled={savingCat}
+                            className="text-xs px-3 py-1.5 bg-teal-500 text-white rounded-lg hover:bg-teal-600 disabled:opacity-50"
+                          >
+                            {savingCat ? 'Saving...' : 'Save'}
+                          </button>
+                          <button onClick={() => setEditingCat(null)} className="text-xs px-3 py-1.5 text-slate-400 hover:text-white">
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-lg bg-white/[0.08] flex items-center justify-center ${cat.color || 'text-teal-400'}`}>
+                            <MessageSquare className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-white">{cat.name}</p>
+                            <p className="text-[11px] text-slate-500">{cat.description || 'No description'} &middot; {cat.thread_count || 0} threads</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-slate-500">/{cat.slug}</span>
+                          <button onClick={() => handleEditCategory(cat)} className="text-xs px-2.5 py-1.5 text-teal-400 hover:text-teal-300 hover:bg-teal-500/10 rounded-lg transition-colors">
+                            Edit
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Banned tab */}
         {tab === 'banned' && (
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-lg">
-            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-              <h2 className="font-semibold text-sm text-slate-900">Banned Users</h2>
+          <div className="bg-white/[0.06] backdrop-blur rounded-2xl border border-white/10 overflow-hidden">
+            <div className="px-4 py-3 border-b border-white/10">
+              <h2 className="font-semibold text-sm text-white flex items-center gap-2">
+                <Ban className="w-4 h-4 text-red-400" /> Banned Users
+              </h2>
             </div>
             {adminData.bannedUsers.length === 0 ? (
               <p className="px-4 py-8 text-center text-sm text-slate-400">No banned users</p>
             ) : (
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-white/5">
                 {adminData.bannedUsers.map(u => (
                   <div key={u.id} className="flex items-center justify-between px-4 py-3">
                     <div>
-                      <span className="font-medium text-slate-900">{u.display_name || u.username}</span>
-                      <p className="text-xs text-red-500 mt-0.5">Reason: {u.ban_reason}</p>
+                      <span className="font-medium text-white">{u.display_name || u.username}</span>
+                      <p className="text-xs text-red-400 mt-0.5">Reason: {u.ban_reason}</p>
                     </div>
                     <button
                       onClick={() => handleBan(u.id, false)}
-                      className="text-xs px-3 py-1.5 bg-green-50 text-green-700 rounded-lg hover:bg-green-100"
+                      className="flex items-center gap-1 text-xs px-3 py-1.5 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors"
                     >
-                      <UserCheck className="w-3.5 h-3.5 inline mr-1" /> Unban
+                      <UserCheck className="w-3.5 h-3.5" /> Unban
                     </button>
                   </div>
                 ))}
@@ -205,7 +617,7 @@ export default function ForumAdmin() {
           </div>
         )}
 
-        {/* Invite tab - all org admins across all organizations */}
+        {/* Invite tab */}
         {tab === 'invite' && isFounder && (
           <div className="space-y-4">
             <div className="bg-white/[0.06] backdrop-blur rounded-2xl border border-white/10 p-5">
@@ -220,44 +632,44 @@ export default function ForumAdmin() {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-lg">
-              <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-                <h2 className="font-semibold text-sm text-slate-900">
+            <div className="bg-white/[0.06] backdrop-blur rounded-2xl border border-white/10 overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+                <h2 className="font-semibold text-sm text-white">
                   Organisation Admins ({(adminData.allOrgAdmins || []).length})
                 </h2>
-                <div className="flex items-center gap-2 text-xs text-slate-500">
-                  <span className="flex items-center gap-1"><CheckCircle className="w-3 h-3 text-green-500" /> Joined</span>
-                  <span className="flex items-center gap-1"><Mail className="w-3 h-3 text-slate-400" /> Not joined</span>
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <span className="flex items-center gap-1"><CheckCircle className="w-3 h-3 text-green-400" /> Joined</span>
+                  <span className="flex items-center gap-1"><Mail className="w-3 h-3 text-slate-500" /> Not joined</span>
                 </div>
               </div>
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-white/5">
                 {(adminData.allOrgAdmins || []).length === 0 ? (
                   <p className="px-4 py-8 text-center text-sm text-slate-400">No organisation admins found</p>
                 ) : (
                   (adminData.allOrgAdmins || []).map((admin, i) => (
-                    <div key={admin.user_id + '-' + i} className="flex items-center justify-between px-4 py-3 hover:bg-slate-50">
+                    <div key={admin.user_id + '-' + i} className="flex items-center justify-between px-4 py-3 hover:bg-white/[0.03]">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium text-sm text-slate-900">{admin.full_name || 'Unnamed'}</span>
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${admin.org_role === 'owner' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-teal-50 text-teal-700 border-teal-200'}`}>
+                          <span className="font-medium text-sm text-white">{admin.full_name || 'Unnamed'}</span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${admin.org_role === 'owner' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' : 'bg-teal-500/20 text-teal-400 border-teal-500/30'}`}>
                             {admin.org_role}
                           </span>
                           {admin.has_forum_profile && (
-                            <span className="flex items-center gap-0.5 text-[10px] text-green-600 font-medium">
+                            <span className="flex items-center gap-0.5 text-[10px] text-green-400 font-medium">
                               <CheckCircle className="w-3 h-3" /> Joined
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-slate-500 mt-0.5">{admin.email}</p>
-                        <p className="text-[10px] text-slate-400">{admin.org_name}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">{admin.email}</p>
+                        <p className="text-[10px] text-slate-500">{admin.org_name}</p>
                       </div>
                       <div className="flex-shrink-0 ml-3">
                         {admin.has_forum_profile ? (
-                          <span className="text-xs text-green-600 font-medium px-3 py-1.5 bg-green-50 rounded-lg">
+                          <span className="text-xs text-green-400 font-medium px-3 py-1.5 bg-green-500/20 rounded-lg">
                             @{admin.forum_username}
                           </span>
                         ) : invited.includes(admin.email) ? (
-                          <span className="flex items-center gap-1 text-xs text-teal-600 font-medium px-3 py-1.5 bg-teal-50 rounded-lg">
+                          <span className="flex items-center gap-1 text-xs text-teal-400 font-medium px-3 py-1.5 bg-teal-500/20 rounded-lg">
                             <CheckCircle className="w-3.5 h-3.5" /> Invited
                           </span>
                         ) : (

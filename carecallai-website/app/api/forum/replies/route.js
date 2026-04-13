@@ -19,11 +19,14 @@ export async function POST(req) {
     if (!fp) return json({ error: 'Complete forum setup first' }, 403)
     if (fp.is_banned) return json({ error: 'You are banned' }, 403)
 
-    // Check thread not locked
+    // Check thread not locked — use stored permissions
     const { data: thread } = await supabase.from('forum_threads').select('is_locked, author_id, title').eq('id', threadId).single()
     if (!thread) return json({ error: 'Thread not found' }, 404)
-    if (thread.is_locked && !['founder', 'admin', 'moderator'].includes(fp.forum_role)) {
-      return json({ error: 'Thread is locked' }, 403)
+    if (thread.is_locked) {
+      const { data: permRow } = await supabase.from('forum_settings').select('value').eq('key', 'role_permissions').single()
+      const perms = permRow?.value || {}
+      const canPost = fp.forum_role === 'founder' || !!(perms[fp.forum_role]?.post_in_locked)
+      if (!canPost) return json({ error: 'Thread is locked' }, 403)
     }
 
     const { data: reply, error: insertErr } = await supabase.from('forum_replies').insert({
@@ -92,13 +95,19 @@ export async function PATCH(req) {
     if (!user) return json({ error: 'Unauthorized' }, 401)
 
     const { data: fp } = await supabase.from('forum_profiles').select('forum_role').eq('id', user.id).single()
-    const isMod = ['founder', 'admin', 'moderator'].includes(fp?.forum_role)
+    const role = fp?.forum_role || 'user'
+    const isFounderUser = role === 'founder'
+
+    // Load stored permissions
+    const { data: permRow } = await supabase.from('forum_settings').select('value').eq('key', 'role_permissions').single()
+    const perms = permRow?.value || {}
+    const hasPerm = (key) => isFounderUser || !!(perms[role]?.[key])
 
     const { data: reply } = await supabase.from('forum_replies').select('author_id, thread_id').eq('id', replyId).single()
     if (!reply) return json({ error: 'Reply not found' }, 404)
 
     if (modAction === 'delete') {
-      if (!isMod && reply.author_id !== user.id) return json({ error: 'Not authorized' }, 403)
+      if (!hasPerm('delete_any_reply') && reply.author_id !== user.id) return json({ error: 'Not authorized' }, 403)
       await supabase.from('forum_replies').delete().eq('id', replyId)
       // Decrement reply count
       const { data: t } = await supabase.from('forum_threads').select('reply_count').eq('id', reply.thread_id).single()
@@ -107,15 +116,15 @@ export async function PATCH(req) {
     }
 
     if (modAction === 'solution') {
-      if (!isMod && reply.author_id !== user.id) return json({ error: 'Not authorized' }, 403)
+      if (!hasPerm('mark_solution') && reply.author_id !== user.id) return json({ error: 'Not authorized' }, 403)
       // Unmark all others, mark this one
       await supabase.from('forum_replies').update({ is_solution: false }).eq('thread_id', reply.thread_id)
       await supabase.from('forum_replies').update({ is_solution: true }).eq('id', replyId)
       return json({ success: true })
     }
 
-    // Edit content
-    if (reply.author_id !== user.id && !isMod) return json({ error: 'Not authorized' }, 403)
+    // Edit content — author or mod with edit_any_post
+    if (reply.author_id !== user.id && !hasPerm('edit_any_post')) return json({ error: 'Not authorized' }, 403)
     if (!content) return json({ error: 'Content required' }, 400)
     await supabase.from('forum_replies').update({ content, updated_at: new Date().toISOString() }).eq('id', replyId)
     return json({ success: true })

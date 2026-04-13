@@ -38,6 +38,17 @@ export async function GET(req) {
       supabase.from('forum_categories').select('*').order('sort_order'),
     ])
 
+    // Get permissions settings
+    const { data: permSettings } = await supabase.from('forum_settings').select('value').eq('key', 'role_permissions').single()
+    const permissions = permSettings?.value || null
+
+    // Get all users for roles tab
+    const { data: allUsers } = await supabase
+      .from('forum_profiles')
+      .select('id, username, display_name, avatar_url, forum_role, is_banned, post_count, thread_count, reputation, created_at, last_seen_at')
+      .order('forum_role', { ascending: true })
+      .order('created_at', { ascending: false })
+
     // Get all org admins/owners across orgs (for invite tab)
     let allOrgAdmins = []
     if (fp?.forum_role === 'founder') {
@@ -92,6 +103,8 @@ export async function GET(req) {
       recentUsers: recentUsers || [],
       categories: categories || [],
       allOrgAdmins,
+      allUsers: allUsers || [],
+      permissions,
     })
   } catch (err) {
     return json({ error: err.message }, 500)
@@ -145,14 +158,21 @@ export async function POST(req) {
       }
 
       case 'update-category': {
-        if (!isAdmin) return json({ error: 'Only admins can manage categories' }, 403)
+        const { data: permRow2 } = await supabase.from('forum_settings').select('value').eq('key', 'role_permissions').single()
+        const perms2 = permRow2?.value || {}
+        const canManage = isFounder || isAdmin || !!(perms2[fp?.forum_role]?.manage_categories)
+        if (!canManage) return json({ error: 'Not authorized to manage categories' }, 403)
         if (!categoryId || !categoryData) return json({ error: 'Missing fields' }, 400)
         await supabase.from('forum_categories').update(categoryData).eq('id', categoryId)
         return json({ success: true })
       }
 
       case 'create-category': {
-        if (!isAdmin) return json({ error: 'Only admins can create categories' }, 403)
+        // Check stored permissions — founder/admin always can, mods need create_categories permission
+        const { data: permRow } = await supabase.from('forum_settings').select('value').eq('key', 'role_permissions').single()
+        const perms = permRow?.value || {}
+        const canCreate = isFounder || isAdmin || (perms[fp?.forum_role]?.create_categories === true)
+        if (!canCreate) return json({ error: 'You do not have permission to create categories' }, 403)
         if (!categoryData?.name || !categoryData?.slug) return json({ error: 'Name and slug required' }, 400)
         const { error: insertErr } = await supabase.from('forum_categories').insert(categoryData)
         if (insertErr) return json({ error: insertErr.message }, 500)
@@ -223,6 +243,16 @@ export async function POST(req) {
           return json({ error: 'Failed to send invite: ' + emailErr.message }, 500)
         }
 
+        return json({ success: true })
+      }
+
+      case 'update-permissions': {
+        if (!isFounder) return json({ error: 'Only founder can update permissions' }, 403)
+        const { permissions: newPerms } = body
+        if (!newPerms) return json({ error: 'permissions object required' }, 400)
+        const { error: permErr } = await supabase.from('forum_settings')
+          .upsert({ key: 'role_permissions', value: newPerms, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+        if (permErr) return json({ error: permErr.message }, 500)
         return json({ success: true })
       }
 

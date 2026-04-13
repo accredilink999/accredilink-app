@@ -46,42 +46,48 @@ export async function PATCH(req, { params }) {
     if (!user) return json({ error: 'Unauthorized' }, 401)
 
     const { data: fp } = await supabase.from('forum_profiles').select('forum_role').eq('id', user.id).single()
-    const isMod = ['founder', 'admin', 'moderator'].includes(fp?.forum_role)
+    const role = fp?.forum_role || 'user'
+    const isFounder = role === 'founder'
+
+    // Load stored permissions
+    const { data: permRow } = await supabase.from('forum_settings').select('value').eq('key', 'role_permissions').single()
+    const perms = permRow?.value || {}
+    const hasPerm = (key) => isFounder || !!(perms[role]?.[key])
 
     const { data: thread } = await supabase.from('forum_threads').select('author_id').eq('id', id).single()
     if (!thread) return json({ error: 'Thread not found' }, 404)
 
-    // Mod actions
+    // Mod actions — check specific permissions
     if (modAction === 'pin' || modAction === 'unpin') {
-      if (!isMod) return json({ error: 'Not authorized' }, 403)
+      if (!hasPerm('pin_threads')) return json({ error: 'Not authorized' }, 403)
       await supabase.from('forum_threads').update({ is_pinned: modAction === 'pin' }).eq('id', id)
       return json({ success: true })
     }
     if (modAction === 'lock' || modAction === 'unlock') {
-      if (!isMod) return json({ error: 'Not authorized' }, 403)
+      if (!hasPerm('lock_threads')) return json({ error: 'Not authorized' }, 403)
       await supabase.from('forum_threads').update({ is_locked: modAction === 'lock' }).eq('id', id)
       return json({ success: true })
     }
     if (modAction === 'delete') {
-      if (!isMod && thread.author_id !== user.id) return json({ error: 'Not authorized' }, 403)
+      if (!hasPerm('delete_threads') && thread.author_id !== user.id) return json({ error: 'Not authorized' }, 403)
       await supabase.from('forum_threads').delete().eq('id', id)
       return json({ success: true })
     }
     if (modAction === 'bump') {
-      if (!isMod) return json({ error: 'Not authorized' }, 403)
+      if (!hasPerm('bump_threads')) return json({ error: 'Not authorized' }, 403)
       await supabase.from('forum_threads').update({ last_reply_at: new Date().toISOString() }).eq('id', id)
       return json({ success: true })
     }
     if (modAction === 'move') {
-      if (!isMod) return json({ error: 'Not authorized' }, 403)
+      if (!hasPerm('move_threads')) return json({ error: 'Not authorized' }, 403)
       const { categoryId: newCatId } = body
       if (!newCatId) return json({ error: 'categoryId required' }, 400)
       await supabase.from('forum_threads').update({ category_id: newCatId }).eq('id', id)
       return json({ success: true })
     }
 
-    // Author edit
-    if (thread.author_id !== user.id && !isMod) return json({ error: 'Not authorized' }, 403)
+    // Author edit — or mod with edit_any_post permission
+    if (thread.author_id !== user.id && !hasPerm('edit_any_post')) return json({ error: 'Not authorized' }, 403)
     const allowedFields = {}
     if (updates.title) allowedFields.title = updates.title
     if (updates.content) allowedFields.content = updates.content
