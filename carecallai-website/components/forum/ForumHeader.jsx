@@ -4,10 +4,10 @@ import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { Search, LogOut, Settings, Menu, X, Mail, Users, Home, ArrowLeft, Shield } from 'lucide-react'
 import NotificationBell from './NotificationBell'
-import UserBadge from './UserBadge'
-import { canModerate } from '@/lib/forumAuth'
+import StarRank from './StarRank'
+import { canModerate, getRoleBadge } from '@/lib/forumAuth'
 
-export default function ForumHeader({ user, profile, token, onLogout }) {
+export default function ForumHeader({ profile, token, onLogout }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const router = useRouter()
@@ -95,15 +95,36 @@ export default function ForumHeader({ user, profile, token, onLogout }) {
                     <Shield className="w-4.5 h-4.5" />
                   </Link>
                 )}
-                <Link href={`/forum/profile/${profile.username}`} className="hidden sm:block ml-1">
-                  <UserBadge
-                    username={profile.username}
-                    displayName={profile.display_name}
-                    avatarUrl={profile.avatar_url}
-                    role={profile.forum_role}
-                    size="sm"
-                    darkMode
-                  />
+                {/* Prominent user profile with avatar, name, role & stars */}
+                <Link href={`/forum/profile/${profile.username}`} className="hidden sm:flex items-center gap-2.5 ml-1 px-2.5 py-1.5 rounded-xl hover:bg-white/[0.06] transition-colors">
+                  <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${profile.forum_role === 'founder' ? 'from-amber-400 to-amber-600' : profile.forum_role === 'admin' ? 'from-teal-400 to-teal-600' : profile.forum_role === 'moderator' ? 'from-purple-400 to-purple-600' : 'from-slate-400 to-slate-500'} flex items-center justify-center text-white font-bold overflow-hidden flex-shrink-0 shadow-sm`}>
+                    {profile.avatar_url ? (
+                      <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-xs">{(profile.display_name || profile.username || '?')[0].toUpperCase()}</span>
+                    )}
+                  </div>
+                  <div className="flex flex-col">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-medium text-white truncate max-w-[120px]">{profile.display_name || profile.username}</span>
+                      {getRoleBadge(profile.forum_role) && (
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold border ${getRoleBadge(profile.forum_role).color}`}>
+                          {getRoleBadge(profile.forum_role).label}
+                        </span>
+                      )}
+                    </div>
+                    <StarRank role={profile.forum_role} postCount={profile.post_count || 0} />
+                  </div>
+                </Link>
+                {/* Mobile avatar */}
+                <Link href={`/forum/profile/${profile.username}`} className="sm:hidden">
+                  <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${profile.forum_role === 'founder' ? 'from-amber-400 to-amber-600' : profile.forum_role === 'admin' ? 'from-teal-400 to-teal-600' : profile.forum_role === 'moderator' ? 'from-purple-400 to-purple-600' : 'from-slate-400 to-slate-500'} flex items-center justify-center text-white font-bold overflow-hidden flex-shrink-0`}>
+                    {profile.avatar_url ? (
+                      <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-[10px]">{(profile.display_name || profile.username || '?')[0].toUpperCase()}</span>
+                    )}
+                  </div>
                 </Link>
                 <button onClick={onLogout} className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors" title="Sign out">
                   <LogOut className="w-4 h-4" />
@@ -136,6 +157,29 @@ export default function ForumHeader({ user, profile, token, onLogout }) {
                 />
               </div>
             </form>
+            {/* Mobile user profile card */}
+            {profile && (
+              <Link href={`/forum/profile/${profile.username}`} className="flex items-center gap-3 px-3 py-2.5 mb-2 bg-white/[0.04] rounded-xl border border-white/5">
+                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${profile.forum_role === 'founder' ? 'from-amber-400 to-amber-600' : profile.forum_role === 'admin' ? 'from-teal-400 to-teal-600' : profile.forum_role === 'moderator' ? 'from-purple-400 to-purple-600' : 'from-slate-400 to-slate-500'} flex items-center justify-center text-white font-bold overflow-hidden flex-shrink-0`}>
+                  {profile.avatar_url ? (
+                    <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-sm">{(profile.display_name || profile.username || '?')[0].toUpperCase()}</span>
+                  )}
+                </div>
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-medium text-white">{profile.display_name || profile.username}</span>
+                    {getRoleBadge(profile.forum_role) && (
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold border ${getRoleBadge(profile.forum_role).color}`}>
+                        {getRoleBadge(profile.forum_role).label}
+                      </span>
+                    )}
+                  </div>
+                  <StarRank role={profile.forum_role} postCount={profile.post_count || 0} />
+                </div>
+              </Link>
+            )}
             <div className="flex flex-col gap-1 pb-2">
               <Link href="/forum" className="px-3 py-2 text-sm text-slate-300 hover:bg-white/[0.06] rounded-lg font-medium flex items-center gap-2"><Home className="w-4 h-4" /> Home</Link>
               <Link href="/forum/members" className="px-3 py-2 text-sm text-slate-300 hover:bg-white/[0.06] rounded-lg flex items-center gap-2"><Users className="w-4 h-4" /> Members</Link>

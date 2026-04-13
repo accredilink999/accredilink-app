@@ -18,7 +18,7 @@ export function getForumClient() {
 }
 
 // Your user ID for Founder badge
-const FOUNDER_ID = '873293fe-b638-4b48-b899-ceb5bae519fb'
+const FOUNDER_ID = '1f5d9e8a-ab4b-4c00-813a-8af23f79fb82'
 
 export function isFounder(userId) {
   return userId === FOUNDER_ID

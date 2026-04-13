@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
 function json(data, status = 200) { return NextResponse.json(data, { status }) }
 
-const FOUNDER_ID = '873293fe-b638-4b48-b899-ceb5bae519fb'
+const FOUNDER_ID = '1f5d9e8a-ab4b-4c00-813a-8af23f79fb82'
 const FAQ_CATEGORY_SLUG = 'customer-faq'
 
 // GET: fetch the FAQ thread + approved replies
