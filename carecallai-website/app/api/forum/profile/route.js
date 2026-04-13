@@ -72,6 +72,17 @@ export async function POST(req) {
       return json({ success: true })
     }
 
+    if (action === 'update-preferences') {
+      const updates = {}
+      if ('notify_replies' in body) updates.notify_replies = body.notify_replies
+      if ('notify_likes' in body) updates.notify_likes = body.notify_likes
+      if ('notify_mentions' in body) updates.notify_mentions = body.notify_mentions
+      if ('notify_pms' in body) updates.notify_pms = body.notify_pms
+      if ('show_online' in body) updates.show_online = body.show_online
+      await supabase.from('forum_profiles').update(updates).eq('id', user.id)
+      return json({ success: true })
+    }
+
     return json({ error: 'Unknown action' }, 400)
   } catch (err) {
     return json({ error: err.message }, 500)

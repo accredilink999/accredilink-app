@@ -38,20 +38,20 @@ function SearchContent() {
   }
 
   return (
-    <>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900">
       <ForumHeader user={user} profile={profile} token={token} onLogout={logout} />
       <div className="max-w-4xl mx-auto px-4 py-6">
-        <h1 className="text-xl font-bold text-slate-900 mb-4">Search Forum</h1>
+        <h1 className="text-xl font-bold text-white mb-4">Search Forum</h1>
 
         <form onSubmit={handleSearch} className="mb-6">
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search threads and replies..."
-              className="w-full pl-12 pr-4 py-3 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="w-full pl-12 pr-4 py-3 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500/30"
               autoFocus
             />
           </div>
@@ -60,9 +60,9 @@ function SearchContent() {
         {searching ? (
           <div className="text-center py-8 text-slate-400">Searching...</div>
         ) : results.length === 0 && q ? (
-          <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
-            <Search className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-500">No results found for &ldquo;{q}&rdquo;</p>
+          <div className="text-center py-12 bg-white/[0.06] rounded-2xl border border-white/10">
+            <Search className="w-12 h-12 text-slate-500 mx-auto mb-3" />
+            <p className="text-slate-400">No results found for &ldquo;{q}&rdquo;</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -71,7 +71,7 @@ function SearchContent() {
                 <ThreadCard key={result.id} thread={result} showCategory />
               ) : (
                 <Link key={result.id} href={`/forum/thread/${result.thread_id}`}>
-                  <div className="bg-white rounded-lg border border-slate-200 p-4 hover:border-teal-300 hover:shadow-sm transition-all">
+                  <div className="bg-white rounded-xl border border-slate-200 p-4 hover:border-teal-300 hover:shadow-md transition-all">
                     <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
                       <MessageSquare className="w-3.5 h-3.5" />
                       <span>Reply in: <strong className="text-slate-600">{result.forum_threads?.title}</strong></span>
@@ -85,13 +85,13 @@ function SearchContent() {
           </div>
         )}
       </div>
-    </>
+    </div>
   )
 }
 
 export default function SearchPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full"></div></div>}>
+    <Suspense fallback={<div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900 flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full"></div></div>}>
       <SearchContent />
     </Suspense>
   )

@@ -745,18 +745,31 @@ export default function Dashboard() {
           {[
             { to: 'Rota', label: 'Shifts', icon: Clock, bg: 'from-orange-400 to-orange-600' },
             { to: 'ClientManagement', label: 'Clients', icon: Heart, bg: 'from-teal-400 to-teal-600' },
-            { to: 'Incidents', label: 'Report', icon: AlertTriangle, bg: 'from-red-400 to-red-600' },
+            { href: 'https://carecallai.co.uk/forum', label: 'Forum', icon: MessageSquare, bg: 'from-cyan-400 to-teal-600' },
             { to: 'ApprovalsAndFinancials', label: 'My Admin', icon: FileText, bg: 'from-indigo-400 to-indigo-600' },
             { to: 'Feedback', label: 'Feedback', icon: Star, bg: 'from-amber-400 to-yellow-500' },
             { to: 'AIAssistant', label: 'AI', icon: Bot, bg: 'from-purple-400 to-purple-600' },
           ].map(section => {
             const Icon = section.icon;
-            return (
-              <Link key={section.to} to={createPageUrl(section.to)} className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-3 sm:p-4 min-h-[90px] active:scale-95">
+            const content = (
+              <>
                 <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br ${section.bg} flex items-center justify-center mb-1.5 shadow-sm`}>
                   <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" strokeWidth={1.8} />
                 </div>
                 <span className="text-xs font-semibold text-slate-700 text-center leading-tight">{section.label}</span>
+              </>
+            );
+            const cls = "flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-3 sm:p-4 min-h-[90px] active:scale-95";
+            if (section.href) {
+              return (
+                <a key={section.label} href={section.href} target="_blank" rel="noopener noreferrer" className={cls}>
+                  {content}
+                </a>
+              );
+            }
+            return (
+              <Link key={section.to} to={createPageUrl(section.to)} className={cls}>
+                {content}
               </Link>
             );
           })}

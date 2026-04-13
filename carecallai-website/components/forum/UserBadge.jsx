@@ -1,5 +1,6 @@
 'use client'
 import { getRoleBadge } from '@/lib/forumAuth'
+import StarRank from './StarRank'
 
 const roleGradients = {
   founder: 'from-amber-400 to-amber-600',
@@ -7,7 +8,7 @@ const roleGradients = {
   moderator: 'from-purple-400 to-purple-600',
 }
 
-export default function UserBadge({ username, displayName, avatarUrl, role, size = 'sm', showName = true, linkToProfile = true }) {
+export default function UserBadge({ username, displayName, avatarUrl, role, postCount = 0, size = 'sm', showName = true, showStars = true, linkToProfile = true, darkMode = false }) {
   const badge = getRoleBadge(role)
   const name = displayName || username
   const initial = (name || '?')[0].toUpperCase()
@@ -33,12 +34,17 @@ export default function UserBadge({ username, displayName, avatarUrl, role, size
         )}
       </div>
       {showName && (
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className={`font-medium text-slate-900 truncate ${s.nameText}`}>{name}</span>
-          {badge && (
-            <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold border ${badge.color}`}>
-              {badge.label}
-            </span>
+        <div className="flex flex-col min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className={`font-medium truncate ${s.nameText} ${darkMode ? 'text-white' : 'text-slate-900'}`}>{name}</span>
+            {badge && (
+              <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold border ${badge.color}`}>
+                {badge.label}
+              </span>
+            )}
+          </div>
+          {showStars && (size === 'sm' || size === 'md' || size === 'lg' || size === 'xl') && (
+            <StarRank role={role} postCount={postCount} />
           )}
         </div>
       )}

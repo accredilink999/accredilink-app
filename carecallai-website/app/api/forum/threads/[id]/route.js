@@ -22,10 +22,10 @@ export async function GET(req, { params }) {
   // Increment view count (fire-and-forget)
   supabase.from('forum_threads').update({ view_count: (thread.view_count || 0) + 1 }).eq('id', thread.id).then(() => {})
 
-  // Get replies with authors
+  // Get replies with authors (include post_count for star ranking)
   const { data: replies } = await supabase
     .from('forum_replies')
-    .select('*, forum_profiles!forum_replies_author_id_fkey(username, display_name, avatar_url, forum_role)')
+    .select('*, forum_profiles!forum_replies_author_id_fkey(username, display_name, avatar_url, forum_role, post_count)')
     .eq('thread_id', thread.id)
     .order('created_at', { ascending: true })
 
@@ -65,6 +65,18 @@ export async function PATCH(req, { params }) {
     if (modAction === 'delete') {
       if (!isMod && thread.author_id !== user.id) return json({ error: 'Not authorized' }, 403)
       await supabase.from('forum_threads').delete().eq('id', id)
+      return json({ success: true })
+    }
+    if (modAction === 'bump') {
+      if (!isMod) return json({ error: 'Not authorized' }, 403)
+      await supabase.from('forum_threads').update({ last_reply_at: new Date().toISOString() }).eq('id', id)
+      return json({ success: true })
+    }
+    if (modAction === 'move') {
+      if (!isMod) return json({ error: 'Not authorized' }, 403)
+      const { categoryId: newCatId } = body
+      if (!newCatId) return json({ error: 'categoryId required' }, 400)
+      await supabase.from('forum_threads').update({ category_id: newCatId }).eq('id', id)
       return json({ success: true })
     }
 

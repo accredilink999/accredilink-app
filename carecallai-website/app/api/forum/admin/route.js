@@ -38,11 +38,60 @@ export async function GET(req) {
       supabase.from('forum_categories').select('*').order('sort_order'),
     ])
 
+    // Get all org admins/owners across orgs (for invite tab)
+    let allOrgAdmins = []
+    if (fp?.forum_role === 'founder') {
+      const { data: orgMembers } = await supabase
+        .from('organization_members')
+        .select('user_id, role, organization_id')
+        .in('role', ['owner', 'admin'])
+
+      if (orgMembers?.length) {
+        const userIds = orgMembers.map(m => m.user_id)
+        // Get profiles for these users
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, email, full_name, role')
+          .in('id', userIds)
+
+        // Get forum profiles to check who has joined
+        const { data: forumProfiles } = await supabase
+          .from('forum_profiles')
+          .select('id, username')
+          .in('id', userIds)
+
+        const profileMap = {}
+        ;(profiles || []).forEach(p => { profileMap[p.id] = p })
+        const forumMap = {}
+        ;(forumProfiles || []).forEach(f => { forumMap[f.id] = f })
+
+        // Get org names
+        const orgIds = [...new Set(orgMembers.map(m => m.organization_id))]
+        const { data: orgs } = await supabase
+          .from('organizations')
+          .select('id, name')
+          .in('id', orgIds)
+        const orgMap = {}
+        ;(orgs || []).forEach(o => { orgMap[o.id] = o.name })
+
+        allOrgAdmins = orgMembers.map(m => ({
+          user_id: m.user_id,
+          org_role: m.role,
+          org_name: orgMap[m.organization_id] || 'Unknown',
+          email: profileMap[m.user_id]?.email || '',
+          full_name: profileMap[m.user_id]?.full_name || '',
+          has_forum_profile: !!forumMap[m.user_id],
+          forum_username: forumMap[m.user_id]?.username || null,
+        }))
+      }
+    }
+
     return json({
       stats: { users: userCount || 0, threads: threadCount || 0, replies: replyCount || 0 },
       bannedUsers: bannedUsers || [],
       recentUsers: recentUsers || [],
       categories: categories || [],
+      allOrgAdmins,
     })
   } catch (err) {
     return json({ error: err.message }, 500)
@@ -52,7 +101,8 @@ export async function GET(req) {
 // POST: admin actions
 export async function POST(req) {
   try {
-    const { token, action, userId, reason, categoryId, categoryData, role } = await req.json()
+    const body = await req.json()
+    const { token, action, userId, reason, categoryId, categoryData, role } = body
     if (!token) return json({ error: 'Unauthorized' }, 401)
 
     const anonClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
@@ -113,6 +163,66 @@ export async function POST(req) {
         if (!isFounder) return json({ error: 'Only founder can delete categories' }, 403)
         if (!categoryId) return json({ error: 'categoryId required' }, 400)
         await supabase.from('forum_categories').delete().eq('id', categoryId)
+        return json({ success: true })
+      }
+
+      case 'invite-to-forum': {
+        if (!isFounder) return json({ error: 'Only founder can send invites' }, 403)
+        const { email, name } = body
+        if (!email) return json({ error: 'Email required' }, 400)
+
+        // Send invite email via Supabase edge function
+        try {
+          const emailBody = `
+            <div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:30px">
+              <div style="text-align:center;margin-bottom:30px">
+                <h1 style="color:#0d9488;font-size:24px;margin:0">CareCall<span style="color:#334155">AI</span> Forum</h1>
+                <p style="color:#64748b;font-size:14px;margin-top:5px">Community for Care Professionals</p>
+              </div>
+              <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:24px">
+                <h2 style="color:#1e293b;font-size:18px;margin:0 0 12px 0">Hi ${name || 'there'},</h2>
+                <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 16px 0">
+                  You're invited to join the <strong>CareCallAI Community Forum</strong> — an exclusive space for care sector administrators to share insights, get support, and connect with fellow professionals.
+                </p>
+                <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 20px 0">
+                  As an organisation admin, you have full access. Simply log in with your existing CareCall AI credentials.
+                </p>
+                <div style="text-align:center;margin:24px 0">
+                  <a href="https://carecallai.co.uk/forum" style="background:linear-gradient(135deg,#14b8a6,#0d9488);color:white;text-decoration:none;padding:12px 32px;border-radius:12px;font-weight:600;font-size:14px;display:inline-block">
+                    Join the Forum
+                  </a>
+                </div>
+                <p style="color:#94a3b8;font-size:12px;text-align:center;margin:0">
+                  Use your existing CareCall AI email and password to sign in
+                </p>
+              </div>
+              <p style="color:#94a3b8;font-size:11px;text-align:center;margin-top:20px">
+                CareCall AI — Smart Care Management
+              </p>
+            </div>
+          `
+
+          const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-campaign-email`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+            },
+            body: JSON.stringify({
+              to: email,
+              subject: 'You\'re invited to the CareCallAI Community Forum',
+              html: emailBody,
+            }),
+          })
+
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}))
+            return json({ error: errData.error || 'Failed to send email' }, 500)
+          }
+        } catch (emailErr) {
+          return json({ error: 'Failed to send invite: ' + emailErr.message }, 500)
+        }
+
         return json({ success: true })
       }
 

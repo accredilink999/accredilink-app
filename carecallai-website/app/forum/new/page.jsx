@@ -71,7 +71,7 @@ function NewThreadForm() {
     <>
       <ForumHeader user={user} profile={profile} token={token} onLogout={logout} />
       <div className="max-w-2xl mx-auto px-4 py-6">
-        <Link href="/forum" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-teal-600 mb-4">
+        <Link href="/forum" className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-teal-400 mb-4">
           <ArrowLeft className="w-4 h-4" /> Back to forum
         </Link>
 
@@ -152,7 +152,7 @@ function NewThreadForm() {
 
 export default function NewThreadPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full"></div></div>}>
+    <Suspense fallback={<div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900 flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full"></div></div>}>
       <NewThreadForm />
     </Suspense>
   )

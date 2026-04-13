@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { downloadCareLogsPDF } from '@/utils/careLogPDF';
 import { ShiftApi } from '@/api/rotaApi';
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -494,27 +495,31 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
     },
   });
 
-  const downloadLogsMutation = useMutation({
-    mutationFn: async (logType) => {
-      const dateRange = logType === 'care' ? careLogDateRange : healthLogDateRange;
-      const response = await base44.functions.invoke('downloadLogsAsPDF', {
-        serviceUserId: serviceUser.id,
-        serviceUserName: serviceUser.full_name,
-        logType,
-        startDate: dateRange.start,
-        endDate: dateRange.end
-      });
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${logType}-logs-${serviceUser.full_name.replace(/\s+/g, '-')}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      window.URL.revokeObjectURL(url);
-      link.remove();
-    },
-  });
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const handleDownloadCareLogsPDF = async () => {
+    if (!careLogDateRange.start || !careLogDateRange.end) {
+      toast.error('Please select a date range first');
+      return;
+    }
+    setPdfLoading(true);
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const orgName = authUser?.user_metadata?.company_name || currentUser?.full_name || '';
+      const count = await downloadCareLogsPDF(
+        serviceUser,
+        careLogDateRange.start,
+        careLogDateRange.end,
+        currentUser,
+        orgName
+      );
+      toast.success(`PDF downloaded — ${count} care log${count !== 1 ? 's' : ''} included`);
+    } catch (err) {
+      toast.error('PDF generation failed: ' + err.message);
+    } finally {
+      setPdfLoading(false);
+    }
+  };
 
   if (!serviceUser) return null;
   if (!open) return null;
@@ -1195,16 +1200,16 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
                  </div>
                  <Button
                    size="sm"
-                   onClick={() => downloadLogsMutation.mutate('care')}
-                   disabled={downloadLogsMutation.isPending}
-                   className="w-full sm:w-auto"
+                   onClick={handleDownloadCareLogsPDF}
+                   disabled={pdfLoading}
+                   className="w-full sm:w-auto bg-blue-700 hover:bg-blue-800 text-white"
                  >
-                   {downloadLogsMutation.isPending ? (
+                   {pdfLoading ? (
                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
                    ) : (
                      <Download className="w-3 h-3 mr-1" />
                    )}
-                   Download PDF
+                   {pdfLoading ? 'Generating PDF...' : 'Download Batch PDF'}
                  </Button>
                </div>
              </Card>

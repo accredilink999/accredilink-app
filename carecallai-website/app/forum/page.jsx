@@ -53,18 +53,18 @@ export default function ForumHome() {
 
   if (loading || !user) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900 flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full"></div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900">
       <ForumHeader user={user} profile={profile} token={token} onLogout={logout} />
 
       {/* Hero Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-teal-900 relative overflow-hidden">
+      <div className="relative overflow-hidden border-b border-white/5">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMDUpIi8+PC9zdmc+')] opacity-50" />
         <div className="max-w-6xl mx-auto px-4 py-10 sm:py-14 relative">
           <div className="flex items-center gap-4 mb-4">
@@ -79,7 +79,6 @@ export default function ForumHome() {
             </div>
           </div>
 
-          {/* Stats bar */}
           {stats && (
             <div className="flex items-center gap-6 mt-6 flex-wrap">
               <div className="flex items-center gap-2 px-4 py-2 bg-white/[0.07] backdrop-blur rounded-xl border border-white/10">
@@ -103,15 +102,12 @@ export default function ForumHome() {
 
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="flex flex-col lg:flex-row gap-8">
-          {/* Sidebar */}
           <ForumSidebar categories={categories} stats={stats} profile={profile} />
 
-          {/* Main content */}
           <main className="flex-1 min-w-0">
-            {/* Categories */}
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <Layers className="w-5 h-5 text-teal-600" />
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <Layers className="w-5 h-5 text-teal-400" />
                 Browse Categories
               </h2>
             </div>
@@ -121,10 +117,9 @@ export default function ForumHome() {
               ))}
             </div>
 
-            {/* Recent Threads */}
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-teal-600" />
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-teal-400" />
                 Recent Threads
               </h2>
             </div>
@@ -132,12 +127,12 @@ export default function ForumHome() {
               {loadingThreads ? (
                 <div className="text-center py-8 text-slate-400">Loading...</div>
               ) : recentThreads.length === 0 ? (
-                <div className="text-center py-16 bg-white rounded-2xl border border-slate-200">
-                  <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <MessageSquare className="w-8 h-8 text-slate-300" />
+                <div className="text-center py-16 bg-white/[0.06] rounded-2xl border border-white/10">
+                  <div className="w-16 h-16 bg-white/[0.06] rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <MessageSquare className="w-8 h-8 text-slate-500" />
                   </div>
-                  <p className="text-slate-500 font-medium">No threads yet</p>
-                  <p className="text-sm text-slate-400 mt-1">Be the first to start a conversation!</p>
+                  <p className="text-slate-400 font-medium">No threads yet</p>
+                  <p className="text-sm text-slate-500 mt-1">Be the first to start a conversation!</p>
                 </div>
               ) : (
                 recentThreads.map(thread => (

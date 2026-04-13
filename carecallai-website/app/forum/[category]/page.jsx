@@ -38,14 +38,14 @@ export default function CategoryPage({ params }) {
 
   if (loading || !user) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900 flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full"></div>
       </div>
     )
   }
 
   return (
-    <>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900">
       <ForumHeader user={user} profile={profile} token={token} onLogout={logout} />
       <div className="max-w-6xl mx-auto px-4 py-6">
         <div className="flex flex-col lg:flex-row gap-6">
@@ -53,7 +53,7 @@ export default function CategoryPage({ params }) {
 
           <main className="flex-1 min-w-0">
             {/* Category header */}
-            <div className="bg-white rounded-xl border border-slate-200 p-5 mb-4">
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-4 shadow-lg">
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
                   <h1 className="text-xl font-bold text-slate-900">{category?.name || categorySlug}</h1>
@@ -62,7 +62,7 @@ export default function CategoryPage({ params }) {
                 {profile && !category?.is_locked && (
                   <Link
                     href={`/forum/new?category=${categorySlug}`}
-                    className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-500 to-teal-600 text-white text-sm font-medium rounded-xl hover:from-teal-600 hover:to-teal-700 transition-all shadow-sm"
                   >
                     <Plus className="w-4 h-4" /> New Thread
                   </Link>
@@ -72,12 +72,12 @@ export default function CategoryPage({ params }) {
 
             {/* Sort */}
             <div className="flex items-center gap-2 mb-4">
-              <ArrowUpDown className="w-4 h-4 text-slate-400" />
+              <ArrowUpDown className="w-4 h-4 text-slate-500" />
               {['newest', 'popular', 'unanswered'].map(s => (
                 <button
                   key={s}
                   onClick={() => { setSort(s); setPage(1) }}
-                  className={`px-3 py-1 text-sm rounded-full transition-colors ${sort === s ? 'bg-teal-100 text-teal-700 font-medium' : 'text-slate-500 hover:bg-slate-100'}`}
+                  className={`px-3 py-1 text-sm rounded-full transition-colors ${sort === s ? 'bg-teal-500/20 text-teal-300 font-medium border border-teal-500/30' : 'text-slate-400 hover:bg-white/[0.06] hover:text-slate-300'}`}
                 >
                   {s.charAt(0).toUpperCase() + s.slice(1)}
                 </button>
@@ -89,10 +89,10 @@ export default function CategoryPage({ params }) {
               {loadingThreads ? (
                 <div className="text-center py-8 text-slate-400">Loading threads...</div>
               ) : threads.length === 0 ? (
-                <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
-                  <p className="text-slate-500">No threads in this category yet.</p>
+                <div className="text-center py-12 bg-white/[0.06] rounded-2xl border border-white/10">
+                  <p className="text-slate-400">No threads in this category yet.</p>
                   {profile && (
-                    <Link href={`/forum/new?category=${categorySlug}`} className="text-teal-600 hover:text-teal-700 text-sm font-medium mt-2 inline-block">
+                    <Link href={`/forum/new?category=${categorySlug}`} className="text-teal-400 hover:text-teal-300 text-sm font-medium mt-2 inline-block">
                       Start the first thread
                     </Link>
                   )}
@@ -108,6 +108,6 @@ export default function CategoryPage({ params }) {
           </main>
         </div>
       </div>
-    </>
+    </div>
   )
 }

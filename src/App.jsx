@@ -99,6 +99,28 @@ const AppShell = () => {
             supabase.from('users').update({ organization_id: org.id }).eq('id', user.id).then(() => {});
             resetOrg();
             await initOrg();
+
+            // ── Notify admin of new trial signup ──────────────────────
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+            const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.access_token) {
+              fetch(`${supabaseUrl}/functions/v1/notifyNewSignup`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${session.access_token}`,
+                  'apikey': supabaseAnonKey,
+                },
+                body: JSON.stringify({
+                  orgId: org.id,
+                  orgName: companyName,
+                  userEmail: user.email,
+                  userName: user.user_metadata?.full_name || '',
+                  plan: 'trial',
+                }),
+              }).catch(e => console.warn('[notifyNewSignup] failed:', e));
+            }
           }
         }
 

@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { Heart, CheckCircle, Edit, Trash2, MoreHorizontal, Reply } from 'lucide-react'
 import UserBadge from './UserBadge'
+import RichContent from './RichContent'
 import { timeAgo, canModerate } from '@/lib/forumAuth'
 
 export default function ReplyCard({ reply, currentUser, onLike, onEdit, onDelete, onSolution, onReply, isLiked }) {
@@ -18,7 +19,7 @@ export default function ReplyCard({ reply, currentUser, onLike, onEdit, onDelete
   }
 
   return (
-    <div className={`bg-white rounded-lg border p-4 ${reply.is_solution ? 'border-green-300 bg-green-50/50' : 'border-slate-200'}`}>
+    <div className={`bg-white rounded-xl border p-5 ${reply.is_solution ? 'border-green-300 bg-green-50/50 shadow-green-100/50 shadow-md' : 'border-slate-200'}`}>
       {reply.is_solution && (
         <div className="flex items-center gap-1.5 text-green-700 text-sm font-semibold mb-3">
           <CheckCircle className="w-4 h-4" />
@@ -32,6 +33,7 @@ export default function ReplyCard({ reply, currentUser, onLike, onEdit, onDelete
           displayName={author.display_name}
           avatarUrl={author.avatar_url}
           role={author.forum_role}
+          postCount={author.post_count || 0}
           size="sm"
         />
         <div className="flex items-center gap-2 text-xs text-slate-400">
@@ -45,7 +47,7 @@ export default function ReplyCard({ reply, currentUser, onLike, onEdit, onDelete
                 <MoreHorizontal className="w-4 h-4" />
               </button>
               {showMenu && (
-                <div className="absolute right-0 top-8 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-10 min-w-[140px]">
+                <div className="absolute right-0 top-8 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-10 min-w-[140px]">
                   {(isOwner || isMod) && (
                     <button onClick={() => { setEditing(true); setShowMenu(false) }} className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2">
                       <Edit className="w-3.5 h-3.5" /> Edit
@@ -81,22 +83,22 @@ export default function ReplyCard({ reply, currentUser, onLike, onEdit, onDelete
           </div>
         </div>
       ) : (
-        <div className="mt-3 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-          {reply.content}
+        <div className="mt-3">
+          <RichContent content={reply.content} />
         </div>
       )}
 
       <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-100">
         <button
           onClick={() => onLike?.(reply.id)}
-          className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full transition-colors ${isLiked ? 'bg-red-50 text-red-600' : 'text-slate-400 hover:bg-slate-100'}`}
+          className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full transition-colors ${isLiked ? 'bg-red-50 text-red-600' : 'text-slate-400 hover:bg-slate-100'}`}
         >
           <Heart className={`w-3.5 h-3.5 ${isLiked ? 'fill-current' : ''}`} />
           {reply.like_count || 0}
         </button>
         <button
           onClick={() => onReply?.(reply)}
-          className="flex items-center gap-1 text-xs text-slate-400 hover:text-teal-600 px-2 py-1 rounded-full hover:bg-slate-100 transition-colors"
+          className="flex items-center gap-1 text-xs text-slate-400 hover:text-teal-600 px-2.5 py-1 rounded-full hover:bg-slate-100 transition-colors"
         >
           <Reply className="w-3.5 h-3.5" /> Reply
         </button>

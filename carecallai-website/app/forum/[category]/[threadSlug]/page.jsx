@@ -6,14 +6,15 @@ import UserBadge from '@/components/forum/UserBadge'
 import ReplyCard from '@/components/forum/ReplyCard'
 import ReplyEditor from '@/components/forum/ReplyEditor'
 import LikeButton from '@/components/forum/LikeButton'
+import RichContent from '@/components/forum/RichContent'
 import { timeAgo, canModerate } from '@/lib/forumAuth'
-import { Pin, Lock, Unlock, Trash2, Edit, Eye, MessageSquare, ArrowLeft, MoreHorizontal } from 'lucide-react'
+import { Pin, Lock, Unlock, Trash2, Edit, Eye, MessageSquare, ArrowLeft, MoreHorizontal, ArrowUpCircle, FolderInput } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 export default function ThreadPage({ params }) {
   const { category, threadSlug } = use(params)
-  const { user, profile, token, loading, logout } = useForum()
+  const { user, profile, token, loading, logout, categories } = useForum()
   const router = useRouter()
   const [thread, setThread] = useState(null)
   const [replies, setReplies] = useState([])
@@ -21,6 +22,7 @@ export default function ThreadPage({ params }) {
   const [likedReplies, setLikedReplies] = useState([])
   const [replyingTo, setReplyingTo] = useState(null)
   const [showModMenu, setShowModMenu] = useState(false)
+  const [showMoveModal, setShowMoveModal] = useState(false)
   const [loadingThread, setLoadingThread] = useState(true)
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState('')
@@ -126,18 +128,28 @@ export default function ThreadPage({ params }) {
     setReplies(prev => prev.map(r => ({ ...r, is_solution: r.id === replyId })))
   }
 
-  const handleModAction = async (action) => {
+  const handleModAction = async (action, extra = {}) => {
     setShowModMenu(false)
     if (action === 'delete' && !confirm('Delete this entire thread?')) return
     await fetch(`/api/forum/threads/${thread.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, action }),
+      body: JSON.stringify({ token, action, ...extra }),
     })
     if (action === 'delete') {
       router.push(`/forum/${category}`)
     } else {
       fetchThread()
+    }
+  }
+
+  const handleMoveThread = async (newCatId) => {
+    setShowMoveModal(false)
+    await handleModAction('move', { categoryId: newCatId })
+    // Redirect to the new category
+    const newCat = categories?.find(c => c.id === newCatId)
+    if (newCat) {
+      router.push(`/forum/${newCat.slug}/${thread.slug}`)
     }
   }
 
@@ -153,24 +165,24 @@ export default function ThreadPage({ params }) {
 
   if (loading || loadingThread) {
     return (
-      <>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900">
         <ForumHeader user={user} profile={profile} token={token} onLogout={logout} />
         <div className="max-w-4xl mx-auto px-4 py-12 flex justify-center">
           <div className="animate-spin w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full"></div>
         </div>
-      </>
+      </div>
     )
   }
 
   if (!thread) {
     return (
-      <>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900">
         <ForumHeader user={user} profile={profile} token={token} onLogout={logout} />
         <div className="max-w-4xl mx-auto px-4 py-12 text-center">
-          <p className="text-slate-500">Thread not found</p>
-          <Link href="/forum" className="text-teal-600 hover:text-teal-700 text-sm mt-2 inline-block">Back to forum</Link>
+          <p className="text-slate-400">Thread not found</p>
+          <Link href="/forum" className="text-teal-400 hover:text-teal-300 text-sm mt-2 inline-block">Back to forum</Link>
         </div>
-      </>
+      </div>
     )
   }
 
@@ -179,20 +191,20 @@ export default function ThreadPage({ params }) {
   const isOwner = user?.id === thread.author_id
 
   return (
-    <>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900">
       <ForumHeader user={user} profile={profile} token={token} onLogout={logout} />
       <div className="max-w-4xl mx-auto px-4 py-6">
         {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-sm text-slate-500 mb-4">
-          <Link href="/forum" className="hover:text-teal-600">Forum</Link>
-          <span>/</span>
-          <Link href={`/forum/${category}`} className="hover:text-teal-600">{thread.forum_categories?.name || category}</Link>
-          <span>/</span>
-          <span className="text-slate-700 truncate">{thread.title}</span>
+        <div className="flex items-center gap-2 text-sm text-slate-400 mb-4">
+          <Link href="/forum" className="hover:text-teal-400">Forum</Link>
+          <span className="text-slate-600">/</span>
+          <Link href={`/forum/${category}`} className="hover:text-teal-400">{thread.forum_categories?.name || category}</Link>
+          <span className="text-slate-600">/</span>
+          <span className="text-slate-300 truncate">{thread.title}</span>
         </div>
 
         {/* Thread */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 sm:p-6 mb-4">
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 mb-4 shadow-lg">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap mb-2">
@@ -222,19 +234,18 @@ export default function ThreadPage({ params }) {
                 <>
                   <h1 className="text-xl sm:text-2xl font-bold text-slate-900">{thread.title}</h1>
                   <div className="flex items-center gap-3 mt-3 flex-wrap">
-                    <UserBadge username={author.username} displayName={author.display_name} avatarUrl={author.avatar_url} role={author.forum_role} size="sm" />
+                    <UserBadge username={author.username} displayName={author.display_name} avatarUrl={author.avatar_url} role={author.forum_role} postCount={author.post_count || 0} size="sm" />
                     <span className="text-xs text-slate-400">{timeAgo(thread.created_at)}</span>
                     {thread.updated_at && thread.updated_at !== thread.created_at && (
                       <span className="text-xs text-slate-400 italic">(edited)</span>
                     )}
                   </div>
-                  <div className="mt-4 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-                    {thread.content}
+                  <div className="mt-4">
+                    <RichContent content={thread.content} />
                   </div>
                 </>
               )}
 
-              {/* Tags */}
               {thread.tags?.length > 0 && (
                 <div className="flex gap-1.5 mt-4 flex-wrap">
                   {thread.tags.map(tag => (
@@ -262,7 +273,7 @@ export default function ThreadPage({ params }) {
                   <MoreHorizontal className="w-5 h-5 text-slate-400" />
                 </button>
                 {showModMenu && (
-                  <div className="absolute right-0 top-10 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-10 min-w-[160px]">
+                  <div className="absolute right-0 top-10 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-10 min-w-[180px]">
                     {(isOwner || isMod) && (
                       <button onClick={() => { setEditing(true); setShowModMenu(false) }} className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 flex items-center gap-2">
                         <Edit className="w-4 h-4" /> Edit
@@ -276,6 +287,12 @@ export default function ThreadPage({ params }) {
                         <button onClick={() => handleModAction(thread.is_locked ? 'unlock' : 'lock')} className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 flex items-center gap-2">
                           {thread.is_locked ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
                           {thread.is_locked ? 'Unlock' : 'Lock'}
+                        </button>
+                        <button onClick={() => handleModAction('bump')} className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 flex items-center gap-2">
+                          <ArrowUpCircle className="w-4 h-4" /> Bump to Top
+                        </button>
+                        <button onClick={() => { setShowMoveModal(true); setShowModMenu(false) }} className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 flex items-center gap-2">
+                          <FolderInput className="w-4 h-4" /> Move Thread
                         </button>
                       </>
                     )}
@@ -291,9 +308,32 @@ export default function ThreadPage({ params }) {
           </div>
         </div>
 
+        {/* Move thread modal */}
+        {showMoveModal && (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setShowMoveModal(false)}>
+            <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+              <h3 className="font-bold text-slate-900 mb-4">Move Thread to Category</h3>
+              <div className="space-y-2">
+                {(categories || []).filter(c => c.id !== thread.category_id).map(cat => (
+                  <button
+                    key={cat.id}
+                    onClick={() => handleMoveThread(cat.id)}
+                    className="w-full text-left px-4 py-3 rounded-xl border border-slate-200 hover:border-teal-300 hover:bg-teal-50 transition-colors text-sm font-medium text-slate-700"
+                  >
+                    {cat.name}
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => setShowMoveModal(false)} className="mt-4 w-full px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-lg">
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Replies */}
         <div className="space-y-3 mb-4">
-          <h2 className="font-semibold text-slate-900">{replies.length} {replies.length === 1 ? 'Reply' : 'Replies'}</h2>
+          <h2 className="font-semibold text-white">{replies.length} {replies.length === 1 ? 'Reply' : 'Replies'}</h2>
           {replies.map(reply => (
             <ReplyCard
               key={reply.id}
@@ -317,18 +357,18 @@ export default function ThreadPage({ params }) {
             onCancelReply={() => setReplyingTo(null)}
           />
         ) : thread.is_locked ? (
-          <div className="bg-slate-100 rounded-lg p-4 text-center text-sm text-slate-500">
-            <Lock className="w-5 h-5 mx-auto mb-1" />
+          <div className="bg-slate-800/50 rounded-xl p-4 text-center text-sm text-slate-400 border border-white/10">
+            <Lock className="w-5 h-5 mx-auto mb-1 text-slate-500" />
             This thread is locked. No new replies can be posted.
           </div>
         ) : (
-          <div className="bg-white rounded-lg border border-slate-200 p-4 text-center">
-            <p className="text-sm text-slate-500">
-              <Link href="/forum/login" className="text-teal-600 hover:text-teal-700 font-medium">Sign in</Link> to reply to this thread.
+          <div className="bg-white/[0.06] rounded-xl border border-white/10 p-4 text-center">
+            <p className="text-sm text-slate-400">
+              <Link href="/forum/login" className="text-teal-400 hover:text-teal-300 font-medium">Sign in</Link> to reply to this thread.
             </p>
           </div>
         )}
       </div>
-    </>
+    </div>
   )
 }
