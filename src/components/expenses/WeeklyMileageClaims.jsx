@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Check, X, Calendar, Car, PoundSterling, Clock, TrendingUp } from 'lucide-react';
+import { Check, X, Calendar, Car, PoundSterling, Clock, TrendingUp, Download, Loader } from 'lucide-react';
 import { format, parseISO, startOfWeek, endOfWeek, isAfter, isSameWeek } from 'date-fns';
+import PrintableMileageSlip from './PrintableMileageSlip';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 // Week runs Friday to Thursday — payment due on the Thursday (end of period)
 function getPaymentThursday(weekStartFriday) {
@@ -18,6 +21,9 @@ function getPaymentThursday(weekStartFriday) {
 export default function WeeklyMileageClaims({ userId, isAdmin }) {
   const queryClient = useQueryClient();
   const [filterStatus, setFilterStatus] = useState('all');
+  const [downloadingKey, setDownloadingKey] = useState(null);
+  const [slipGroup, setSlipGroup] = useState(null);
+  const printRef = useRef(null);
 
   // Fetch all mileage expenses (individual per-shift records)
   const { data: expenses = [], isLoading } = useQuery({
@@ -124,6 +130,40 @@ export default function WeeklyMileageClaims({ userId, isAdmin }) {
       queryClient.invalidateQueries({ queryKey: ['weekly-mileage-summaries'] });
     },
   });
+
+  // Load company settings for slip branding
+  const { data: companySettings } = useQuery({
+    queryKey: ['payrollSettings'],
+    queryFn: async () => {
+      const result = await base44.entities.PayrollSettings.list('-created_date', 1);
+      return result?.[0] || {};
+    },
+  });
+
+  const handleDownloadSlip = async (weekKey, group) => {
+    setSlipGroup(group);
+    setDownloadingKey(weekKey);
+    // Wait for render
+    await new Promise(r => setTimeout(r, 200));
+    try {
+      const el = printRef.current;
+      if (!el) return;
+      const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      const staffName = (group.staffName || 'mileage').replace(/\s+/g, '_');
+      const weekStr = format(group.weekStart, 'dd-MMM-yyyy');
+      pdf.save(`Mileage_${staffName}_${weekStr}.pdf`);
+    } catch (err) {
+      console.error('PDF generation error:', err);
+    } finally {
+      setDownloadingKey(null);
+      setSlipGroup(null);
+    }
+  };
 
   const getStatusBadge = (status) => {
     const colors = {
@@ -315,10 +355,40 @@ export default function WeeklyMileageClaims({ userId, isAdmin }) {
                     Mark as Paid
                   </Button>
                 )}
+
+                {/* Download mileage slip */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleDownloadSlip(weekKey, group)}
+                  disabled={downloadingKey === weekKey}
+                  className="w-full min-h-[44px] touch-manipulation"
+                >
+                  {downloadingKey === weekKey
+                    ? <Loader className="w-4 h-4 mr-1 animate-spin" />
+                    : <Download className="w-4 h-4 mr-1" />
+                  }
+                  {downloadingKey === weekKey ? 'Generating...' : 'Download Mileage Slip'}
+                </Button>
               </CardContent>
             </Card>
           );
         })
+      )}
+
+      {/* Hidden printable slip for PDF generation */}
+      {slipGroup && (
+        <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+          <PrintableMileageSlip
+            ref={printRef}
+            group={slipGroup}
+            mileageRatePpm={mileageRatePpm}
+            settings={{
+              company_name: companySettings?.company_name,
+              company_logo: companySettings?.company_logo,
+            }}
+          />
+        </div>
       )}
     </div>
   );
