@@ -148,7 +148,18 @@ export default function GeneratePayroll() {
       // For salaried staff: monthly gross = annual salary / 12, hours are tracked but don't affect pay
       const monthlySalary = isSalaried ? Math.round(((ov.salary !== undefined ? parseFloat(ov.salary) : (member.salary || 0)) / 12) * 100) / 100 : 0;
 
-      const regularHours = ov.regularHours !== undefined ? parseFloat(ov.regularHours) : parseFloat(totalHours.toFixed(2));
+      // Subtract any leave-day shift hours that were accidentally included in totalHours
+      // (e.g. if a shift on a leave day was clocked in / completed)
+      let workOnlyHours = totalHours;
+      if (leaveDates.size > 0) {
+        staffShifts.forEach(s => {
+          if (leaveDates.has(s.date)) {
+            workOnlyHours -= getShiftHours(s);
+          }
+        });
+        if (workOnlyHours < 0) workOnlyHours = 0;
+      }
+      const regularHours = ov.regularHours !== undefined ? parseFloat(ov.regularHours) : parseFloat(workOnlyHours.toFixed(2));
       const overtimeHours = ov.overtimeHours !== undefined ? parseFloat(ov.overtimeHours) : 0;
       const hourlyRate = ov.hourlyRate !== undefined ? parseFloat(ov.hourlyRate) : (member.hourly_rate || 0);
       const overtimeRate = ov.overtimeRate !== undefined ? parseFloat(ov.overtimeRate) : null;

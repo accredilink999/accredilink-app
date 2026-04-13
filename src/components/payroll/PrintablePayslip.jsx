@@ -141,10 +141,10 @@ const PrintablePayslip = React.forwardRef(({ record, settings }, ref) => {
             ) : (
               <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
                 <td style={{ padding: '8px 10px' }}>Basic Pay</td>
-                <td style={{ padding: '8px 10px', textAlign: 'center' }}>{((record.regular_hours || 0) - (record.holiday_hours || 0)).toFixed(2)}</td>
+                <td style={{ padding: '8px 10px', textAlign: 'center' }}>{(record.regular_hours || 0).toFixed(2)}</td>
                 <td style={{ padding: '8px 10px', textAlign: 'right' }}>£{(record.hourly_rate || 0).toFixed(2)}</td>
                 <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 'bold' }}>
-                  £{(((record.regular_hours || 0) - (record.holiday_hours || 0)) * (record.hourly_rate || 0)).toFixed(2)}
+                  £{((record.regular_hours || 0) * (record.hourly_rate || 0)).toFixed(2)}
                 </td>
               </tr>
             )}
