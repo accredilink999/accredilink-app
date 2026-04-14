@@ -16,7 +16,13 @@ const PrintablePayslip = React.forwardRef(({ record, settings }, ref) => {
   const periodEnd = record.period_end ? new Date(record.period_end).toLocaleDateString('en-GB') : '';
   const paymentDate = record.payment_date ? new Date(record.payment_date).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB');
 
-  const totalDeductions = (deductions.tax || 0) + (deductions.ni || 0) + (deductions.pension || 0) + (deductions.other || 0);
+  // If tax is negative, it's a rebate — show separately
+  const rawTax = deductions.tax || 0;
+  const hasTaxRebate = rawTax < 0;
+  const taxRebateAmount = hasTaxRebate ? Math.abs(rawTax) : 0;
+  const displayTax = hasTaxRebate ? 0 : rawTax;
+
+  const totalDeductions = displayTax + (deductions.ni || 0) + (deductions.pension || 0) + (deductions.other || 0) - taxRebateAmount;
 
   const sortedShifts = [...shiftDetails].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
@@ -232,7 +238,7 @@ const PrintablePayslip = React.forwardRef(({ record, settings }, ref) => {
           <tbody>
             <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
               <td style={{ padding: '8px 10px' }}>PAYE Income Tax ({record.tax_code || '1257L'})</td>
-              <td style={{ padding: '8px 10px', textAlign: 'right', color: '#dc2626' }}>£{(deductions.tax || 0).toFixed(2)}</td>
+              <td style={{ padding: '8px 10px', textAlign: 'right', color: '#dc2626' }}>£{displayTax.toFixed(2)}</td>
             </tr>
             <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
               <td style={{ padding: '8px 10px' }}>National Insurance (Cat {record.ni_category || 'A'})</td>
@@ -242,6 +248,12 @@ const PrintablePayslip = React.forwardRef(({ record, settings }, ref) => {
               <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
                 <td style={{ padding: '8px 10px' }}>Pension ({record.pension_percent || 0}%)</td>
                 <td style={{ padding: '8px 10px', textAlign: 'right', color: '#dc2626' }}>£{(deductions.pension || 0).toFixed(2)}</td>
+              </tr>
+            )}
+            {hasTaxRebate && (
+              <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                <td style={{ padding: '8px 10px', color: '#166534', fontWeight: 'bold' }}>Tax Rebate (HMRC)</td>
+                <td style={{ padding: '8px 10px', textAlign: 'right', color: '#166534', fontWeight: 'bold' }}>+£{taxRebateAmount.toFixed(2)}</td>
               </tr>
             )}
             {deductions.other > 0 && (

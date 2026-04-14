@@ -19,7 +19,7 @@ export async function GET(req) {
 
   let query = supabase
     .from('forum_threads')
-    .select('*, forum_categories!inner(slug, name), forum_profiles!forum_threads_author_id_fkey(username, display_name, avatar_url, forum_role)', { count: 'exact' })
+    .select('*, forum_categories!inner(slug, name), forum_profiles!forum_threads_author_id_fkey(username, display_name, avatar_url, forum_role, post_count)', { count: 'exact' })
 
   if (categorySlug) {
     query = query.eq('forum_categories.slug', categorySlug)

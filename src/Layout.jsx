@@ -727,6 +727,10 @@ export default function Layout({ children, currentPageName }) {
                   <User className="w-4 h-4 mr-2" />
                   My Profile
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate(createPageUrl('Payroll'))} className="cursor-pointer touch-manipulation min-h-[44px]">
+                  <PoundSterling className="w-4 h-4 mr-2" />
+                  My Payslips
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate(createPageUrl('Settings'))} className="cursor-pointer touch-manipulation min-h-[44px]">
                   <Settings className="w-4 h-4 mr-2" />
                   Settings

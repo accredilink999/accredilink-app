@@ -61,8 +61,18 @@ function StaffPayslips({ user }) {
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+      heightLeft -= pageHeight;
+      while (heightLeft > 0) {
+        position -= pageHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
       const staffName = (record.staff_name || 'payslip').replace(/\s+/g, '_');
       const period = record.period_start || 'period';
       pdf.save(`Payslip_${staffName}_${period}.pdf`);
@@ -118,7 +128,11 @@ function StaffPayslips({ user }) {
                         <div className="flex gap-2 sm:gap-3 text-xs text-slate-500 mt-1 flex-wrap">
                           <span>{record.regular_hours || 0}h worked</span>
                           <span>Gross: £{(record.gross_pay || 0).toFixed(2)}</span>
-                          <span>Tax: £{(deductions.tax || 0).toFixed(2)}</span>
+                          {(deductions.tax || 0) < 0 ? (
+                            <span className="text-green-600 font-medium">Rebate: +£{Math.abs(deductions.tax).toFixed(2)}</span>
+                          ) : (
+                            <span>Tax: £{(deductions.tax || 0).toFixed(2)}</span>
+                          )}
                           <span>NI: £{(deductions.ni || 0).toFixed(2)}</span>
                         </div>
                       </div>
@@ -157,10 +171,10 @@ function StaffPayslips({ user }) {
         </div>
       ))}
 
-      {/* View Payslip Dialog — shows PDF-style preview */}
+      {/* View Payslip Dialog — full-size scrollable preview */}
       {viewRecord && (
         <Dialog open={!!viewRecord} onOpenChange={() => setViewRecord(null)}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-[95vw] w-[850px] max-h-[95vh] overflow-y-auto p-4">
             <DialogHeader>
               <div className="flex items-center justify-between">
                 <DialogTitle className="text-lg">
@@ -175,10 +189,8 @@ function StaffPayslips({ user }) {
                 </Button>
               </div>
             </DialogHeader>
-            <div className="border rounded-lg overflow-hidden bg-white">
-              <div style={{ transform: 'scale(0.55)', transformOrigin: 'top left', width: '182%', overflow: 'auto' }}>
-                <PrintablePayslip record={viewRecord} settings={slipSettings} />
-              </div>
+            <div className="overflow-x-auto bg-white">
+              <PrintablePayslip record={viewRecord} settings={slipSettings} />
             </div>
           </DialogContent>
         </Dialog>

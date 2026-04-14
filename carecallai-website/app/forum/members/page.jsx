@@ -5,7 +5,7 @@ import { useForum } from '@/lib/forumContext'
 import ForumHeader from '@/components/forum/ForumHeader'
 import StarRank from '@/components/forum/StarRank'
 import { timeAgo, canModerate, getRoleBadge } from '@/lib/forumAuth'
-import { Users, Search, MessageSquare, Heart, Mail, Shield, Trash2, Ban, ChevronDown, AlertTriangle, UserCheck } from 'lucide-react'
+import { Users, Search, MessageSquare, Heart, Mail, Shield, Trash2, Ban, ChevronDown, AlertTriangle, UserCheck, MoreVertical } from 'lucide-react'
 import Link from 'next/link'
 
 export default function MembersPage() {
@@ -72,6 +72,10 @@ export default function MembersPage() {
     handleAction('delete-member', memberId)
   }
 
+  const toggleMember = (memberId) => {
+    setSelectedMember(prev => prev === memberId ? null : memberId)
+  }
+
   const filtered = search
     ? members.filter(m =>
         (m.display_name || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -110,10 +114,6 @@ export default function MembersPage() {
           </div>
         </div>
 
-        {isMod && (
-          <p className="text-xs text-slate-500 mb-4">Click on a member to see management options</p>
-        )}
-
         {loadingMembers ? (
           <div className="flex justify-center py-12">
             <div className="animate-spin w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full"></div>
@@ -133,12 +133,9 @@ export default function MembersPage() {
 
               return (
                 <div key={member.id}>
-                  <div
-                    className={`bg-white/[0.06] backdrop-blur rounded-2xl border p-5 transition-all ${isMod && !isMe ? 'cursor-pointer' : ''} ${isSelected ? 'border-teal-500/50 bg-white/[0.1] ring-1 ring-teal-500/20' : 'border-white/10 hover:border-white/20 hover:bg-white/[0.08]'} ${isBanned ? 'opacity-60' : ''}`}
-                    onClick={() => { if (isMod && !isMe) setSelectedMember(isSelected ? null : member.id) }}
-                  >
+                  <div className={`bg-white/[0.06] backdrop-blur rounded-2xl border p-5 transition-all ${isSelected ? 'border-teal-500/50 bg-white/[0.1] ring-1 ring-teal-500/20' : 'border-white/10 hover:border-white/20 hover:bg-white/[0.08]'} ${isBanned ? 'opacity-60' : ''}`}>
                     <div className="flex items-start gap-4">
-                      <Link href={`/forum/profile/${member.username}`} onClick={e => e.stopPropagation()}>
+                      <Link href={`/forum/profile/${member.username}`}>
                         <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${roleGradient} flex items-center justify-center text-white font-bold text-lg overflow-hidden shadow-sm flex-shrink-0`}>
                           {member.avatar_url ? (
                             <img src={member.avatar_url} alt="" className="w-full h-full object-cover" />
@@ -149,7 +146,7 @@ export default function MembersPage() {
                       </Link>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <Link href={`/forum/profile/${member.username}`} onClick={e => e.stopPropagation()} className="font-semibold text-white hover:text-teal-400 transition-colors">
+                          <Link href={`/forum/profile/${member.username}`} className="font-semibold text-white hover:text-teal-400 transition-colors">
                             {member.display_name || member.username}
                           </Link>
                           {badge && (
@@ -178,14 +175,24 @@ export default function MembersPage() {
                           </span>
                         </div>
                       </div>
+
+                      {/* Manage button — visible to mods/admins/founder on other members */}
+                      {isMod && !isMe && (
+                        <button
+                          onClick={() => toggleMember(member.id)}
+                          className={`p-2 rounded-lg transition-colors flex-shrink-0 ${isSelected ? 'bg-teal-500/20 text-teal-400' : 'text-slate-500 hover:text-teal-400 hover:bg-white/[0.08]'}`}
+                          title="Manage member"
+                        >
+                          <MoreVertical className="w-5 h-5" />
+                        </button>
+                      )}
                     </div>
 
-                    {/* Action panel — shown when member is selected by founder/mod/admin */}
+                    {/* Action panel — shown when manage button is clicked */}
                     {isSelected && (
-                      <div className="mt-4 pt-4 border-t border-white/10" onClick={e => e.stopPropagation()}>
-                        <p className="text-[10px] text-slate-500 mb-2 uppercase tracking-wider font-semibold">Actions</p>
+                      <div className="mt-4 pt-4 border-t border-white/10">
+                        <p className="text-[10px] text-slate-500 mb-2 uppercase tracking-wider font-semibold">Manage {member.display_name || member.username}</p>
                         <div className="flex flex-wrap gap-2">
-                          {/* Message — always available */}
                           <Link
                             href={`/forum/messages/new?to=${member.username}`}
                             className="flex items-center gap-1.5 text-xs px-3 py-2 bg-teal-500/20 text-teal-400 rounded-lg hover:bg-teal-500/30 transition-colors font-medium"
@@ -193,7 +200,6 @@ export default function MembersPage() {
                             <Mail className="w-3.5 h-3.5" /> Message
                           </Link>
 
-                          {/* Warn — mods, admins, founder */}
                           {member.forum_role !== 'founder' && (
                             <button
                               onClick={() => handleWarn(member.id)}
@@ -204,7 +210,6 @@ export default function MembersPage() {
                             </button>
                           )}
 
-                          {/* Make Moderator — founder + admins can promote users to mod */}
                           {isAdmin && member.forum_role === 'user' && (
                             <button
                               onClick={() => handleAction('set-role', member.id, { role: 'moderator' })}
@@ -215,7 +220,6 @@ export default function MembersPage() {
                             </button>
                           )}
 
-                          {/* Make Admin — founder only */}
                           {isFounder && member.forum_role !== 'founder' && member.forum_role !== 'admin' && (
                             <button
                               onClick={() => handleAction('set-role', member.id, { role: 'admin' })}
@@ -226,20 +230,16 @@ export default function MembersPage() {
                             </button>
                           )}
 
-                          {/* Demote — founder can demote anyone, admins can demote mods */}
-                          {member.forum_role !== 'user' && member.forum_role !== 'founder' && (
-                            (isFounder || (isAdmin && member.forum_role === 'moderator')) ? (
-                              <button
-                                onClick={() => handleAction('set-role', member.id, { role: 'user' })}
-                                disabled={actionLoading}
-                                className="flex items-center gap-1.5 text-xs px-3 py-2 bg-slate-500/20 text-slate-400 rounded-lg hover:bg-slate-500/30 transition-colors disabled:opacity-50 font-medium"
-                              >
-                                <ChevronDown className="w-3.5 h-3.5" /> Demote
-                              </button>
-                            ) : null
+                          {member.forum_role !== 'user' && member.forum_role !== 'founder' && (isFounder || (isAdmin && member.forum_role === 'moderator')) && (
+                            <button
+                              onClick={() => handleAction('set-role', member.id, { role: 'user' })}
+                              disabled={actionLoading}
+                              className="flex items-center gap-1.5 text-xs px-3 py-2 bg-slate-500/20 text-slate-400 rounded-lg hover:bg-slate-500/30 transition-colors disabled:opacity-50 font-medium"
+                            >
+                              <ChevronDown className="w-3.5 h-3.5" /> Demote
+                            </button>
                           )}
 
-                          {/* Ban / Unban — mods can ban users, admins can ban users+mods, founder can ban anyone */}
                           {member.forum_role !== 'founder' && (
                             isBanned ? (
                               <button
@@ -260,7 +260,6 @@ export default function MembersPage() {
                             )
                           )}
 
-                          {/* Delete — founder only */}
                           {isFounder && member.forum_role !== 'founder' && (
                             <button
                               onClick={() => handleDelete(member.id, member.display_name || member.username)}

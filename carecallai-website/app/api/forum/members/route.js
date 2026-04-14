@@ -12,6 +12,10 @@ const FOUNDER_ID = '1f5d9e8a-ab4b-4c00-813a-8af23f79fb82'
  */
 async function autoProvisionAdmins() {
   try {
+    // Load excluded users (previously deleted from forum)
+    const { data: excludedRow } = await supabase.from('forum_settings').select('value').eq('key', 'excluded_users').single()
+    const excludedIds = new Set(excludedRow?.value || [])
+
     const { data: orgMembers } = await supabase
       .from('organization_members')
       .select('user_id, role')
@@ -27,6 +31,9 @@ async function autoProvisionAdmins() {
     const adminIds = new Set()
     orgMembers.forEach(m => adminIds.add(m.user_id))
     profileAdmins?.forEach(p => adminIds.add(p.id))
+
+    // Remove excluded (deleted) users
+    excludedIds.forEach(id => adminIds.delete(id))
 
     const { data: existingProfiles } = await supabase
       .from('forum_profiles')

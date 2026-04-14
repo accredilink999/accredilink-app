@@ -11,7 +11,7 @@ export async function GET(req, { params }) {
   // Try UUID first, then slug
   const isUUID = /^[0-9a-f]{8}-/.test(id)
   let query = supabase.from('forum_threads')
-    .select('*, forum_categories(id, name, slug), forum_profiles!forum_threads_author_id_fkey(username, display_name, avatar_url, forum_role)')
+    .select('*, forum_categories(id, name, slug), forum_profiles!forum_threads_author_id_fkey(username, display_name, avatar_url, forum_role, post_count)')
 
   if (isUUID) query = query.eq('id', id)
   else query = query.eq('slug', id)

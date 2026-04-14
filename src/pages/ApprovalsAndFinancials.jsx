@@ -16,9 +16,13 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { CheckCircle2, Clock, XCircle, DollarSign, Plus, Calendar, Car, PoundSterling, TrendingUp } from 'lucide-react';
+import { CheckCircle2, Clock, XCircle, DollarSign, Plus, Calendar, Car, PoundSterling, TrendingUp, FileText, Download, Eye, Loader } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import LeaveCalendarPopup from '@/components/leave/LeaveCalendarPopup';
 import MigratedPayslips from '@/components/payroll/MigratedPayslips';
+import PrintablePayslip from '@/components/payroll/PrintablePayslip';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import { formatDistanceToNow, format, parseISO, isWithinInterval, startOfWeek, endOfWeek } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -29,6 +33,9 @@ export default function ApprovalsAndFinancials() {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [expenseForm, setExpenseForm] = useState({ description: '', amount: '', notes: '' });
   const [leaveForm, setLeaveForm] = useState({ type: '', start_date: '', end_date: '', reason: '' });
+  const [viewRecord, setViewRecord] = useState(null);
+  const [downloading, setDownloading] = useState(null);
+  const printRef = React.useRef(null);
   const queryClient = useQueryClient();
 
   const { data: user } = useQuery({
@@ -146,9 +153,65 @@ export default function ApprovalsAndFinancials() {
 
   const { data: payrollRecords = [] } = useQuery({
     queryKey: ['myPayroll', user?.id],
-    queryFn: () => base44.entities.PayrollRecord.filter({ staff_id: user?.id }, '-created_date', 12),
+    queryFn: async () => {
+      const records = await base44.entities.PayrollRecord.filter({ staff_id: user?.id }, '-created_date', 500);
+      return records.filter(r => r.status === 'approved' || r.status === 'paid');
+    },
     enabled: !!user?.id,
   });
+
+  const { data: payrollSettings } = useQuery({
+    queryKey: ['payrollSettings'],
+    queryFn: async () => {
+      const result = await base44.entities.PayrollSettings.list('-created_date', 1);
+      return result?.[0];
+    }
+  });
+
+  const { data: companySettings = {} } = useQuery({
+    queryKey: ['companySettings'],
+    queryFn: async () => {
+      const rows = await base44.entities.SystemSettings.filter({ setting_key: ['company_name', 'company_logo'] });
+      const result = {};
+      rows.forEach(s => { result[s.setting_key] = s.setting_value; });
+      return result;
+    },
+  });
+
+  const slipSettings = { ...payrollSettings, company_logo: companySettings?.company_logo, company_name: companySettings?.company_name || payrollSettings?.company_name };
+
+  const handleDownloadPDF = async (record) => {
+    setViewRecord(record);
+    setDownloading(record.id);
+    await new Promise(r => setTimeout(r, 300));
+    try {
+      const el = printRef.current;
+      if (!el) return;
+      const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+      heightLeft -= pageHeight;
+      while (heightLeft > 0) {
+        position -= pageHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      const staffName = (record.staff_name || 'payslip').replace(/\s+/g, '_');
+      const period = record.period_start || 'period';
+      pdf.save(`Payslip_${staffName}_${period}.pdf`);
+    } catch (err) {
+      console.error('PDF generation failed:', err);
+    } finally {
+      setDownloading(null);
+    }
+  };
 
   const { data: staffMembers = [] } = useQuery({
     queryKey: ['staffMembers'],
@@ -668,30 +731,119 @@ export default function ApprovalsAndFinancials() {
 
         {/* Payroll Tab */}
         <TabsContent value="payroll" className="space-y-6">
+          {payrollRecords.length === 0 && (
+            <Card className="p-8 text-center">
+              <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500">No payslips available yet</p>
+            </Card>
+          )}
+
+          {payrollRecords.length > 0 && (() => {
+            const grouped = {};
+            payrollRecords.forEach(r => {
+              const d = new Date(r.period_end);
+              const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+              const label = d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+              if (!grouped[key]) grouped[key] = { label, records: [] };
+              grouped[key].records.push(r);
+            });
+            const months = Object.entries(grouped).sort(([a], [b]) => b.localeCompare(a));
+
+            return months.map(([key, { label, records }]) => (
+              <div key={key}>
+                <h3 className="font-semibold text-slate-900 mb-2">{label}</h3>
+                <div className="space-y-2">
+                  {records.map(record => {
+                    const deductions = typeof record.deductions === 'string'
+                      ? JSON.parse(record.deductions) : (record.deductions || {});
+                    return (
+                      <Card key={record.id} className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-teal-50 flex items-center justify-center shrink-0">
+                              <FileText className="w-5 h-5 text-teal-600" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-medium text-slate-900">
+                                {new Date(record.period_start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – {new Date(record.period_end).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </p>
+                              <div className="flex gap-2 sm:gap-3 text-xs text-slate-500 mt-1 flex-wrap">
+                                <span>{record.regular_hours || 0}h worked</span>
+                                <span>Gross: £{(record.gross_pay || 0).toFixed(2)}</span>
+                                {(deductions.tax || 0) < 0 ? (
+                                  <span className="text-green-600 font-medium">Rebate: +£{Math.abs(deductions.tax).toFixed(2)}</span>
+                                ) : (
+                                  <span>Tax: £{(deductions.tax || 0).toFixed(2)}</span>
+                                )}
+                                <span>NI: £{(deductions.ni || 0).toFixed(2)}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="text-right hidden sm:block">
+                              <p className="text-xs text-slate-500">Net Pay</p>
+                              <p className="text-lg font-bold text-green-700">£{(record.net_pay || 0).toFixed(2)}</p>
+                            </div>
+                            <Badge className={record.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}>
+                              {record.status}
+                            </Badge>
+                            <Button size="sm" variant="outline" onClick={() => setViewRecord(record)} className="min-h-[36px] touch-manipulation">
+                              <Eye className="w-4 h-4 mr-1" />
+                              <span className="hidden sm:inline">View</span>
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleDownloadPDF(record)}
+                              disabled={downloading === record.id} className="min-h-[36px] touch-manipulation">
+                              {downloading === record.id
+                                ? <Loader className="w-4 h-4 animate-spin" />
+                                : <Download className="w-4 h-4 mr-1" />
+                              }
+                              <span className="hidden sm:inline">{downloading === record.id ? '...' : 'PDF'}</span>
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="sm:hidden flex justify-between items-center mt-2 pt-2 border-t border-slate-100">
+                          <span className="text-xs text-slate-500">Net Pay</span>
+                          <span className="text-base font-bold text-green-700">£{(record.net_pay || 0).toFixed(2)}</span>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+            ));
+          })()}
+
           <MigratedPayslips user={user} />
 
-          {payrollRecords.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-lg font-bold text-slate-900">Payroll Records</h3>
-              {payrollRecords.map(record => (
-                <Card key={record.id} className="p-4 bg-gradient-to-r from-indigo-50 to-blue-50 border-indigo-200">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-slate-900 mb-2">{new Date(record.period_start).toLocaleDateString()} - {new Date(record.period_end).toLocaleDateString()}</h3>
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p className="text-slate-600">Gross Pay</p>
-                          <p className="font-semibold text-slate-900">£{parseFloat(record.gross_pay || 0).toFixed(2)}</p>
-                        </div>
-                        <div>
-                          <p className="text-slate-600">Net Pay</p>
-                          <p className="font-semibold text-slate-900">£{parseFloat(record.net_pay || 0).toFixed(2)}</p>
-                        </div>
-                      </div>
-                    </div>
+          {/* View Payslip Dialog — full-size scrollable preview */}
+          {viewRecord && (
+            <Dialog open={!!viewRecord} onOpenChange={() => setViewRecord(null)}>
+              <DialogContent className="max-w-[95vw] w-[850px] max-h-[95vh] overflow-y-auto p-4">
+                <DialogHeader>
+                  <div className="flex items-center justify-between">
+                    <DialogTitle className="text-lg">
+                      Payslip — {new Date(viewRecord.period_start).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
+                    </DialogTitle>
+                    <Button variant="outline" onClick={() => handleDownloadPDF(viewRecord)} disabled={downloading === viewRecord.id}>
+                      {downloading === viewRecord.id
+                        ? <Loader className="w-4 h-4 mr-2 animate-spin" />
+                        : <Download className="w-4 h-4 mr-2" />
+                      }
+                      Download PDF
+                    </Button>
                   </div>
-                </Card>
-              ))}
+                </DialogHeader>
+                <div className="overflow-x-auto bg-white">
+                  <PrintablePayslip record={viewRecord} settings={slipSettings} />
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
+
+          {/* Hidden printable for PDF generation */}
+          {viewRecord && (
+            <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+              <PrintablePayslip ref={printRef} record={viewRecord} settings={slipSettings} />
             </div>
           )}
         </TabsContent>

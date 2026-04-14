@@ -284,6 +284,13 @@ export async function POST(req) {
         await supabase.from('forum_replies').delete().eq('author_id', userId)
         await supabase.from('forum_threads').delete().eq('author_id', userId)
         await supabase.from('forum_profiles').delete().eq('id', userId)
+        // Add to exclusion list so auto-provisioning doesn't re-create them
+        const { data: exRow } = await supabase.from('forum_settings').select('value').eq('key', 'excluded_users').single()
+        const excluded = exRow?.value || []
+        if (!excluded.includes(userId)) {
+          excluded.push(userId)
+          await supabase.from('forum_settings').upsert({ key: 'excluded_users', value: excluded, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+        }
         return json({ success: true })
       }
 

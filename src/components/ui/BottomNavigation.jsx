@@ -8,12 +8,13 @@ import {
   MessageSquare,
   User,
   Shield,
-  Package
+  Package,
+  PoundSterling
 } from 'lucide-react';
 
 const navigation = [
   { name: 'Dashboard', icon: LayoutDashboard, page: 'Dashboard' },
-  { name: 'Assets', icon: Package, page: 'Assets', iconClassName: 'fill-orange-500' },
+  { name: 'Payslips', icon: PoundSterling, page: 'Payroll' },
   { name: 'Chat', icon: MessageSquare, page: 'Chat' },
   { name: 'Profile', icon: User, page: 'Profile' },
 ];

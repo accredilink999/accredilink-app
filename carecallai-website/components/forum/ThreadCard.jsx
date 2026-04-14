@@ -2,6 +2,7 @@
 import Link from 'next/link'
 import { MessageSquare, Eye, Heart, Pin, Lock, Flame } from 'lucide-react'
 import UserBadge from './UserBadge'
+import StarRank from './StarRank'
 import { timeAgo } from '@/lib/forumAuth'
 
 function isHotTopic(thread) {
@@ -39,7 +40,7 @@ export default function ThreadCard({ thread, showCategory = false }) {
 
         <div className="flex items-start gap-3">
           {/* Author avatar */}
-          <div className="hidden sm:block flex-shrink-0">
+          <div className="hidden sm:flex flex-col items-center flex-shrink-0 gap-1">
             {author.avatar_url ? (
               <img src={author.avatar_url} alt="" className="w-10 h-10 rounded-xl object-cover" />
             ) : (
@@ -47,6 +48,7 @@ export default function ThreadCard({ thread, showCategory = false }) {
                 {(author.display_name || author.username || '?')[0].toUpperCase()}
               </div>
             )}
+            <StarRank role={author.forum_role} postCount={author.post_count || 0} />
           </div>
 
           <div className="flex-1 min-w-0">
