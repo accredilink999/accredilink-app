@@ -157,8 +157,18 @@ export default function PayslipView({ record, open, onClose, readOnly = false })
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+      heightLeft -= pageHeight;
+      while (heightLeft > 0) {
+        position -= pageHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
 
       const staffName = (record?.staff_name || 'payslip').replace(/\s+/g, '_');
       const period = record?.period_start || 'period';
@@ -174,15 +184,21 @@ export default function PayslipView({ record, open, onClose, readOnly = false })
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-[95vw] w-[850px] max-h-[95vh] overflow-y-auto p-4">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle className="text-lg">
               Payslip — {record.staff_name}
             </DialogTitle>
-            <Badge className={record.status === 'paid' ? 'bg-green-100 text-green-800' : record.status === 'approved' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-800'}>
-              {record.status}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge className={record.status === 'paid' ? 'bg-green-100 text-green-800' : record.status === 'approved' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-800'}>
+                {record.status}
+              </Badge>
+              <Button variant="outline" onClick={handleDownloadPDF} disabled={downloading}>
+                {downloading ? <Loader className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+                Download PDF
+              </Button>
+            </div>
           </div>
         </DialogHeader>
 
@@ -344,33 +360,25 @@ export default function PayslipView({ record, open, onClose, readOnly = false })
                 <p className="font-bold text-green-700 text-lg">£{netPay.toFixed(2)}</p>
               </div>
             </div>
+
+            {/* Save button for edit mode */}
+            <div className="flex justify-end">
+              <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="bg-teal-600 hover:bg-teal-700">
+                {saveMutation.isPending ? <Loader className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                Save Changes
+              </Button>
+            </div>
           </div>
         )}
 
-        {/* Payslip PDF Preview — shown in BOTH edit and read-only modes */}
-        <div className="border rounded-lg overflow-hidden bg-white">
-          <div style={{ transform: 'scale(0.55)', transformOrigin: 'top left', width: '182%', maxHeight: '600px', overflow: 'auto' }}>
-            <PrintablePayslip record={previewRecord} settings={slipSettings} />
-          </div>
+        {/* Full-size Payslip Preview */}
+        <div className="overflow-x-auto bg-white">
+          <PrintablePayslip record={previewRecord} settings={slipSettings} />
         </div>
 
         {/* Hidden Payslip for PDF generation */}
         <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
           <PrintablePayslip ref={printRef} record={previewRecord} settings={slipSettings} />
-        </div>
-
-        {/* Actions */}
-        <div className="flex gap-2 justify-end pt-2">
-          <Button variant="outline" onClick={handleDownloadPDF} disabled={downloading}>
-            {downloading ? <Loader className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
-            Download PDF
-          </Button>
-          {!readOnly && (
-            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="bg-teal-600 hover:bg-teal-700">
-              {saveMutation.isPending ? <Loader className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-              Save Changes
-            </Button>
-          )}
         </div>
       </DialogContent>
     </Dialog>
