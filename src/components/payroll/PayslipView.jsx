@@ -376,11 +376,12 @@ export default function PayslipView({ record, open, onClose, readOnly = false })
           <PrintablePayslip record={readOnly ? record : previewRecord} settings={slipSettings} />
         </div>
 
-        {/* Hidden Payslip for PDF generation */}
-        <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
-          <PrintablePayslip ref={printRef} record={readOnly ? record : previewRecord} settings={slipSettings} />
-        </div>
       </DialogContent>
+
+      {/* Hidden Payslip for PDF generation — outside dialog scroll container */}
+      <div style={{ position: 'fixed', left: '-9999px', top: 0, overflow: 'visible', zIndex: -1 }}>
+        <PrintablePayslip ref={printRef} record={readOnly ? record : previewRecord} settings={slipSettings} />
+      </div>
     </Dialog>
   );
 }

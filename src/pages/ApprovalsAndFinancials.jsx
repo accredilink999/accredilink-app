@@ -840,9 +840,9 @@ export default function ApprovalsAndFinancials() {
             </Dialog>
           )}
 
-          {/* Hidden printable for PDF generation */}
+          {/* Hidden printable for PDF generation — fixed position to avoid scroll clipping */}
           {viewRecord && (
-            <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+            <div style={{ position: 'fixed', left: '-9999px', top: 0, overflow: 'visible', zIndex: -1 }}>
               <PrintablePayslip ref={printRef} record={viewRecord} settings={slipSettings} />
             </div>
           )}
