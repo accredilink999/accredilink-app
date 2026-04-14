@@ -373,12 +373,12 @@ export default function PayslipView({ record, open, onClose, readOnly = false })
 
         {/* Full-size Payslip Preview */}
         <div className="overflow-x-auto bg-white">
-          <PrintablePayslip record={previewRecord} settings={slipSettings} />
+          <PrintablePayslip record={readOnly ? record : previewRecord} settings={slipSettings} />
         </div>
 
         {/* Hidden Payslip for PDF generation */}
         <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
-          <PrintablePayslip ref={printRef} record={previewRecord} settings={slipSettings} />
+          <PrintablePayslip ref={printRef} record={readOnly ? record : previewRecord} settings={slipSettings} />
         </div>
       </DialogContent>
     </Dialog>
