@@ -5,7 +5,7 @@ import ForumHeader from '@/components/forum/ForumHeader'
 import StarRank from '@/components/forum/StarRank'
 import { canModerate, timeAgo, PERMISSION_LABELS, DEFAULT_PERMISSIONS, getRoleBadge, slugify } from '@/lib/forumAuth'
 import { useRouter } from 'next/navigation'
-import { Users, MessageSquare, BarChart3, Ban, UserCheck, ArrowLeft, Mail, CheckCircle, Loader2, Send, UserPlus, Shield, ChevronDown, FolderPlus, Save, Search } from 'lucide-react'
+import { Users, MessageSquare, BarChart3, Ban, UserCheck, ArrowLeft, Mail, CheckCircle, Loader2, Send, UserPlus, Shield, ChevronDown, FolderPlus, Save, Search, Flag, AlertTriangle, Trash2, Eye } from 'lucide-react'
 import Link from 'next/link'
 
 export default function ForumAdmin() {
@@ -32,6 +32,19 @@ export default function ForumAdmin() {
   const [editCatName, setEditCatName] = useState('')
   const [editCatDesc, setEditCatDesc] = useState('')
   const [savingCat, setSavingCat] = useState(false)
+  // Direct email invite
+  const [directEmail, setDirectEmail] = useState('')
+  const [directName, setDirectName] = useState('')
+  const [directMessage, setDirectMessage] = useState('The CareCallAI Community Forum is where you can get support for the app, connect with other care professionals, share best practices, and book demos.\n\nJoin us today!')
+  const [sendingDirect, setSendingDirect] = useState(false)
+  const [directSent, setDirectSent] = useState([])
+  const [bulkEmails, setBulkEmails] = useState('')
+  const [sendingBulk, setSendingBulk] = useState(false)
+  const [bulkResult, setBulkResult] = useState(null)
+  // Reports
+  const [reports, setReports] = useState([])
+  const [loadingReports, setLoadingReports] = useState(false)
+  const [reportFilter, setReportFilter] = useState('pending')
 
   useEffect(() => {
     if (!loading && (!profile || !canModerate(profile.forum_role))) {
@@ -146,6 +159,65 @@ export default function ForumAdmin() {
     finally { setCreatingCat(false) }
   }
 
+  const handleSendDirectInvite = async () => {
+    if (!directEmail.trim()) return
+    setSendingDirect(true)
+    try {
+      const res = await fetch('/api/forum/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, action: 'send-direct-invite', email: directEmail.trim(), name: directName.trim(), message: directMessage }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setDirectSent(prev => [...prev, directEmail.trim()])
+        setDirectEmail('')
+        setDirectName('')
+      } else alert(data.error || 'Failed to send')
+    } catch { alert('Failed to send invite') }
+    finally { setSendingDirect(false) }
+  }
+
+  const handleSendBulkInvite = async () => {
+    const emails = bulkEmails.split('\n').map(l => l.trim()).filter(Boolean).map(line => {
+      const parts = line.split(',')
+      return { email: parts[0]?.trim(), name: parts[1]?.trim() || '' }
+    }).filter(e => e.email.includes('@'))
+    if (!emails.length) return alert('No valid emails found')
+    setSendingBulk(true)
+    setBulkResult(null)
+    try {
+      const res = await fetch('/api/forum/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, action: 'send-bulk-invite', emails, message: directMessage }),
+      })
+      const data = await res.json()
+      setBulkResult(data)
+    } catch { alert('Failed to send') }
+    finally { setSendingBulk(false) }
+  }
+
+  const fetchReports = async (status = 'pending') => {
+    setLoadingReports(true)
+    try {
+      const res = await fetch(`/api/forum/reports?token=${token}&status=${status}`)
+      const data = await res.json()
+      setReports(data.reports || [])
+    } catch {} finally { setLoadingReports(false) }
+  }
+
+  const handleResolveReport = async (reportId, action) => {
+    try {
+      await fetch('/api/forum/reports', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, reportId, action }),
+      })
+      fetchReports(reportFilter)
+    } catch { alert('Failed to resolve report') }
+  }
+
   const handleEditCategory = (cat) => {
     setEditingCat(cat.id)
     setEditCatName(cat.name)
@@ -184,8 +256,8 @@ export default function ForumAdmin() {
 
   const isFounder = profile?.forum_role === 'founder'
   const isAdmin = ['founder', 'admin'].includes(profile?.forum_role)
-  const allTabs = ['overview', 'roles', 'permissions', 'banned', 'categories']
-  if (isFounder) allTabs.push('invite')
+  const allTabs = ['overview', 'roles', 'permissions', 'banned', 'categories', 'reports']
+  if (isFounder) allTabs.push('invite', 'email-invite')
 
   const tabLabels = {
     overview: 'Overview',
@@ -193,7 +265,9 @@ export default function ForumAdmin() {
     permissions: 'Permissions',
     banned: 'Banned',
     categories: 'Categories',
+    reports: 'Reports',
     invite: 'Invite Admins',
+    'email-invite': 'Email Invite',
   }
 
   const iconOptions = [
@@ -227,7 +301,7 @@ export default function ForumAdmin() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900">
       <ForumHeader user={user} profile={profile} token={token} onLogout={logout} />
-      <div className="max-w-5xl mx-auto px-4 py-6">
+      <div className="max-w-[1600px] mx-auto px-4 py-6">
         <Link href="/forum" className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-teal-400 mb-4">
           <ArrowLeft className="w-4 h-4" /> Back to forum
         </Link>
@@ -612,6 +686,194 @@ export default function ForumAdmin() {
                     </button>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Reports tab */}
+        {tab === 'reports' && (
+          <div className="space-y-4">
+            <div className="bg-white/[0.06] backdrop-blur rounded-2xl border border-white/10 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <Flag className="w-5 h-5 text-amber-400" />
+                  <h2 className="font-semibold text-white">Content Reports</h2>
+                </div>
+                <div className="flex gap-1">
+                  {['pending', 'resolved', 'all'].map(f => (
+                    <button
+                      key={f}
+                      onClick={() => { setReportFilter(f); fetchReports(f) }}
+                      className={`px-3 py-1 text-xs rounded-lg transition-colors ${reportFilter === f ? 'bg-teal-500/20 text-teal-300 font-medium' : 'text-slate-400 hover:bg-white/[0.06]'}`}
+                    >
+                      {f.charAt(0).toUpperCase() + f.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {!reports.length && !loadingReports && (
+                <button onClick={() => fetchReports(reportFilter)} className="w-full py-3 text-sm text-teal-400 hover:text-teal-300 font-medium">
+                  Load Reports
+                </button>
+              )}
+
+              {loadingReports && (
+                <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 text-teal-400 animate-spin" /></div>
+              )}
+
+              {reports.length > 0 && (
+                <div className="space-y-3">
+                  {reports.map(report => (
+                    <div key={report.id} className="bg-white/[0.04] rounded-xl border border-white/10 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <AlertTriangle className="w-4 h-4 text-amber-400" />
+                            <span className="text-sm font-medium text-amber-300">{report.reason}</span>
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${report.status === 'pending' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-green-500/20 text-green-400 border border-green-500/30'}`}>
+                              {report.status}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-400 mb-2">Reported by: {report.reporter_name} &middot; {timeAgo(report.created_at)}</p>
+                          {report.details && <p className="text-xs text-slate-300 mb-2 italic">"{report.details}"</p>}
+                          {report.content_preview && (
+                            <div className="text-xs text-slate-400 bg-white/[0.04] rounded-lg p-3 border border-white/5">
+                              <Eye className="w-3.5 h-3.5 inline mr-1 text-slate-500" />
+                              {report.content_preview}
+                            </div>
+                          )}
+                        </div>
+                        {report.status === 'pending' && (
+                          <div className="flex gap-1.5 flex-shrink-0">
+                            <button
+                              onClick={() => handleResolveReport(report.id, 'dismiss')}
+                              className="text-xs px-3 py-1.5 bg-slate-500/20 text-slate-300 rounded-lg hover:bg-slate-500/30 transition-colors"
+                            >
+                              Dismiss
+                            </button>
+                            <button
+                              onClick={() => handleResolveReport(report.id, 'delete-content')}
+                              className="text-xs px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors flex items-center gap-1"
+                            >
+                              <Trash2 className="w-3 h-3" /> Delete Content
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {reports.length === 0 && !loadingReports && reportFilter === 'pending' && (
+                <p className="text-center text-sm text-slate-400 py-4">No pending reports</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Email Invite tab */}
+        {tab === 'email-invite' && isFounder && (
+          <div className="space-y-4">
+            <div className="bg-white/[0.06] backdrop-blur rounded-2xl border border-white/10 p-5">
+              <div className="flex items-center gap-3 mb-4">
+                <Mail className="w-5 h-5 text-teal-400" />
+                <div>
+                  <h2 className="font-semibold text-white">Direct Email Invite</h2>
+                  <p className="text-xs text-slate-400">Send an invite email to anyone — they don't need to be an existing user</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                <input
+                  type="email"
+                  value={directEmail}
+                  onChange={(e) => setDirectEmail(e.target.value)}
+                  placeholder="Email address *"
+                  className="px-4 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                />
+                <input
+                  type="text"
+                  value={directName}
+                  onChange={(e) => setDirectName(e.target.value)}
+                  placeholder="Name (optional)"
+                  className="px-4 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                />
+              </div>
+
+              <textarea
+                value={directMessage}
+                onChange={(e) => setDirectMessage(e.target.value)}
+                rows={4}
+                className="w-full px-4 py-3 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/30 resize-y mb-3"
+                placeholder="Custom message..."
+              />
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleSendDirectInvite}
+                  disabled={sendingDirect || !directEmail.trim()}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-teal-500 to-teal-600 text-white text-sm font-medium rounded-xl hover:from-teal-600 hover:to-teal-700 disabled:opacity-50 transition-all shadow-sm"
+                >
+                  {sendingDirect ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  Send Invite
+                </button>
+                {directSent.length > 0 && (
+                  <span className="text-xs text-green-400 flex items-center gap-1">
+                    <CheckCircle className="w-3.5 h-3.5" /> {directSent.length} sent
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Bulk invite */}
+            <div className="bg-white/[0.06] backdrop-blur rounded-2xl border border-white/10 p-5">
+              <div className="flex items-center gap-3 mb-4">
+                <Users className="w-5 h-5 text-teal-400" />
+                <div>
+                  <h2 className="font-semibold text-white">Bulk Email Invite</h2>
+                  <p className="text-xs text-slate-400">One email per line. Format: email, name (name is optional)</p>
+                </div>
+              </div>
+
+              <textarea
+                value={bulkEmails}
+                onChange={(e) => setBulkEmails(e.target.value)}
+                rows={6}
+                className="w-full px-4 py-3 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/30 resize-y font-mono mb-3"
+                placeholder={"john@example.com, John Smith\njane@example.com, Jane Doe\nuser@company.com"}
+              />
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleSendBulkInvite}
+                  disabled={sendingBulk || !bulkEmails.trim()}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-teal-500 to-teal-600 text-white text-sm font-medium rounded-xl hover:from-teal-600 hover:to-teal-700 disabled:opacity-50 transition-all shadow-sm"
+                >
+                  {sendingBulk ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  Send All
+                </button>
+                {bulkResult && (
+                  <span className="text-xs text-green-400 flex items-center gap-1">
+                    <CheckCircle className="w-3.5 h-3.5" /> {bulkResult.sent || 0} sent, {bulkResult.failed || 0} failed
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Sent history */}
+            {directSent.length > 0 && (
+              <div className="bg-white/[0.06] backdrop-blur rounded-2xl border border-white/10 p-4">
+                <h3 className="text-sm font-medium text-slate-300 mb-2">Recently Sent</h3>
+                <div className="space-y-1">
+                  {directSent.map((email, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs text-slate-400">
+                      <CheckCircle className="w-3 h-3 text-green-400" /> {email}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
