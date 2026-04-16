@@ -46,11 +46,23 @@ export function ForumProvider({ children }) {
       const client = getForumClient()
       if (!client) { setLoading(false); return }
 
-      const { data: { session } } = await client.auth.getSession()
+      let { data: { session } } = await client.auth.getSession()
       if (session?.user) {
         setUser(session.user)
         setToken(session.access_token)
-        await fetchProfile(session.access_token)
+        const fp = await fetchProfile(session.access_token)
+        // If profile fetch failed (possibly expired token), try refreshing the session
+        if (!fp && session.refresh_token) {
+          try {
+            const { data: refreshed } = await client.auth.refreshSession()
+            if (refreshed?.session) {
+              session = refreshed.session
+              setUser(session.user)
+              setToken(session.access_token)
+              await fetchProfile(session.access_token)
+            }
+          } catch {}
+        }
       }
 
       const { data: { subscription } } = client.auth.onAuthStateChange(async (_event, session) => {
