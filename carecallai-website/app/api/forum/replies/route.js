@@ -34,7 +34,16 @@ export async function POST(req) {
       parent_id: parentId || null,
       author_id: user.id,
       content,
-    }).select('*, forum_profiles!forum_replies_author_id_fkey(username, display_name, avatar_url, forum_role)').single()
+    }).select('*').single()
+
+    // Manually attach forum_profiles (no FK constraint)
+    if (reply) {
+      const { data: authorProfile } = await supabase
+        .from('forum_profiles')
+        .select('username, display_name, avatar_url, forum_role')
+        .eq('id', user.id).single()
+      reply.forum_profiles = authorProfile || null
+    }
 
     if (insertErr) return json({ error: insertErr.message }, 500)
 

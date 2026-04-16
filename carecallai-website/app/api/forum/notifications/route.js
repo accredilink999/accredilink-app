@@ -17,14 +17,23 @@ export async function GET(req) {
 
     const { data: notifications } = await supabase
       .from('forum_notifications')
-      .select('*, forum_profiles!forum_notifications_actor_id_fkey(username, avatar_url)')
+      .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(50)
 
-    const unreadCount = (notifications || []).filter(n => !n.is_read).length
+    // Manually join forum_profiles for actors
+    const actorIds = [...new Set((notifications || []).map(n => n.actor_id).filter(Boolean))]
+    let profileMap = {}
+    if (actorIds.length > 0) {
+      const { data: profiles } = await supabase.from('forum_profiles').select('id, username, avatar_url').in('id', actorIds)
+      ;(profiles || []).forEach(p => { profileMap[p.id] = p })
+    }
+    const enriched = (notifications || []).map(n => ({ ...n, forum_profiles: profileMap[n.actor_id] || null }))
 
-    return json({ notifications: notifications || [], unreadCount })
+    const unreadCount = enriched.filter(n => !n.is_read).length
+
+    return json({ notifications: enriched, unreadCount })
   } catch (err) {
     return json({ error: err.message }, 500)
   }

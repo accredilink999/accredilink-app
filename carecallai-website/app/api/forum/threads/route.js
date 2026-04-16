@@ -19,7 +19,7 @@ export async function GET(req) {
 
   let query = supabase
     .from('forum_threads')
-    .select('*, forum_categories!inner(slug, name), forum_profiles!forum_threads_author_id_fkey(username, display_name, avatar_url, forum_role, post_count)', { count: 'exact' })
+    .select('*, forum_categories!inner(slug, name)', { count: 'exact' })
 
   if (categorySlug) {
     query = query.eq('forum_categories.slug', categorySlug)
@@ -43,7 +43,23 @@ export async function GET(req) {
   const { data, error, count } = await query
   if (error) return json({ error: error.message }, 500)
 
-  return json({ threads: data, total: count, page, totalPages: Math.ceil((count || 0) / limit) })
+  // Manually join forum_profiles (no FK constraint exists)
+  const authorIds = [...new Set((data || []).map(t => t.author_id).filter(Boolean))]
+  let profileMap = {}
+  if (authorIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('forum_profiles')
+      .select('id, username, display_name, avatar_url, forum_role, post_count')
+      .in('id', authorIds)
+    ;(profiles || []).forEach(p => { profileMap[p.id] = p })
+  }
+
+  const threads = (data || []).map(t => ({
+    ...t,
+    forum_profiles: profileMap[t.author_id] || null,
+  }))
+
+  return json({ threads, total: count, page, totalPages: Math.ceil((count || 0) / limit) })
 }
 
 // POST: create thread

@@ -11,7 +11,7 @@ export async function GET(req, { params }) {
   // Try UUID first, then slug
   const isUUID = /^[0-9a-f]{8}-/.test(id)
   let query = supabase.from('forum_threads')
-    .select('*, forum_categories(id, name, slug), forum_profiles!forum_threads_author_id_fkey(username, display_name, avatar_url, forum_role, post_count)')
+    .select('*, forum_categories(id, name, slug)')
 
   if (isUUID) query = query.eq('id', id)
   else query = query.eq('slug', id)
@@ -22,14 +22,32 @@ export async function GET(req, { params }) {
   // Increment view count (fire-and-forget)
   supabase.from('forum_threads').update({ view_count: (thread.view_count || 0) + 1 }).eq('id', thread.id).then(() => {})
 
-  // Get replies with authors (include post_count for star ranking)
+  // Get replies
   const { data: replies } = await supabase
     .from('forum_replies')
-    .select('*, forum_profiles!forum_replies_author_id_fkey(username, display_name, avatar_url, forum_role, post_count)')
+    .select('*')
     .eq('thread_id', thread.id)
     .order('created_at', { ascending: true })
 
-  return json({ thread, replies: replies || [] })
+  // Manually join forum_profiles for thread author + reply authors (no FK constraint)
+  const allAuthorIds = [thread.author_id, ...(replies || []).map(r => r.author_id)].filter(Boolean)
+  const uniqueIds = [...new Set(allAuthorIds)]
+  let profileMap = {}
+  if (uniqueIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('forum_profiles')
+      .select('id, username, display_name, avatar_url, forum_role, post_count')
+      .in('id', uniqueIds)
+    ;(profiles || []).forEach(p => { profileMap[p.id] = p })
+  }
+
+  thread.forum_profiles = profileMap[thread.author_id] || null
+  const enrichedReplies = (replies || []).map(r => ({
+    ...r,
+    forum_profiles: profileMap[r.author_id] || null,
+  }))
+
+  return json({ thread, replies: enrichedReplies })
 }
 
 // PATCH: update thread (edit, pin, lock, feature, delete)

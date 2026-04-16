@@ -27,12 +27,21 @@ export async function GET(req) {
       const { data: otherUser } = await supabase.from('forum_profiles').select('id').eq('username', conversationWith).single()
       if (!otherUser) return json({ error: 'User not found' }, 404)
 
-      const { data: messages } = await supabase
+      const { data: rawMessages } = await supabase
         .from('forum_messages')
-        .select('*, sender:forum_profiles!forum_messages_sender_id_fkey(username, display_name, avatar_url, forum_role)')
+        .select('*')
         .or(`and(sender_id.eq.${user.id},recipient_id.eq.${otherUser.id}),and(sender_id.eq.${otherUser.id},recipient_id.eq.${user.id})`)
         .is('parent_id', null)
         .order('created_at', { ascending: true })
+
+      // Manually join sender profiles
+      const senderIds = [...new Set((rawMessages || []).map(m => m.sender_id).filter(Boolean))]
+      let senderMap = {}
+      if (senderIds.length > 0) {
+        const { data: profiles } = await supabase.from('forum_profiles').select('id, username, display_name, avatar_url, forum_role').in('id', senderIds)
+        ;(profiles || []).forEach(p => { senderMap[p.id] = p })
+      }
+      const messages = (rawMessages || []).map(m => ({ ...m, sender: senderMap[m.sender_id] || null }))
 
       // Mark received messages as read
       await supabase.from('forum_messages')
@@ -47,17 +56,31 @@ export async function GET(req) {
     // List conversations (latest message per user)
     const { data: sent } = await supabase
       .from('forum_messages')
-      .select('*, recipient:forum_profiles!forum_messages_recipient_id_fkey(username, display_name, avatar_url, forum_role)')
+      .select('*')
       .eq('sender_id', user.id)
       .is('parent_id', null)
       .order('created_at', { ascending: false })
 
     const { data: received } = await supabase
       .from('forum_messages')
-      .select('*, sender:forum_profiles!forum_messages_sender_id_fkey(username, display_name, avatar_url, forum_role)')
+      .select('*')
       .eq('recipient_id', user.id)
       .is('parent_id', null)
       .order('created_at', { ascending: false })
+
+    // Manually join profiles for all participants
+    const allUserIds = [...new Set([
+      ...(sent || []).map(m => m.recipient_id),
+      ...(received || []).map(m => m.sender_id),
+    ].filter(Boolean))]
+    let msgProfileMap = {}
+    if (allUserIds.length > 0) {
+      const { data: profiles } = await supabase.from('forum_profiles').select('id, username, display_name, avatar_url, forum_role').in('id', allUserIds)
+      ;(profiles || []).forEach(p => { msgProfileMap[p.id] = p })
+    }
+    // Attach profiles
+    ;(sent || []).forEach(m => { m.recipient = msgProfileMap[m.recipient_id] || null })
+    ;(received || []).forEach(m => { m.sender = msgProfileMap[m.sender_id] || null })
 
     // Build conversation list
     const convos = {}
