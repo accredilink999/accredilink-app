@@ -146,6 +146,16 @@ Deno.serve(async (req) => {
     <tr><td style="padding:6px 0;color:#475569;font-size:14px;">&#10003;&nbsp;&nbsp;Create your first rota and deploy shift patterns</td></tr>
     <tr><td style="padding:6px 0;color:#475569;font-size:14px;">&#10003;&nbsp;&nbsp;Set up compliance tracking for CIW or CQC</td></tr>
   </table>
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+    <tr><td style="padding:16px;background:#f0fdfa;border-radius:8px;border-left:4px solid #0d9488;">
+      <table cellpadding="0" cellspacing="0"><tr>
+        <td style="padding-right:14px;vertical-align:top;font-size:24px;">&#128483;</td>
+        <td><p style="margin:0;color:#0d9488;font-size:14px;font-weight:700;">Join the CareCallAI Community Forum</p>
+        <p style="margin:4px 0 10px;color:#475569;font-size:13px;line-height:1.5;">Connect with other care professionals, get direct support from the CareCallAI team, share best practices, and book a free demo or setup session.</p>
+        <a href="https://carecallai.co.uk/forum" style="display:inline-block;background:#0d9488;color:#ffffff;text-decoration:none;padding:8px 20px;border-radius:6px;font-size:13px;font-weight:600;">Visit the Forum &rarr;</a></td>
+      </tr></table>
+    </td></tr>
+  </table>
   <p style="margin:0;color:#475569;font-size:15px;line-height:1.7;">Warm regards,<br/><strong style="color:#1e293b;">The CareCallAI Team</strong></p>
 </td></tr>
 <tr><td style="background:#f8fafc;padding:24px 40px;border-top:1px solid #e2e8f0;">
@@ -201,6 +211,35 @@ Deno.serve(async (req) => {
           });
         }
       } catch (e) { console.error('[notifyNewSignup] Contact insert failed:', e); }
+
+      // 4. Auto-create forum profile for new org owner
+      try {
+        const { data: existingForum } = await supabase
+          .from('forum_profiles')
+          .select('id')
+          .eq('id', user.id)
+          .maybeSingle();
+        if (!existingForum) {
+          // Generate username from email prefix
+          let username = (userEmail.split('@')[0] || 'user').toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').slice(0, 20);
+          // Check uniqueness, append random digits if duplicate
+          const { data: dupCheck } = await supabase.from('forum_profiles').select('id').eq('username', username).maybeSingle();
+          if (dupCheck) username = username.slice(0, 16) + '-' + Math.floor(Math.random() * 9999).toString().padStart(4, '0');
+
+          await supabase.from('forum_profiles').insert({
+            id: user.id,
+            username,
+            display_name: userName || username,
+            forum_role: 'user',
+            profile_customized: false,
+            post_count: 0,
+            thread_count: 0,
+            reputation: 0,
+            is_banned: false,
+          });
+          console.log(`[notifyNewSignup] Forum profile created: @${username}`);
+        }
+      } catch (e) { console.error('[notifyNewSignup] Forum profile creation failed:', e); }
     }
 
     console.log(`[notifyNewSignup] Complete for ${userEmail} / ${orgName}`);

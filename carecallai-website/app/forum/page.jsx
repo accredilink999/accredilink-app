@@ -68,7 +68,7 @@ export default function ForumHome() {
       {/* Hero Banner */}
       <div className="relative overflow-hidden border-b border-white/5">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMDUpIi8+PC9zdmc+')] opacity-50" />
-        <div className="max-w-6xl mx-auto px-4 py-10 sm:py-14 relative">
+        <div className="max-w-[1600px] mx-auto px-4 py-10 sm:py-14 relative">
           <div className="flex items-center gap-4 mb-4">
             <div className="w-14 h-14 bg-gradient-to-br from-teal-400 to-teal-600 rounded-2xl flex items-center justify-center shadow-xl shadow-teal-500/20">
               <img src="/logo-icon.png" alt="CareCall AI" className="w-10 h-10 rounded-lg" />
@@ -102,7 +102,7 @@ export default function ForumHome() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="max-w-[1600px] mx-auto px-4 py-8">
         <div className="flex flex-col lg:flex-row gap-8">
           <ForumSidebar categories={categories} stats={stats} profile={profile} />
 

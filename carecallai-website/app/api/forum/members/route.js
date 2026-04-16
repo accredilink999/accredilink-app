@@ -107,6 +107,18 @@ export async function GET(req) {
       }
     }
 
+    // Quick search mode for @mention autocomplete
+    const q = searchParams.get('q')
+    if (q && q.length >= 1) {
+      const { data: results } = await supabase
+        .from('forum_profiles')
+        .select('id, username, display_name, avatar_url, forum_role')
+        .ilike('username', `${q}%`)
+        .eq('is_banned', false)
+        .limit(10)
+      return json({ members: results || [] })
+    }
+
     // Mods/admins/founder see all members including banned; regular users don't see banned
     const canSeeAll = ['founder', 'admin', 'moderator'].includes(viewerRole)
     let query = supabase

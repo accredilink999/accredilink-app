@@ -105,6 +105,54 @@ export async function notifyLike(supabase, { userId, actorName, threadTitle, thr
 /**
  * Notify user when mentioned or when mod action is taken
  */
+/**
+ * Notify user when mentioned in a post
+ */
+export async function notifyMention(supabase, { userId, actorName, threadTitle, threadId, content }) {
+  const email = await getUserEmail(supabase, userId)
+  if (!email) return
+
+  const preview = (content || '').slice(0, 200)
+  await sendEmail({
+    to: email,
+    subject: `${actorName} mentioned you in "${threadTitle}" - CareCall AI Forum`,
+    html: wrapHtml(
+      `${actorName} mentioned you`,
+      `<p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 12px;">
+        You were mentioned in <strong>"${threadTitle}"</strong>:
+      </p>
+      <div style="background:#f8fafc;border-left:3px solid #0d9488;padding:12px 16px;border-radius:0 8px 8px 0;margin:0 0 12px;">
+        <p style="color:#334155;font-size:14px;line-height:1.5;margin:0;">${preview}${content?.length > 200 ? '...' : ''}</p>
+      </div>
+      <p style="margin:0;"><a href="${FORUM_URL}/thread/${threadId}" style="color:#0d9488;font-size:14px;text-decoration:none;font-weight:600;">View Thread &rarr;</a></p>`
+    ),
+  })
+}
+
+/**
+ * Notify subscriber when new reply is posted to watched thread
+ */
+export async function notifySubscriber(supabase, { userId, threadTitle, threadId, replyAuthor, replyContent }) {
+  const email = await getUserEmail(supabase, userId)
+  if (!email) return
+
+  const preview = (replyContent || '').slice(0, 200)
+  await sendEmail({
+    to: email,
+    subject: `New activity in "${threadTitle}" - CareCall AI Forum`,
+    html: wrapHtml(
+      `New reply in a thread you're watching`,
+      `<p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 12px;">
+        <strong>${replyAuthor}</strong> replied in <strong>"${threadTitle}"</strong>:
+      </p>
+      <div style="background:#f8fafc;border-left:3px solid #0d9488;padding:12px 16px;border-radius:0 8px 8px 0;margin:0 0 12px;">
+        <p style="color:#334155;font-size:14px;line-height:1.5;margin:0;">${preview}${replyContent?.length > 200 ? '...' : ''}</p>
+      </div>
+      <p style="margin:0;"><a href="${FORUM_URL}/thread/${threadId}" style="color:#0d9488;font-size:14px;text-decoration:none;font-weight:600;">View Thread &rarr;</a></p>`
+    ),
+  })
+}
+
 export async function notifyModAction(supabase, { userId, action, threadTitle, reason }) {
   const email = await getUserEmail(supabase, userId)
   if (!email) return

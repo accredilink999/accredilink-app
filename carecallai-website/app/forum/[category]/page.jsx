@@ -47,7 +47,7 @@ export default function CategoryPage({ params }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900">
       <ForumHeader user={user} profile={profile} token={token} onLogout={logout} />
-      <div className="max-w-6xl mx-auto px-4 py-6">
+      <div className="max-w-[1600px] mx-auto px-4 py-6">
         <div className="flex flex-col lg:flex-row gap-6">
           <ForumSidebar categories={categories} profile={profile} />
 

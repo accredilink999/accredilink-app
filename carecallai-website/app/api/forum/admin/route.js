@@ -202,6 +202,91 @@ export async function POST(req) {
         return json({ success: true })
       }
 
+      case 'send-direct-invite': {
+        if (!isFounder) return json({ error: 'Only founder can send invites' }, 403)
+        const { email: directEmail, name: directName, message: customMessage } = body
+        if (!directEmail) return json({ error: 'Email required' }, 400)
+
+        const defaultMsg = 'You\'re invited to join the CareCallAI Community Forum — an exclusive space for care professionals. Get direct support from the CareCallAI team, connect with other administrators, share best practices, and book free demo or setup sessions.'
+        const finalMsg = customMessage?.trim() || defaultMsg
+
+        try {
+          const emailBody = `
+            <div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:30px">
+              <div style="text-align:center;margin-bottom:30px">
+                <h1 style="color:#0d9488;font-size:24px;margin:0">CareCall<span style="color:#334155">AI</span> Forum</h1>
+                <p style="color:#64748b;font-size:14px;margin-top:5px">Community & Support for Care Professionals</p>
+              </div>
+              <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:24px">
+                <h2 style="color:#1e293b;font-size:18px;margin:0 0 12px 0">Hi ${directName || 'there'},</h2>
+                <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 16px 0">${finalMsg}</p>
+                <div style="background:#f0fdfa;border-radius:8px;padding:16px;margin:0 0 16px 0">
+                  <p style="color:#0d9488;font-size:13px;font-weight:600;margin:0 0 8px 0">What you'll find:</p>
+                  <p style="color:#475569;font-size:13px;line-height:1.6;margin:0;">
+                    &#10003; Direct support from the CareCallAI team<br/>
+                    &#10003; Tips and best practices from fellow care professionals<br/>
+                    &#10003; Book free demos and onboarding sessions<br/>
+                    &#10003; Feature requests and feedback
+                  </p>
+                </div>
+                <div style="text-align:center;margin:24px 0">
+                  <a href="https://carecallai.co.uk/forum" style="background:linear-gradient(135deg,#14b8a6,#0d9488);color:white;text-decoration:none;padding:12px 32px;border-radius:12px;font-weight:600;font-size:14px;display:inline-block">
+                    Join the Forum
+                  </a>
+                </div>
+                <p style="color:#94a3b8;font-size:12px;text-align:center;margin:0">
+                  Log in with your CareCall AI email and password
+                </p>
+              </div>
+              <p style="color:#94a3b8;font-size:11px;text-align:center;margin-top:20px">
+                CareCall AI — Smart Care Management
+              </p>
+            </div>
+          `
+          const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-campaign-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` },
+            body: JSON.stringify({ to: directEmail, subject: 'You\'re invited to the CareCallAI Community Forum', html: emailBody }),
+          })
+          if (!res.ok) { const e = await res.json().catch(() => ({})); return json({ error: e.error || 'Failed to send' }, 500) }
+        } catch (e) { return json({ error: 'Failed: ' + e.message }, 500) }
+        return json({ success: true })
+      }
+
+      case 'send-bulk-invite': {
+        if (!isFounder) return json({ error: 'Only founder can send invites' }, 403)
+        const { emails: bulkEmails, message: bulkMessage } = body
+        if (!bulkEmails?.length) return json({ error: 'No emails provided' }, 400)
+        let sent = 0, failed = 0
+        for (const item of bulkEmails) {
+          try {
+            const emailBody = `
+              <div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:30px">
+                <div style="text-align:center;margin-bottom:30px">
+                  <h1 style="color:#0d9488;font-size:24px;margin:0">CareCall<span style="color:#334155">AI</span> Forum</h1>
+                  <p style="color:#64748b;font-size:14px;margin-top:5px">Community & Support for Care Professionals</p>
+                </div>
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:24px">
+                  <h2 style="color:#1e293b;font-size:18px;margin:0 0 12px 0">Hi ${item.name || 'there'},</h2>
+                  <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 16px 0">${bulkMessage || 'You\'re invited to join the CareCallAI Community Forum — get direct support, connect with other care professionals, and book free demos.'}</p>
+                  <div style="text-align:center;margin:24px 0">
+                    <a href="https://carecallai.co.uk/forum" style="background:linear-gradient(135deg,#14b8a6,#0d9488);color:white;text-decoration:none;padding:12px 32px;border-radius:12px;font-weight:600;font-size:14px;display:inline-block">Join the Forum</a>
+                  </div>
+                  <p style="color:#94a3b8;font-size:12px;text-align:center;margin:0">Log in with your CareCall AI email and password</p>
+                </div>
+              </div>
+            `
+            const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-campaign-email`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` },
+              body: JSON.stringify({ to: item.email, subject: 'You\'re invited to the CareCallAI Community Forum', html: emailBody }),
+            })
+            if (res.ok) sent++; else failed++
+          } catch { failed++ }
+        }
+        return json({ success: true, sent, failed })
+      }
+
       case 'invite-to-forum': {
         if (!isFounder) return json({ error: 'Only founder can send invites' }, 403)
         const { email, name } = body

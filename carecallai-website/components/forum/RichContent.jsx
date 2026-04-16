@@ -124,6 +124,19 @@ function renderInlineMarkdown(text) {
       continue
     }
 
+    // @mentions
+    match = remaining.match(/^(.*?)@([a-z0-9_-]+)/i)
+    if (match) {
+      if (match[1]) parts.push(<span key={key++}>{renderInlineMarkdown(match[1])}</span>)
+      parts.push(
+        <a key={key++} href={`/forum/profile/${match[2].toLowerCase()}`} className="text-teal-600 font-semibold hover:underline bg-teal-50 px-1 rounded">
+          @{match[2]}
+        </a>
+      )
+      remaining = remaining.slice(match[0].length)
+      continue
+    }
+
     // Plain URL detection
     match = remaining.match(/^(.*?)(https?:\/\/[^\s<>]+)(.*)$/)
     if (match) {

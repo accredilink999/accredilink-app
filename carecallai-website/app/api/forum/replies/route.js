@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-import { notifyReply } from '@/lib/forumEmail'
+import { notifyReply, notifyMention, notifySubscriber } from '@/lib/forumEmail'
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
 function json(data, status = 200) { return NextResponse.json(data, { status }) }
@@ -77,6 +77,49 @@ export async function POST(req) {
         replyContent: content,
       }).catch(() => {})
     }
+
+    // Notify thread subscribers (except author and reply author)
+    try {
+      const { data: subs } = await supabase
+        .from('forum_subscriptions')
+        .select('user_id')
+        .eq('thread_id', threadId)
+      const subscriberIds = (subs || [])
+        .map(s => s.user_id)
+        .filter(id => id !== user.id && id !== thread.author_id)
+      for (const subId of subscriberIds) {
+        await supabase.from('forum_notifications').insert({
+          user_id: subId, type: 'reply', thread_id: threadId, reply_id: reply.id,
+          actor_id: user.id, message: `${fp.username} replied to "${thread.title}"`,
+        })
+        notifySubscriber(supabase, {
+          userId: subId, threadTitle: thread.title, threadId,
+          replyAuthor: fp.username, replyContent: content,
+        }).catch(() => {})
+      }
+    } catch {}
+
+    // Detect @mentions and notify
+    try {
+      const mentionRegex = /@([a-z0-9_-]+)/gi
+      const mentions = [...content.matchAll(mentionRegex)].map(m => m[1].toLowerCase())
+      const uniqueMentions = [...new Set(mentions)]
+      for (const username of uniqueMentions) {
+        if (username === fp.username) continue // skip self-mention
+        const { data: mentioned } = await supabase
+          .from('forum_profiles').select('id').eq('username', username).maybeSingle()
+        if (mentioned && mentioned.id !== user.id && mentioned.id !== thread.author_id) {
+          await supabase.from('forum_notifications').insert({
+            user_id: mentioned.id, type: 'mention', thread_id: threadId, reply_id: reply.id,
+            actor_id: user.id, message: `${fp.username} mentioned you in "${thread.title}"`,
+          })
+          notifyMention(supabase, {
+            userId: mentioned.id, actorName: fp.username,
+            threadTitle: thread.title, threadId, content,
+          }).catch(() => {})
+        }
+      }
+    } catch {}
 
     return json({ success: true, reply })
   } catch (err) {

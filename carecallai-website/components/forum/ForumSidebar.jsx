@@ -71,6 +71,33 @@ export default function ForumSidebar({ categories, stats, profile }) {
         </nav>
       </div>
 
+      {/* Book a Demo */}
+      <div className="bg-gradient-to-br from-blue-500/20 to-teal-500/20 backdrop-blur rounded-2xl border border-blue-400/20 p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
+            <span className="text-lg">📅</span>
+          </div>
+          <h3 className="font-semibold text-sm text-white">Book a Demo</h3>
+        </div>
+        <p className="text-xs text-slate-300 mb-3">Get a personal walkthrough of CareCallAI with our team via Microsoft Teams.</p>
+        <div className="space-y-2">
+          <a
+            href="mailto:hello@carecallai.co.uk?subject=CareCallAI%20Demo%20Request&body=Hi%2C%20I%20would%20like%20to%20book%20a%20demo%20of%20CareCallAI.%20Please%20let%20me%20know%20available%20times."
+            className="flex items-center justify-center gap-2 w-full px-3 py-2 bg-blue-500/80 hover:bg-blue-500 text-white text-xs font-medium rounded-xl transition-colors"
+          >
+            ✉️ Email Us
+          </a>
+          <a
+            href="https://wa.me/447762533406?text=Hi%2C%20I%20would%20like%20to%20book%20a%20demo%20of%20CareCallAI"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full px-3 py-2 bg-green-500/80 hover:bg-green-500 text-white text-xs font-medium rounded-xl transition-colors"
+          >
+            💬 WhatsApp
+          </a>
+        </div>
+      </div>
+
       {stats && (
         <div className="bg-white/[0.06] backdrop-blur rounded-2xl border border-white/10 p-4">
           <h3 className="font-semibold text-sm text-slate-300 mb-3">Forum Stats</h3>

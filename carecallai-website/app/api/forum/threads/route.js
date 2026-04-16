@@ -87,20 +87,17 @@ export async function POST(req) {
 
     if (insertErr) return json({ error: insertErr.message }, 500)
 
-    // Update category counts
-    await supabase.rpc('increment_field', { table_name: 'forum_categories', row_id: resolvedCategoryId, field_name: 'thread_count', amount: 1 }).catch(() => {
-      // Fallback: direct update
-      supabase.from('forum_categories').update({ thread_count: supabase.rpc ? undefined : 1 }).eq('id', resolvedCategoryId)
-    })
-    // Simple increment
-    await supabase.from('forum_categories').select('thread_count').eq('id', resolvedCategoryId).single().then(({ data: c }) => {
-      if (c) supabase.from('forum_categories').update({ thread_count: (c.thread_count || 0) + 1 }).eq('id', resolvedCategoryId)
-    })
+    // Update category thread count
+    try {
+      const { data: c } = await supabase.from('forum_categories').select('thread_count').eq('id', resolvedCategoryId).single()
+      if (c) await supabase.from('forum_categories').update({ thread_count: (c.thread_count || 0) + 1 }).eq('id', resolvedCategoryId)
+    } catch {}
 
-    // Update user stats
-    await supabase.from('forum_profiles').select('thread_count').eq('id', user.id).single().then(({ data: p }) => {
-      if (p) supabase.from('forum_profiles').update({ thread_count: (p.thread_count || 0) + 1 }).eq('id', user.id)
-    })
+    // Update user thread count
+    try {
+      const { data: p } = await supabase.from('forum_profiles').select('thread_count').eq('id', user.id).single()
+      if (p) await supabase.from('forum_profiles').update({ thread_count: (p.thread_count || 0) + 1 }).eq('id', user.id)
+    } catch {}
 
     return json({ success: true, thread, categorySlug: cat?.slug })
   } catch (err) {
