@@ -24,6 +24,7 @@ export default function ForumAdmin() {
   const [roleSearch, setRoleSearch] = useState('')
   // Create category
   const [newCatName, setNewCatName] = useState('')
+  const [newCatDesc, setNewCatDesc] = useState('')
   const [newCatIcon, setNewCatIcon] = useState('MessageSquare')
   const [newCatColor, setNewCatColor] = useState('text-teal-500')
   const [creatingCat, setCreatingCat] = useState(false)
@@ -141,6 +142,7 @@ export default function ForumAdmin() {
           action: 'create-category',
           categoryData: {
             name: newCatName.trim(),
+            description: newCatDesc.trim() || null,
             slug: slugify(newCatName.trim()),
             icon: newCatIcon,
             color: newCatColor,
@@ -151,6 +153,7 @@ export default function ForumAdmin() {
       const data = await res.json()
       if (data.success) {
         setNewCatName('')
+        setNewCatDesc('')
         fetchAdmin()
       } else {
         alert(data.error || 'Failed to create category')
@@ -216,6 +219,20 @@ export default function ForumAdmin() {
       })
       fetchReports(reportFilter)
     } catch { alert('Failed to resolve report') }
+  }
+
+  const handleDeleteCategory = async (catId, catName) => {
+    if (!confirm(`Delete category "${catName}"? All threads in this category will also be deleted. This cannot be undone.`)) return
+    try {
+      const res = await fetch('/api/forum/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, action: 'delete-category', categoryId: catId }),
+      })
+      const data = await res.json()
+      if (data.success) fetchAdmin()
+      else alert(data.error || 'Failed to delete')
+    } catch { alert('Failed to delete category') }
   }
 
   const handleEditCategory = (cat) => {
@@ -589,6 +606,13 @@ export default function ForumAdmin() {
                   ))}
                 </select>
               </div>
+              <input
+                type="text"
+                value={newCatDesc}
+                onChange={(e) => setNewCatDesc(e.target.value)}
+                placeholder="Category description (optional)..."
+                className="w-full mt-3 px-3 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+              />
               <button
                 onClick={handleCreateCategory}
                 disabled={creatingCat || !newCatName.trim()}
@@ -650,6 +674,11 @@ export default function ForumAdmin() {
                           <button onClick={() => handleEditCategory(cat)} className="text-xs px-2.5 py-1.5 text-teal-400 hover:text-teal-300 hover:bg-teal-500/10 rounded-lg transition-colors">
                             Edit
                           </button>
+                          {isFounder && (
+                            <button onClick={() => handleDeleteCategory(cat.id, cat.name)} className="text-xs px-2.5 py-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors">
+                              Delete
+                            </button>
+                          )}
                         </div>
                       </div>
                     )}

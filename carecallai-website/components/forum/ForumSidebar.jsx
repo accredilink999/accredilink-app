@@ -79,22 +79,30 @@ export default function ForumSidebar({ categories, stats, profile }) {
           </div>
           <h3 className="font-semibold text-sm text-white">Book a Demo</h3>
         </div>
-        <p className="text-xs text-slate-300 mb-3">Get a personal walkthrough of CareCallAI with our team via Microsoft Teams.</p>
+        <p className="text-xs text-slate-300 mb-3">Book a free 1-hour Teams demo, or contact us directly.</p>
         <div className="space-y-2">
-          <a
-            href="mailto:hello@carecallai.co.uk?subject=CareCallAI%20Demo%20Request&body=Hi%2C%20I%20would%20like%20to%20book%20a%20demo%20of%20CareCallAI.%20Please%20let%20me%20know%20available%20times."
-            className="flex items-center justify-center gap-2 w-full px-3 py-2 bg-blue-500/80 hover:bg-blue-500 text-white text-xs font-medium rounded-xl transition-colors"
+          <Link
+            href="/forum/booking"
+            className="flex items-center justify-center gap-2 w-full px-3 py-2 bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-600 hover:to-teal-600 text-white text-xs font-semibold rounded-xl transition-colors shadow-sm"
           >
-            ✉️ Email Us
-          </a>
-          <a
-            href="https://wa.me/447762533406?text=Hi%2C%20I%20would%20like%20to%20book%20a%20demo%20of%20CareCallAI"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 w-full px-3 py-2 bg-green-500/80 hover:bg-green-500 text-white text-xs font-medium rounded-xl transition-colors"
-          >
-            💬 WhatsApp
-          </a>
+            📅 View Calendar & Book
+          </Link>
+          <div className="flex gap-2">
+            <a
+              href="mailto:hello@carecallai.co.uk?subject=CareCallAI%20Demo%20Request"
+              className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-blue-500/60 hover:bg-blue-500 text-white text-xs font-medium rounded-xl transition-colors"
+            >
+              Email
+            </a>
+            <a
+              href="https://wa.me/447762533406?text=Hi%2C%20I%20would%20like%20to%20book%20a%20demo%20of%20CareCallAI"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-green-500/60 hover:bg-green-500 text-white text-xs font-medium rounded-xl transition-colors"
+            >
+              WhatsApp
+            </a>
+          </div>
         </div>
       </div>
 
