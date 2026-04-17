@@ -85,14 +85,14 @@ export default function MembersPage() {
 
   if (loading || !user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900 flex items-center justify-center">
+      <div className="min-h-screen  flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full"></div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900">
+    <div className="min-h-screen ">
       <ForumHeader profile={profile} token={token} onLogout={logout} />
 
       <div className="max-w-4xl mx-auto px-4 py-8">

@@ -296,7 +296,7 @@ export default function ForumAdmin() {
 
   if (loading || loadingAdmin) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900">
+      <div className="min-h-screen ">
         <ForumHeader user={user} profile={profile} token={token} onLogout={logout} />
         <div className="max-w-5xl mx-auto px-4 py-12 flex justify-center">
           <div className="animate-spin w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full"></div>
@@ -353,7 +353,7 @@ export default function ForumAdmin() {
   const sortedUsers = [...filteredUsers].sort((a, b) => (roleOrder[a.forum_role] || 3) - (roleOrder[b.forum_role] || 3))
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900">
+    <div className="min-h-screen ">
       <ForumHeader user={user} profile={profile} token={token} onLogout={logout} />
       <div className="max-w-[1600px] mx-auto px-4 py-6">
         <Link href="/forum" className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-teal-400 mb-4">

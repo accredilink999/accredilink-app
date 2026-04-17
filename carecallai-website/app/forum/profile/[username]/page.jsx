@@ -90,7 +90,7 @@ export default function ProfilePage({ params }) {
 
   if (loading || loadingProfile) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900">
+      <div className="min-h-screen ">
         <ForumHeader user={user} profile={myProfile} token={token} onLogout={logout} />
         <div className="max-w-4xl mx-auto px-4 py-12 flex justify-center">
           <div className="animate-spin w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full"></div>
@@ -101,7 +101,7 @@ export default function ProfilePage({ params }) {
 
   if (!profileData) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900">
+      <div className="min-h-screen ">
         <ForumHeader user={user} profile={myProfile} token={token} onLogout={logout} />
         <div className="max-w-4xl mx-auto px-4 py-12 text-center">
           <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -116,11 +116,11 @@ export default function ProfilePage({ params }) {
   const badge = getRoleBadge(profileData.forum_role)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900">
+    <div className="min-h-screen ">
       <ForumHeader user={user} profile={myProfile} token={token} onLogout={logout} />
 
       {/* Profile header with gradient */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-teal-900">
+      <div className="">
         <div className="max-w-4xl mx-auto px-4 py-10">
           <div className="flex items-start gap-5">
             {/* Avatar with upload */}

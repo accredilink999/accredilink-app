@@ -57,7 +57,7 @@ export default function ForumLogin() {
 
   if (autoLogging) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900 flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen  flex flex-col items-center justify-center p-4">
         <Loader2 className="w-10 h-10 text-teal-400 animate-spin mb-4" />
         <p className="text-slate-400 text-sm">Checking login status...</p>
       </div>
@@ -65,7 +65,7 @@ export default function ForumLogin() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900 flex items-center justify-center p-4">
+    <div className="min-h-screen  flex items-center justify-center p-4">
       <div className="w-full max-w-lg">
         {/* Branding */}
         <div className="text-center mb-8">

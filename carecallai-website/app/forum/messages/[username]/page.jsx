@@ -55,14 +55,14 @@ export default function ConversationPage({ params }) {
 
   if (loading || !user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900 flex items-center justify-center">
+      <div className="min-h-screen  flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full"></div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900 flex flex-col">
+    <div className="min-h-screen  flex flex-col">
       <ForumHeader user={user} profile={profile} token={token} onLogout={logout} />
 
       <div className="max-w-3xl mx-auto px-4 py-4 w-full flex-1 flex flex-col">

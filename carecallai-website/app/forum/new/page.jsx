@@ -50,7 +50,7 @@ function NewThreadForm() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900 flex items-center justify-center">
+      <div className="min-h-screen  flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full"></div>
       </div>
     )
@@ -58,7 +58,7 @@ function NewThreadForm() {
 
   if (!profile) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900">
+      <div className="min-h-screen ">
         <ForumHeader user={user} profile={profile} token={token} onLogout={logout} />
         <div className="max-w-2xl mx-auto px-4 py-12 text-center">
           <p className="text-slate-400">You need to <Link href="/forum/login" className="text-teal-400 font-medium">sign in</Link> to create a thread.</p>
@@ -68,7 +68,7 @@ function NewThreadForm() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900">
+    <div className="min-h-screen ">
       <ForumHeader user={user} profile={profile} token={token} onLogout={logout} />
       <div className="max-w-2xl mx-auto px-4 py-6">
         <div className="bg-white/[0.06] backdrop-blur rounded-2xl border border-white/10 p-6">
@@ -148,7 +148,7 @@ function NewThreadForm() {
 
 export default function NewThreadPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900 flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full"></div></div>}>
+    <Suspense fallback={<div className="min-h-screen  flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full"></div></div>}>
       <NewThreadForm />
     </Suspense>
   )
