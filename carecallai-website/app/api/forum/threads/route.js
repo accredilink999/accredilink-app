@@ -3,8 +3,13 @@ import { NextResponse } from 'next/server'
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
 
+export const dynamic = 'force-dynamic'
+
 function json(data, status = 200) {
-  return NextResponse.json(data, { status })
+  return NextResponse.json(data, {
+    status,
+    headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate', 'Pragma': 'no-cache' },
+  })
 }
 
 // GET: list threads (with ?category=slug&sort=newest|popular|unanswered&page=1)

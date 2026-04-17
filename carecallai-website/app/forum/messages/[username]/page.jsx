@@ -1,4 +1,5 @@
 'use client'
+export const dynamic = 'force-dynamic'
 import { useState, useEffect, useRef, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForum } from '@/lib/forumContext'
