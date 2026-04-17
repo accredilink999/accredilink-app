@@ -78,8 +78,8 @@ export default function ThreadCard({ thread, showCategory = false }) {
               {thread.title}
             </h3>
 
-            <p className="text-sm text-slate-500 mt-1 line-clamp-2 leading-relaxed">
-              {thread.content?.replace(/[#*_`>\[\]]/g, '').slice(0, 150)}
+            <p className="text-sm text-slate-500 mt-1 leading-relaxed whitespace-pre-line">
+              {thread.content?.replace(/[#*_`>\[\]]/g, '')}
             </p>
 
             <div className="flex items-center gap-3 mt-3 flex-wrap">
