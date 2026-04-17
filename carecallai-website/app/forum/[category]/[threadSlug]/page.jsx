@@ -271,7 +271,7 @@ export default function ThreadPage({ params }) {
                   {(author.display_name || author.username || '?')[0].toUpperCase()}
                 </div>
               )}
-              <span className="text-xs font-semibold text-slate-700 text-center mt-1.5 leading-tight w-full truncate">{author.display_name || author.username || 'User'}</span>
+              <span className="text-xs font-semibold text-slate-700 text-center mt-1.5 leading-tight w-full">{author.display_name || author.username || 'User'}</span>
               {author.forum_role && author.forum_role !== 'user' && (
                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded mt-1 ${author.forum_role === 'founder' ? 'bg-amber-100 text-amber-700' : author.forum_role === 'admin' ? 'bg-teal-100 text-teal-700' : 'bg-purple-100 text-purple-700'}`}>
                   {author.forum_role === 'founder' ? 'Founder' : author.forum_role === 'admin' ? 'Admin' : 'Mod'}

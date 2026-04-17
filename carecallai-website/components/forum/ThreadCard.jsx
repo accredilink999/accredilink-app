@@ -40,7 +40,7 @@ export default function ThreadCard({ thread, showCategory = false }) {
 
         <div className="flex items-start gap-3">
           {/* Author avatar */}
-          <div className="hidden sm:flex flex-col items-center flex-shrink-0 gap-1 w-16">
+          <div className="hidden sm:flex flex-col items-center flex-shrink-0 gap-1 w-20">
             {author.avatar_url ? (
               <img src={author.avatar_url} alt="" className="w-10 h-10 rounded-xl object-cover" />
             ) : (
@@ -48,7 +48,7 @@ export default function ThreadCard({ thread, showCategory = false }) {
                 {(author.display_name || author.username || '?')[0].toUpperCase()}
               </div>
             )}
-            <span className="text-[10px] font-semibold text-slate-700 text-center leading-tight truncate w-full">{author.display_name || author.username || 'User'}</span>
+            <span className="text-[10px] font-semibold text-slate-700 text-center leading-tight w-full">{author.display_name || author.username || 'User'}</span>
             {author.forum_role && author.forum_role !== 'user' && (
               <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded ${author.forum_role === 'founder' ? 'bg-amber-100 text-amber-700' : author.forum_role === 'admin' ? 'bg-teal-100 text-teal-700' : 'bg-purple-100 text-purple-700'}`}>
                 {author.forum_role === 'founder' ? 'Founder' : author.forum_role === 'admin' ? 'Admin' : 'Mod'}

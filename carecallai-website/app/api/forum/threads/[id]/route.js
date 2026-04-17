@@ -75,7 +75,7 @@ export async function PATCH(req, { params }) {
     const perms = permRow?.value || {}
     const hasPerm = (key) => isFounder || !!(perms[role]?.[key])
 
-    const { data: thread } = await supabase.from('forum_threads').select('author_id').eq('id', id).single()
+    const { data: thread } = await supabase.from('forum_threads').select('author_id, category_id').eq('id', id).single()
     if (!thread) return json({ error: 'Thread not found' }, 404)
 
     // Mod actions — check specific permissions
@@ -92,6 +92,11 @@ export async function PATCH(req, { params }) {
     if (modAction === 'delete') {
       if (!hasPerm('delete_threads') && thread.author_id !== user.id) return json({ error: 'Not authorized' }, 403)
       await supabase.from('forum_threads').delete().eq('id', id)
+      // Decrement old category thread count
+      if (thread.category_id) {
+        const { data: c } = await supabase.from('forum_categories').select('thread_count').eq('id', thread.category_id).single()
+        if (c) await supabase.from('forum_categories').update({ thread_count: Math.max(0, (c.thread_count || 1) - 1) }).eq('id', thread.category_id)
+      }
       return json({ success: true })
     }
     if (modAction === 'bump') {
@@ -104,6 +109,13 @@ export async function PATCH(req, { params }) {
       const { categoryId: newCatId } = body
       if (!newCatId) return json({ error: 'categoryId required' }, 400)
       await supabase.from('forum_threads').update({ category_id: newCatId }).eq('id', id)
+      // Decrement old category, increment new category
+      if (thread.category_id) {
+        const { data: oldCat } = await supabase.from('forum_categories').select('thread_count').eq('id', thread.category_id).single()
+        if (oldCat) await supabase.from('forum_categories').update({ thread_count: Math.max(0, (oldCat.thread_count || 1) - 1) }).eq('id', thread.category_id)
+      }
+      const { data: newCat } = await supabase.from('forum_categories').select('thread_count').eq('id', newCatId).single()
+      if (newCat) await supabase.from('forum_categories').update({ thread_count: (newCat.thread_count || 0) + 1 }).eq('id', newCatId)
       return json({ success: true })
     }
 
