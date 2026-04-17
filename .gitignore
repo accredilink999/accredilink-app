@@ -48,3 +48,5 @@ ios/DerivedData/
 *.cer
 google-services.json
 GoogleService-Info.plist
+
+.env*.local

@@ -140,8 +140,36 @@ export function ForumProvider({ children }) {
     if (token) await fetchProfile(token)
   }
 
+  // Get a fresh token — refreshes session if needed
+  const getFreshToken = useCallback(async () => {
+    const client = getForumClient()
+    if (!client) return token
+    try {
+      // First try current session
+      const { data: { session } } = await client.auth.getSession()
+      if (session?.access_token) {
+        // Check if token has changed
+        if (session.access_token !== token) {
+          setToken(session.access_token)
+          setUser(session.user)
+        }
+        return session.access_token
+      }
+    } catch {}
+    // Session missing — try refresh
+    try {
+      const { data: refreshed } = await client.auth.refreshSession()
+      if (refreshed?.session) {
+        setToken(refreshed.session.access_token)
+        setUser(refreshed.session.user)
+        return refreshed.session.access_token
+      }
+    } catch {}
+    return token // fallback to whatever we have
+  }, [token])
+
   return (
-    <ForumContext.Provider value={{ user, profile, token, loading, categories, needsSetup, setNeedsSetup, login, logout, refreshProfile, fetchCategories }}>
+    <ForumContext.Provider value={{ user, profile, token, loading, categories, needsSetup, setNeedsSetup, login, logout, refreshProfile, fetchCategories, getFreshToken }}>
       {children}
     </ForumContext.Provider>
   )

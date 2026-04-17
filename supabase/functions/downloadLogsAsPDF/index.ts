@@ -1,4 +1,4 @@
-﻿import { createClient } from 'npm:@supabase/supabase-js@2';
+import { createClient } from 'npm:@supabase/supabase-js@2';
 import { jsPDF } from 'npm:jspdf@2.5.2';
 
 function getBodyRegion(x: number, y: number): string {
@@ -15,19 +15,28 @@ function getBodyRegion(x: number, y: number): string {
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+
 Deno.serve(async (req) => {
   try {
-      if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' } })
-  }
-  const authHeader = req.headers.get('Authorization') || ''
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { Authorization: authHeader } } })
-  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
-  const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser()
-  if (authError || !currentUser) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    const user = currentUser;
+    if (req.method === 'OPTIONS') {
+      return new Response(null, { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' } });
+    }
 
-    if (!user || user.role !== 'admin') {
+    const authHeader = req.headers.get('Authorization') || '';
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { Authorization: authHeader } } });
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+    const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+    if (authError || !currentUser) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // Check role via user profile (not user.role which doesn't exist on auth user)
+    const { data: profile } = await supabaseAdmin
+      .from('users')
+      .select('role, full_name, organization_id')
+      .eq('id', currentUser.id)
+      .single();
+
+    if (!profile || profile.role !== 'admin') {
       return Response.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
@@ -38,22 +47,44 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Missing required parameters' }, { status: 400 });
     }
 
-    let logs = [];
+    // Fetch service user details for the cover sheet
+    const { data: serviceUser } = await supabaseAdmin
+      .from('service_users')
+      .select('full_name, date_of_birth, address, phone, care_type, status')
+      .eq('id', serviceUserId)
+      .single();
+
+    // Fetch organisation details for the cover sheet
+    const { data: org } = await supabaseAdmin
+      .from('organizations')
+      .select('name, phone, email, address')
+      .eq('id', profile.organization_id)
+      .single();
+
+    let logs: any[] = [];
     if (logType === 'care') {
-      logs = await (async () => { const { data, error } = await supabase.from('care_logs').select('*'); if (error) throw error; return data || [] })();
+      // Filter at DB level by service_user_id and date range
+      const { data, error } = await supabaseAdmin
+        .from('care_logs')
+        .select('*')
+        .eq('service_user_id', serviceUserId)
+        .gte('visit_date', startDate)
+        .lte('visit_date', endDate)
+        .order('visit_date', { ascending: true })
+        .order('visit_time', { ascending: true });
+      if (error) throw error;
+      logs = data || [];
     } else if (logType === 'healthcare') {
-      logs = await (async () => { const { data, error } = await supabase.from('healthcare_logs').select('*'); if (error) throw error; return data || [] })();
+      const { data, error } = await supabaseAdmin
+        .from('healthcare_logs')
+        .select('*')
+        .eq('service_user_id', serviceUserId)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true });
+      if (error) throw error;
+      logs = data || [];
     }
-
-    // Filter by date range
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
-
-    const filteredLogs = logs.filter(log => {
-      const logDate = new Date(log.visit_date || log.date);
-      return logDate >= start && logDate <= end;
-    });
 
     // Fetch form configs for custom field labels
     let formConfigs: any[] = [];
@@ -66,193 +97,240 @@ Deno.serve(async (req) => {
 
     const doc = new jsPDF();
     doc.setFont('helvetica');
-
-    // Header
-    doc.setFontSize(18);
-    doc.text(logType === 'care' ? 'Care Logs Report' : 'Communication Logs Report', 20, 20);
-
-    doc.setFontSize(11);
-    doc.text(`Client: ${serviceUserName}`, 20, 30);
-    doc.text(`Date Range: ${startDate} to ${endDate}`, 20, 37);
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 44);
-
-    let yPosition = 55;
+    const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
     const margin = 20;
 
-    filteredLogs.forEach((log, index) => {
-      if (yPosition > pageHeight - 30) {
-        doc.addPage();
-        yPosition = 20;
-      }
+    // ─── COVER SHEET ────────────────────────────────────────────────────────
 
-      // Log header with date
-      doc.setFontSize(11);
+    // Top colour bar
+    doc.setFillColor(30, 58, 138); // dark blue
+    doc.rect(0, 0, pageWidth, 40, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text(logType === 'care' ? 'Care Log Report' : 'Communication Log Report', margin, 22);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text(org?.name || 'Care Provider', margin, 33);
+
+    doc.setTextColor(0, 0, 0);
+
+    // Client info box
+    doc.setFillColor(241, 245, 249); // slate-100
+    doc.roundedRect(margin, 50, pageWidth - margin * 2, 55, 3, 3, 'F');
+
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Client Details', margin + 6, 62);
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const clientName = serviceUser?.full_name || serviceUserName || 'Unknown';
+    doc.text(`Name:`, margin + 6, 73);
+    doc.setFont('helvetica', 'bold');
+    doc.text(clientName, margin + 30, 73);
+    doc.setFont('helvetica', 'normal');
+
+    if (serviceUser?.date_of_birth) {
+      doc.text(`Date of Birth:`, margin + 6, 81);
+      doc.text(serviceUser.date_of_birth, margin + 45, 81);
+    }
+    if (serviceUser?.address) {
+      const addr = doc.splitTextToSize(`Address: ${serviceUser.address}`, pageWidth - margin * 2 - 12);
+      doc.text(addr, margin + 6, 89);
+    }
+    if (serviceUser?.care_type) {
+      doc.text(`Care Type:`, margin + 6, 97);
+      doc.text(serviceUser.care_type.replace(/_/g, ' '), margin + 35, 97);
+    }
+
+    // Report period box
+    doc.setFillColor(219, 234, 254); // blue-100
+    doc.roundedRect(margin, 115, pageWidth - margin * 2, 35, 3, 3, 'F');
+
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Report Period', margin + 6, 127);
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`From: ${startDate}`, margin + 6, 137);
+    doc.text(`To: ${endDate}`, margin + 70, 137);
+    doc.text(`Total Entries: ${logs.length}`, margin + 130, 137);
+    doc.text(`Generated: ${new Date().toLocaleDateString('en-GB')}`, margin + 6, 144);
+    doc.text(`Generated by: ${profile.full_name || 'Administrator'}`, margin + 90, 144);
+
+    // Provider info box
+    if (org) {
+      doc.setFillColor(240, 253, 244); // green-50
+      doc.roundedRect(margin, 160, pageWidth - margin * 2, 45, 3, 3, 'F');
+
+      doc.setFontSize(13);
       doc.setFont('helvetica', 'bold');
-      doc.text(`Entry ${index + 1} - ${log.visit_date || log.date}`, margin, yPosition);
-      yPosition += 7;
+      doc.text('Care Provider', margin + 6, 172);
 
-      doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      if (org.name) doc.text(org.name, margin + 6, 181);
+      if (org.phone) doc.text(`Tel: ${org.phone}`, margin + 6, 188);
+      if (org.email) doc.text(`Email: ${org.email}`, margin + 6, 195);
+      if (org.address) {
+        const addr2 = doc.splitTextToSize(`Address: ${org.address}`, pageWidth - margin * 2 - 12);
+        doc.text(addr2, margin + 6, 202);
+      }
+    }
 
-      // Log details
+    // Footer on cover page
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text('CONFIDENTIAL — This document contains personal care information. Handle in accordance with GDPR and organisational policy.', margin, pageHeight - 15, { maxWidth: pageWidth - margin * 2 });
+    doc.setTextColor(0, 0, 0);
+
+    // ─── LOG ENTRIES ─────────────────────────────────────────────────────────
+
+    if (logs.length === 0) {
+      doc.addPage();
+      doc.setFontSize(14);
+      doc.setTextColor(100, 116, 139);
+      doc.text('No care log entries found for the selected date range.', pageWidth / 2, pageHeight / 2, { align: 'center' });
+    }
+
+    logs.forEach((log, index) => {
+      doc.addPage();
+      let yPosition = margin;
+
+      // Entry header bar
+      doc.setFillColor(30, 58, 138);
+      doc.rect(0, 0, pageWidth, 16, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Entry ${index + 1} of ${logs.length}  •  ${log.visit_date || log.date}${log.visit_time ? ' at ' + log.visit_time : ''}  •  ${clientName}`, margin, 11);
+      doc.setTextColor(0, 0, 0);
+
+      yPosition = 28;
+
+      const addLine = (label: string, value: string | null | undefined, indent = false) => {
+        if (!value) return;
+        if (yPosition > pageHeight - 20) { doc.addPage(); yPosition = margin; }
+        const x = indent ? margin + 8 : margin;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        const labelWidth = doc.getTextWidth(label + '  ');
+        doc.text(label, x, yPosition);
+        doc.setFont('helvetica', 'normal');
+        const wrapped = doc.splitTextToSize(value, pageWidth - x - margin - labelWidth);
+        doc.text(wrapped[0], x + labelWidth, yPosition);
+        for (let i = 1; i < wrapped.length; i++) {
+          yPosition += 5;
+          if (yPosition > pageHeight - 20) { doc.addPage(); yPosition = margin; }
+          doc.text(wrapped[i], x + labelWidth, yPosition);
+        }
+        yPosition += 6;
+      };
+
+      const addSection = (title: string) => {
+        if (yPosition > pageHeight - 30) { doc.addPage(); yPosition = margin; }
+        yPosition += 2;
+        doc.setFillColor(241, 245, 249);
+        doc.rect(margin, yPosition - 4, pageWidth - margin * 2, 8, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.text(title, margin + 3, yPosition + 1);
+        doc.setFont('helvetica', 'normal');
+        yPosition += 8;
+      };
+
       if (logType === 'care') {
-        doc.text(`Staff: ${log.staff_name || 'N/A'}`, margin, yPosition);
-        yPosition += 5;
-        doc.text(`Status: ${log.status || 'N/A'}`, margin, yPosition);
-        yPosition += 5;
-        if (log.mood) {
-          doc.text(`Mood: ${log.mood}`, margin, yPosition);
-          yPosition += 5;
-        }
-        if (log.food_intake) {
-          doc.text(`Food Intake: ${log.food_intake}`, margin, yPosition);
-          yPosition += 5;
-        }
-        if (log.fluid_intake) {
-          doc.text(`Fluid Intake: ${log.fluid_intake}`, margin, yPosition);
-          yPosition += 5;
-        }
-        if (log.welfare_impression_on_arrival) {
-          doc.text(`Welfare Impression: ${log.welfare_impression_on_arrival.replace(/_/g, ' ')}`, margin, yPosition);
-          yPosition += 5;
-        }
-        if (log.personal_care) {
-          doc.text(`Personal Care: ${log.personal_care}`, margin, yPosition);
-          yPosition += 5;
-        }
-        if (log.personal_care_description) {
-          const wrappedPC = doc.splitTextToSize(`  Details: ${log.personal_care_description}`, 170);
-          wrappedPC.forEach(line => { if (yPosition > pageHeight - 20) { doc.addPage(); yPosition = 20; } doc.text(line, margin, yPosition); yPosition += 5; });
-        }
-        if (log.continence_care_provided) {
-          doc.text(`Continence Care: ${log.continence_care_provided}`, margin, yPosition);
-          yPosition += 5;
-        }
-        if (log.catheter_care_provided) {
-          doc.text(`Catheter Care: ${log.catheter_care_provided}`, margin, yPosition);
-          yPosition += 5;
-        }
-        if (log.catheter_care_description) {
-          const wrappedCC = doc.splitTextToSize(`  Details: ${log.catheter_care_description}`, 170);
-          wrappedCC.forEach(line => { if (yPosition > pageHeight - 20) { doc.addPage(); yPosition = 20; } doc.text(line, margin, yPosition); yPosition += 5; });
-        }
-        if (log.repositioned_on_visit) {
-          doc.text(`Repositioned: ${log.repositioned_on_visit}`, margin, yPosition);
-          yPosition += 5;
-        }
-        if (log.skincare_provided) {
-          doc.text(`Skincare: ${log.skincare_provided}`, margin, yPosition);
-          yPosition += 5;
-        }
-        if (log.skin_integrity_concerns) {
-          doc.text(`Skin Integrity Concerns: ${log.skin_integrity_concerns}`, margin, yPosition);
-          yPosition += 5;
-        }
-        // Body map markers
-        if (log.body_map_markers && Array.isArray(log.body_map_markers) && log.body_map_markers.length > 0) {
-          if (yPosition > pageHeight - 30) { doc.addPage(); yPosition = 20; }
+        addSection('Visit Summary');
+        addLine('Staff:', log.staff_name);
+        addLine('Status:', log.status ? log.status.charAt(0).toUpperCase() + log.status.slice(1) : undefined);
+        addLine('Duration:', log.duration_minutes ? `${log.duration_minutes} minutes` : undefined);
+        addLine('Double Handed:', log.double_handed_call);
+        addLine('Staff Grade:', log.staff_grade);
+
+        addSection('Welfare & Observations');
+        addLine('Welfare on Arrival:', log.welfare_impression_on_arrival?.replace(/_/g, ' '));
+        addLine('Mood:', log.mood ? log.mood.charAt(0).toUpperCase() + log.mood.slice(1) : undefined);
+        if (log.observations) {
+          if (yPosition > pageHeight - 30) { doc.addPage(); yPosition = margin; }
           doc.setFont('helvetica', 'bold');
-          doc.text('Body Map Markers:', margin, yPosition);
-          yPosition += 5;
+          doc.setFontSize(9);
+          doc.text('Observations:', margin, yPosition);
+          yPosition += 6;
           doc.setFont('helvetica', 'normal');
-          log.body_map_markers.forEach((marker: any, idx: number) => {
-            if (yPosition > pageHeight - 20) { doc.addPage(); yPosition = 20; }
-            const side = marker.side === 'front' ? 'Front' : 'Back';
-            const region = getBodyRegion(marker.x, marker.y);
-            const note = marker.note ? ` - ${marker.note}` : '';
-            doc.text(`  ${idx + 1}. ${side} - ${region}${note}`, margin, yPosition);
+          const wrapped = doc.splitTextToSize(log.observations, pageWidth - margin * 2 - 8);
+          wrapped.forEach(line => {
+            if (yPosition > pageHeight - 20) { doc.addPage(); yPosition = margin; }
+            doc.text(line, margin + 8, yPosition);
             yPosition += 5;
           });
         }
-        if (log.food_offered) {
-          doc.text(`Food Offered: ${log.food_offered}`, margin, yPosition);
-          yPosition += 5;
-          if (log.food_accepted) {
-            doc.text(`  Accepted: ${log.food_accepted}`, margin, yPosition);
-            yPosition += 5;
-          }
-          if (log.food_given) {
-            doc.text(`  What Was Given: ${log.food_given}`, margin, yPosition);
-            yPosition += 5;
-          }
-          if (log.food_outcome) {
-            doc.text(`  Outcome: ${log.food_outcome.replace(/_/g, ' ')}`, margin, yPosition);
-            yPosition += 5;
-          }
-        }
-        if (log.drinks_offered) {
-          doc.text(`Drinks Offered: ${log.drinks_offered}`, margin, yPosition);
-          yPosition += 5;
-          if (log.drinks_accepted) {
-            doc.text(`  Accepted: ${log.drinks_accepted}`, margin, yPosition);
-            yPosition += 5;
-          }
-          if (log.drinks_given) {
-            doc.text(`  What Was Given: ${log.drinks_given}`, margin, yPosition);
-            yPosition += 5;
-          }
-          if (log.drinks_outcome) {
-            doc.text(`  Outcome: ${log.drinks_outcome.replace(/_/g, ' ')}`, margin, yPosition);
-            yPosition += 5;
-          }
-        }
-        if (log.add_medication_round) {
-          doc.text(`Medication Round: ${log.add_medication_round}`, margin, yPosition);
-          yPosition += 5;
-          if (log.medication_round_outcome) {
-            doc.text(`  Outcome: ${log.medication_round_outcome}`, margin, yPosition);
-            yPosition += 5;
-          }
-        }
+
+        addSection('Personal Care');
+        addLine('Personal Care:', log.personal_care);
+        addLine('Details:', log.personal_care_description, true);
+        addLine('Continence Care:', log.continence_care_provided);
+        addLine('Catheter Care:', log.catheter_care_provided);
+        addLine('Catheter Details:', log.catheter_care_description, true);
+        addLine('Repositioned:', log.repositioned_on_visit);
+        addLine('Skincare:', log.skincare_provided);
+        addLine('Skin Integrity Concerns:', log.skin_integrity_concerns);
+
+        addSection('Nutrition & Fluids');
+        addLine('Food Intake:', log.food_intake ? log.food_intake.charAt(0).toUpperCase() + log.food_intake.slice(1) : undefined);
+        addLine('Food Offered:', log.food_offered);
+        addLine('Food Accepted:', log.food_accepted, true);
+        addLine('What Was Given:', log.food_given, true);
+        addLine('Food Outcome:', log.food_outcome?.replace(/_/g, ' '), true);
+        addLine('Fluid Intake:', log.fluid_intake ? log.fluid_intake.charAt(0).toUpperCase() + log.fluid_intake.slice(1) : undefined);
+        addLine('Drinks Offered:', log.drinks_offered);
+        addLine('Drinks Accepted:', log.drinks_accepted, true);
+        addLine('What Was Given:', log.drinks_given, true);
+        addLine('Drinks Outcome:', log.drinks_outcome?.replace(/_/g, ' '), true);
+
+        addSection('Medications');
+        addLine('Medication Round:', log.add_medication_round);
+        addLine('Outcome:', log.medication_round_outcome, true);
         if (log.medication_concerns && log.medication_concerns !== 'no') {
-          doc.text(`Medication Concerns: ${log.medication_concerns}`, margin, yPosition);
-          yPosition += 5;
-          if (log.medication_concerns_details) {
-            const wrappedMC = doc.splitTextToSize(`  Details: ${log.medication_concerns_details}`, 170);
-            wrappedMC.forEach(line => { if (yPosition > pageHeight - 20) { doc.addPage(); yPosition = 20; } doc.text(line, margin, yPosition); yPosition += 5; });
-          }
+          addLine('Medication Concerns:', log.medication_concerns);
+          addLine('Details:', log.medication_concerns_details, true);
         }
+
         if (log.healthcare_visit_required && log.healthcare_visit_required !== 'no') {
-          doc.text(`Healthcare Visit Required: ${log.healthcare_visit_required}`, margin, yPosition);
-          yPosition += 5;
-          if (log.healthcare_visit_type) {
-            doc.text(`  Type: ${log.healthcare_visit_type}`, margin, yPosition);
-            yPosition += 5;
-          }
+          addSection('Healthcare');
+          addLine('Healthcare Visit Required:', log.healthcare_visit_required);
+          addLine('Type:', log.healthcare_visit_type, true);
         }
+
         if (log.further_concerns && log.further_concerns !== 'no') {
-          doc.text(`Further Concerns: ${log.further_concerns}`, margin, yPosition);
-          yPosition += 5;
-          if (log.further_concerns_details) {
-            const wrappedFC = doc.splitTextToSize(`  Details: ${log.further_concerns_details}`, 170);
-            wrappedFC.forEach(line => { if (yPosition > pageHeight - 20) { doc.addPage(); yPosition = 20; } doc.text(line, margin, yPosition); yPosition += 5; });
-          }
+          addSection('Concerns & Incidents');
+          addLine('Further Concerns:', log.further_concerns);
+          addLine('Details:', log.further_concerns_details, true);
         }
+
+        // Body map markers
+        if (log.body_map_markers && Array.isArray(log.body_map_markers) && log.body_map_markers.length > 0) {
+          addSection('Body Map Markers');
+          log.body_map_markers.forEach((marker: any, idx: number) => {
+            const side = marker.side === 'front' ? 'Front' : 'Back';
+            const region = getBodyRegion(marker.x, marker.y);
+            const note = marker.note ? ` — ${marker.note}` : '';
+            addLine(`${idx + 1}.`, `${side} body, ${region}${note}`);
+          });
+        }
+
         if (log.extended_notes) {
-          doc.text('Extended Notes:', margin, yPosition);
-          yPosition += 5;
-          const wrappedEN = doc.splitTextToSize(log.extended_notes, 170);
-          wrappedEN.forEach(line => { if (yPosition > pageHeight - 20) { doc.addPage(); yPosition = 20; } doc.text(line, margin + 5, yPosition); yPosition += 5; });
-        }
-        if (log.staff_grade) {
-          doc.text(`Staff Grade: ${log.staff_grade}`, margin, yPosition);
-          yPosition += 5;
-        }
-        if (log.double_handed_call) {
-          doc.text(`Double Handed Call: ${log.double_handed_call}`, margin, yPosition);
-          yPosition += 5;
-        }
-        if (log.observations) {
-          doc.text('Observations:', margin, yPosition);
-          yPosition += 5;
-          const wrappedText = doc.splitTextToSize(log.observations, 170);
-          wrappedText.forEach(line => {
-            if (yPosition > pageHeight - 20) {
-              doc.addPage();
-              yPosition = 20;
-            }
-            doc.text(line, margin + 5, yPosition);
+          addSection('Extended Notes');
+          if (yPosition > pageHeight - 30) { doc.addPage(); yPosition = margin; }
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9);
+          const wrapped = doc.splitTextToSize(log.extended_notes, pageWidth - margin * 2 - 8);
+          wrapped.forEach(line => {
+            if (yPosition > pageHeight - 20) { doc.addPage(); yPosition = margin; }
+            doc.text(line, margin + 8, yPosition);
             yPosition += 5;
           });
         }
@@ -262,69 +340,55 @@ Deno.serve(async (req) => {
           for (const [sectionId, fields] of Object.entries(log.custom_fields)) {
             if (!fields || typeof fields !== 'object' || Object.keys(fields).length === 0) continue;
 
-            if (yPosition > pageHeight - 30) { doc.addPage(); yPosition = 20; }
-
-            // Find section label from form configs
             let sectionLabel = sectionId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
             for (const cfg of formConfigs) {
               const sections = cfg.config?.sections || [];
-              const match = sections.find(s => s.id === sectionId && s.type === 'custom');
+              const match = sections.find((s: any) => s.id === sectionId && s.type === 'custom');
               if (match) { sectionLabel = match.label || match.name || sectionLabel; break; }
             }
 
-            doc.setFont('helvetica', 'bold');
-            doc.text(`${sectionLabel}:`, margin, yPosition);
-            yPosition += 5;
-            doc.setFont('helvetica', 'normal');
+            addSection(sectionLabel);
 
-            for (const [fieldId, value] of Object.entries(fields)) {
+            for (const [fieldId, value] of Object.entries(fields as Record<string, unknown>)) {
               if (value === null || value === undefined || value === '') continue;
 
-              // Find field label from form configs
-              let fieldLabel = fieldId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+              let fieldLabel = fieldId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) + ':';
               for (const cfg of formConfigs) {
                 const sections = cfg.config?.sections || [];
-                const section = sections.find(s => s.id === sectionId);
+                const section = sections.find((s: any) => s.id === sectionId);
                 if (section?.fields) {
-                  const fieldMatch = section.fields.find(f => f.id === fieldId);
-                  if (fieldMatch) { fieldLabel = fieldMatch.label || fieldLabel; break; }
+                  const fieldMatch = section.fields.find((f: any) => f.id === fieldId);
+                  if (fieldMatch) { fieldLabel = (fieldMatch.label || fieldLabel) + ':'; break; }
                 }
               }
 
-              const displayValue = Array.isArray(value) ? value.join(', ') : String(value);
-              const line = `  ${fieldLabel}: ${displayValue}`;
-              const wrappedCF = doc.splitTextToSize(line, 170);
-              wrappedCF.forEach(l => {
-                if (yPosition > pageHeight - 20) { doc.addPage(); yPosition = 20; }
-                doc.text(l, margin, yPosition);
-                yPosition += 5;
-              });
+              const displayValue = Array.isArray(value) ? (value as any[]).join(', ') : String(value);
+              addLine(fieldLabel, displayValue);
             }
           }
         }
+
       } else if (logType === 'healthcare') {
-        doc.text(`Visitor: ${log.visitor_name || 'N/A'}`, margin, yPosition);
-        yPosition += 5;
-        doc.text(`Type: ${log.visit_type || 'N/A'}`, margin, yPosition);
-        yPosition += 5;
-        doc.text(`Recorded by: ${log.recorded_by_name || 'N/A'}`, margin, yPosition);
-        yPosition += 5;
+        addSection('Visit Details');
+        addLine('Visitor:', log.visitor_name);
+        addLine('Type:', log.visit_type);
+        addLine('Recorded by:', log.recorded_by_name);
         if (log.notes) {
-          doc.text('Notes:', margin, yPosition);
-          yPosition += 5;
-          const wrappedText = doc.splitTextToSize(log.notes, 170);
-          wrappedText.forEach(line => {
-            if (yPosition > pageHeight - 20) {
-              doc.addPage();
-              yPosition = 20;
-            }
-            doc.text(line, margin + 5, yPosition);
+          addSection('Notes');
+          const wrapped = doc.splitTextToSize(log.notes, pageWidth - margin * 2 - 8);
+          wrapped.forEach((line: string) => {
+            if (yPosition > pageHeight - 20) { doc.addPage(); yPosition = margin; }
+            doc.text(line, margin + 8, yPosition);
             yPosition += 5;
           });
         }
       }
 
-      yPosition += 8;
+      // Footer on each log page
+      doc.setFontSize(7);
+      doc.setTextColor(148, 163, 184);
+      doc.text(`${clientName}  |  ${logType === 'care' ? 'Care Log' : 'Communication Log'}  |  ${log.visit_date || log.date}  |  Page ${index + 2}`, margin, pageHeight - 8);
+      doc.setTextColor(0, 0, 0);
     });
 
     const pdfBytes = doc.output('arraybuffer');
@@ -333,7 +397,8 @@ Deno.serve(async (req) => {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${serviceUserName}_${logType}_logs_${startDate}_to_${endDate}.pdf"`
+        'Content-Disposition': `attachment; filename="${(serviceUser?.full_name || serviceUserName || 'client').replace(/\s+/g, '-')}_${logType}_logs_${startDate}_to_${endDate}.pdf"`,
+        'Access-Control-Allow-Origin': '*',
       }
     });
   } catch (error) {

@@ -50,6 +50,8 @@ export async function GET(req, { params }) {
   return json({ thread, replies: enrichedReplies })
 }
 
+const FOUNDER_ID = '1f5d9e8a-ab4b-4c00-813a-8af23f79fb82'
+
 // PATCH: update thread (edit, pin, lock, feature, delete)
 export async function PATCH(req, { params }) {
   try {
@@ -57,15 +59,16 @@ export async function PATCH(req, { params }) {
     const body = await req.json()
     const { token, action: modAction, ...updates } = body
 
-    if (!token) return json({ error: 'Unauthorized' }, 401)
+    if (!token) return json({ error: 'Unauthorized — no token' }, 401)
 
     const anonClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
-    const { data: { user } } = await anonClient.auth.getUser(token)
-    if (!user) return json({ error: 'Unauthorized' }, 401)
+    const { data: { user }, error: authErr } = await anonClient.auth.getUser(token)
+    if (!user) return json({ error: 'Unauthorized — token expired. Please log out and log back in. (' + (authErr?.message || 'no user') + ')' }, 401)
 
     const { data: fp } = await supabase.from('forum_profiles').select('forum_role').eq('id', user.id).single()
     const role = fp?.forum_role || 'user'
-    const isFounder = role === 'founder'
+    // Check founder by BOTH role AND user ID
+    const isFounder = role === 'founder' || user.id === FOUNDER_ID
 
     // Load stored permissions
     const { data: permRow } = await supabase.from('forum_settings').select('value').eq('key', 'role_permissions').single()

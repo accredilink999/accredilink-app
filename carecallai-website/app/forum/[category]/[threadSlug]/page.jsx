@@ -9,13 +9,14 @@ import LikeButton from '@/components/forum/LikeButton'
 import RichContent from '@/components/forum/RichContent'
 import ReactionBar from '@/components/forum/ReactionBar'
 import { timeAgo, canModerate, isFounder } from '@/lib/forumAuth'
+import StarRank from '@/components/forum/StarRank'
 import { Pin, Lock, Unlock, Trash2, Edit, Eye, MessageSquare, MoreHorizontal, ArrowUpCircle, FolderInput, Bell, BellOff, Flag } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 export default function ThreadPage({ params }) {
   const { category, threadSlug } = use(params)
-  const { user, profile, token, loading, logout, categories } = useForum()
+  const { user, profile, token, loading, logout, categories, getFreshToken } = useForum()
   const router = useRouter()
   const [thread, setThread] = useState(null)
   const [replies, setReplies] = useState([])
@@ -188,7 +189,8 @@ export default function ThreadPage({ params }) {
     setShowModMenu(false)
     if (action === 'delete' && !confirm('Delete this entire thread?')) return
     try {
-      const res = await fetch(`/api/forum/threads/${thread.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, action, ...extra }) })
+      const freshToken = await getFreshToken()
+      const res = await fetch(`/api/forum/threads/${thread.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: freshToken, action, ...extra }) })
       const data = await res.json()
       if (!res.ok) { alert(data.error || 'Action failed. Please try logging out and back in.'); return }
       if (action === 'delete') { router.push(`/forum/${category}`) } else { fetchThread() }
@@ -206,7 +208,8 @@ export default function ThreadPage({ params }) {
 
   const handleSaveEdit = async () => {
     try {
-      const res = await fetch(`/api/forum/threads/${thread.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, title: editTitle, content: editContent }) })
+      const freshToken = await getFreshToken()
+      const res = await fetch(`/api/forum/threads/${thread.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: freshToken, title: editTitle, content: editContent }) })
       const data = await res.json()
       if (!res.ok) { alert(data.error || 'Save failed. Please try logging out and back in.'); return }
       setThread(prev => ({ ...prev, title: editTitle, content: editContent, updated_at: new Date().toISOString() }))
@@ -274,6 +277,7 @@ export default function ThreadPage({ params }) {
                   {author.forum_role === 'founder' ? 'Founder' : author.forum_role === 'admin' ? 'Admin' : 'Mod'}
                 </span>
               )}
+              <StarRank role={author.forum_role} postCount={author.post_count || 0} />
             </div>
 
             {/* Content area */}
