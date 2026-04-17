@@ -1,9 +1,10 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Plus, TrendingUp, Megaphone, HelpCircle, Bug, Lightbulb, MessageCircle, Star, Shield, ClipboardCheck, MessageSquare } from 'lucide-react'
+import { Plus, TrendingUp, Megaphone, HelpCircle, Bug, Lightbulb, MessageCircle, Star, Shield, ClipboardCheck, MessageSquare, BookOpen } from 'lucide-react'
 
 const iconMap = {
+  'user-documentation': BookOpen,
   announcements: Megaphone,
   'help-support': HelpCircle,
   'bug-reports': Bug,
@@ -15,6 +16,7 @@ const iconMap = {
 }
 
 const colorMap = {
+  'user-documentation': 'text-indigo-400',
   announcements: 'text-amber-400',
   'help-support': 'text-blue-400',
   'bug-reports': 'text-red-400',
