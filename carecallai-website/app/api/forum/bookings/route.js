@@ -1,25 +1,13 @@
 /*
-  Forum Demo Booking System - API Route
+  Forum Booking System - API Route
 
-  SQL to create table:
+  Default availability: Mon-Fri 9am-5pm (1-hour slots)
+  Founder can block specific slots when unavailable
+  Users book available slots
 
-  CREATE TABLE forum_bookings (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID,
-    type TEXT NOT NULL CHECK (type IN ('slot', 'booking')),
-    date DATE NOT NULL,
-    start_time TIME NOT NULL,
-    end_time TIME NOT NULL,
-    status TEXT DEFAULT 'confirmed' CHECK (status IN ('confirmed', 'cancelled')),
-    notes TEXT,
-    user_name TEXT,
-    user_email TEXT,
-    created_at TIMESTAMPTZ DEFAULT now()
-  );
-
-  CREATE INDEX idx_forum_bookings_date ON forum_bookings (date);
-  CREATE INDEX idx_forum_bookings_type ON forum_bookings (type);
-  CREATE INDEX idx_forum_bookings_user ON forum_bookings (user_id);
+  Uses forum_bookings table:
+  - type='booking' — a user's booked session
+  - type='blocked' — founder marked as unavailable
 */
 
 import { createClient } from '@supabase/supabase-js'
@@ -33,7 +21,6 @@ const FOUNDER_EMAIL = 'mikebohanna.work@gmail.com'
 
 function getWeekRange(weekStart) {
   const start = new Date(weekStart)
-  // Ensure we start on Monday
   const day = start.getDay()
   const diff = day === 0 ? -6 : 1 - day
   start.setDate(start.getDate() + diff)
@@ -67,7 +54,7 @@ async function sendNotificationEmail(to, subject, html) {
   }
 }
 
-// GET: fetch available slots and existing bookings for a week
+// GET: fetch blocked slots and bookings for a week
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url)
@@ -76,18 +63,16 @@ export async function GET(req) {
 
     const { startDate, endDate } = getWeekRange(weekParam)
 
-    // Fetch all slots for the week
-    const { data: slots, error: slotErr } = await supabase
+    // Fetch blocked slots for the week
+    const { data: blocked, error: blockErr } = await supabase
       .from('forum_bookings')
-      .select('id, date, start_time, end_time, status')
-      .eq('type', 'slot')
+      .select('id, date, start_time, end_time')
+      .eq('type', 'blocked')
       .eq('status', 'confirmed')
       .gte('date', startDate)
       .lte('date', endDate)
-      .order('date')
-      .order('start_time')
 
-    if (slotErr) return json({ error: slotErr.message }, 500)
+    if (blockErr) return json({ error: blockErr.message }, 500)
 
     // Fetch all bookings for the week (don't expose user details to everyone)
     const { data: bookings, error: bookErr } = await supabase
@@ -122,13 +107,13 @@ export async function GET(req) {
       }
     }
 
-    return json({ slots: slots || [], bookings: bookings || [], userBookings })
+    return json({ blocked: blocked || [], bookings: bookings || [], userBookings })
   } catch (err) {
     return json({ error: err.message }, 500)
   }
 }
 
-// POST: create booking, add/remove slots, cancel booking
+// POST: book, cancel, block, unblock
 export async function POST(req) {
   try {
     const body = await req.json()
@@ -147,18 +132,31 @@ export async function POST(req) {
       const { date, start_time, end_time, notes } = body
       if (!date || !start_time || !end_time) return json({ error: 'Missing date or time' }, 400)
 
-      // Check that a matching slot exists and is available
-      const { data: matchingSlots } = await supabase
+      // Validate it's a weekday
+      const dateObj = new Date(date + 'T00:00:00')
+      const dayOfWeek = dateObj.getDay()
+      if (dayOfWeek === 0 || dayOfWeek === 6) return json({ error: 'Bookings are only available Monday to Friday' }, 400)
+
+      // Validate it's within 9am-5pm
+      const hour = parseInt(start_time.split(':')[0])
+      if (hour < 9 || hour >= 17) return json({ error: 'Bookings are only available between 9am and 5pm' }, 400)
+
+      // Check not in the past
+      const now = new Date()
+      const slotTime = new Date(date + 'T' + start_time)
+      if (slotTime < now) return json({ error: 'Cannot book a slot in the past' }, 400)
+
+      // Check not blocked by founder
+      const { data: blockedSlots } = await supabase
         .from('forum_bookings')
         .select('id')
-        .eq('type', 'slot')
+        .eq('type', 'blocked')
         .eq('status', 'confirmed')
         .eq('date', date)
         .eq('start_time', start_time)
-        .eq('end_time', end_time)
 
-      if (!matchingSlots || matchingSlots.length === 0) {
-        return json({ error: 'This time slot is no longer available' }, 400)
+      if (blockedSlots && blockedSlots.length > 0) {
+        return json({ error: 'This time slot is unavailable' }, 400)
       }
 
       // Check no existing booking at this time
@@ -172,28 +170,6 @@ export async function POST(req) {
 
       if (existingBookings && existingBookings.length > 0) {
         return json({ error: 'This slot has already been booked' }, 409)
-      }
-
-      // Check user doesn't already have a booking this week
-      const bookDate = new Date(date)
-      const day = bookDate.getDay()
-      const mondayDiff = day === 0 ? -6 : 1 - day
-      const monday = new Date(bookDate)
-      monday.setDate(monday.getDate() + mondayDiff)
-      const friday = new Date(monday)
-      friday.setDate(friday.getDate() + 4)
-
-      const { data: weekBookings } = await supabase
-        .from('forum_bookings')
-        .select('id')
-        .eq('type', 'booking')
-        .eq('status', 'confirmed')
-        .eq('user_id', user.id)
-        .gte('date', monday.toISOString().split('T')[0])
-        .lte('date', friday.toISOString().split('T')[0])
-
-      if (weekBookings && weekBookings.length > 0) {
-        return json({ error: 'You already have a booking this week. Please cancel your existing booking first.' }, 409)
       }
 
       // Get user profile info
@@ -225,19 +201,17 @@ export async function POST(req) {
 
       if (insertErr) return json({ error: insertErr.message }, 500)
 
-      // Format date and time for email
-      const dateObj = new Date(date + 'T00:00:00')
       const formattedDate = dateObj.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
       const hhmm = (t) => (t || '').slice(0, 5)
 
       // Send email notification to founder
       await sendNotificationEmail(
         FOUNDER_EMAIL,
-        `New Demo Booking: ${userName} - ${formattedDate}`,
+        `New Session Booking: ${userName} - ${formattedDate}`,
         `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #0d9488, #0891b2); padding: 24px; border-radius: 12px 12px 0 0;">
-            <h1 style="color: white; margin: 0; font-size: 20px;">New Demo Booking</h1>
+            <h1 style="color: white; margin: 0; font-size: 20px;">New Session Booking</h1>
           </div>
           <div style="background: #f8fafc; padding: 24px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
             <table style="width: 100%; border-collapse: collapse;">
@@ -257,7 +231,7 @@ export async function POST(req) {
                 <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Time</td>
                 <td style="padding: 8px 0; font-weight: 600; font-size: 14px;">${hhmm(start_time)} - ${hhmm(end_time)}</td>
               </tr>
-              ${notes ? `<tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Notes</td><td style="padding: 8px 0; font-size: 14px;">${notes}</td></tr>` : ''}
+              ${notes ? `<tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">What they want to cover</td><td style="padding: 8px 0; font-size: 14px;">${notes}</td></tr>` : ''}
             </table>
             <p style="margin-top: 16px; font-size: 13px; color: #94a3b8;">This booking was made via the CareCallAI forum.</p>
           </div>
@@ -268,22 +242,22 @@ export async function POST(req) {
       // Send confirmation email to user
       await sendNotificationEmail(
         userEmail,
-        `Demo Booking Confirmed - ${formattedDate}`,
+        `Session Confirmed - ${formattedDate}`,
         `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #0d9488, #0891b2); padding: 24px; border-radius: 12px 12px 0 0;">
-            <h1 style="color: white; margin: 0; font-size: 20px;">Your Demo is Confirmed!</h1>
+            <h1 style="color: white; margin: 0; font-size: 20px;">Your Session is Confirmed!</h1>
           </div>
           <div style="background: #f8fafc; padding: 24px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
             <p style="font-size: 15px; color: #334155;">Hi ${userName},</p>
-            <p style="font-size: 14px; color: #475569;">Your CareCallAI demo session has been confirmed:</p>
+            <p style="font-size: 14px; color: #475569;">Your CareCallAI session has been confirmed:</p>
             <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 16px 0;">
               <p style="margin: 4px 0; font-size: 14px;"><strong>Date:</strong> ${formattedDate}</p>
               <p style="margin: 4px 0; font-size: 14px;"><strong>Time:</strong> ${hhmm(start_time)} - ${hhmm(end_time)}</p>
               <p style="margin: 4px 0; font-size: 14px;"><strong>Platform:</strong> Microsoft Teams</p>
             </div>
             <p style="font-size: 14px; color: #475569;">We'll send you a Microsoft Teams meeting link before your session. If you need to reschedule, you can cancel and rebook from the forum.</p>
-            <p style="font-size: 14px; color: #475569; margin-top: 16px;">Looking forward to showing you CareCallAI!</p>
+            <p style="font-size: 14px; color: #475569; margin-top: 16px;">Looking forward to helping you!</p>
             <p style="font-size: 14px; color: #475569;">- The CareCallAI Team</p>
           </div>
         </div>
@@ -296,131 +270,145 @@ export async function POST(req) {
           user_id: FOUNDER_ID,
           actor_id: user.id,
           type: 'booking',
-          message: `${userName} booked a demo on ${formattedDate} at ${hhmm(start_time)}`,
+          message: `${userName} booked a session on ${formattedDate} at ${hhmm(start_time)}`,
         })
       } catch {}
 
       return json({ success: true, booking })
     }
 
-    // --- ADD SLOT (founder only) ---
-    if (action === 'add-slot') {
-      if (!isFounder) return json({ error: 'Only the founder can manage slots' }, 403)
+    // --- BLOCK SLOT (founder only) ---
+    if (action === 'block') {
+      if (!isFounder) return json({ error: 'Only the founder can manage availability' }, 403)
 
       const { date, start_time, end_time } = body
       if (!date || !start_time || !end_time) return json({ error: 'Missing date or time' }, 400)
 
-      // Validate the date is not in the past
-      const today = new Date().toISOString().split('T')[0]
-      if (date < today) return json({ error: 'Cannot add slots in the past' }, 400)
-
-      // Check for duplicate slot
-      const { data: existing } = await supabase
+      // Check for existing booking — can't block a slot that's already booked
+      const { data: existingBookings } = await supabase
         .from('forum_bookings')
         .select('id')
-        .eq('type', 'slot')
+        .eq('type', 'booking')
         .eq('status', 'confirmed')
         .eq('date', date)
         .eq('start_time', start_time)
-        .eq('end_time', end_time)
 
-      if (existing && existing.length > 0) {
-        return json({ error: 'This slot already exists' }, 409)
+      if (existingBookings && existingBookings.length > 0) {
+        return json({ error: 'Cannot block a slot that has an active booking. Cancel the booking first.' }, 409)
       }
 
-      const { data: slot, error: insertErr } = await supabase
+      // Check not already blocked
+      const { data: existing } = await supabase
+        .from('forum_bookings')
+        .select('id')
+        .eq('type', 'blocked')
+        .eq('status', 'confirmed')
+        .eq('date', date)
+        .eq('start_time', start_time)
+
+      if (existing && existing.length > 0) {
+        return json({ success: true, message: 'Already blocked' })
+      }
+
+      const { error: insertErr } = await supabase
         .from('forum_bookings')
         .insert({
           user_id: user.id,
-          type: 'slot',
+          type: 'blocked',
           date,
           start_time,
           end_time,
           status: 'confirmed',
         })
-        .select()
-        .single()
 
       if (insertErr) return json({ error: insertErr.message }, 500)
-      return json({ success: true, slot })
+      return json({ success: true })
     }
 
-    // --- ADD SLOTS IN BULK (founder only) ---
-    if (action === 'add-slots-bulk') {
-      if (!isFounder) return json({ error: 'Only the founder can manage slots' }, 403)
+    // --- UNBLOCK SLOT (founder only) ---
+    if (action === 'unblock') {
+      if (!isFounder) return json({ error: 'Only the founder can manage availability' }, 403)
 
-      const { slots } = body
-      if (!slots || !Array.isArray(slots) || slots.length === 0) return json({ error: 'No slots provided' }, 400)
-
-      const today = new Date().toISOString().split('T')[0]
-      const validSlots = slots.filter(s => s.date >= today && s.start_time && s.end_time)
-
-      if (validSlots.length === 0) return json({ error: 'No valid slots to add' }, 400)
-
-      // Check for duplicates
-      const { data: existingSlots } = await supabase
-        .from('forum_bookings')
-        .select('date, start_time, end_time')
-        .eq('type', 'slot')
-        .eq('status', 'confirmed')
-        .in('date', validSlots.map(s => s.date))
-
-      const existingSet = new Set((existingSlots || []).map(s => `${s.date}_${s.start_time}_${s.end_time}`))
-      const newSlots = validSlots
-        .filter(s => !existingSet.has(`${s.date}_${s.start_time}_${s.end_time}`))
-        .map(s => ({
-          user_id: user.id,
-          type: 'slot',
-          date: s.date,
-          start_time: s.start_time,
-          end_time: s.end_time,
-          status: 'confirmed',
-        }))
-
-      if (newSlots.length === 0) return json({ error: 'All slots already exist' }, 409)
-
-      const { data: created, error: insertErr } = await supabase
-        .from('forum_bookings')
-        .insert(newSlots)
-        .select()
-
-      if (insertErr) return json({ error: insertErr.message }, 500)
-      return json({ success: true, count: created.length, slots: created })
-    }
-
-    // --- REMOVE SLOT (founder only) ---
-    if (action === 'remove-slot') {
-      if (!isFounder) return json({ error: 'Only the founder can manage slots' }, 403)
-
-      const { id } = body
-      if (!id) return json({ error: 'Missing slot id' }, 400)
-
-      // Check there's no booking for this slot time before removing
-      const { data: slot } = await supabase
-        .from('forum_bookings')
-        .select('date, start_time, end_time')
-        .eq('id', id)
-        .eq('type', 'slot')
-        .single()
-
-      if (!slot) return json({ error: 'Slot not found' }, 404)
-
-      const { data: bookingsAtTime } = await supabase
-        .from('forum_bookings')
-        .select('id')
-        .eq('type', 'booking')
-        .eq('status', 'confirmed')
-        .eq('date', slot.date)
-        .eq('start_time', slot.start_time)
-
-      if (bookingsAtTime && bookingsAtTime.length > 0) {
-        return json({ error: 'Cannot remove slot that has an active booking. Cancel the booking first.' }, 409)
-      }
+      const { date, start_time } = body
+      if (!date || !start_time) return json({ error: 'Missing date or time' }, 400)
 
       const { error: delErr } = await supabase
         .from('forum_bookings')
         .update({ status: 'cancelled' })
-        .eq('id', id)
+        .eq('type', 'blocked')
+        .eq('status', 'confirmed')
+        .eq('date', date)
+        .eq('start_time', start_time)
+
+      if (delErr) return json({ error: delErr.message }, 500)
+      return json({ success: true })
+    }
+
+    // --- BLOCK FULL DAY (founder only) ---
+    if (action === 'block-day') {
+      if (!isFounder) return json({ error: 'Only the founder can manage availability' }, 403)
+
+      const { date } = body
+      if (!date) return json({ error: 'Missing date' }, 400)
+
+      // Check for bookings on this day
+      const { data: dayBookings } = await supabase
+        .from('forum_bookings')
+        .select('id, start_time')
+        .eq('type', 'booking')
+        .eq('status', 'confirmed')
+        .eq('date', date)
+
+      if (dayBookings && dayBookings.length > 0) {
+        return json({ error: `Cannot block this day — ${dayBookings.length} booking(s) exist. Cancel them first.` }, 409)
+      }
+
+      // Get already blocked slots for this day
+      const { data: existingBlocked } = await supabase
+        .from('forum_bookings')
+        .select('start_time')
+        .eq('type', 'blocked')
+        .eq('status', 'confirmed')
+        .eq('date', date)
+
+      const blockedTimes = new Set((existingBlocked || []).map(b => (b.start_time || '').slice(0, 5)))
+      const newBlocks = []
+
+      for (let h = 9; h < 17; h++) {
+        const st = `${String(h).padStart(2, '0')}:00`
+        if (!blockedTimes.has(st)) {
+          newBlocks.push({
+            user_id: user.id,
+            type: 'blocked',
+            date,
+            start_time: st,
+            end_time: `${String(h + 1).padStart(2, '0')}:00`,
+            status: 'confirmed',
+          })
+        }
+      }
+
+      if (newBlocks.length > 0) {
+        const { error: insertErr } = await supabase.from('forum_bookings').insert(newBlocks)
+        if (insertErr) return json({ error: insertErr.message }, 500)
+      }
+
+      return json({ success: true, blocked: newBlocks.length })
+    }
+
+    // --- UNBLOCK FULL DAY (founder only) ---
+    if (action === 'unblock-day') {
+      if (!isFounder) return json({ error: 'Only the founder can manage availability' }, 403)
+
+      const { date } = body
+      if (!date) return json({ error: 'Missing date' }, 400)
+
+      const { error: delErr } = await supabase
+        .from('forum_bookings')
+        .update({ status: 'cancelled' })
+        .eq('type', 'blocked')
+        .eq('status', 'confirmed')
+        .eq('date', date)
 
       if (delErr) return json({ error: delErr.message }, 500)
       return json({ success: true })
@@ -431,7 +419,6 @@ export async function POST(req) {
       const { id } = body
       if (!id) return json({ error: 'Missing booking id' }, 400)
 
-      // Verify ownership or founder
       const { data: booking } = await supabase
         .from('forum_bookings')
         .select('*')
@@ -452,27 +439,27 @@ export async function POST(req) {
 
       if (updateErr) return json({ error: updateErr.message }, 500)
 
+      const bookDateObj = new Date(booking.date + 'T00:00:00')
+      const formattedDate = bookDateObj.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+      const hhmm = (t) => (t || '').slice(0, 5)
+
       // Notify founder if user cancelled
       if (!isFounder) {
-        const dateObj = new Date(booking.date + 'T00:00:00')
-        const formattedDate = dateObj.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-        const hhmm = (t) => (t || '').slice(0, 5)
-
         await sendNotificationEmail(
           FOUNDER_EMAIL,
-          `Demo Cancelled: ${booking.user_name} - ${formattedDate}`,
+          `Session Cancelled: ${booking.user_name} - ${formattedDate}`,
           `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <div style="background: linear-gradient(135deg, #ef4444, #dc2626); padding: 24px; border-radius: 12px 12px 0 0;">
-              <h1 style="color: white; margin: 0; font-size: 20px;">Demo Cancelled</h1>
+              <h1 style="color: white; margin: 0; font-size: 20px;">Session Cancelled</h1>
             </div>
             <div style="background: #f8fafc; padding: 24px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
-              <p style="font-size: 14px; color: #475569;"><strong>${booking.user_name}</strong> has cancelled their demo booking:</p>
+              <p style="font-size: 14px; color: #475569;"><strong>${booking.user_name}</strong> has cancelled their session:</p>
               <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 16px 0;">
                 <p style="margin: 4px 0; font-size: 14px;"><strong>Date:</strong> ${formattedDate}</p>
                 <p style="margin: 4px 0; font-size: 14px;"><strong>Time:</strong> ${hhmm(booking.start_time)} - ${hhmm(booking.end_time)}</p>
               </div>
-              <p style="font-size: 13px; color: #94a3b8;">The slot is now available again for other users.</p>
+              <p style="font-size: 13px; color: #94a3b8;">The slot is now available again.</p>
             </div>
           </div>
           `
@@ -483,28 +470,24 @@ export async function POST(req) {
             user_id: FOUNDER_ID,
             actor_id: user.id,
             type: 'booking_cancel',
-            message: `${booking.user_name} cancelled their demo on ${formattedDate} at ${hhmm(booking.start_time)}`,
+            message: `${booking.user_name} cancelled their session on ${formattedDate} at ${hhmm(booking.start_time)}`,
           })
         } catch {}
       }
 
       // Notify user if founder cancelled
       if (isFounder && booking.user_email) {
-        const dateObj = new Date(booking.date + 'T00:00:00')
-        const formattedDate = dateObj.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-        const hhmm = (t) => (t || '').slice(0, 5)
-
         await sendNotificationEmail(
           booking.user_email,
-          `Demo Cancelled - ${formattedDate}`,
+          `Session Cancelled - ${formattedDate}`,
           `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <div style="background: linear-gradient(135deg, #ef4444, #dc2626); padding: 24px; border-radius: 12px 12px 0 0;">
-              <h1 style="color: white; margin: 0; font-size: 20px;">Demo Session Cancelled</h1>
+              <h1 style="color: white; margin: 0; font-size: 20px;">Session Cancelled</h1>
             </div>
             <div style="background: #f8fafc; padding: 24px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
               <p style="font-size: 15px; color: #334155;">Hi ${booking.user_name},</p>
-              <p style="font-size: 14px; color: #475569;">Unfortunately, your demo session has been cancelled:</p>
+              <p style="font-size: 14px; color: #475569;">Unfortunately, your session has been cancelled:</p>
               <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 16px 0;">
                 <p style="margin: 4px 0; font-size: 14px;"><strong>Date:</strong> ${formattedDate}</p>
                 <p style="margin: 4px 0; font-size: 14px;"><strong>Time:</strong> ${hhmm(booking.start_time)} - ${hhmm(booking.end_time)}</p>

@@ -1,8 +1,8 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { Calendar, ChevronLeft, ChevronRight, Clock, CheckCircle, Loader2, X } from 'lucide-react'
+import { Calendar, ChevronLeft, ChevronRight, Clock, CheckCircle, Loader2, X, Ban, CalendarOff } from 'lucide-react'
 
-const HOURS = Array.from({ length: 8 }, (_, i) => i + 9) // 9am to 4pm (last slot start)
+const HOURS = Array.from({ length: 8 }, (_, i) => i + 9) // 9am to 4pm (last slot starts at 4pm, ends 5pm)
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
 const SHORT_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
 const FOUNDER_ID = '1f5d9e8a-ab4b-4c00-813a-8af23f79fb82'
@@ -36,7 +36,7 @@ function formatLongDate(dateStr) {
 
 export default function BookingWidget({ token, userId, profile }) {
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()))
-  const [slots, setSlots] = useState([])
+  const [blocked, setBlocked] = useState([])
   const [bookings, setBookings] = useState([])
   const [userBookings, setUserBookings] = useState([])
   const [loading, setLoading] = useState(true)
@@ -45,8 +45,8 @@ export default function BookingWidget({ token, userId, profile }) {
   const [notes, setNotes] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [addingSlot, setAddingSlot] = useState(false)
-  const [managingSlots, setManagingSlots] = useState(false)
+  const [managing, setManaging] = useState(false)
+  const [actionLoading, setActionLoading] = useState(null) // 'date-hour' key
 
   const isFounder = userId === FOUNDER_ID
 
@@ -63,11 +63,11 @@ export default function BookingWidget({ token, userId, profile }) {
       if (data.error) {
         setError(data.error)
       } else {
-        setSlots(data.slots || [])
+        setBlocked(data.blocked || [])
         setBookings(data.bookings || [])
         setUserBookings(data.userBookings || [])
       }
-    } catch (err) {
+    } catch {
       setError('Failed to load booking data')
     }
     setLoading(false)
@@ -106,33 +106,35 @@ export default function BookingWidget({ token, userId, profile }) {
 
   function getSlotStatus(dateStr, hour) {
     const startTime = `${String(hour).padStart(2, '0')}:00`
-    const endTime = `${String(hour + 1).padStart(2, '0')}:00`
 
-    const isAvailable = slots.some(s =>
-      s.date === dateStr && hhmm(s.start_time) === startTime && hhmm(s.end_time) === endTime
+    const isBlocked = blocked.some(b =>
+      b.date === dateStr && hhmm(b.start_time) === startTime
     )
     const isBooked = bookings.some(b =>
-      b.date === dateStr && hhmm(b.start_time) === startTime && hhmm(b.end_time) === endTime
+      b.date === dateStr && hhmm(b.start_time) === startTime
     )
     const userBooking = userBookings.find(b =>
-      b.date === dateStr && hhmm(b.start_time) === startTime && hhmm(b.end_time) === endTime
+      b.date === dateStr && hhmm(b.start_time) === startTime
     )
 
     if (userBooking) return { status: 'mine', booking: userBooking }
     if (isBooked) return { status: 'booked' }
-    if (isAvailable) {
-      const slot = slots.find(s =>
-        s.date === dateStr && hhmm(s.start_time) === startTime && hhmm(s.end_time) === endTime
-      )
-      return { status: 'available', slot }
-    }
-    return { status: 'empty' }
+    if (isBlocked) return { status: 'blocked' }
+    return { status: 'available' }
   }
 
   function isPast(dateStr, hour) {
     const now = new Date()
     const slotTime = new Date(dateStr + 'T' + String(hour).padStart(2, '0') + ':00:00')
     return slotTime < now
+  }
+
+  function isDayFullyBlocked(dateStr) {
+    return HOURS.every(hour => {
+      if (isPast(dateStr, hour)) return true
+      const status = getSlotStatus(dateStr, hour).status
+      return status === 'blocked'
+    })
   }
 
   async function handleBook() {
@@ -156,7 +158,7 @@ export default function BookingWidget({ token, userId, profile }) {
       if (!res.ok || data.error) {
         setError(data.error || 'Failed to book')
       } else {
-        setSuccess('Your demo has been booked! Check your email for confirmation.')
+        setSuccess('Your session has been booked! Check your email for confirmation.')
         setSelectedSlot(null)
         setNotes('')
         fetchData()
@@ -188,97 +190,56 @@ export default function BookingWidget({ token, userId, profile }) {
     }
   }
 
-  async function handleAddSlot(dateStr, hour) {
+  async function handleToggleBlock(dateStr, hour) {
     if (!isFounder) return
-    setAddingSlot(true)
+    const key = `${dateStr}-${hour}`
+    setActionLoading(key)
     setError('')
+
+    const info = getSlotStatus(dateStr, hour)
+    const startTime = `${String(hour).padStart(2, '0')}:00`
+    const endTime = `${String(hour + 1).padStart(2, '0')}:00`
+    const action = info.status === 'blocked' ? 'unblock' : 'block'
+
     try {
       const res = await fetch('/api/forum/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'add-slot',
-          token,
-          date: dateStr,
-          start_time: `${String(hour).padStart(2, '0')}:00`,
-          end_time: `${String(hour + 1).padStart(2, '0')}:00`,
-        }),
+        body: JSON.stringify({ action, token, date: dateStr, start_time: startTime, end_time: endTime }),
       })
       const data = await res.json()
       if (!res.ok || data.error) {
-        setError(data.error || 'Failed to add slot')
+        setError(data.error || `Failed to ${action}`)
       } else {
         fetchData()
       }
     } catch {
       setError('Network error')
     }
-    setAddingSlot(false)
+    setActionLoading(null)
   }
 
-  async function handleRemoveSlot(slotId) {
+  async function handleToggleDay(dateStr) {
     if (!isFounder) return
     setError('')
+    const isFullyBlocked = isDayFullyBlocked(dateStr)
+    const action = isFullyBlocked ? 'unblock-day' : 'block-day'
+
     try {
       const res = await fetch('/api/forum/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'remove-slot', token, id: slotId }),
+        body: JSON.stringify({ action, token, date: dateStr }),
       })
       const data = await res.json()
       if (!res.ok || data.error) {
-        setError(data.error || 'Failed to remove slot')
+        setError(data.error || 'Failed')
       } else {
         fetchData()
       }
     } catch {
       setError('Network error')
     }
-  }
-
-  async function handleAddAllSlots() {
-    if (!isFounder) return
-    setAddingSlot(true)
-    setError('')
-    const slotsToAdd = []
-    weekDates.forEach(dateStr => {
-      if (isPast(dateStr, 16)) return // skip fully past days
-      HOURS.forEach(hour => {
-        if (isPast(dateStr, hour)) return
-        const info = getSlotStatus(dateStr, hour)
-        if (info.status === 'empty') {
-          slotsToAdd.push({
-            date: dateStr,
-            start_time: `${String(hour).padStart(2, '0')}:00`,
-            end_time: `${String(hour + 1).padStart(2, '0')}:00`,
-          })
-        }
-      })
-    })
-
-    if (slotsToAdd.length === 0) {
-      setError('No empty slots to add')
-      setAddingSlot(false)
-      return
-    }
-
-    try {
-      const res = await fetch('/api/forum/bookings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'add-slots-bulk', token, slots: slotsToAdd }),
-      })
-      const data = await res.json()
-      if (!res.ok || data.error) {
-        setError(data.error || 'Failed to add slots')
-      } else {
-        setSuccess(`Added ${data.count} slots`)
-        fetchData()
-      }
-    } catch {
-      setError('Network error')
-    }
-    setAddingSlot(false)
   }
 
   // Clear messages after 5s
@@ -292,18 +253,19 @@ export default function BookingWidget({ token, userId, profile }) {
       <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Calendar className="w-4 h-4 text-teal-400" />
-          <h3 className="font-semibold text-sm text-white">Book a Demo</h3>
+          <h3 className="font-semibold text-sm text-white">Book a Session</h3>
+          <span className="text-[10px] text-slate-500 hidden sm:inline">Mon-Fri, 9am-5pm</span>
         </div>
         {isFounder && (
           <button
-            onClick={() => setManagingSlots(!managingSlots)}
+            onClick={() => setManaging(!managing)}
             className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors ${
-              managingSlots
+              managing
                 ? 'bg-amber-500/20 text-amber-300 border border-amber-400/30'
                 : 'bg-white/10 text-slate-400 hover:text-white'
             }`}
           >
-            {managingSlots ? 'Done Managing' : 'Manage Slots'}
+            {managing ? 'Done' : 'Manage Availability'}
           </button>
         )}
       </div>
@@ -318,19 +280,6 @@ export default function BookingWidget({ token, userId, profile }) {
           <ChevronRight className="w-4 h-4" />
         </button>
       </div>
-
-      {/* Founder: Add all slots button */}
-      {isFounder && managingSlots && (
-        <div className="px-4 py-2 border-b border-white/10 bg-amber-500/5">
-          <button
-            onClick={handleAddAllSlots}
-            disabled={addingSlot}
-            className="w-full px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-medium rounded-lg transition-colors disabled:opacity-50 border border-amber-400/20"
-          >
-            {addingSlot ? 'Adding...' : 'Add All Empty Slots This Week'}
-          </button>
-        </div>
-      )}
 
       {/* Status Messages */}
       {error && (
@@ -361,14 +310,28 @@ export default function BookingWidget({ token, userId, profile }) {
               <div className="p-2 bg-slate-50"></div>
               {weekDates.map((dateStr, i) => {
                 const isToday = dateStr === formatDate(new Date())
+                const dayBlocked = isDayFullyBlocked(dateStr)
                 return (
-                  <div key={dateStr} className={`p-2 text-center border-l border-slate-200 ${isToday ? 'bg-teal-50' : 'bg-slate-50'}`}>
+                  <div key={dateStr} className={`p-2 text-center border-l border-slate-200 ${isToday ? 'bg-teal-50' : dayBlocked ? 'bg-slate-100' : 'bg-slate-50'}`}>
                     <div className={`text-[10px] uppercase tracking-wider font-semibold ${isToday ? 'text-teal-600' : 'text-slate-500'}`}>
                       {SHORT_DAYS[i]}
                     </div>
                     <div className={`text-sm font-bold ${isToday ? 'text-teal-700' : 'text-slate-700'}`}>
                       {formatDisplayDate(dateStr)}
                     </div>
+                    {/* Founder: block/unblock full day */}
+                    {isFounder && managing && (
+                      <button
+                        onClick={() => handleToggleDay(dateStr)}
+                        className={`mt-1 text-[8px] font-medium px-1.5 py-0.5 rounded transition-colors ${
+                          dayBlocked
+                            ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                            : 'bg-red-100 text-red-600 hover:bg-red-200'
+                        }`}
+                      >
+                        {dayBlocked ? 'Unblock Day' : 'Block Day'}
+                      </button>
+                    )}
                   </div>
                 )
               })}
@@ -380,25 +343,32 @@ export default function BookingWidget({ token, userId, profile }) {
                 <div className="p-2 flex items-center justify-center bg-slate-50 border-r border-slate-200">
                   <span className="text-[11px] font-medium text-slate-500">{`${hour}:00`}</span>
                 </div>
-                {weekDates.map((dateStr, dayIdx) => {
+                {weekDates.map((dateStr) => {
                   const info = getSlotStatus(dateStr, hour)
                   const past = isPast(dateStr, hour)
+                  const loadKey = `${dateStr}-${hour}`
+                  const isLoading = actionLoading === loadKey
 
                   return (
                     <div key={`${dateStr}-${hour}`} className="border-l border-slate-100 p-0.5">
                       {past ? (
-                        <div className="h-full min-h-[36px] rounded bg-slate-50 flex items-center justify-center">
-                          <span className="text-[9px] text-slate-300">Past</span>
+                        <div className="h-full min-h-[40px] rounded bg-slate-50 flex items-center justify-center">
+                          <span className="text-[9px] text-slate-300">-</span>
+                        </div>
+                      ) : isLoading ? (
+                        <div className="h-full min-h-[40px] rounded bg-slate-50 flex items-center justify-center">
+                          <Loader2 className="w-3 h-3 text-slate-400 animate-spin" />
                         </div>
                       ) : info.status === 'available' ? (
-                        managingSlots && isFounder ? (
+                        managing && isFounder ? (
                           <button
-                            onClick={() => handleRemoveSlot(info.slot.id)}
-                            className="w-full h-full min-h-[36px] rounded bg-emerald-50 hover:bg-red-50 border border-emerald-200 hover:border-red-200 flex items-center justify-center transition-colors group"
-                            title="Click to remove this slot"
+                            onClick={() => handleToggleBlock(dateStr, hour)}
+                            className="w-full h-full min-h-[40px] rounded bg-emerald-100 hover:bg-red-50 border border-emerald-300 hover:border-red-300 flex flex-col items-center justify-center transition-colors group"
+                            title="Click to mark as unavailable"
                           >
-                            <span className="text-[9px] font-medium text-emerald-600 group-hover:hidden">Open</span>
-                            <X className="w-3 h-3 text-red-400 hidden group-hover:block" />
+                            <span className="text-[9px] font-bold text-emerald-600 group-hover:hidden">Available</span>
+                            <Ban className="w-3.5 h-3.5 text-red-400 hidden group-hover:block" />
+                            <span className="text-[8px] text-red-400 hidden group-hover:block">Block</span>
                           </button>
                         ) : token ? (
                           <button
@@ -411,44 +381,46 @@ export default function BookingWidget({ token, userId, profile }) {
                               setNotes('')
                               setError('')
                             }}
-                            className="w-full h-full min-h-[36px] rounded bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 hover:border-emerald-300 flex items-center justify-center transition-colors"
+                            className="w-full h-full min-h-[40px] rounded bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 hover:border-emerald-400 flex items-center justify-center transition-colors"
                             title="Click to book this slot"
                           >
-                            <span className="text-[9px] font-semibold text-emerald-600">Available</span>
+                            <span className="text-[10px] font-bold text-emerald-700">Available</span>
                           </button>
                         ) : (
-                          <div className="h-full min-h-[36px] rounded bg-emerald-50 border border-emerald-200 flex items-center justify-center">
-                            <span className="text-[9px] font-medium text-emerald-500">Available</span>
+                          <div className="h-full min-h-[40px] rounded bg-emerald-100 border border-emerald-300 flex items-center justify-center">
+                            <span className="text-[10px] font-bold text-emerald-600">Available</span>
                           </div>
                         )
                       ) : info.status === 'mine' ? (
                         <div
-                          className="h-full min-h-[36px] rounded bg-teal-100 border border-teal-300 flex items-center justify-center cursor-pointer group relative"
+                          className="h-full min-h-[40px] rounded bg-teal-100 border-2 border-teal-400 flex items-center justify-center cursor-pointer group relative"
                           onClick={() => handleCancel(info.booking.id)}
                           title="Click to cancel your booking"
                         >
-                          <span className="text-[9px] font-bold text-teal-700 group-hover:hidden">Your Demo</span>
-                          <span className="text-[9px] font-medium text-red-500 hidden group-hover:block">Cancel</span>
+                          <span className="text-[9px] font-bold text-teal-700 group-hover:hidden">Your Session</span>
+                          <span className="text-[9px] font-medium text-red-500 hidden group-hover:block">Cancel?</span>
                         </div>
                       ) : info.status === 'booked' ? (
-                        <div className="h-full min-h-[36px] rounded bg-slate-100 border border-slate-200 flex items-center justify-center">
-                          <span className="text-[9px] font-medium text-slate-400">Booked</span>
+                        <div className="h-full min-h-[40px] rounded bg-red-100 border border-red-300 flex items-center justify-center">
+                          <span className="text-[10px] font-bold text-red-600">Booked</span>
                         </div>
-                      ) : (
-                        // Empty — no slot set
-                        managingSlots && isFounder ? (
+                      ) : info.status === 'blocked' ? (
+                        managing && isFounder ? (
                           <button
-                            onClick={() => handleAddSlot(dateStr, hour)}
-                            disabled={addingSlot}
-                            className="w-full h-full min-h-[36px] rounded bg-white hover:bg-amber-50 border border-dashed border-slate-200 hover:border-amber-300 flex items-center justify-center transition-colors"
-                            title="Click to add this slot"
+                            onClick={() => handleToggleBlock(dateStr, hour)}
+                            className="w-full h-full min-h-[40px] rounded bg-slate-200 hover:bg-emerald-50 border border-slate-300 hover:border-emerald-300 flex flex-col items-center justify-center transition-colors group"
+                            title="Click to make available again"
                           >
-                            <span className="text-[9px] text-slate-300 hover:text-amber-500">+ Add</span>
+                            <CalendarOff className="w-3.5 h-3.5 text-slate-400 group-hover:hidden" />
+                            <span className="text-[8px] text-slate-400 group-hover:hidden">Unavailable</span>
+                            <span className="text-[9px] font-bold text-emerald-600 hidden group-hover:block">Unblock</span>
                           </button>
                         ) : (
-                          <div className="h-full min-h-[36px] rounded bg-white border border-transparent"></div>
+                          <div className="h-full min-h-[40px] rounded bg-slate-200 border border-slate-300 flex items-center justify-center">
+                            <span className="text-[10px] font-medium text-slate-400">Unavailable</span>
+                          </div>
                         )
-                      )}
+                      ) : null}
                     </div>
                   )
                 })}
@@ -458,25 +430,29 @@ export default function BookingWidget({ token, userId, profile }) {
         )}
 
         {/* Legend */}
-        <div className="flex flex-wrap gap-3 mt-3 px-1">
+        <div className="flex flex-wrap gap-4 mt-3 px-1">
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded bg-emerald-50 border border-emerald-200"></div>
+            <div className="w-3 h-3 rounded bg-emerald-100 border border-emerald-300"></div>
             <span className="text-[10px] text-slate-400">Available</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded bg-teal-100 border border-teal-300"></div>
+            <div className="w-3 h-3 rounded bg-red-100 border border-red-300"></div>
+            <span className="text-[10px] text-slate-400">Booked</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-teal-100 border-2 border-teal-400"></div>
             <span className="text-[10px] text-slate-400">Your Booking</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded bg-slate-100 border border-slate-200"></div>
-            <span className="text-[10px] text-slate-400">Booked</span>
+            <div className="w-3 h-3 rounded bg-slate-200 border border-slate-300"></div>
+            <span className="text-[10px] text-slate-400">Unavailable</span>
           </div>
         </div>
 
         {/* Not logged in message */}
         {!token && (
           <div className="mt-3 px-3 py-2 bg-blue-500/10 border border-blue-400/20 rounded-lg">
-            <p className="text-xs text-blue-300 text-center">Sign in to book a demo session</p>
+            <p className="text-xs text-blue-300 text-center">Sign in to book a session</p>
           </div>
         )}
       </div>
@@ -492,6 +468,7 @@ export default function BookingWidget({ token, userId, profile }) {
                 <div>
                   <p className="text-xs font-medium text-white">{formatLongDate(b.date)}</p>
                   <p className="text-[10px] text-slate-400">{hhmm(b.start_time)} - {hhmm(b.end_time)} via Microsoft Teams</p>
+                  {b.notes && <p className="text-[10px] text-slate-500 mt-0.5">Topics: {b.notes}</p>}
                 </div>
               </div>
               <button
@@ -510,7 +487,7 @@ export default function BookingWidget({ token, userId, profile }) {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedSlot(null)}>
           <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-white">Book Demo Session</h3>
+              <h3 className="text-lg font-bold text-white">Book a Session</h3>
               <button onClick={() => setSelectedSlot(null)} className="text-slate-400 hover:text-white transition-colors">
                 <X className="w-5 h-5" />
               </button>
@@ -525,18 +502,19 @@ export default function BookingWidget({ token, userId, profile }) {
                 <Clock className="w-4 h-4 text-teal-400" />
                 <span className="text-sm text-white font-medium">{selectedSlot.start_time} - {selectedSlot.end_time}</span>
               </div>
-              <p className="text-xs text-slate-400 mt-1">1-hour personal walkthrough via Microsoft Teams</p>
+              <p className="text-xs text-slate-400 mt-1">1-hour session via Microsoft Teams</p>
             </div>
 
             <div className="mb-4">
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Notes (optional)</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1.5">What would you like the session to cover?</label>
               <textarea
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
-                placeholder="Any specific areas you'd like to cover..."
+                placeholder="e.g. help setting up rota, walkthrough of clinical features, compliance guidance, full demo..."
                 className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-teal-400/50 resize-none"
                 rows={3}
               />
+              <p className="text-[10px] text-slate-500 mt-1">This helps us prepare for your session. You can cover anything — demos, setup help, troubleshooting, or live guidance.</p>
             </div>
 
             {error && (
