@@ -4,7 +4,7 @@ import { ForumProvider } from '@/lib/forumContext'
 export default function ForumLayout({ children }) {
   return (
     <ForumProvider>
-      <div className="min-h-screen bg-gradient-to-br from-slate-800 via-slate-700 to-teal-800 relative">
+      <div className="min-h-screen bg-gradient-to-br from-slate-700 via-slate-600 to-teal-700 relative">
         {/* Watermark logo pattern as the background */}
         <div
           className="fixed inset-0 pointer-events-none z-0"
@@ -12,7 +12,7 @@ export default function ForumLayout({ children }) {
             backgroundImage: 'url(/logo-icon.svg)',
             backgroundRepeat: 'repeat',
             backgroundSize: '140px 140px',
-            opacity: 0.08,
+            opacity: 0.10,
           }}
         />
         <div className="relative z-10">
