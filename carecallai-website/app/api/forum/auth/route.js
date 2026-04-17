@@ -90,13 +90,10 @@ export async function POST(req) {
           orgRole: orgMember?.role,
         })
       } else {
-        // Auto-correct founder only
-        if (isFounder && (forumProfile.forum_role !== 'founder' || forumProfile.username !== 'carecallai-founder')) {
+        // Auto-correct founder role only (don't overwrite display_name)
+        if (isFounder && forumProfile.forum_role !== 'founder') {
           const updates = {
             forum_role: 'founder',
-            username: 'carecallai-founder',
-            display_name: 'CareCallAI Founder',
-            bio: 'Founder & Creator of CareCallAI. Building the future of intelligent care management — one feature at a time. Passionate about empowering care professionals with technology that actually works.',
             profile_customized: true,
           }
           await supabase.from('forum_profiles').update(updates).eq('id', userId)
@@ -145,11 +142,9 @@ export async function POST(req) {
       if (forumProfile) {
         const isFounder = user.id === FOUNDER_ID
         const updates = { last_seen_at: new Date().toISOString() }
-        // Only auto-correct for founder
-        if (isFounder && (forumProfile.forum_role !== 'founder' || forumProfile.username !== 'carecallai-founder')) {
+        // Only auto-correct founder role (don't overwrite display_name)
+        if (isFounder && forumProfile.forum_role !== 'founder') {
           updates.forum_role = 'founder'
-          updates.username = 'carecallai-founder'
-          updates.display_name = 'CareCallAI Founder'
           updates.profile_customized = true
           Object.assign(forumProfile, updates)
         }
