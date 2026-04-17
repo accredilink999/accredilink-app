@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Plus, TrendingUp, Megaphone, HelpCircle, Bug, Lightbulb, MessageCircle, Star, Shield, ClipboardCheck, MessageSquare, BookOpen } from 'lucide-react'
+import { Plus, TrendingUp, Megaphone, HelpCircle, Bug, Lightbulb, MessageCircle, Star, Shield, ClipboardCheck, MessageSquare, BookOpen, CalendarDays } from 'lucide-react'
 
 const iconMap = {
   'user-documentation': BookOpen,
@@ -51,6 +51,12 @@ export default function ForumSidebar({ categories, stats, profile }) {
             className={`flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors ${pathname === '/forum' ? 'bg-teal-500/20 text-teal-300 font-medium border-r-2 border-teal-400' : 'text-slate-400 hover:bg-white/[0.04] hover:text-slate-300'}`}
           >
             <TrendingUp className="w-4 h-4" /> All Categories
+          </Link>
+          <Link
+            href="/forum/booking"
+            className={`flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors ${pathname === '/forum/booking' ? 'bg-teal-500/20 text-teal-300 font-medium border-r-2 border-teal-400' : 'text-slate-400 hover:bg-white/[0.04] hover:text-slate-300'}`}
+          >
+            <CalendarDays className={`w-4 h-4 ${pathname === '/forum/booking' ? 'text-teal-400' : 'text-emerald-400'}`} /> Book a Session
           </Link>
           {(categories || []).map(cat => {
             const Icon = iconMap[cat.slug] || MessageSquare
