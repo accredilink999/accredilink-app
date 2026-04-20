@@ -385,6 +385,266 @@ export async function POST(req) {
         return json({ success: true })
       }
 
+      case 'seed-intro-threads': {
+        if (!isFounder) return json({ error: 'Only founder' }, 403)
+        const FOUNDER_ID = '1f5d9e8a-ab4b-4c00-813a-8af23f79fb82'
+        const introThreads = [
+          {
+            category_id: '71759a2c-13be-4291-81dc-a7ba0d5e3cd8',
+            slug: 'welcome-to-announcements',
+            title: 'Welcome to Announcements',
+            content: `# Welcome to the Announcements Board
+
+This is the official channel for all **CareCallAI updates, new features, and important news**.
+
+## What gets posted here
+
+- **New feature releases** — detailed breakdowns of what's new and how to use it
+- **Platform updates** — maintenance windows, performance improvements, and system changes
+- **Regulatory updates** — changes to CIW or CQC requirements that affect your compliance
+- **Community milestones** — user count achievements, partnerships, and celebrations
+
+## How it works
+
+- Only the **CareCallAI team** can post new announcements
+- You **cannot reply** to announcements here to keep things clean
+- If you have questions about an announcement, head over to **Help & Support** or **General Discussion**
+
+## Stay informed
+
+We recommend checking this board regularly. All major changes to CareCallAI will be announced here first before rolling out.
+
+Thank you for being part of the CareCallAI community!`
+          },
+          {
+            category_id: '8ed481f7-5796-4793-8c18-5a7c2d93478e',
+            slug: 'welcome-to-feature-requests',
+            title: 'Welcome to Feature Requests',
+            content: `# Welcome to Feature Requests
+
+This is where **you** shape the future of CareCallAI. We build this platform for care professionals, and your ideas directly influence what we develop next.
+
+## How to submit a feature request
+
+1. **Search first** — check if someone has already requested the same feature
+2. **Create a new thread** with a clear, descriptive title (e.g. "Add PDF export for care plans")
+3. **Describe the feature** — what would it do and how would it work?
+4. **Explain why it matters** — how would this help your day-to-day care work?
+5. **Add context** — are you using a workaround currently? Is this blocking you?
+
+## How we prioritise
+
+We review every request and prioritise based on:
+
+- **Impact** — how many users would benefit
+- **Compliance** — does it help meet CIW/CQC requirements
+- **Effort** — how complex is the build
+- **Votes** — features with more likes get higher priority
+
+## What happens next
+
+- We'll respond to let you know the request has been seen
+- Popular requests get tagged with status updates: **Under Review**, **Planned**, **In Progress**, or **Shipped**
+- When a feature ships, we'll link back to the original request so you know
+
+Your feedback makes CareCallAI better for everyone. Don't hold back!`
+          },
+          {
+            category_id: 'e4602e18-3d7b-4683-8905-47723bf9cda3',
+            slug: 'welcome-to-general-discussion',
+            title: 'Welcome to General Discussion',
+            content: `# Welcome to General Discussion
+
+This is the place for **open conversation** with fellow care professionals using CareCallAI.
+
+## What belongs here
+
+- **Introductions** — tell us about yourself, your organisation, and your role
+- **Care sector chat** — share experiences, challenges, and wins from your work
+- **Networking** — connect with other domiciliary care and care home managers
+- **Off-topic** — anything that doesn't fit neatly into the other categories
+- **Community events** — meetups, webinars, and training opportunities
+
+## Guidelines
+
+- Be respectful and professional — we're all working toward better care
+- Keep confidential information out of posts (no service user names or details)
+- If your post is about a **bug**, **feature request**, or **support question**, please use the relevant category instead
+- Have fun and be supportive — this is your community
+
+## Introduce yourself
+
+Why not start by introducing yourself? Tell us:
+- Your name and role
+- What type of care service you run
+- How long you've been using CareCallAI
+- One thing you'd love to see improved
+
+We look forward to hearing from you!`
+          },
+          {
+            category_id: 'efc40e5c-caff-4e3e-b8ff-547f1ccbea12',
+            slug: 'welcome-to-tips-and-best-practice',
+            title: 'Welcome to Tips & Best Practice',
+            content: `# Welcome to Tips & Best Practice
+
+This category is for **sharing practical knowledge** that helps you get the most from CareCallAI and run your care service more effectively.
+
+## What to share here
+
+- **CareCallAI tips** — shortcuts, hidden features, workflows that save you time
+- **Rota management** — how you structure shifts, manage patterns, handle last-minute changes
+- **Care planning** — templates, approaches, and documentation strategies that work
+- **Staff management** — supervision scheduling, training records, onboarding processes
+- **Compliance shortcuts** — how to stay audit-ready with less effort
+- **eMAR best practice** — medication management tips and error prevention
+- **Family portal** — how to keep families engaged and informed
+
+## Sharing format
+
+When sharing a tip, try to include:
+
+1. **What it is** — a clear title describing the tip
+2. **The problem** — what challenge does this solve?
+3. **The solution** — step-by-step how to do it
+4. **The result** — what improvement you saw
+
+## Why share?
+
+Every care provider faces similar challenges. By sharing what works for you, you help the entire community deliver better care. And you might learn something new from others too!
+
+Start sharing your best tips today.`
+          },
+          {
+            category_id: 'b5b9adf5-1d15-42c9-82b2-e39f83d3d665',
+            slug: 'welcome-to-ciw-compliance',
+            title: 'Welcome to CIW Compliance',
+            content: `# Welcome to CIW Compliance
+
+This category is dedicated to **Care Inspectorate Wales (CIW)** compliance — everything you need to stay compliant under the **Regulation and Inspection of Social Care (Wales) Act 2016 (RISCA)**.
+
+## What belongs here
+
+- **RISCA regulations** — discussion of specific regulations and how CareCallAI helps you meet them
+- **Inspection preparation** — how to prepare for CIW inspections using CareCallAI
+- **Annual returns** — tips for completing your CIW annual return efficiently
+- **Statement of Purpose** — guidance on updating and maintaining your Statement of Purpose
+- **Staff compliance** — DBS checks, mandatory training, supervision (Reg 36), and fitness requirements
+- **Quality of care** — Regulation 21 reviews, outcomes-based reporting, and evidence gathering
+- **Safeguarding** — reporting requirements, policies, and CareCallAI safeguarding tools
+- **Notifications** — which events must be reported to CIW and how
+
+## CareCallAI compliance features
+
+CareCallAI has built-in tools for CIW compliance:
+
+- **Pre-populated CIW forms** with regulation guidance
+- **12-weekly supervision tracking** (RISCA Reg 36)
+- **Compliance filing** with regulation-specific forms
+- **Safeguarding incident reporting**
+- **Staff training and DBS tracking**
+
+## Ask questions, share knowledge
+
+Whether you're newly registered or an experienced provider, this is your space to discuss CIW requirements and learn from each other. No question is too basic!`
+          },
+          {
+            category_id: 'e42ba333-0772-4537-ad22-334832b5f625',
+            slug: 'welcome-to-cqc-compliance',
+            title: 'Welcome to CQC Compliance',
+            content: `# Welcome to CQC Compliance
+
+This category is for **Care Quality Commission (CQC)** compliance in England — helping you meet the requirements of the **Health and Social Care Act 2008** and the new **Single Assessment Framework**.
+
+## What belongs here
+
+- **CQC Key Questions** — Safe, Effective, Caring, Responsive, and Well-Led
+- **Evidence statements** — how to demonstrate quality and compliance through CareCallAI
+- **Inspection preparation** — what CQC inspectors look for and how to be ready
+- **PIR (Provider Information Return)** — tips for completing your PIR efficiently
+- **Rating improvement** — strategies for moving from Requires Improvement to Good, or Good to Outstanding
+- **Regulation 18 (Staffing)** — supervision, training, competency assessments
+- **Regulation 12 (Safe care)** — risk assessments, medication management, safeguarding
+- **Notifications** — statutory notifications to CQC and how to submit them
+
+## CareCallAI compliance features
+
+CareCallAI supports CQC compliance through:
+
+- **Compliance management** with regulation filing and guidance
+- **Staff supervision tracking** (Reg 18)
+- **Clinical assessments** — Waterlow, MUST, Falls Risk, NEWS2, and more
+- **Care logging** with evidence-based documentation
+- **Safeguarding** and incident reporting
+
+## Join the conversation
+
+Share your inspection experiences, ask about specific regulations, or help others prepare for their next CQC visit. Together we can raise standards across the sector.`
+          },
+          {
+            category_id: '98c52d96-97bb-4d9a-af3a-9f5569a654c0',
+            slug: 'welcome-to-help-and-support',
+            title: 'Welcome to Help & Support',
+            content: `# Welcome to Help & Support
+
+This is the go-to place when you need **help with CareCallAI**. Whether you're stuck on something, can't find a feature, or need guidance, ask here.
+
+## Before you post
+
+1. **Check User Documentation** — your question may already be answered in our comprehensive user guides
+2. **Search existing threads** — someone may have already asked the same question
+3. **Check Announcements** — recent changes might explain what you're seeing
+
+## How to ask for help
+
+To get the fastest and most helpful response, please include:
+
+- **What you're trying to do** — describe the task or goal
+- **What's happening** — describe the issue or unexpected behaviour
+- **What you expected** — what should have happened instead
+- **Screenshots** — if possible, include a screenshot showing the problem
+- **Device info** — are you on mobile (iOS/Android), tablet, or desktop?
+
+## Response times
+
+- The CareCallAI team monitors this board regularly
+- Community members may also help with common questions
+- For urgent issues, use the **Book a Session** option to schedule a free call
+
+## Book a Free Teams Meeting
+
+Need hands-on help? You can book a **free Microsoft Teams session** with the CareCallAI team for:
+- Live walkthroughs of features
+- Troubleshooting specific issues
+- Training for your team
+- Setup and configuration help
+
+Look for the **Book a Session** thread pinned in this category, or visit [carecallai.co.uk/booking](https://carecallai.co.uk/booking).
+
+We're here to help!`
+          },
+        ]
+
+        // Check which already exist
+        const slugs = introThreads.map(t => t.slug)
+        const { data: existing } = await supabase.from('forum_threads').select('slug').in('slug', slugs)
+        const existingSlugs = new Set((existing || []).map(t => t.slug))
+
+        let created = 0
+        for (const t of introThreads) {
+          if (existingSlugs.has(t.slug)) continue
+          const { error: insertErr } = await supabase.from('forum_threads').insert({
+            ...t,
+            author_id: FOUNDER_ID,
+            is_pinned: true,
+            is_locked: true,
+          })
+          if (!insertErr) created++
+        }
+
+        return json({ success: true, created, skipped: introThreads.length - created })
+      }
+
       default:
         return json({ error: 'Unknown action' }, 400)
     }
