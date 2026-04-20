@@ -1,10 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-import { notifyModAction } from '@/lib/forumEmail'
+import { notifyModAction, forumInviteHtml } from '@/lib/forumEmail'
 
 
 export const dynamic = 'force-dynamic'
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://x.supabase.co', process.env.SUPABASE_SERVICE_ROLE_KEY || 'x')
 function json(data, status = 200) { return NextResponse.json(data, { status }) }
 
 // GET: admin dashboard stats
@@ -31,6 +31,7 @@ export async function GET(req) {
       { data: bannedUsers },
       { data: recentUsers },
       { data: categories },
+      { data: onlineUsers },
     ] = await Promise.all([
       supabase.from('forum_profiles').select('*', { count: 'exact', head: true }),
       supabase.from('forum_threads').select('*', { count: 'exact', head: true }),
@@ -38,6 +39,7 @@ export async function GET(req) {
       supabase.from('forum_profiles').select('id, username, display_name, forum_role, is_banned, ban_reason, created_at').eq('is_banned', true),
       supabase.from('forum_profiles').select('id, username, display_name, forum_role, is_banned, post_count, thread_count, created_at, last_seen_at').order('created_at', { ascending: false }).limit(20),
       supabase.from('forum_categories').select('*').order('sort_order'),
+      supabase.from('forum_profiles').select('id, username, display_name, forum_role, last_seen_at').gte('last_seen_at', new Date(Date.now() - 5 * 60 * 1000).toISOString()),
     ])
 
     // Get permissions settings
@@ -50,6 +52,10 @@ export async function GET(req) {
       .select('id, username, display_name, avatar_url, forum_role, is_banned, post_count, thread_count, reputation, created_at, last_seen_at')
       .order('forum_role', { ascending: true })
       .order('created_at', { ascending: false })
+
+    // Get invited emails tracking
+    const { data: invitedRow } = await supabase.from('forum_settings').select('value').eq('key', 'forum_invited_emails').single()
+    const invitedEmails = invitedRow?.value || []
 
     // Get all org admins/owners across orgs (for invite tab)
     let allOrgAdmins = []
@@ -95,18 +101,21 @@ export async function GET(req) {
           full_name: profileMap[m.user_id]?.full_name || '',
           has_forum_profile: !!forumMap[m.user_id],
           forum_username: forumMap[m.user_id]?.username || null,
+          was_invited: invitedEmails.includes(profileMap[m.user_id]?.email),
         }))
       }
     }
 
     return json({
-      stats: { users: userCount || 0, threads: threadCount || 0, replies: replyCount || 0 },
+      stats: { users: userCount || 0, threads: threadCount || 0, replies: replyCount || 0, online: onlineUsers?.length || 0 },
+      onlineUsers: onlineUsers || [],
       bannedUsers: bannedUsers || [],
       recentUsers: recentUsers || [],
       categories: categories || [],
       allOrgAdmins,
       allUsers: allUsers || [],
       permissions,
+      invitedEmails,
     })
   } catch (err) {
     return json({ error: err.message }, 500)
@@ -206,85 +215,47 @@ export async function POST(req) {
 
       case 'send-direct-invite': {
         if (!isFounder) return json({ error: 'Only founder can send invites' }, 403)
-        const { email: directEmail, name: directName, message: customMessage } = body
+        const { email: directEmail, name: directName } = body
         if (!directEmail) return json({ error: 'Email required' }, 400)
 
-        const defaultMsg = 'You\'re invited to join the CareCallAI Community Forum — an exclusive space for care professionals. Get direct support from the CareCallAI team, connect with other administrators, share best practices, and book free demo or setup sessions.'
-        const finalMsg = customMessage?.trim() || defaultMsg
-
         try {
-          const emailBody = `
-            <div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:30px">
-              <div style="text-align:center;margin-bottom:30px">
-                <h1 style="color:#0d9488;font-size:24px;margin:0">CareCall<span style="color:#334155">AI</span> Forum</h1>
-                <p style="color:#64748b;font-size:14px;margin-top:5px">Community & Support for Care Professionals</p>
-              </div>
-              <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:24px">
-                <h2 style="color:#1e293b;font-size:18px;margin:0 0 12px 0">Hi ${directName || 'there'},</h2>
-                <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 16px 0">${finalMsg}</p>
-                <div style="background:#f0fdfa;border-radius:8px;padding:16px;margin:0 0 16px 0">
-                  <p style="color:#0d9488;font-size:13px;font-weight:600;margin:0 0 8px 0">What you'll find:</p>
-                  <p style="color:#475569;font-size:13px;line-height:1.6;margin:0;">
-                    &#10003; Direct support from the CareCallAI team<br/>
-                    &#10003; Tips and best practices from fellow care professionals<br/>
-                    &#10003; Book free demos and onboarding sessions<br/>
-                    &#10003; Feature requests and feedback
-                  </p>
-                </div>
-                <div style="text-align:center;margin:24px 0">
-                  <a href="https://carecallai.co.uk/forum" style="background:linear-gradient(135deg,#14b8a6,#0d9488);color:white;text-decoration:none;padding:12px 32px;border-radius:12px;font-weight:600;font-size:14px;display:inline-block">
-                    Join the Forum
-                  </a>
-                </div>
-                <p style="color:#94a3b8;font-size:12px;text-align:center;margin:0">
-                  Log in with your CareCall AI email and password
-                </p>
-              </div>
-              <p style="color:#94a3b8;font-size:11px;text-align:center;margin-top:20px">
-                CareCall AI — Smart Care Management
-              </p>
-            </div>
-          `
           const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-campaign-email`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` },
-            body: JSON.stringify({ to: directEmail, subject: 'You\'re invited to the CareCallAI Community Forum', html: emailBody }),
+            body: JSON.stringify({ to: directEmail, subject: 'Join the CareCallAI Community Forum — Your Account is Ready', html: forumInviteHtml(directName) }),
           })
           if (!res.ok) { const e = await res.json().catch(() => ({})); return json({ error: e.error || 'Failed to send' }, 500) }
+
+          // Track this email as invited
+          const { data: invR } = await supabase.from('forum_settings').select('value').eq('key', 'forum_invited_emails').single()
+          const invL = invR?.value || []
+          if (!invL.includes(directEmail)) {
+            invL.push(directEmail)
+            await supabase.from('forum_settings').upsert({ key: 'forum_invited_emails', value: invL, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+          }
         } catch (e) { return json({ error: 'Failed: ' + e.message }, 500) }
         return json({ success: true })
       }
 
       case 'send-bulk-invite': {
         if (!isFounder) return json({ error: 'Only founder can send invites' }, 403)
-        const { emails: bulkEmails, message: bulkMessage } = body
+        const { emails: bulkEmails } = body
         if (!bulkEmails?.length) return json({ error: 'No emails provided' }, 400)
         let sent = 0, failed = 0
+        const { data: invR3 } = await supabase.from('forum_settings').select('value').eq('key', 'forum_invited_emails').single()
+        const bulkInvList = invR3?.value || []
         for (const item of bulkEmails) {
           try {
-            const emailBody = `
-              <div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:30px">
-                <div style="text-align:center;margin-bottom:30px">
-                  <h1 style="color:#0d9488;font-size:24px;margin:0">CareCall<span style="color:#334155">AI</span> Forum</h1>
-                  <p style="color:#64748b;font-size:14px;margin-top:5px">Community & Support for Care Professionals</p>
-                </div>
-                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:24px">
-                  <h2 style="color:#1e293b;font-size:18px;margin:0 0 12px 0">Hi ${item.name || 'there'},</h2>
-                  <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 16px 0">${bulkMessage || 'You\'re invited to join the CareCallAI Community Forum — get direct support, connect with other care professionals, and book free demos.'}</p>
-                  <div style="text-align:center;margin:24px 0">
-                    <a href="https://carecallai.co.uk/forum" style="background:linear-gradient(135deg,#14b8a6,#0d9488);color:white;text-decoration:none;padding:12px 32px;border-radius:12px;font-weight:600;font-size:14px;display:inline-block">Join the Forum</a>
-                  </div>
-                  <p style="color:#94a3b8;font-size:12px;text-align:center;margin:0">Log in with your CareCall AI email and password</p>
-                </div>
-              </div>
-            `
             const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-campaign-email`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` },
-              body: JSON.stringify({ to: item.email, subject: 'You\'re invited to the CareCallAI Community Forum', html: emailBody }),
+              body: JSON.stringify({ to: item.email, subject: 'Join the CareCallAI Community Forum — Your Account is Ready', html: forumInviteHtml(item.name) }),
             })
-            if (res.ok) sent++; else failed++
+            if (res.ok) { sent++; if (!bulkInvList.includes(item.email)) bulkInvList.push(item.email) } else { failed++ }
           } catch { failed++ }
+        }
+        if (sent > 0) {
+          await supabase.from('forum_settings').upsert({ key: 'forum_invited_emails', value: bulkInvList, updated_at: new Date().toISOString() }, { onConflict: 'key' })
         }
         return json({ success: true, sent, failed })
       }
@@ -294,59 +265,81 @@ export async function POST(req) {
         const { email, name } = body
         if (!email) return json({ error: 'Email required' }, 400)
 
-        // Send invite email via Supabase edge function
         try {
-          const emailBody = `
-            <div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:30px">
-              <div style="text-align:center;margin-bottom:30px">
-                <h1 style="color:#0d9488;font-size:24px;margin:0">CareCall<span style="color:#334155">AI</span> Forum</h1>
-                <p style="color:#64748b;font-size:14px;margin-top:5px">Community for Care Professionals</p>
-              </div>
-              <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:24px">
-                <h2 style="color:#1e293b;font-size:18px;margin:0 0 12px 0">Hi ${name || 'there'},</h2>
-                <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 16px 0">
-                  You're invited to join the <strong>CareCallAI Community Forum</strong> — an exclusive space for care sector administrators to share insights, get support, and connect with fellow professionals.
-                </p>
-                <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 20px 0">
-                  As an organisation admin, you have full access. Simply log in with your existing CareCall AI credentials.
-                </p>
-                <div style="text-align:center;margin:24px 0">
-                  <a href="https://carecallai.co.uk/forum" style="background:linear-gradient(135deg,#14b8a6,#0d9488);color:white;text-decoration:none;padding:12px 32px;border-radius:12px;font-weight:600;font-size:14px;display:inline-block">
-                    Join the Forum
-                  </a>
-                </div>
-                <p style="color:#94a3b8;font-size:12px;text-align:center;margin:0">
-                  Use your existing CareCall AI email and password to sign in
-                </p>
-              </div>
-              <p style="color:#94a3b8;font-size:11px;text-align:center;margin-top:20px">
-                CareCall AI — Smart Care Management
-              </p>
-            </div>
-          `
-
           const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-campaign-email`, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
-            },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` },
             body: JSON.stringify({
               to: email,
-              subject: 'You\'re invited to the CareCallAI Community Forum',
-              html: emailBody,
+              subject: 'Join the CareCallAI Community Forum — Your Account is Ready',
+              html: forumInviteHtml(name),
             }),
           })
+          if (!res.ok) { const e = await res.json().catch(() => ({})); return json({ error: e.error || 'Failed to send email' }, 500) }
 
-          if (!res.ok) {
-            const errData = await res.json().catch(() => ({}))
-            return json({ error: errData.error || 'Failed to send email' }, 500)
+          // Track this email as invited
+          const { data: invRow } = await supabase.from('forum_settings').select('value').eq('key', 'forum_invited_emails').single()
+          const invList = invRow?.value || []
+          if (!invList.includes(email)) {
+            invList.push(email)
+            await supabase.from('forum_settings').upsert({ key: 'forum_invited_emails', value: invList, updated_at: new Date().toISOString() }, { onConflict: 'key' })
           }
         } catch (emailErr) {
           return json({ error: 'Failed to send invite: ' + emailErr.message }, 500)
         }
 
         return json({ success: true })
+      }
+
+      case 'send-forum-invite-all': {
+        if (!isFounder) return json({ error: 'Only founder can send invites' }, 403)
+
+        // Get org admins
+        const { data: orgMems } = await supabase.from('organization_members').select('user_id, role').in('role', ['owner', 'admin'])
+        if (!orgMems?.length) return json({ success: true, sent: 0, skipped: 0, failed: 0 })
+
+        const uids = orgMems.map(m => m.user_id)
+        const { data: profs } = await supabase.from('profiles').select('id, email, full_name').in('id', uids)
+        const { data: fProfs } = await supabase.from('forum_profiles').select('id').in('id', uids)
+        const forumIds = new Set((fProfs || []).map(f => f.id))
+
+        // Get already-invited list
+        const { data: invRow2 } = await supabase.from('forum_settings').select('value').eq('key', 'forum_invited_emails').single()
+        const alreadyInvited = new Set(invRow2?.value || [])
+
+        // Build send list — skip those who joined or were already invited
+        const profMap = {}
+        ;(profs || []).forEach(p => { profMap[p.id] = p })
+        const toSend = []
+        const seen = new Set()
+        for (const m of orgMems) {
+          const p = profMap[m.user_id]
+          if (!p?.email || seen.has(p.email)) continue
+          seen.add(p.email)
+          if (forumIds.has(m.user_id)) continue // already joined
+          if (alreadyInvited.has(p.email)) continue // already invited
+          toSend.push({ email: p.email, name: p.full_name || '' })
+        }
+
+        let sent = 0, failed = 0
+        const newInvited = [...alreadyInvited]
+        for (const item of toSend) {
+          try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-campaign-email`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` },
+              body: JSON.stringify({ to: item.email, subject: 'Join the CareCallAI Community Forum — Your Account is Ready', html: forumInviteHtml(item.name) }),
+            })
+            if (res.ok) { sent++; newInvited.push(item.email) } else { failed++ }
+          } catch { failed++ }
+        }
+
+        // Save updated invited list
+        if (sent > 0) {
+          await supabase.from('forum_settings').upsert({ key: 'forum_invited_emails', value: newInvited, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+        }
+
+        return json({ success: true, sent, failed, skipped: orgMems.length - toSend.length - (orgMems.length - Object.keys(profMap).length) })
       }
 
       case 'update-permissions': {
