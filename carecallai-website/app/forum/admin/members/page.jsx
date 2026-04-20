@@ -86,7 +86,7 @@ export default function AdminMembers() {
           Members ({members.length})
         </h2>
         <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
             value={search}
@@ -138,17 +138,17 @@ export default function AdminMembers() {
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-slate-500">@{member.username}</p>
+                    <p className="text-xs text-slate-400">@{member.username}</p>
                     <StarRank role={member.forum_role} postCount={member.post_count || 0} />
                     {member.bio && <p className="text-xs text-slate-400 mt-1 line-clamp-2">{member.bio}</p>}
                     <div className="flex items-center gap-3 mt-2">
-                      <span className="flex items-center gap-1 text-xs text-slate-500">
+                      <span className="flex items-center gap-1 text-xs text-slate-400">
                         <MessageSquare className="w-3 h-3" /> {member.thread_count || 0}
                       </span>
-                      <span className="flex items-center gap-1 text-xs text-slate-500">
+                      <span className="flex items-center gap-1 text-xs text-slate-400">
                         <Heart className="w-3 h-3" /> {member.reputation || 0}
                       </span>
-                      <span className="text-xs text-slate-500">
+                      <span className="text-xs text-slate-400">
                         Joined {timeAgo(member.created_at)}
                       </span>
                     </div>
@@ -157,7 +157,7 @@ export default function AdminMembers() {
                   {!isMe && (
                     <button
                       onClick={() => setSelectedMember(prev => prev === member.id ? null : member.id)}
-                      className={`p-2 rounded-lg transition-colors flex-shrink-0 ${isSelected ? 'bg-teal-500/20 text-teal-400' : 'text-slate-500 hover:text-teal-400 hover:bg-white/[0.08]'}`}
+                      className={`p-2 rounded-lg transition-colors flex-shrink-0 ${isSelected ? 'bg-teal-500/20 text-teal-400' : 'text-slate-400 hover:text-teal-400 hover:bg-white/[0.08]'}`}
                       title="Manage member"
                     >
                       <MoreVertical className="w-5 h-5" />
@@ -167,7 +167,7 @@ export default function AdminMembers() {
 
                 {isSelected && (
                   <div className="mt-4 pt-4 border-t border-white/10">
-                    <p className="text-[10px] text-slate-500 mb-2 uppercase tracking-wider font-semibold">Manage {member.display_name || member.username}</p>
+                    <p className="text-[10px] text-slate-400 mb-2 uppercase tracking-wider font-semibold">Manage {member.display_name || member.username}</p>
                     <div className="flex flex-wrap gap-2">
                       <Link href={`/forum/messages/new?to=${member.username}`} className="flex items-center gap-1.5 text-xs px-3 py-2 bg-teal-500/20 text-teal-400 rounded-lg hover:bg-teal-500/30 transition-colors font-medium">
                         <Mail className="w-3.5 h-3.5" /> Message
@@ -217,7 +217,7 @@ export default function AdminMembers() {
         })}
         {filtered.length === 0 && (
           <div className="col-span-2 text-center py-12 bg-white/[0.06] rounded-2xl border border-white/10">
-            <Users className="w-8 h-8 text-slate-500 mx-auto mb-2" />
+            <Users className="w-8 h-8 text-slate-400 mx-auto mb-2" />
             <p className="text-slate-400 text-sm">No members found</p>
           </div>
         )}

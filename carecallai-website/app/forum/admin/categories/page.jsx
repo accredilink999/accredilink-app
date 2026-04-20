@@ -163,11 +163,11 @@ export default function AdminCategories() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-white">{cat.name}</p>
-                      <p className="text-[11px] text-slate-500">{cat.description || 'No description'} &middot; {cat.thread_count || 0} threads</p>
+                      <p className="text-[11px] text-slate-400">{cat.description || 'No description'} &middot; {cat.thread_count || 0} threads</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-500 hidden sm:inline">/{cat.slug}</span>
+                    <span className="text-xs text-slate-400 hidden sm:inline">/{cat.slug}</span>
                     <button onClick={() => handleEdit(cat)} className="flex items-center gap-1 text-xs px-3 py-1.5 bg-teal-500/20 text-teal-300 hover:bg-teal-500/30 rounded-lg transition-colors font-medium border border-teal-500/30">
                       <Edit className="w-3 h-3" /> Edit
                     </button>

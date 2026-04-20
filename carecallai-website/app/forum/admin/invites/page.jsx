@@ -245,7 +245,7 @@ export default function AdminInvites() {
                       )}
                     </div>
                     <p className="text-xs text-slate-400 mt-0.5">{admin.email}</p>
-                    <p className="text-[10px] text-slate-500">{admin.org_name}</p>
+                    <p className="text-[10px] text-slate-400">{admin.org_name}</p>
                   </div>
                   <div className="flex-shrink-0 ml-3 flex items-center gap-2">
                     {isJoined && (

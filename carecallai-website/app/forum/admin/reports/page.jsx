@@ -81,7 +81,7 @@ export default function AdminReports() {
                     {report.details && <p className="text-xs text-slate-300 mb-2 italic">&quot;{report.details}&quot;</p>}
                     {report.content_preview && (
                       <div className="text-xs text-slate-400 bg-white/[0.04] rounded-lg p-3 border border-white/5">
-                        <Eye className="w-3.5 h-3.5 inline mr-1 text-slate-500" />
+                        <Eye className="w-3.5 h-3.5 inline mr-1 text-slate-400" />
                         {report.content_preview}
                       </div>
                     )}

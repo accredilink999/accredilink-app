@@ -90,7 +90,7 @@ export default function AdminPermissions() {
                 <tr key={key} className="border-b border-white/5 hover:bg-white/[0.02]">
                   <td className="px-4 py-3">
                     <p className="text-sm text-white font-medium">{label}</p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">{desc}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">{desc}</p>
                   </td>
                   <td className="text-center px-4 py-3">
                     <button onClick={() => isFounder && handleToggle('moderator', key)} disabled={!isFounder} className={`w-9 h-5 rounded-full transition-colors relative ${permissions?.moderator?.[key] ? 'bg-purple-500' : 'bg-slate-600'} ${isFounder ? 'cursor-pointer' : 'cursor-default opacity-80'}`}>
@@ -115,7 +115,7 @@ export default function AdminPermissions() {
 
         {isFounder && (
           <div className="px-4 py-3 border-t border-white/10 bg-white/[0.02]">
-            <p className="text-xs text-slate-500">Founder always has all permissions (cannot be changed). Toggle switches to enable or disable permissions for moderators and admins.</p>
+            <p className="text-xs text-slate-400">Founder always has all permissions (cannot be changed). Toggle switches to enable or disable permissions for moderators and admins.</p>
           </div>
         )}
       </div>

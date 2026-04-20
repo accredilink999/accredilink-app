@@ -5,7 +5,7 @@ import { useForum } from '@/lib/forumContext'
 import StarRank from '@/components/forum/StarRank'
 import { getRoleBadge, timeAgo } from '@/lib/forumAuth'
 import { isFounder as isFounderFn } from '@/lib/forumAuth'
-import { Users, MessageSquare, BarChart3, ExternalLink, Loader2, Mail, FolderOpen, Shield, Ban, Flag, Wifi } from 'lucide-react'
+import { Users, MessageSquare, BarChart3, ExternalLink, Loader2, Mail, FolderOpen, Shield, Ban, Flag, Wifi, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 
 export default function AdminDashboard() {
@@ -13,6 +13,8 @@ export default function AdminDashboard() {
   const isFounder = profile?.forum_role === 'founder' || isFounderFn(user?.id)
   const [adminData, setAdminData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [seeding, setSeeding] = useState(false)
+  const [seedResult, setSeedResult] = useState(null)
 
   useEffect(() => {
     if (token) fetchAdmin()
@@ -79,40 +81,59 @@ export default function AdminDashboard() {
         <Link href="/forum/admin/members" className="bg-white/[0.06] backdrop-blur rounded-xl border border-white/10 p-4 hover:bg-white/[0.1] hover:border-teal-500/30 transition-all group">
           <Users className="w-5 h-5 text-blue-400 mb-2 group-hover:text-teal-400 transition-colors" />
           <p className="text-sm font-medium text-white">Manage Members</p>
-          <p className="text-xs text-slate-500 mt-0.5">{adminData.stats?.users || 0} total</p>
+          <p className="text-xs text-slate-300 mt-0.5">{adminData.stats?.users || 0} total</p>
         </Link>
         <Link href="/forum/admin/threads" className="bg-white/[0.06] backdrop-blur rounded-xl border border-white/10 p-4 hover:bg-white/[0.1] hover:border-teal-500/30 transition-all group">
           <MessageSquare className="w-5 h-5 text-purple-400 mb-2 group-hover:text-teal-400 transition-colors" />
           <p className="text-sm font-medium text-white">Moderate Threads</p>
-          <p className="text-xs text-slate-500 mt-0.5">{adminData.stats?.threads || 0} total</p>
+          <p className="text-xs text-slate-300 mt-0.5">{adminData.stats?.threads || 0} total</p>
         </Link>
         <Link href="/forum/admin/categories" className="bg-white/[0.06] backdrop-blur rounded-xl border border-white/10 p-4 hover:bg-white/[0.1] hover:border-teal-500/30 transition-all group">
           <FolderOpen className="w-5 h-5 text-teal-400 mb-2 group-hover:text-teal-300 transition-colors" />
           <p className="text-sm font-medium text-white">Categories</p>
-          <p className="text-xs text-slate-500 mt-0.5">Manage forum categories</p>
+          <p className="text-xs text-slate-300 mt-0.5">Manage forum categories</p>
         </Link>
         <Link href="/forum/admin/reports" className="bg-white/[0.06] backdrop-blur rounded-xl border border-white/10 p-4 hover:bg-white/[0.1] hover:border-teal-500/30 transition-all group">
           <Flag className="w-5 h-5 text-amber-400 mb-2 group-hover:text-teal-400 transition-colors" />
           <p className="text-sm font-medium text-white">Content Reports</p>
-          <p className="text-xs text-slate-500 mt-0.5">Review flagged content</p>
+          <p className="text-xs text-slate-300 mt-0.5">Review flagged content</p>
         </Link>
         <Link href="/forum/admin/banned" className="bg-white/[0.06] backdrop-blur rounded-xl border border-white/10 p-4 hover:bg-white/[0.1] hover:border-teal-500/30 transition-all group">
           <Ban className="w-5 h-5 text-red-400 mb-2 group-hover:text-teal-400 transition-colors" />
           <p className="text-sm font-medium text-white">Banned Users</p>
-          <p className="text-xs text-slate-500 mt-0.5">{adminData.bannedUsers?.length || 0} banned</p>
+          <p className="text-xs text-slate-300 mt-0.5">{adminData.bannedUsers?.length || 0} banned</p>
         </Link>
         {isFounder && (
           <>
             <Link href="/forum/admin/roles" className="bg-white/[0.06] backdrop-blur rounded-xl border border-white/10 p-4 hover:bg-white/[0.1] hover:border-teal-500/30 transition-all group">
               <Shield className="w-5 h-5 text-cyan-400 mb-2 group-hover:text-teal-400 transition-colors" />
               <p className="text-sm font-medium text-white">Roles</p>
-              <p className="text-xs text-slate-500 mt-0.5">Assign user roles</p>
+              <p className="text-xs text-slate-300 mt-0.5">Assign user roles</p>
             </Link>
             <Link href="/forum/admin/invites" className="bg-gradient-to-br from-teal-500/10 to-cyan-500/10 backdrop-blur rounded-xl border border-teal-500/20 p-4 hover:bg-teal-500/15 hover:border-teal-500/40 transition-all group">
               <Mail className="w-5 h-5 text-teal-400 mb-2 group-hover:text-teal-300 transition-colors" />
               <p className="text-sm font-semibold text-white">Invite Users</p>
-              <p className="text-xs text-teal-400/70 mt-0.5">Send forum invites</p>
+              <p className="text-xs text-teal-300/70 mt-0.5">Send forum invites</p>
             </Link>
+            <button
+              onClick={async () => {
+                setSeeding(true); setSeedResult(null)
+                try {
+                  const res = await fetch('/api/forum/admin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, action: 'seed-intro-threads' }) })
+                  const data = await res.json()
+                  setSeedResult(data)
+                } catch { setSeedResult({ error: 'Failed' }) }
+                finally { setSeeding(false) }
+              }}
+              disabled={seeding}
+              className="bg-gradient-to-br from-purple-500/10 to-indigo-500/10 backdrop-blur rounded-xl border border-purple-500/20 p-4 hover:bg-purple-500/15 hover:border-purple-500/40 transition-all text-left"
+            >
+              <Sparkles className="w-5 h-5 text-purple-400 mb-2" />
+              <p className="text-sm font-medium text-white">{seeding ? 'Creating...' : 'Seed Intro Threads'}</p>
+              <p className="text-xs text-slate-300 mt-0.5">
+                {seedResult ? (seedResult.created ? `${seedResult.created} created, ${seedResult.skipped} existed` : seedResult.error || 'Done') : 'Create pinned intro posts'}
+              </p>
+            </button>
           </>
         )}
       </div>
@@ -141,13 +162,13 @@ export default function AdminDashboard() {
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-xs text-slate-400">@{u.username}</span>
-                    <span className="text-xs text-slate-500">&middot; {u.post_count || 0} posts &middot; {timeAgo(u.created_at)}</span>
+                    <span className="text-xs text-slate-400">&middot; {u.post_count || 0} posts &middot; {timeAgo(u.created_at)}</span>
                   </div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <StarRank role={u.forum_role} postCount={u.post_count || 0} />
-                <ExternalLink className="w-3.5 h-3.5 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <ExternalLink className="w-3.5 h-3.5 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
             </Link>
           ))}
