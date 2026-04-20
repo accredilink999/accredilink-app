@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useForum } from '@/lib/forumContext'
 import { isFounder as isFounderFn } from '@/lib/forumAuth'
 import { useRouter } from 'next/navigation'
-import { Mail, Users, UserPlus, Send, CheckCircle, Loader2 } from 'lucide-react'
+import { Mail, Users, UserPlus, Send, CheckCircle, Loader2, Zap } from 'lucide-react'
 
 export default function AdminInvites() {
   const { user, profile, token } = useForum()
@@ -12,17 +12,19 @@ export default function AdminInvites() {
   const [adminData, setAdminData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [inviting, setInviting] = useState(null)
-  const [invited, setInvited] = useState([])
+  const [sessionInvited, setSessionInvited] = useState([])
   // Direct email
   const [directEmail, setDirectEmail] = useState('')
   const [directName, setDirectName] = useState('')
-  const [directMessage, setDirectMessage] = useState('The CareCallAI Community Forum is where you can get support for the app, connect with other care professionals, share best practices, and book demos.\n\nJoin us today!')
   const [sendingDirect, setSendingDirect] = useState(false)
   const [directSent, setDirectSent] = useState([])
   // Bulk
   const [bulkEmails, setBulkEmails] = useState('')
   const [sendingBulk, setSendingBulk] = useState(false)
   const [bulkResult, setBulkResult] = useState(null)
+  // Invite All
+  const [sendingAll, setSendingAll] = useState(false)
+  const [inviteAllResult, setInviteAllResult] = useState(null)
 
   const isFounder = profile?.forum_role === 'founder' || isFounderFn(user?.id)
 
@@ -48,7 +50,7 @@ export default function AdminInvites() {
         body: JSON.stringify({ token, action: 'invite-to-forum', email, name }),
       })
       const data = await res.json()
-      if (data.success) setInvited(prev => [...prev, email])
+      if (data.success) setSessionInvited(prev => [...prev, email])
       else alert(data.error || 'Failed to send invite')
     } catch { alert('Failed to send invite') }
     finally { setInviting(null) }
@@ -61,7 +63,7 @@ export default function AdminInvites() {
       const res = await fetch('/api/forum/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, action: 'send-direct-invite', email: directEmail.trim(), name: directName.trim(), message: directMessage }),
+        body: JSON.stringify({ token, action: 'send-direct-invite', email: directEmail.trim(), name: directName.trim() }),
       })
       const data = await res.json()
       if (data.success) { setDirectSent(prev => [...prev, directEmail.trim()]); setDirectEmail(''); setDirectName('') }
@@ -82,13 +84,36 @@ export default function AdminInvites() {
       const res = await fetch('/api/forum/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, action: 'send-bulk-invite', emails, message: directMessage }),
+        body: JSON.stringify({ token, action: 'send-bulk-invite', emails }),
       })
       const data = await res.json()
       setBulkResult(data)
     } catch { alert('Failed to send') }
     finally { setSendingBulk(false) }
   }
+
+  const handleInviteAll = async () => {
+    if (!confirm('Send forum invite emails to all uninvited organisation admins?')) return
+    setSendingAll(true)
+    setInviteAllResult(null)
+    try {
+      const res = await fetch('/api/forum/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, action: 'send-forum-invite-all' }),
+      })
+      const data = await res.json()
+      setInviteAllResult(data)
+      if (data.success) fetchData() // refresh to update statuses
+    } catch { alert('Failed to send invites') }
+    finally { setSendingAll(false) }
+  }
+
+  // Derived counts
+  const orgAdmins = adminData?.allOrgAdmins || []
+  const joinedCount = orgAdmins.filter(a => a.has_forum_profile).length
+  const invitedCount = orgAdmins.filter(a => !a.has_forum_profile && (a.was_invited || sessionInvited.includes(a.email))).length
+  const uninvitedCount = orgAdmins.filter(a => !a.has_forum_profile && !a.was_invited && !sessionInvited.includes(a.email)).length
 
   if (loading) {
     return <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 text-teal-400 animate-spin" /></div>
@@ -98,6 +123,39 @@ export default function AdminInvites() {
 
   return (
     <div className="space-y-4">
+      {/* Invite All Uninvited — top banner */}
+      {orgAdmins.length > 0 && (
+        <div className="bg-gradient-to-r from-teal-500/10 to-cyan-500/10 backdrop-blur rounded-2xl border border-teal-500/20 p-5">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h2 className="font-semibold text-white text-lg flex items-center gap-2">
+                <Zap className="w-5 h-5 text-teal-400" /> Invite All Organisation Admins
+              </h2>
+              <div className="flex items-center gap-4 mt-2 text-xs">
+                <span className="text-green-400 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> {joinedCount} joined</span>
+                <span className="text-teal-400 flex items-center gap-1"><Mail className="w-3 h-3" /> {invitedCount} invited</span>
+                <span className="text-slate-400 flex items-center gap-1"><UserPlus className="w-3 h-3" /> {uninvitedCount} not invited</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {inviteAllResult && (
+                <span className="text-xs text-green-400 flex items-center gap-1">
+                  <CheckCircle className="w-3.5 h-3.5" /> {inviteAllResult.sent || 0} sent{inviteAllResult.failed ? `, ${inviteAllResult.failed} failed` : ''}
+                </span>
+              )}
+              <button
+                onClick={handleInviteAll}
+                disabled={sendingAll || uninvitedCount === 0}
+                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-teal-500 to-teal-600 text-white text-sm font-semibold rounded-xl hover:from-teal-600 hover:to-teal-700 disabled:opacity-50 transition-all shadow-lg shadow-teal-500/20"
+              >
+                {sendingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                {sendingAll ? 'Sending...' : uninvitedCount === 0 ? 'All Invited' : `Invite ${uninvitedCount} Uninvited`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Direct Email Invite */}
       <div className="bg-white/[0.06] backdrop-blur rounded-2xl border border-white/10 p-5">
         <div className="flex items-center gap-3 mb-4">
@@ -111,7 +169,6 @@ export default function AdminInvites() {
           <input type="email" value={directEmail} onChange={(e) => setDirectEmail(e.target.value)} placeholder="Email address *" className="px-4 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/30" />
           <input type="text" value={directName} onChange={(e) => setDirectName(e.target.value)} placeholder="Name (optional)" className="px-4 py-2.5 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/30" />
         </div>
-        <textarea value={directMessage} onChange={(e) => setDirectMessage(e.target.value)} rows={4} className="w-full px-4 py-3 bg-white/[0.06] border border-white/10 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/30 resize-y mb-3" placeholder="Custom message..." />
         <div className="flex items-center gap-3">
           <button onClick={handleSendDirect} disabled={sendingDirect || !directEmail.trim()} className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-teal-500 to-teal-600 text-white text-sm font-medium rounded-xl hover:from-teal-600 hover:to-teal-700 disabled:opacity-50 transition-all shadow-sm">
             {sendingDirect ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
@@ -148,24 +205,26 @@ export default function AdminInvites() {
         </div>
       </div>
 
-      {/* Invite Org Admins */}
-      {adminData?.allOrgAdmins && (
+      {/* Org Admins List with Status */}
+      {orgAdmins.length > 0 && (
         <div className="bg-white/[0.06] backdrop-blur rounded-2xl border border-white/10 overflow-hidden">
           <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <UserPlus className="w-5 h-5 text-teal-400" />
-              <h2 className="font-semibold text-white">Organisation Admins ({adminData.allOrgAdmins.length})</h2>
+              <h2 className="font-semibold text-white">Organisation Admins ({orgAdmins.length})</h2>
             </div>
-            <div className="flex items-center gap-2 text-xs text-slate-400">
-              <span className="flex items-center gap-1"><CheckCircle className="w-3 h-3 text-green-400" /> Joined</span>
-              <span className="flex items-center gap-1"><Mail className="w-3 h-3 text-slate-500" /> Not joined</span>
+            <div className="flex items-center gap-3 text-xs text-slate-400">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400" /> Joined</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-teal-400" /> Invited</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-500" /> Not invited</span>
             </div>
           </div>
           <div className="divide-y divide-white/5">
-            {adminData.allOrgAdmins.length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-slate-400">No organisation admins found</p>
-            ) : (
-              adminData.allOrgAdmins.map((admin, i) => (
+            {orgAdmins.map((admin, i) => {
+              const isJoined = admin.has_forum_profile
+              const isInvited = !isJoined && (admin.was_invited || sessionInvited.includes(admin.email))
+
+              return (
                 <div key={admin.user_id + '-' + i} className="flex items-center justify-between px-4 py-3 hover:bg-white/[0.03]">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -173,32 +232,38 @@ export default function AdminInvites() {
                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${admin.org_role === 'owner' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' : 'bg-teal-500/20 text-teal-400 border-teal-500/30'}`}>
                         {admin.org_role}
                       </span>
-                      {admin.has_forum_profile && (
+                      {isJoined && (
                         <span className="flex items-center gap-0.5 text-[10px] text-green-400 font-medium">
                           <CheckCircle className="w-3 h-3" /> Joined
+                        </span>
+                      )}
+                      {isInvited && (
+                        <span className="flex items-center gap-0.5 text-[10px] text-teal-400 font-medium">
+                          <Mail className="w-3 h-3" /> Invited
                         </span>
                       )}
                     </div>
                     <p className="text-xs text-slate-400 mt-0.5">{admin.email}</p>
                     <p className="text-[10px] text-slate-500">{admin.org_name}</p>
                   </div>
-                  <div className="flex-shrink-0 ml-3">
-                    {admin.has_forum_profile ? (
+                  <div className="flex-shrink-0 ml-3 flex items-center gap-2">
+                    {isJoined && (
                       <span className="text-xs text-green-400 font-medium px-3 py-1.5 bg-green-500/20 rounded-lg">@{admin.forum_username}</span>
-                    ) : invited.includes(admin.email) ? (
+                    )}
+                    {sessionInvited.includes(admin.email) || (isInvited && !isJoined) ? (
                       <span className="flex items-center gap-1 text-xs text-teal-400 font-medium px-3 py-1.5 bg-teal-500/20 rounded-lg">
-                        <CheckCircle className="w-3.5 h-3.5" /> Invited
+                        <CheckCircle className="w-3.5 h-3.5" /> Invite Sent
                       </span>
                     ) : (
                       <button onClick={() => handleInvite(admin.email, admin.full_name)} disabled={inviting === admin.email} className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-lg hover:from-teal-600 hover:to-teal-700 disabled:opacity-50 transition-all shadow-sm">
                         {inviting === admin.email ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                        Invite
+                        {isJoined ? 'Send Email' : 'Invite'}
                       </button>
                     )}
                   </div>
                 </div>
-              ))
-            )}
+              )
+            })}
           </div>
         </div>
       )}
@@ -206,7 +271,7 @@ export default function AdminInvites() {
       {/* Sent history */}
       {directSent.length > 0 && (
         <div className="bg-white/[0.06] backdrop-blur rounded-2xl border border-white/10 p-4">
-          <h3 className="text-sm font-medium text-slate-300 mb-2">Recently Sent</h3>
+          <h3 className="text-sm font-medium text-slate-300 mb-2">Recently Sent This Session</h3>
           <div className="space-y-1">
             {directSent.map((email, i) => (
               <div key={i} className="flex items-center gap-2 text-xs text-slate-400">
