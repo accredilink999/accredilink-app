@@ -222,7 +222,8 @@ export default function AdminInvites() {
           <div className="divide-y divide-white/5">
             {orgAdmins.map((admin, i) => {
               const isJoined = admin.has_forum_profile
-              const isInvited = !isJoined && (admin.was_invited || sessionInvited.includes(admin.email))
+              const wasInvited = admin.was_invited || sessionInvited.includes(admin.email)
+              const isInvited = !isJoined && wasInvited
 
               return (
                 <div key={admin.user_id + '-' + i} className="flex items-center justify-between px-4 py-3 hover:bg-white/[0.03]">
@@ -250,7 +251,7 @@ export default function AdminInvites() {
                     {isJoined && (
                       <span className="text-xs text-green-400 font-medium px-3 py-1.5 bg-green-500/20 rounded-lg">@{admin.forum_username}</span>
                     )}
-                    {sessionInvited.includes(admin.email) || (isInvited && !isJoined) ? (
+                    {wasInvited ? (
                       <span className="flex items-center gap-1 text-xs text-teal-400 font-medium px-3 py-1.5 bg-teal-500/20 rounded-lg">
                         <CheckCircle className="w-3.5 h-3.5" /> Invite Sent
                       </span>
