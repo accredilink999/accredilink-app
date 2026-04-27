@@ -12,10 +12,10 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-
+import { sendPushToFounder } from '@/lib/pushNotifications'
 
 export const dynamic = 'force-dynamic'
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://x.supabase.co', process.env.SUPABASE_SERVICE_ROLE_KEY || 'x')
 function json(data, status = 200) { return NextResponse.json(data, { status }) }
 
 const FOUNDER_ID = '1f5d9e8a-ab4b-4c00-813a-8af23f79fb82'
@@ -276,6 +276,14 @@ export async function POST(req) {
         })
       } catch {}
 
+      // Push notification to founder
+      sendPushToFounder({
+        title: 'New Session Booking',
+        body: `${userName} booked ${formattedDate} at ${hhmm(start_time)}`,
+        url: '/forum/booking',
+        tag: `booking-${booking.id}`,
+      }).catch(() => {})
+
       return json({ success: true, booking })
     }
 
@@ -475,6 +483,13 @@ export async function POST(req) {
             message: `${booking.user_name} cancelled their session on ${formattedDate} at ${hhmm(booking.start_time)}`,
           })
         } catch {}
+
+        sendPushToFounder({
+          title: 'Session Cancelled',
+          body: `${booking.user_name} cancelled ${formattedDate} at ${hhmm(booking.start_time)}`,
+          url: '/forum/booking',
+          tag: `cancel-${booking.id}`,
+        }).catch(() => {})
       }
 
       // Notify user if founder cancelled

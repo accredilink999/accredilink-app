@@ -68,7 +68,7 @@ const ORG_FILTERED_TABLES = new Set([
   'safeguarding_reports', 'supervision_records', 'meetings',
   'meeting_participants', 'clinical_observations', 'wound_records',
   'falls_records', 'repositioning_records', 'continence_records',
-  'archived_mar_charts', 'payroll_settings',
+  'archived_mar_charts', 'payroll_settings', 'needs_assessments',
 ])
 
 /** Add org filter to a query if the table supports it */
@@ -401,6 +401,7 @@ export const entities = {
   FallsRecord:                 buildEntity('falls_records'),
   RepositioningRecord:         buildEntity('repositioning_records'),
   ContinenceRecord:            buildEntity('continence_records'),
+  NeedsAssessment:             buildEntity('needs_assessments'),
 
   // Admin
   Incident:                    buildEntity('incidents'),

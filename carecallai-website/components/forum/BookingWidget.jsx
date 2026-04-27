@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Calendar, ChevronLeft, ChevronRight, Clock, CheckCircle, Loader2, X, Ban, CalendarOff } from 'lucide-react'
 
 const HOURS = Array.from({ length: 8 }, (_, i) => i + 9) // 9am to 4pm (last slot starts at 4pm, ends 5pm)
@@ -17,7 +17,10 @@ function getMonday(d) {
 }
 
 function formatDate(date) {
-  return date.toISOString().split('T')[0]
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
 function hhmm(t) {
@@ -242,6 +245,29 @@ export default function BookingWidget({ token, userId, profile }) {
     }
   }
 
+  // Swipe to change week
+  const touchStart = useRef(null)
+  const touchEnd = useRef(null)
+  const minSwipe = 50
+
+  function onTouchStart(e) {
+    touchEnd.current = null
+    touchStart.current = e.targetTouches[0].clientX
+  }
+  function onTouchMove(e) {
+    touchEnd.current = e.targetTouches[0].clientX
+  }
+  function onTouchEnd() {
+    if (!touchStart.current || !touchEnd.current) return
+    const dist = touchStart.current - touchEnd.current
+    if (Math.abs(dist) >= minSwipe) {
+      if (dist > 0) nextWeek()   // swipe left = next week
+      else prevWeek()            // swipe right = prev week
+    }
+    touchStart.current = null
+    touchEnd.current = null
+  }
+
   // Clear messages after 5s
   useEffect(() => {
     if (success) { const t = setTimeout(() => setSuccess(''), 5000); return () => clearTimeout(t) }
@@ -304,7 +330,7 @@ export default function BookingWidget({ token, userId, profile }) {
             <span className="ml-2 text-sm text-slate-400">Loading calendar...</span>
           </div>
         ) : (
-          <div className="bg-white rounded-xl overflow-hidden border border-slate-200 shadow-sm">
+          <div className="bg-white rounded-xl overflow-hidden border border-slate-200 shadow-sm" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
             {/* Day headers */}
             <div className="grid grid-cols-[60px_repeat(5,1fr)] border-b border-slate-200">
               <div className="p-2 bg-slate-50"></div>
@@ -363,7 +389,7 @@ export default function BookingWidget({ token, userId, profile }) {
                         managing && isFounder ? (
                           <button
                             onClick={() => handleToggleBlock(dateStr, hour)}
-                            className="w-full h-full min-h-[40px] rounded bg-emerald-100 hover:bg-red-50 border border-emerald-300 hover:border-red-300 flex flex-col items-center justify-center transition-colors group"
+                            className="w-full h-full min-h-[40px] rounded bg-emerald-300 hover:bg-red-100 border-2 border-emerald-500 hover:border-red-400 flex flex-col items-center justify-center transition-colors group"
                             title="Click to mark as unavailable"
                           >
                             <span className="text-[9px] font-bold text-emerald-600 group-hover:hidden">Available</span>
@@ -381,13 +407,13 @@ export default function BookingWidget({ token, userId, profile }) {
                               setNotes('')
                               setError('')
                             }}
-                            className="w-full h-full min-h-[40px] rounded bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 hover:border-emerald-400 flex items-center justify-center transition-colors"
+                            className="w-full h-full min-h-[40px] rounded bg-emerald-300 hover:bg-emerald-400 border-2 border-emerald-500 hover:border-emerald-600 flex items-center justify-center transition-colors"
                             title="Click to book this slot"
                           >
                             <span className="text-[10px] font-bold text-emerald-700">Available</span>
                           </button>
                         ) : (
-                          <div className="h-full min-h-[40px] rounded bg-emerald-100 border border-emerald-300 flex items-center justify-center">
+                          <div className="h-full min-h-[40px] rounded bg-emerald-300 border-2 border-emerald-500 flex items-center justify-center">
                             <span className="text-[10px] font-bold text-emerald-600">Available</span>
                           </div>
                         )
@@ -432,7 +458,7 @@ export default function BookingWidget({ token, userId, profile }) {
         {/* Legend */}
         <div className="flex flex-wrap gap-4 mt-3 px-1">
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded bg-emerald-100 border border-emerald-300"></div>
+            <div className="w-3 h-3 rounded bg-emerald-300 border-2 border-emerald-500"></div>
             <span className="text-[10px] text-slate-400">Available</span>
           </div>
           <div className="flex items-center gap-1.5">

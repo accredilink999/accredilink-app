@@ -1,10 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-import { notifyReply, notifyMention, notifySubscriber } from '@/lib/forumEmail'
+import { notifyReply, notifyMention, notifySubscriber, notifyFounderNewReply } from '@/lib/forumEmail'
+import { sendPushToFounder, sendPushToUser, sendPushToUsers } from '@/lib/pushNotifications'
 
+const FOUNDER_ID = '1f5d9e8a-ab4b-4c00-813a-8af23f79fb82'
 
 export const dynamic = 'force-dynamic'
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://x.supabase.co', process.env.SUPABASE_SERVICE_ROLE_KEY || 'x')
 function json(data, status = 200) { return NextResponse.json(data, { status }) }
 
 // POST: create reply
@@ -87,6 +89,14 @@ export async function POST(req) {
         replyAuthor: fp.username,
         replyContent: content,
       }).catch(() => {})
+
+      // Push notification to thread author
+      sendPushToUser(thread.author_id, {
+        title: 'New Reply',
+        body: `${fp.username} replied to "${thread.title}"`,
+        url: `/forum/thread/${threadId}`,
+        tag: `reply-${reply.id}`,
+      }).catch(() => {})
     }
 
     // Notify thread subscribers (except author and reply author)
@@ -108,7 +118,31 @@ export async function POST(req) {
           replyAuthor: fp.username, replyContent: content,
         }).catch(() => {})
       }
+      // Push notification to all subscribers
+      if (subscriberIds.length > 0) {
+        sendPushToUsers(subscriberIds, {
+          title: 'Thread Update',
+          body: `${fp.username} replied to "${thread.title}"`,
+          url: `/forum/thread/${threadId}`,
+          tag: `reply-${reply.id}`,
+        }).catch(() => {})
+      }
     } catch {}
+
+    // Notify founder of every reply (email + push) — unless founder is the author
+    if (user.id !== FOUNDER_ID) {
+      notifyFounderNewReply(supabase, {
+        authorName: fp.username, threadTitle: thread.title,
+        threadId, replyContent: content,
+      }).catch(() => {})
+
+      sendPushToFounder({
+        title: 'New Forum Reply',
+        body: `${fp.username} replied in "${thread.title}"`,
+        url: `/forum/thread/${threadId}`,
+        tag: `reply-${reply.id}`,
+      }).catch(() => {})
+    }
 
     // Detect @mentions and notify
     try {
@@ -127,6 +161,14 @@ export async function POST(req) {
           notifyMention(supabase, {
             userId: mentioned.id, actorName: fp.username,
             threadTitle: thread.title, threadId, content,
+          }).catch(() => {})
+
+          // Push notification for mention
+          sendPushToUser(mentioned.id, {
+            title: 'You were mentioned',
+            body: `${fp.username} mentioned you in "${thread.title}"`,
+            url: `/forum/thread/${threadId}`,
+            tag: `mention-${reply.id}`,
           }).catch(() => {})
         }
       }

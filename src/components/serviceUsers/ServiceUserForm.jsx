@@ -659,7 +659,7 @@ ${formData.care_plan ? `CARE PLAN DETAILS:\n${formData.care_plan}` : ''}`;
              <TabsTrigger value="personal" className="text-xs sm:text-sm">Personal</TabsTrigger>
              <TabsTrigger value="emergency" className="text-xs sm:text-sm">Emergency</TabsTrigger>
              <TabsTrigger value="medical" className="text-xs sm:text-sm">Medical</TabsTrigger>
-             <TabsTrigger value="care" className="text-xs sm:text-sm">Care</TabsTrigger>
+             <TabsTrigger value="care" className="text-xs sm:text-sm">Care Plan</TabsTrigger>
              <TabsTrigger value="calls" className="text-xs sm:text-sm">Calls</TabsTrigger>
              <TabsTrigger value="medications" className="text-xs sm:text-sm">Meds & MAR</TabsTrigger>
            </TabsList>

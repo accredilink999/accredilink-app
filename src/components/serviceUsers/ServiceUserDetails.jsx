@@ -26,6 +26,8 @@ import { supabase } from '@/api/supabaseClient';
 import CallTypeManager from '../rota/CallTypeManager';
 import SafeguardingReports from './SafeguardingReports';
 import ClinicalPanel from '../clinical/ClinicalPanel';
+import AssessmentHistory from './AssessmentHistory';
+import AssessmentWizard from './AssessmentWizard';
 import { openExternalUrl } from '@/lib/openExternalUrl';
 import { archiveItem } from '@/utils/archiveHelper';
 import {
@@ -49,6 +51,7 @@ import {
   Activity,
   User,
   ClipboardList,
+  ClipboardCheck,
   MessageSquare,
   Armchair,
   Stethoscope,
@@ -120,6 +123,7 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
     const [holdType, setHoldType] = useState('permanent');
     const [holdRemainingCalls, setHoldRemainingCalls] = useState(5);
     const [marFullscreen, setMARFullscreen] = useState(false);
+    const [showAssessmentWizard, setShowAssessmentWizard] = useState(false);
     const [deleteServiceUserConfirmOpen, setDeleteServiceUserConfirmOpen] = useState(false);
     const [showCommunicationPastLogs, setShowCommunicationPastLogs] = useState(false);
     const [showSittingPastLogs, setShowSittingPastLogs] = useState(false);
@@ -252,6 +256,16 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
   const { data: callTypes = [] } = useQuery({
     queryKey: ['callTypes'],
     queryFn: () => base44.entities.CallType.filter({ is_active: true }, 'sort_order'),
+  });
+
+  const { data: existingAssessments = [] } = useQuery({
+    queryKey: ['needsAssessments', serviceUser?.id],
+    queryFn: () => base44.entities.NeedsAssessment.filter(
+      { service_user_id: serviceUser.id },
+      '-completed_at',
+      50
+    ),
+    enabled: !!serviceUser?.id,
   });
 
   const clientArea = rotaAreas.find(a => a.id === serviceUser?.area_id);
@@ -689,6 +703,7 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
                  { value: 'sitting', label: 'Sitting\nService', icon: Armchair, bg: 'from-orange-400 to-orange-600', iconBg: 'bg-orange-200', iconColor: 'text-orange-700' },
                  { value: 'safeguarding', label: 'Safe-\nguarding', icon: Shield, bg: 'from-purple-400 to-purple-600', iconBg: 'bg-purple-200', iconColor: 'text-purple-700' },
                  { value: 'clinical', label: 'Clinical\nAssess.', icon: Stethoscope, bg: 'from-pink-400 to-pink-600', iconBg: 'bg-pink-200', iconColor: 'text-pink-700' },
+                 ...(isAdmin ? [{ value: 'assessment', label: 'Assessment\nOf Needs', icon: ClipboardCheck, bg: 'from-cyan-400 to-cyan-600', iconBg: 'bg-cyan-200', iconColor: 'text-cyan-700' }] : []),
                  { value: 'review', label: 'Client\nFeedback', icon: Star, bg: 'from-yellow-400 to-amber-500', iconBg: 'bg-amber-200', iconColor: 'text-amber-700' },
                ].map(tile => {
                  const Icon = tile.icon;
@@ -738,6 +753,7 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
              <TabsTrigger value="sitting">Sitting</TabsTrigger>
              <TabsTrigger value="safeguarding">Safe</TabsTrigger>
              <TabsTrigger value="clinical">Clinical</TabsTrigger>
+             <TabsTrigger value="assessment">Assessment</TabsTrigger>
              <TabsTrigger value="review">Review</TabsTrigger>
            </TabsList>
 
@@ -1319,6 +1335,13 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
              <ClinicalPanel serviceUser={serviceUser} />
            </TabsContent>
 
+           <TabsContent value="assessment" className="space-y-3 mt-4">
+             <AssessmentHistory
+               serviceUser={serviceUser}
+               onStartAssessment={() => setShowAssessmentWizard(true)}
+             />
+           </TabsContent>
+
            <TabsContent value="review" className="space-y-4 mt-4">
              {/* Client Reviews for Inspection Evidence */}
              <Card className="p-5">
@@ -1577,6 +1600,20 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
            </TabsContent>
            </Tabs>
            </div>
+
+           {showAssessmentWizard && (
+             <AssessmentWizard
+               serviceUser={serviceUser}
+               open={showAssessmentWizard}
+               onClose={() => setShowAssessmentWizard(false)}
+               onComplete={() => {
+                 setShowAssessmentWizard(false);
+                 queryClient.invalidateQueries({ queryKey: ['needsAssessments', serviceUser?.id] });
+                 queryClient.invalidateQueries({ queryKey: ['serviceUsers'] });
+               }}
+               existingAssessments={existingAssessments}
+             />
+           )}
 
            <ConfirmDialog
              open={deleteServiceUserConfirmOpen}

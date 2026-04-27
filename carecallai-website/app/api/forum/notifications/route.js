@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 
 
 export const dynamic = 'force-dynamic'
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://x.supabase.co', process.env.SUPABASE_SERVICE_ROLE_KEY || 'x')
 function json(data, status = 200) { return NextResponse.json(data, { status }) }
 
 // GET: fetch user notifications

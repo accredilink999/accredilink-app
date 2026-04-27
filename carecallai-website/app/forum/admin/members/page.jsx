@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useForum } from '@/lib/forumContext'
 import StarRank from '@/components/forum/StarRank'
 import { canModerate, isFounder as isFounderFn, timeAgo, getRoleBadge } from '@/lib/forumAuth'
-import { Users, Search, MessageSquare, Heart, Mail, Shield, Trash2, Ban, ChevronDown, AlertTriangle, UserCheck, MoreVertical, Loader2 } from 'lucide-react'
+import { Users, Search, MessageSquare, Heart, Mail, Shield, Trash2, Ban, ChevronDown, AlertTriangle, UserCheck, MoreVertical, Loader2, Clock } from 'lucide-react'
 import Link from 'next/link'
 
 export default function AdminMembers() {
@@ -141,7 +141,7 @@ export default function AdminMembers() {
                     <p className="text-xs text-slate-400">@{member.username}</p>
                     <StarRank role={member.forum_role} postCount={member.post_count || 0} />
                     {member.bio && <p className="text-xs text-slate-400 mt-1 line-clamp-2">{member.bio}</p>}
-                    <div className="flex items-center gap-3 mt-2">
+                    <div className="flex items-center gap-3 mt-2 flex-wrap">
                       <span className="flex items-center gap-1 text-xs text-slate-400">
                         <MessageSquare className="w-3 h-3" /> {member.thread_count || 0}
                       </span>
@@ -151,6 +151,16 @@ export default function AdminMembers() {
                       <span className="text-xs text-slate-400">
                         Joined {timeAgo(member.created_at)}
                       </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      <Clock className="w-3 h-3 text-slate-500" />
+                      {member.last_seen_at ? (
+                        <span className={`text-xs font-medium ${(Date.now() - new Date(member.last_seen_at).getTime()) < 5 * 60 * 1000 ? 'text-green-400' : 'text-slate-400'}`}>
+                          {(Date.now() - new Date(member.last_seen_at).getTime()) < 5 * 60 * 1000 ? 'Online now' : `Last seen ${timeAgo(member.last_seen_at)}`}
+                        </span>
+                      ) : (
+                        <span className="text-xs font-medium text-red-400">Never logged in</span>
+                      )}
                     </div>
                   </div>
 

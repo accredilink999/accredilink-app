@@ -1,4 +1,5 @@
 'use client'
+import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Plus, TrendingUp, Megaphone, HelpCircle, Bug, Lightbulb, MessageCircle, Star, Shield, ClipboardCheck, MessageSquare, BookOpen, CalendarDays } from 'lucide-react'
@@ -29,6 +30,21 @@ const colorMap = {
 
 export default function ForumSidebar({ categories, stats, profile }) {
   const pathname = usePathname()
+  const isFirstRender = useRef(true)
+
+  // On mobile, scroll to main content when navigating between categories
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      return
+    }
+    if (window.innerWidth < 1024) {
+      const main = document.querySelector('main')
+      if (main) {
+        setTimeout(() => main.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
+      }
+    }
+  }, [pathname])
 
   return (
     <aside className="w-full lg:w-64 flex-shrink-0 space-y-4">
@@ -41,37 +57,37 @@ export default function ForumSidebar({ categories, stats, profile }) {
         </Link>
       )}
 
-      <div className="bg-white/[0.06] backdrop-blur rounded-2xl border border-white/10 overflow-hidden">
-        <div className="px-4 py-3 border-b border-white/10">
-          <h3 className="font-semibold text-sm text-slate-300">Categories</h3>
+      <div className="bg-slate-900/80 backdrop-blur rounded-2xl border border-slate-700/60 overflow-hidden shadow-lg">
+        <div className="px-4 py-3 border-b border-slate-700/60 bg-slate-800/50">
+          <h3 className="font-bold text-sm text-white tracking-wide">Categories</h3>
         </div>
         <nav className="py-1">
           <Link
             href="/forum"
-            className={`flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors ${pathname === '/forum' ? 'bg-teal-500/20 text-teal-300 font-medium border-r-2 border-teal-400' : 'text-slate-400 hover:bg-white/[0.04] hover:text-slate-300'}`}
+            className={`flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors ${pathname === '/forum' ? 'bg-teal-500/25 text-teal-200 font-semibold border-r-2 border-teal-400' : 'text-slate-200 hover:bg-white/10 hover:text-white'}`}
           >
             <TrendingUp className="w-4 h-4" /> All Categories
           </Link>
           <Link
             href="/forum/booking"
-            className={`flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors ${pathname === '/forum/booking' ? 'bg-teal-500/20 text-teal-300 font-medium border-r-2 border-teal-400' : 'text-slate-400 hover:bg-white/[0.04] hover:text-slate-300'}`}
+            className={`flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors ${pathname === '/forum/booking' ? 'bg-teal-500/25 text-teal-200 font-semibold border-r-2 border-teal-400' : 'text-slate-200 hover:bg-white/10 hover:text-white'}`}
           >
             <CalendarDays className={`w-4 h-4 ${pathname === '/forum/booking' ? 'text-teal-400' : 'text-emerald-400'}`} /> Book a Session
           </Link>
           {(categories || []).map(cat => {
             const Icon = iconMap[cat.slug] || MessageSquare
-            const color = colorMap[cat.slug] || 'text-slate-400'
+            const color = colorMap[cat.slug] || 'text-slate-300'
             const isActive = pathname === `/forum/${cat.slug}`
             return (
               <Link
                 key={cat.id}
                 href={`/forum/${cat.slug}`}
-                className={`flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors ${isActive ? 'bg-teal-500/20 text-teal-300 font-medium border-r-2 border-teal-400' : 'text-slate-400 hover:bg-white/[0.04] hover:text-slate-300'}`}
+                className={`flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors ${isActive ? 'bg-teal-500/25 text-teal-200 font-semibold border-r-2 border-teal-400' : 'text-slate-200 hover:bg-white/10 hover:text-white'}`}
               >
                 <Icon className={`w-4 h-4 ${isActive ? 'text-teal-400' : color}`} />
                 <span className="truncate flex-1">{cat.name}</span>
                 {(cat.thread_count > 0) && (
-                  <span className="text-[10px] font-medium bg-white/10 text-slate-400 px-1.5 py-0.5 rounded-full">{cat.thread_count}</span>
+                  <span className="text-[10px] font-medium bg-white/15 text-slate-300 px-1.5 py-0.5 rounded-full">{cat.thread_count}</span>
                 )}
               </Link>
             )
@@ -80,16 +96,16 @@ export default function ForumSidebar({ categories, stats, profile }) {
       </div>
 
       {stats && (
-        <div className="bg-white/[0.06] backdrop-blur rounded-2xl border border-white/10 p-4">
-          <h3 className="font-semibold text-sm text-slate-300 mb-3">Forum Stats</h3>
+        <div className="bg-slate-900/80 backdrop-blur rounded-2xl border border-slate-700/60 p-4 shadow-lg">
+          <h3 className="font-bold text-sm text-white mb-3">Forum Stats</h3>
           <div className="grid grid-cols-2 gap-3 text-center">
-            <div className="bg-white/[0.06] rounded-xl p-3">
+            <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/40">
               <p className="text-lg font-bold text-teal-400">{stats.threads || 0}</p>
-              <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wide">Threads</p>
+              <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Threads</p>
             </div>
-            <div className="bg-white/[0.06] rounded-xl p-3">
+            <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/40">
               <p className="text-lg font-bold text-teal-400">{stats.categories || 0}</p>
-              <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wide">Categories</p>
+              <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Categories</p>
             </div>
           </div>
         </div>

@@ -1,7 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { notifyFounderNewThread } from '@/lib/forumEmail'
+import { sendPushToFounder } from '@/lib/pushNotifications'
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://x.supabase.co', process.env.SUPABASE_SERVICE_ROLE_KEY || 'x')
+const FOUNDER_ID = '1f5d9e8a-ab4b-4c00-813a-8af23f79fb82'
 
 export const dynamic = 'force-dynamic'
 
@@ -116,8 +119,33 @@ export async function POST(req) {
 
     // Update user thread count
     try {
-      const { data: p } = await supabase.from('forum_profiles').select('thread_count').eq('id', user.id).single()
+      const { data: p } = await supabase.from('forum_profiles').select('thread_count, username').eq('id', user.id).single()
       if (p) await supabase.from('forum_profiles').update({ thread_count: (p.thread_count || 0) + 1 }).eq('id', user.id)
+
+      // Notify founder of new thread (email + push)
+      if (user.id !== FOUNDER_ID) {
+        const authorName = p?.username || user.email
+        const categoryName = cat?.slug || 'unknown'
+
+        notifyFounderNewThread(supabase, {
+          authorName, title, content, categoryName,
+          threadSlug: slug, categorySlug: cat?.slug,
+        }).catch(() => {})
+
+        sendPushToFounder({
+          title: 'New Forum Post',
+          body: `${authorName} posted "${title}" in ${categoryName}`,
+          url: `/forum/${cat?.slug}/${slug}`,
+          tag: `thread-${thread.id}`,
+        }).catch(() => {})
+
+        // Forum notification for founder
+        await supabase.from('forum_notifications').insert({
+          user_id: FOUNDER_ID, actor_id: user.id, type: 'new_thread',
+          thread_id: thread.id,
+          message: `${authorName} created a new thread: "${title}"`,
+        }).catch(() => {})
+      }
     } catch {}
 
     return json({ success: true, thread, categorySlug: cat?.slug })
