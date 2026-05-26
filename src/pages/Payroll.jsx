@@ -222,11 +222,10 @@ export default function Payroll() {
   });
 
   const isSuperAdmin = user?.role === 'super_admin';
-  const isAdmin = isSuperAdmin || user?.role === 'admin';
   const [activeTab, setActiveTab] = useState('dashboard');
 
-  // Only super_admin and admin roles see the full payroll management view
-  if (!isAdmin) {
+  // Only super_admin sees the full payroll management view
+  if (!isSuperAdmin) {
     return (
       <div className="space-y-6">
         <PageHeader
