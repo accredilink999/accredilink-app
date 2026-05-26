@@ -222,10 +222,11 @@ export default function Payroll() {
   });
 
   const isSuperAdmin = user?.role === 'super_admin';
+  const isAdmin = isSuperAdmin || user?.role === 'admin' || ['admin', 'manager', 'supervisor'].includes(user?.job_title);
   const [activeTab, setActiveTab] = useState('dashboard');
 
   // Non-admin staff see their own payslips + migrated
-  if (!isSuperAdmin) {
+  if (!isAdmin) {
     return (
       <div className="space-y-6">
         <PageHeader
