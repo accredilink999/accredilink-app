@@ -170,7 +170,7 @@ export default function ClockInOut() {
   };
 
   return (
-    <div className="space-y-6 dark:bg-slate-950">
+    <div className="space-y-6 dark:bg-slate-950 pb-10">
       <PageHeader 
         title="Clock In / Out" 
         subtitle={format(new Date(), 'EEEE, d MMMM yyyy')}
