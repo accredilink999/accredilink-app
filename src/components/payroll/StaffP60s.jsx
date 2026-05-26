@@ -39,13 +39,16 @@ export default function StaffP60s({ user }) {
   const staffName = (user?.staff_full_name || user?.full_name || 'P60').replace(/\s+/g, '_');
 
   // View — opens PDF in a new browser tab
+  // window.open must be called synchronously before any await to avoid popup blockers
   const handleView = async (year, path) => {
     setLoading(`view-${year}`);
+    const win = window.open('', '_blank'); // open immediately on user gesture
     try {
       const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600);
       if (error || !data?.signedUrl) throw new Error('Could not get link');
-      window.open(data.signedUrl, '_blank');
+      win.location.href = data.signedUrl; // now navigate the already-open tab
     } catch {
+      if (win) win.close();
       alert('Could not open P60. Please try again.');
     } finally {
       setLoading(null);
