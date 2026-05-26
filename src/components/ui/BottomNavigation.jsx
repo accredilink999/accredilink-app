@@ -14,6 +14,7 @@ import {
 
 const navigation = [
   { name: 'Dashboard', icon: LayoutDashboard, page: 'Dashboard' },
+  { name: 'Assets', icon: Package, page: 'Assets', iconClassName: 'fill-orange-500' },
   { name: 'Chat', icon: MessageSquare, page: 'Chat' },
   { name: 'Profile', icon: User, page: 'Profile' },
 ];
