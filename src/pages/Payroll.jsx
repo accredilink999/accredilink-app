@@ -222,10 +222,10 @@ export default function Payroll() {
   });
 
   const isSuperAdmin = user?.role === 'super_admin';
-  const isAdmin = isSuperAdmin || user?.role === 'admin' || ['admin', 'manager', 'supervisor'].includes(user?.job_title);
+  const isAdmin = isSuperAdmin || user?.role === 'admin';
   const [activeTab, setActiveTab] = useState('dashboard');
 
-  // Non-admin staff see their own payslips + migrated
+  // Only super_admin and admin roles see the full payroll management view
   if (!isAdmin) {
     return (
       <div className="space-y-6">
