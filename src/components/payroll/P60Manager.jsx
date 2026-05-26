@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
-import { getCurrentOrgId } from '@/lib/orgContext';
+import { base44 } from '@/api/base44Client';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,20 +28,10 @@ export default function P60Manager() {
   const [deleting, setDeleting] = useState(null);
   const fileInputRefs = useRef({});
 
-  // Fetch only staff from this organisation
+  // Fetch only staff from this organisation — base44.entities.User applies org filter automatically
   const { data: staffList = [] } = useQuery({
     queryKey: ['all-staff-p60'],
-    queryFn: async () => {
-      const orgId = getCurrentOrgId();
-      let q = supabase
-        .from('profiles')
-        .select('id, full_name, email, staff_full_name')
-        .order('full_name', { ascending: true });
-      if (orgId) q = q.eq('organization_id', orgId);
-      const { data, error } = await q;
-      if (error) throw error;
-      return (data || []).filter(s => s.id);
-    },
+    queryFn: () => base44.entities.User.list(),
   });
 
   // Fetch existing P60s for selected year
@@ -151,7 +141,7 @@ export default function P60Manager() {
       ) : (
         <div className="space-y-2">
           {staffList.map(staff => {
-            const name = staff.staff_full_name || staff.full_name || staff.email;
+            const name = staff.staff_full_name || staff.full_name || staff.name || staff.email;
             const hasP60 = uploaded.has(staff.id);
             const isUploading = uploading === staff.id;
             const isDeleting = deleting === staff.id;
