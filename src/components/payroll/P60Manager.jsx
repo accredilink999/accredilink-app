@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Download, CheckCircle2, Loader2, FileText, Trash2, Users } from 'lucide-react';
+import { Upload, Download, CheckCircle2, Loader2, FileText, Trash2, Users, Eye } from 'lucide-react';
 
 const TAX_YEARS = [
   '2025-2026',
@@ -83,14 +83,25 @@ export default function P60Manager() {
     }
   };
 
+  const handleView = async (staffId) => {
+    const path = p60Path(selectedYear, staffId);
+    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600);
+    if (error) { alert('Could not open file. Please try again.'); return; }
+    window.open(data.signedUrl, '_blank');
+  };
+
   const handleDownload = async (staffId, staffName) => {
     const path = p60Path(selectedYear, staffId);
     const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600);
     if (error) { alert('Could not get download link'); return; }
+    const res = await fetch(data.signedUrl);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = data.signedUrl;
+    a.href = url;
     a.download = `P60_${(staffName || staffId).replace(/\s+/g, '_')}_${selectedYear}.pdf`;
     a.click();
+    URL.revokeObjectURL(url);
   };
 
   const uploaded = new Set(existingP60s);
@@ -165,10 +176,10 @@ export default function P60Manager() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleDownload(staff.id, name)}
+                          onClick={() => handleView(staff.id)}
                           className="min-h-[36px] touch-manipulation"
                         >
-                          <Download className="w-4 h-4" />
+                          <Eye className="w-4 h-4" />
                           <span className="hidden sm:inline ml-1">View</span>
                         </Button>
                         <Button

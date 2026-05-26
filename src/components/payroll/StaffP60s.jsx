@@ -39,10 +39,14 @@ export default function StaffP60s({ user }) {
     const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600);
     if (error) { alert('Could not get download link. Please try again.'); return; }
     const name = user?.staff_full_name || user?.full_name || 'staff';
+    const res = await fetch(data.signedUrl);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = data.signedUrl;
+    a.href = url;
     a.download = `P60_${name.replace(/\s+/g, '_')}_${year}.pdf`;
     a.click();
+    URL.revokeObjectURL(url);
   };
 
   if (isLoading) {
