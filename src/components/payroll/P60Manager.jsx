@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
+import { getCurrentOrgId } from '@/lib/orgContext';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,14 +28,17 @@ export default function P60Manager() {
   const [deleting, setDeleting] = useState(null);
   const fileInputRefs = useRef({});
 
-  // Fetch all staff
+  // Fetch only staff from this organisation
   const { data: staffList = [] } = useQuery({
     queryKey: ['all-staff-p60'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const orgId = getCurrentOrgId();
+      let q = supabase
         .from('profiles')
         .select('id, full_name, email, staff_full_name')
         .order('full_name', { ascending: true });
+      if (orgId) q = q.eq('organization_id', orgId);
+      const { data, error } = await q;
       if (error) throw error;
       return (data || []).filter(s => s.id);
     },
