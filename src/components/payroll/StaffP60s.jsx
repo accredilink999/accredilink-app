@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Download, FileText, Loader2, Eye } from 'lucide-react';
 
 const BUCKET = 'uploads';
@@ -15,10 +17,10 @@ const TAX_YEARS = [
 ];
 
 export default function StaffP60s({ user }) {
+  const [viewing, setViewing] = useState(null); // { year, url, downloadUrl }
   const staffName = (user?.staff_full_name || user?.full_name || 'P60').replace(/\s+/g, '_');
 
-  // Pre-fetch signed URLs for each tax year on load
-  // Signed URLs are valid for 1 hour — real <a> links, no JS navigation needed
+  // Pre-fetch signed URLs for each available tax year
   const { data: availableP60s = [], isLoading } = useQuery({
     queryKey: ['p60s-staff', user?.id],
     queryFn: async () => {
@@ -26,15 +28,13 @@ export default function StaffP60s({ user }) {
       const results = [];
       for (const year of TAX_YEARS) {
         const path = `${P60_FOLDER}/${year}/${user.id}.pdf`;
-
-        // View URL — inline display
-        const { data: viewData, error: viewErr } = await supabase.storage
+        // View URL — no download header, displays inline
+        const { data: viewData, error } = await supabase.storage
           .from(BUCKET)
           .createSignedUrl(path, 3600);
+        if (error || !viewData?.signedUrl) continue;
 
-        if (viewErr || !viewData?.signedUrl) continue; // file doesn't exist for this year
-
-        // Download URL — Content-Disposition: attachment forces save
+        // Download URL — Content-Disposition: attachment
         const { data: dlData } = await supabase.storage
           .from(BUCKET)
           .createSignedUrl(path, 3600, { download: `P60_${staffName}_${year}.pdf` });
@@ -48,7 +48,7 @@ export default function StaffP60s({ user }) {
       return results;
     },
     enabled: !!user?.id,
-    staleTime: 30 * 60 * 1000, // refresh after 30 mins (URLs valid 1 hour)
+    staleTime: 30 * 60 * 1000,
   });
 
   if (isLoading) {
@@ -96,23 +96,22 @@ export default function StaffP60s({ user }) {
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <Badge className="bg-green-100 text-green-700 hidden sm:flex">Available</Badge>
 
-                  {/* View — plain anchor, opens PDF in browser */}
-                  <a
-                    href={viewUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 px-3 py-2 rounded-md border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors min-h-[36px] touch-manipulation"
+                  {/* View — opens PDF modal in-app */}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setViewing({ year, viewUrl, downloadUrl })}
+                    className="min-h-[36px] touch-manipulation"
                   >
                     <Eye className="w-4 h-4" />
-                    <span className="hidden sm:inline">View</span>
-                  </a>
+                    <span className="hidden sm:inline ml-1">View</span>
+                  </Button>
 
-                  {/* Download — plain anchor with download attribute */}
+                  {/* Download — forces save via Supabase Content-Disposition header */}
                   <a
                     href={downloadUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    download={`P60_${staffName}_${year}.pdf`}
                     className="inline-flex items-center gap-1 px-3 py-2 rounded-md bg-teal-600 text-white text-sm font-medium hover:bg-teal-700 transition-colors min-h-[36px] touch-manipulation"
                   >
                     <Download className="w-4 h-4" />
@@ -128,6 +127,36 @@ export default function StaffP60s({ user }) {
       <p className="text-xs text-slate-400 text-center px-4">
         Your P60 shows your total pay and tax deducted for the tax year. Keep it safe — you may need it for tax returns or benefit claims.
       </p>
+
+      {/* PDF Viewer Modal */}
+      {viewing && (
+        <Dialog open={!!viewing} onOpenChange={() => setViewing(null)}>
+          <DialogContent className="max-w-[95vw] w-[850px] p-4" style={{ maxHeight: '95vh', display: 'flex', flexDirection: 'column' }}>
+            <DialogHeader className="flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <DialogTitle>P60 — Tax Year {viewing.year}</DialogTitle>
+                <a
+                  href={viewing.downloadUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-3 py-2 rounded-md bg-teal-600 text-white text-sm font-medium hover:bg-teal-700 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Download PDF
+                </a>
+              </div>
+            </DialogHeader>
+            <div className="flex-1 mt-3 rounded-lg overflow-hidden border border-slate-200" style={{ minHeight: '70vh' }}>
+              <iframe
+                src={viewing.viewUrl}
+                className="w-full h-full"
+                style={{ minHeight: '70vh', border: 'none' }}
+                title={`P60 Tax Year ${viewing.year}`}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
