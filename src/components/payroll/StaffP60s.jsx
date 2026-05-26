@@ -38,29 +38,31 @@ export default function StaffP60s({ user }) {
 
   const staffName = (user?.staff_full_name || user?.full_name || 'P60').replace(/\s+/g, '_');
 
-  // View — opens PDF in a new browser tab
-  // window.open must be called synchronously before any await to avoid popup blockers
+  // View — get signed URL and navigate to it in a new tab
   const handleView = async (year, path) => {
     setLoading(`view-${year}`);
-    const win = window.open('', '_blank'); // open immediately on user gesture
     try {
       const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600);
       if (error || !data?.signedUrl) throw new Error('Could not get link');
-      win.location.href = data.signedUrl; // now navigate the already-open tab
+      const a = document.createElement('a');
+      a.href = data.signedUrl;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     } catch {
-      if (win) win.close();
       alert('Could not open P60. Please try again.');
     } finally {
       setLoading(null);
     }
   };
 
-  // Download — forces the file to save to device
+  // Download — same but with Content-Disposition: attachment to force save
   const handleDownload = async (year, path) => {
     setLoading(`download-${year}`);
     try {
       const filename = `P60_${staffName}_${year}.pdf`;
-      // Pass download option — Supabase adds Content-Disposition: attachment
       const { data, error } = await supabase.storage
         .from(BUCKET)
         .createSignedUrl(path, 3600, { download: filename });
