@@ -14,6 +14,8 @@ import MigratedPayslips from '@/components/payroll/MigratedPayslips';
 import PayPeriodManager from '@/components/approvals/PayPeriodManager';
 import PayrollSettingsManager from '@/components/payroll/PayrollSettingsManager';
 import PrintablePayslip from '@/components/payroll/PrintablePayslip';
+import P60Manager from '@/components/payroll/P60Manager';
+import StaffP60s from '@/components/payroll/StaffP60s';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { DollarSign, FileText, Download, Eye, Loader } from 'lucide-react';
@@ -232,12 +234,16 @@ export default function Payroll() {
           icon={DollarSign}
         />
         <Tabs defaultValue="payslips">
-          <TabsList className="grid w-full max-w-sm grid-cols-2">
+          <TabsList className="grid w-full max-w-md grid-cols-3">
             <TabsTrigger value="payslips">Payslips</TabsTrigger>
-            <TabsTrigger value="migrated">Older Payslips</TabsTrigger>
+            <TabsTrigger value="p60">P60s</TabsTrigger>
+            <TabsTrigger value="migrated">Older</TabsTrigger>
           </TabsList>
           <TabsContent value="payslips" className="mt-4">
             <StaffPayslips user={user} />
+          </TabsContent>
+          <TabsContent value="p60" className="mt-4">
+            <StaffP60s user={user} />
           </TabsContent>
           <TabsContent value="migrated" className="mt-4">
             <MigratedPayslips user={user} />
@@ -263,10 +269,11 @@ export default function Payroll() {
       <PayrollSettingsManager />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full max-w-lg grid-cols-4">
+        <TabsList className="grid w-full max-w-xl grid-cols-5">
           <TabsTrigger value="dashboard">Overview</TabsTrigger>
           <TabsTrigger value="records">Records</TabsTrigger>
           <TabsTrigger value="generate">Generate</TabsTrigger>
+          <TabsTrigger value="p60">P60s</TabsTrigger>
           <TabsTrigger value="migrated">Migrated</TabsTrigger>
         </TabsList>
 
@@ -280,6 +287,10 @@ export default function Payroll() {
 
         <TabsContent value="generate" className="mt-6">
           <GeneratePayroll />
+        </TabsContent>
+
+        <TabsContent value="p60" className="mt-6">
+          <P60Manager />
         </TabsContent>
 
         <TabsContent value="migrated" className="mt-6">
