@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Download, FileText, Loader2, Eye } from 'lucide-react';
 
@@ -16,9 +15,10 @@ const TAX_YEARS = [
 ];
 
 export default function StaffP60s({ user }) {
-  const [loading, setLoading] = useState(null); // 'view-year' or 'download-year'
+  const staffName = (user?.staff_full_name || user?.full_name || 'P60').replace(/\s+/g, '_');
 
-  // Check each tax year for this staff member's P60
+  // Pre-fetch signed URLs for each tax year on load
+  // Signed URLs are valid for 1 hour — real <a> links, no JS navigation needed
   const { data: availableP60s = [], isLoading } = useQuery({
     queryKey: ['p60s-staff', user?.id],
     queryFn: async () => {
@@ -26,60 +26,30 @@ export default function StaffP60s({ user }) {
       const results = [];
       for (const year of TAX_YEARS) {
         const path = `${P60_FOLDER}/${year}/${user.id}.pdf`;
-        const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 60);
-        if (!error && data?.signedUrl) {
-          results.push({ year, path });
-        }
+
+        // View URL — inline display
+        const { data: viewData, error: viewErr } = await supabase.storage
+          .from(BUCKET)
+          .createSignedUrl(path, 3600);
+
+        if (viewErr || !viewData?.signedUrl) continue; // file doesn't exist for this year
+
+        // Download URL — Content-Disposition: attachment forces save
+        const { data: dlData } = await supabase.storage
+          .from(BUCKET)
+          .createSignedUrl(path, 3600, { download: `P60_${staffName}_${year}.pdf` });
+
+        results.push({
+          year,
+          viewUrl: viewData.signedUrl,
+          downloadUrl: dlData?.signedUrl || viewData.signedUrl,
+        });
       }
       return results;
     },
     enabled: !!user?.id,
+    staleTime: 30 * 60 * 1000, // refresh after 30 mins (URLs valid 1 hour)
   });
-
-  const staffName = (user?.staff_full_name || user?.full_name || 'P60').replace(/\s+/g, '_');
-
-  // View — get signed URL and navigate to it in a new tab
-  const handleView = async (year, path) => {
-    setLoading(`view-${year}`);
-    try {
-      const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600);
-      if (error || !data?.signedUrl) throw new Error('Could not get link');
-      const a = document.createElement('a');
-      a.href = data.signedUrl;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    } catch {
-      alert('Could not open P60. Please try again.');
-    } finally {
-      setLoading(null);
-    }
-  };
-
-  // Download — same but with Content-Disposition: attachment to force save
-  const handleDownload = async (year, path) => {
-    setLoading(`download-${year}`);
-    try {
-      const filename = `P60_${staffName}_${year}.pdf`;
-      const { data, error } = await supabase.storage
-        .from(BUCKET)
-        .createSignedUrl(path, 3600, { download: filename });
-      if (error || !data?.signedUrl) throw new Error('Could not get link');
-      const a = document.createElement('a');
-      a.href = data.signedUrl;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    } catch {
-      alert('Download failed. Please try again.');
-    } finally {
-      setLoading(null);
-    }
-  };
 
   if (isLoading) {
     return (
@@ -108,12 +78,12 @@ export default function StaffP60s({ user }) {
           <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
           <p className="text-slate-600 font-medium">No P60s available yet</p>
           <p className="text-slate-400 text-sm mt-1">
-            Your P60 will appear here once your employer has uploaded it after the tax year end (5 April).
+            Your P60 will appear here once your employer uploads it after the tax year end (5 April).
           </p>
         </Card>
       ) : (
         <div className="space-y-2">
-          {availableP60s.map(({ year, path }) => (
+          {availableP60s.map(({ year, viewUrl, downloadUrl }) => (
             <Card key={year} className="p-4 border-0 shadow-sm">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
@@ -125,33 +95,29 @@ export default function StaffP60s({ user }) {
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <Badge className="bg-green-100 text-green-700 hidden sm:flex">Available</Badge>
-                  {/* View button */}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleView(year, path)}
-                    disabled={!!loading}
-                    className="min-h-[36px] touch-manipulation"
+
+                  {/* View — plain anchor, opens PDF in browser */}
+                  <a
+                    href={viewUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-3 py-2 rounded-md border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors min-h-[36px] touch-manipulation"
                   >
-                    {loading === `view-${year}`
-                      ? <Loader2 className="w-4 h-4 animate-spin" />
-                      : <Eye className="w-4 h-4" />
-                    }
-                    <span className="hidden sm:inline ml-1">View</span>
-                  </Button>
-                  {/* Download button */}
-                  <Button
-                    size="sm"
-                    onClick={() => handleDownload(year, path)}
-                    disabled={!!loading}
-                    className="bg-teal-600 hover:bg-teal-700 min-h-[36px] touch-manipulation"
+                    <Eye className="w-4 h-4" />
+                    <span className="hidden sm:inline">View</span>
+                  </a>
+
+                  {/* Download — plain anchor with download attribute */}
+                  <a
+                    href={downloadUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    download={`P60_${staffName}_${year}.pdf`}
+                    className="inline-flex items-center gap-1 px-3 py-2 rounded-md bg-teal-600 text-white text-sm font-medium hover:bg-teal-700 transition-colors min-h-[36px] touch-manipulation"
                   >
-                    {loading === `download-${year}`
-                      ? <Loader2 className="w-4 h-4 animate-spin" />
-                      : <Download className="w-4 h-4" />
-                    }
-                    <span className="hidden sm:inline ml-1">Download</span>
-                  </Button>
+                    <Download className="w-4 h-4" />
+                    <span className="hidden sm:inline">Download</span>
+                  </a>
                 </div>
               </div>
             </Card>
