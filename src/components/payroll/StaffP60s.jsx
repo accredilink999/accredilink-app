@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Download, FileText, Loader2 } from 'lucide-react';
+import { Download, FileText, Loader2, Eye } from 'lucide-react';
 
 const BUCKET = 'uploads';
 const P60_FOLDER = 'p60';
@@ -16,6 +16,8 @@ const TAX_YEARS = [
 ];
 
 export default function StaffP60s({ user }) {
+  const [loading, setLoading] = useState(null); // 'view-year' or 'download-year'
+
   // Check each tax year for this staff member's P60
   const { data: availableP60s = [], isLoading } = useQuery({
     queryKey: ['p60s-staff', user?.id],
@@ -24,7 +26,6 @@ export default function StaffP60s({ user }) {
       const results = [];
       for (const year of TAX_YEARS) {
         const path = `${P60_FOLDER}/${year}/${user.id}.pdf`;
-        // Try to create a signed URL — if it fails, the file doesn't exist
         const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 60);
         if (!error && data?.signedUrl) {
           results.push({ year, path });
@@ -35,11 +36,44 @@ export default function StaffP60s({ user }) {
     enabled: !!user?.id,
   });
 
+  const staffName = (user?.staff_full_name || user?.full_name || 'P60').replace(/\s+/g, '_');
+
+  // View — opens PDF in a new browser tab
+  const handleView = async (year, path) => {
+    setLoading(`view-${year}`);
+    try {
+      const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600);
+      if (error || !data?.signedUrl) throw new Error('Could not get link');
+      window.open(data.signedUrl, '_blank');
+    } catch {
+      alert('Could not open P60. Please try again.');
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  // Download — forces the file to save to device
   const handleDownload = async (year, path) => {
-    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600);
-    if (error) { alert('Could not get download link. Please try again.'); return; }
-    // Open in new tab — browser will show/download the PDF
-    window.open(data.signedUrl, '_blank');
+    setLoading(`download-${year}`);
+    try {
+      const filename = `P60_${staffName}_${year}.pdf`;
+      // Pass download option — Supabase adds Content-Disposition: attachment
+      const { data, error } = await supabase.storage
+        .from(BUCKET)
+        .createSignedUrl(path, 3600, { download: filename });
+      if (error || !data?.signedUrl) throw new Error('Could not get link');
+      const a = document.createElement('a');
+      a.href = data.signedUrl;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch {
+      alert('Download failed. Please try again.');
+    } finally {
+      setLoading(null);
+    }
   };
 
   if (isLoading) {
@@ -59,7 +93,7 @@ export default function StaffP60s({ user }) {
           </div>
           <div>
             <p className="font-semibold text-slate-900">P60 — Tax Year End Documents</p>
-            <p className="text-xs text-slate-500">Your annual P60 certificates for download</p>
+            <p className="text-xs text-slate-500">Your annual P60 certificates</p>
           </div>
         </div>
       </Card>
@@ -84,15 +118,34 @@ export default function StaffP60s({ user }) {
                   <p className="font-semibold text-slate-900">P60 — Tax Year {year}</p>
                   <p className="text-xs text-slate-500">End of year certificate • PDF</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge className="bg-green-100 text-green-700">Available</Badge>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Badge className="bg-green-100 text-green-700 hidden sm:flex">Available</Badge>
+                  {/* View button */}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleView(year, path)}
+                    disabled={!!loading}
+                    className="min-h-[36px] touch-manipulation"
+                  >
+                    {loading === `view-${year}`
+                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                      : <Eye className="w-4 h-4" />
+                    }
+                    <span className="hidden sm:inline ml-1">View</span>
+                  </Button>
+                  {/* Download button */}
                   <Button
                     size="sm"
                     onClick={() => handleDownload(year, path)}
+                    disabled={!!loading}
                     className="bg-teal-600 hover:bg-teal-700 min-h-[36px] touch-manipulation"
                   >
-                    <Download className="w-4 h-4 mr-1" />
-                    Download
+                    {loading === `download-${year}`
+                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                      : <Download className="w-4 h-4" />
+                    }
+                    <span className="hidden sm:inline ml-1">Download</span>
                   </Button>
                 </div>
               </div>
