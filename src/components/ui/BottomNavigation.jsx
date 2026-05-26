@@ -14,7 +14,6 @@ import {
 
 const navigation = [
   { name: 'Dashboard', icon: LayoutDashboard, page: 'Dashboard' },
-  { name: 'Payslips', icon: PoundSterling, page: 'Payroll' },
   { name: 'Chat', icon: MessageSquare, page: 'Chat' },
   { name: 'Profile', icon: User, page: 'Profile' },
 ];

@@ -745,6 +745,7 @@ export default function Dashboard() {
           {[
             { to: 'Rota', label: 'Shifts', icon: Clock, bg: 'from-orange-400 to-orange-600' },
             { to: 'ClientManagement', label: 'Clients', icon: Heart, bg: 'from-teal-400 to-teal-600' },
+            { to: 'Payroll', label: 'Payslips', icon: PoundSterling, bg: 'from-green-400 to-emerald-600' },
             { href: 'https://carecallai.co.uk/forum', label: 'Forum', icon: MessageSquare, bg: 'from-cyan-400 to-teal-600' },
             { to: 'ApprovalsAndFinancials', label: 'My Admin', icon: FileText, bg: 'from-indigo-400 to-indigo-600' },
             { to: 'Feedback', label: 'Feedback', icon: Star, bg: 'from-amber-400 to-yellow-500' },
