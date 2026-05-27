@@ -34,11 +34,13 @@ import {
   FileArchive,
   LogOut,
   Settings,
-  ChevronLeft
+  ChevronLeft,
+  LayoutGrid
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import AppDownloadGuide from '@/components/profile/AppDownloadGuide';
+import StaffMyMatrix from '@/components/profile/StaffMyMatrix';
 
 export default function Profile() {
   const queryClient = useQueryClient();
@@ -647,6 +649,10 @@ export default function Profile() {
                   ))}
                 </div>
               )}
+
+              {activeSection === 'matrix' && (
+                <StaffMyMatrix userId={user?.id} />
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
@@ -655,6 +661,7 @@ export default function Profile() {
                 { value: 'files', label: 'My Files', icon: Upload, bg: 'from-teal-400 to-teal-600', desc: 'Upload & manage files' },
                 { value: 'training', label: 'Training', icon: Award, bg: 'from-purple-400 to-purple-600', desc: 'Certificates & CPD' },
                 { value: 'activity', label: 'Activity', icon: Clock, bg: 'from-amber-400 to-amber-600', desc: 'Recent shift history' },
+                { value: 'matrix', label: 'My Matrix', icon: LayoutGrid, bg: 'from-rose-400 to-rose-600', desc: 'Compliance & training docs' },
               ].map(section => {
                 const Icon = section.icon;
                 return (
