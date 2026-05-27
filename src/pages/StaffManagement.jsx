@@ -7,6 +7,7 @@ import StaffDirectory from '@/components/staff/StaffDirectory';
 import StaffProfile from '@/components/staff/StaffProfile';
 import TeamsManager from '@/components/staff/TeamsManager';
 import BulkOnboardPanel from '@/components/staff/BulkOnboardPanel';
+import StaffMatrix from '@/components/staff/StaffMatrix';
 import { Users } from 'lucide-react';
 import HelpTip from '@/components/ui/HelpTip';
 
@@ -41,10 +42,11 @@ export default function StaffManagement() {
       />
 
       <Tabs defaultValue="staff" className="w-full">
-        <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-3' : 'grid-cols-2'}`}>
-          <TabsTrigger value="staff">Staff<HelpTip tip="Browse all staff members. Tap a name to view their full profile, contracts, and training." inline /></TabsTrigger>
-          <TabsTrigger value="teams">Teams<HelpTip tip="Organise staff into teams for easier rota and communication management." inline /></TabsTrigger>
-          {isAdmin && <TabsTrigger value="onboard">Onboard<HelpTip tip="Quickly add multiple new staff members at once with bulk onboarding." inline /></TabsTrigger>}
+        <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-4' : 'grid-cols-2'}`}>
+          <TabsTrigger value="staff" className="text-xs sm:text-sm">Staff<HelpTip tip="Browse all staff members. Tap a name to view their full profile, contracts, and training." inline /></TabsTrigger>
+          <TabsTrigger value="teams" className="text-xs sm:text-sm">Teams<HelpTip tip="Organise staff into teams for easier rota and communication management." inline /></TabsTrigger>
+          {isAdmin && <TabsTrigger value="onboard" className="text-xs sm:text-sm">Onboard<HelpTip tip="Quickly add multiple new staff members at once with bulk onboarding." inline /></TabsTrigger>}
+          {isAdmin && <TabsTrigger value="matrix" className="text-xs sm:text-sm">Staff Matrix<HelpTip tip="Visual compliance matrix for onboarding, training and compliance documents across all staff." inline /></TabsTrigger>}
         </TabsList>
 
         <TabsContent value="staff" className="mt-6">
@@ -67,6 +69,12 @@ export default function StaffManagement() {
         {isAdmin && (
           <TabsContent value="onboard" className="mt-6">
             <BulkOnboardPanel />
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="matrix" className="mt-6">
+            <StaffMatrix isAdmin={isAdmin} />
           </TabsContent>
         )}
       </Tabs>
