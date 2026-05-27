@@ -18,17 +18,34 @@ import { toast } from 'sonner';
 
 // ── Matrix types ──────────────────────────────────────────────────────────────
 const MATRIX_TYPES = [
-  { key: 'onboarding', label: 'Onboarding', fullLabel: 'Onboarding Documents', emoji: '📋', accent: '#3b82f6' },
-  { key: 'training',   label: 'Training',   fullLabel: 'Training & Development', emoji: '🎓', accent: '#8b5cf6' },
-  { key: 'compliance', label: 'Compliance', fullLabel: 'Compliance',             emoji: '✅', accent: '#0d9488' },
+  { key: 'onboarding', label: 'Onboarding', fullLabel: 'Onboarding Documents',   emoji: '📋', accent: '#3b82f6' },
+  { key: 'compliance', label: 'Compliance', fullLabel: 'Compliance',              emoji: '✅', accent: '#0d9488', yearly: true },
+  { key: 'training',   label: 'Training',   fullLabel: 'Training & Development',  emoji: '🎓', accent: '#8b5cf6' },
 ];
 
 // ── Status helpers ────────────────────────────────────────────────────────────
-function getStatus(entry) {
+function getStatus(entry, matrixType) {
   if (!entry) return 'empty';
-  if (!entry.expiry_date) return 'valid';
   const today = new Date(); today.setHours(0,0,0,0);
-  const exp   = new Date(entry.expiry_date);
+
+  // Compliance: yearly cycle — expires Dec 31 of the year it was completed
+  if (matrixType === 'compliance') {
+    let exp;
+    if (entry.expiry_date) {
+      exp = new Date(entry.expiry_date);
+    } else if (entry.record_date) {
+      exp = new Date(`${new Date(entry.record_date).getFullYear()}-12-31`);
+    } else {
+      return 'valid'; // entry exists but no dates yet
+    }
+    if (exp < today) return 'expired';
+    if (exp < addMonths(today, 2)) return 'expiring';
+    return 'valid';
+  }
+
+  // Standard: use expiry_date if present
+  if (!entry.expiry_date) return 'valid';
+  const exp = new Date(entry.expiry_date);
   if (exp < today) return 'expired';
   if (exp < addMonths(today, 2)) return 'expiring';
   return 'valid';
@@ -139,9 +156,11 @@ export default function StaffMyMatrix({ userId }) {
 
   const openEdit = (column) => {
     const entry = entryMap[column.id] || null;
+    const isCompliance = column.matrix_type === 'compliance';
+    const currentYear  = new Date().getFullYear();
     setForm({
       record_date:        entry?.record_date        || '',
-      expiry_date:        entry?.expiry_date        || '',
+      expiry_date:        entry?.expiry_date        || (isCompliance ? `${currentYear}-12-31` : ''),
       certificate_number: entry?.certificate_number || '',
       document_url:       entry?.document_url       || '',
       document_name:      entry?.document_name      || '',
@@ -154,7 +173,7 @@ export default function StaffMyMatrix({ userId }) {
   const totals = useMemo(() => {
     let valid = 0, expiring = 0, expired = 0, empty = 0;
     columns.forEach(col => {
-      const s = getStatus(entryMap[col.id]);
+      const s = getStatus(entryMap[col.id], matrixType);
       if (s === 'valid') valid++;
       else if (s === 'expiring') expiring++;
       else if (s === 'expired') expired++;
@@ -233,7 +252,7 @@ export default function StaffMyMatrix({ userId }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {columns.map(col => {
             const entry  = entryMap[col.id] || null;
-            const status = getStatus(entry);
+            const status = getStatus(entry, matrixType);
             const { bg, border, color, label, Icon } = STATUS[status];
 
             return (
@@ -318,6 +337,13 @@ export default function StaffMyMatrix({ userId }) {
             </DialogHeader>
 
             <div className="space-y-4 py-2">
+
+              {/* Compliance yearly note */}
+              {editDialog.column.matrix_type === 'compliance' && (
+                <div className="text-xs text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2">
+                  📅 Compliance items renew every January — expiry defaults to 31 Dec this year.
+                </div>
+              )}
 
               {/* Dates */}
               <div className="grid grid-cols-2 gap-3">
@@ -409,7 +435,7 @@ export default function StaffMyMatrix({ userId }) {
 
               {/* Status preview */}
               {(form.expiry_date || form.record_date) && (() => {
-                const s = getStatus({ expiry_date: form.expiry_date });
+                const s = getStatus({ expiry_date: form.expiry_date, record_date: form.record_date }, editDialog?.column?.matrix_type);
                 const { bg, border, color, label } = STATUS[form.expiry_date ? s : 'valid'];
                 return (
                   <div style={{
