@@ -22,6 +22,9 @@ import SubscriptionGate from '@/components/billing/SubscriptionGate';
 import OrgSetup from '@/pages/OrgSetup';
 import TermsConsentGate from '@/components/TermsConsentGate';
 import { supabase } from '@/api/supabaseClient';
+import PinLockScreen from '@/components/auth/PinLockScreen';
+import PinSetupModal from '@/components/auth/PinSetupModal';
+import { hasPin, isPinSessionUnlocked, wasPinPromptShown } from '@/utils/pinUtils';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -32,12 +35,33 @@ const mainPageKey = mainPage ?? Object.keys(Pages)[0];
  * Pages are swapped via the keep-alive pattern inside Layout.
  */
 const AppShell = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated, isPasswordRecovery } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated, isPasswordRecovery, user } = useAuth();
   const location = useLocation();
   const hasEverAuthedRef = useRef(false);
   const [orgReady, setOrgReady] = useState(null); // null = loading, true = ready
   const [needsOrgSetup, setNeedsOrgSetup] = useState(false);
   const [needsTermsConsent, setNeedsTermsConsent] = useState(false);
+
+  // ── PIN state ─────────────────────────────────────────────────────────────
+  // pinLocked: true = show lock screen (has PIN + session not yet unlocked)
+  // showPinSetup: true = show "would you like a PIN?" prompt
+  const [pinLocked, setPinLocked] = useState(false);
+  const [showPinSetup, setShowPinSetup] = useState(false);
+  const pinCheckedRef = useRef(false);
+
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id || pinCheckedRef.current) return;
+    pinCheckedRef.current = true;
+
+    if (hasPin(user.id) && !isPinSessionUnlocked()) {
+      // User has a PIN and hasn't unlocked this session → show lock screen
+      setPinLocked(true);
+    } else if (!hasPin(user.id) && !wasPinPromptShown(user.id)) {
+      // Never been asked → show setup prompt after a short delay
+      const t = setTimeout(() => setShowPinSetup(true), 1500);
+      return () => clearTimeout(t);
+    }
+  }, [isAuthenticated, user?.id]);
 
   if (isAuthenticated) hasEverAuthedRef.current = true;
 
@@ -187,6 +211,17 @@ const AppShell = () => {
   // Login page
   if (location.pathname === '/login') return <Login />;
 
+  // PIN lock screen — shown when user has a PIN and this session hasn't been unlocked yet
+  if (pinLocked && user?.id) {
+    return (
+      <PinLockScreen
+        userId={user.id}
+        userName={user.full_name || user.staff_full_name || user.email}
+        onUnlock={() => setPinLocked(false)}
+      />
+    );
+  }
+
   // Auth error (before first auth only)
   if (!hasEverAuthedRef.current && authError) {
     if (authError.type === 'user_not_registered') return <UserNotRegisteredError />;
@@ -235,6 +270,14 @@ const AppShell = () => {
       <AppUpdateChecker />
       <HelpNudge />
       <Layout currentPageName={currentPageName} />
+      {/* PIN setup prompt — shown once after first login if no PIN set */}
+      {showPinSetup && user?.id && (
+        <PinSetupModal
+          userId={user.id}
+          userName={user.full_name || user.staff_full_name || user.email}
+          onDone={() => setShowPinSetup(false)}
+        />
+      )}
     </>
   );
 };
