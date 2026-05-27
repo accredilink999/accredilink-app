@@ -2,10 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Mail, Phone, MapPin, Calendar, Pencil, Check, X } from 'lucide-react';
+import { Mail, Phone, MapPin, Calendar, Pencil, Check, X, Briefcase } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 
+// ── Inline text / email / tel / number field ──────────────────────────────────
 function EditableField({ label, value, field, icon: Icon, staffId, isAdmin, placeholder = 'Not provided', type = 'text' }) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
@@ -19,11 +20,8 @@ function EditableField({ label, value, field, icon: Icon, staffId, isAdmin, plac
     }
   }, [editing]);
 
-  // Sync editValue when the external value changes (e.g. after save)
   useEffect(() => {
-    if (!editing) {
-      setEditValue(value || '');
-    }
+    if (!editing) setEditValue(value || '');
   }, [value, editing]);
 
   const updateMutation = useMutation({
@@ -35,33 +33,21 @@ function EditableField({ label, value, field, icon: Icon, staffId, isAdmin, plac
       setEditing(false);
     },
     onError: (err) => {
-      console.error(`Failed to update ${field}:`, err);
       toast.error(`Failed to update ${label}: ${err.message || 'Unknown error'}`);
     },
   });
 
   const handleSave = () => {
     const trimmed = editValue.trim();
-    if (trimmed === (value || '')) {
-      setEditing(false);
-      return;
-    }
+    if (trimmed === (value || '')) { setEditing(false); return; }
     updateMutation.mutate(trimmed || null);
   };
 
-  const handleCancel = () => {
-    setEditValue(value || '');
-    setEditing(false);
-  };
+  const handleCancel = () => { setEditValue(value || ''); setEditing(false); };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleSave();
-    }
-    if (e.key === 'Escape') {
-      handleCancel();
-    }
+    if (e.key === 'Enter') { e.preventDefault(); handleSave(); }
+    if (e.key === 'Escape') handleCancel();
   };
 
   if (editing) {
@@ -80,23 +66,10 @@ function EditableField({ label, value, field, icon: Icon, staffId, isAdmin, plac
           className="flex-1 min-w-0 px-2 py-0.5 text-sm border border-teal-300 rounded focus:outline-none focus:ring-1 focus:ring-teal-500 bg-white"
           placeholder={placeholder}
         />
-        <button
-          type="button"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={handleSave}
-          disabled={updateMutation.isPending}
-          className="text-teal-600 hover:text-teal-700 flex-shrink-0"
-          title="Save"
-        >
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={handleSave} disabled={updateMutation.isPending} className="text-teal-600 hover:text-teal-700 flex-shrink-0" title="Save">
           <Check className="w-4 h-4" />
         </button>
-        <button
-          type="button"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={handleCancel}
-          className="text-slate-400 hover:text-slate-600 flex-shrink-0"
-          title="Cancel"
-        >
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={handleCancel} className="text-slate-400 hover:text-slate-600 flex-shrink-0" title="Cancel">
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -109,12 +82,7 @@ function EditableField({ label, value, field, icon: Icon, staffId, isAdmin, plac
       <span className="text-slate-600">{label}:</span>
       <span className="text-slate-900 flex-1">{value || placeholder}</span>
       {isAdmin && (
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-teal-600 flex-shrink-0"
-          title={`Edit ${label.toLowerCase()}`}
-        >
+        <button type="button" onClick={() => setEditing(true)} className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-teal-600 flex-shrink-0" title={`Edit ${label.toLowerCase()}`}>
           <Pencil className="w-3.5 h-3.5" />
         </button>
       )}
@@ -122,23 +90,19 @@ function EditableField({ label, value, field, icon: Icon, staffId, isAdmin, plac
   );
 }
 
-function EditableRowField({ label, value, field, staffId, isAdmin, placeholder = 'Not provided', type = 'text' }) {
+// ── Right-aligned row field (label left, value right) ────────────────────────
+function EditableRowField({ label, value, field, staffId, isAdmin, placeholder = 'Not provided', type = 'text', suffix = '' }) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
-  const [editValue, setEditValue] = useState(value || '');
+  const [editValue, setEditValue] = useState(value ?? '');
   const inputRef = useRef(null);
 
   useEffect(() => {
-    if (editing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
+    if (editing && inputRef.current) { inputRef.current.focus(); inputRef.current.select(); }
   }, [editing]);
 
   useEffect(() => {
-    if (!editing) {
-      setEditValue(value || '');
-    }
+    if (!editing) setEditValue(value ?? '');
   }, [value, editing]);
 
   const updateMutation = useMutation({
@@ -150,33 +114,19 @@ function EditableRowField({ label, value, field, staffId, isAdmin, placeholder =
       setEditing(false);
     },
     onError: (err) => {
-      console.error(`Failed to update ${field}:`, err);
       toast.error(`Failed to update ${label}: ${err.message || 'Unknown error'}`);
     },
   });
 
   const handleSave = () => {
-    const trimmed = editValue.trim();
-    if (trimmed === (value || '')) {
-      setEditing(false);
-      return;
-    }
-    updateMutation.mutate(trimmed || null);
-  };
-
-  const handleCancel = () => {
-    setEditValue(value || '');
-    setEditing(false);
+    const val = type === 'number' ? (editValue === '' ? null : parseFloat(editValue)) : (editValue.trim() || null);
+    if (val === value) { setEditing(false); return; }
+    updateMutation.mutate(val);
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleSave();
-    }
-    if (e.key === 'Escape') {
-      handleCancel();
-    }
+    if (e.key === 'Enter') { e.preventDefault(); handleSave(); }
+    if (e.key === 'Escape') { setEditValue(value ?? ''); setEditing(false); }
   };
 
   if (editing) {
@@ -187,33 +137,18 @@ function EditableRowField({ label, value, field, staffId, isAdmin, placeholder =
           <input
             ref={inputRef}
             type={type}
+            step={type === 'number' ? '1' : undefined}
+            min={type === 'number' ? '0' : undefined}
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
             onBlur={handleSave}
             onKeyDown={handleKeyDown}
             disabled={updateMutation.isPending}
-            className="w-40 px-2 py-0.5 text-sm text-right border border-teal-300 rounded focus:outline-none focus:ring-1 focus:ring-teal-500 bg-white"
+            className="w-32 px-2 py-0.5 text-sm text-right border border-teal-300 rounded focus:outline-none focus:ring-1 focus:ring-teal-500 bg-white"
             placeholder={placeholder}
           />
-          <button
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={handleSave}
-            disabled={updateMutation.isPending}
-            className="text-teal-600 hover:text-teal-700 flex-shrink-0"
-            title="Save"
-          >
-            <Check className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={handleCancel}
-            className="text-slate-400 hover:text-slate-600 flex-shrink-0"
-            title="Cancel"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={handleSave} disabled={updateMutation.isPending} className="text-teal-600 hover:text-teal-700 flex-shrink-0"><Check className="w-4 h-4" /></button>
+          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setEditValue(value ?? ''); setEditing(false); }} className="text-slate-400 hover:text-slate-600 flex-shrink-0"><X className="w-4 h-4" /></button>
         </div>
       </div>
     );
@@ -223,14 +158,75 @@ function EditableRowField({ label, value, field, staffId, isAdmin, placeholder =
     <div className="flex items-center justify-between group">
       <span className="text-slate-600">{label}:</span>
       <div className="flex items-center gap-1">
-        <span className="text-slate-900">{value || placeholder}</span>
+        <span className={value != null ? 'text-slate-900' : 'text-slate-400'}>
+          {value != null ? `${value}${suffix}` : placeholder}
+        </span>
         {isAdmin && (
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-teal-600 flex-shrink-0"
-            title={`Edit ${label.toLowerCase()}`}
-          >
+          <button type="button" onClick={() => setEditing(true)} className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-teal-600 flex-shrink-0" title={`Edit ${label.toLowerCase()}`}>
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Date field (stored as YYYY-MM-DD string) ──────────────────────────────────
+function EditableDateField({ label, value, field, staffId, isAdmin, placeholder = 'Not set' }) {
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState(value || '');
+
+  useEffect(() => {
+    if (!editing) setEditValue(value || '');
+  }, [value, editing]);
+
+  const updateMutation = useMutation({
+    mutationFn: (newValue) => base44.entities.User.update(staffId, { [field]: newValue }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['staff', staffId] });
+      queryClient.invalidateQueries({ queryKey: ['allStaff'] });
+      toast.success(`${label} updated`);
+      setEditing(false);
+    },
+    onError: (err) => toast.error(`Failed to update ${label}: ${err.message}`),
+  });
+
+  const handleSave = () => {
+    if (editValue === (value || '')) { setEditing(false); return; }
+    updateMutation.mutate(editValue || null);
+  };
+
+  const displayValue = value
+    ? (() => { try { return format(parseISO(value), 'dd MMM yyyy'); } catch { return value; } })()
+    : placeholder;
+
+  if (editing) {
+    return (
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-slate-600 flex-shrink-0">{label}:</span>
+        <div className="flex items-center gap-1">
+          <input
+            type="date"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            disabled={updateMutation.isPending}
+            className="px-2 py-0.5 text-sm border border-teal-300 rounded focus:outline-none focus:ring-1 focus:ring-teal-500 bg-white"
+          />
+          <button type="button" onClick={handleSave} disabled={updateMutation.isPending} className="text-teal-600 hover:text-teal-700"><Check className="w-4 h-4" /></button>
+          <button type="button" onClick={() => { setEditValue(value || ''); setEditing(false); }} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-between group">
+      <span className="text-slate-600">{label}:</span>
+      <div className="flex items-center gap-1">
+        <span className={value ? 'text-slate-900' : 'text-slate-400'}>{displayValue}</span>
+        {isAdmin && (
+          <button type="button" onClick={() => setEditing(true)} className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-teal-600 flex-shrink-0" title={`Edit ${label.toLowerCase()}`}>
             <Pencil className="w-3.5 h-3.5" />
           </button>
         )}
@@ -242,6 +238,8 @@ function EditableRowField({ label, value, field, staffId, isAdmin, placeholder =
 export default function StaffBasicInfo({ staff, isAdmin, isOwnProfile }) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
+
+      {/* Personal Details */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Personal Details</CardTitle>
@@ -255,9 +253,19 @@ export default function StaffBasicInfo({ staff, isAdmin, isOwnProfile }) {
             isAdmin={isAdmin}
             placeholder="Not provided"
           />
+          <EditableField
+            label="Job Title"
+            value={staff?.job_title}
+            field="job_title"
+            icon={Briefcase}
+            staffId={staff?.id}
+            isAdmin={isAdmin}
+            placeholder="Not provided"
+          />
         </CardContent>
       </Card>
 
+      {/* Contact Information */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Contact Information</CardTitle>
@@ -295,6 +303,7 @@ export default function StaffBasicInfo({ staff, isAdmin, isOwnProfile }) {
         </CardContent>
       </Card>
 
+      {/* Emergency Contact */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Emergency Contact</CardTitle>
@@ -320,35 +329,45 @@ export default function StaffBasicInfo({ staff, isAdmin, isOwnProfile }) {
         </CardContent>
       </Card>
 
+      {/* Employment Dates — editable for admin */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Employment Dates</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
-          <div className="flex justify-between">
-            <span className="text-slate-600">Start Date:</span>
-            <span className="text-slate-900">
-              {staff?.start_date ? format(parseISO(staff.start_date), 'MMM d, yyyy') : 'Not set'}
-            </span>
-          </div>
-          {staff?.end_date && (
-            <div className="flex justify-between">
-              <span className="text-slate-600">End Date:</span>
-              <span className="text-slate-900">{format(parseISO(staff.end_date), 'MMM d, yyyy')}</span>
-            </div>
-          )}
+          <EditableDateField
+            label="Start Date"
+            value={staff?.start_date}
+            field="start_date"
+            staffId={staff?.id}
+            isAdmin={isAdmin}
+          />
+          <EditableDateField
+            label="End Date"
+            value={staff?.end_date}
+            field="end_date"
+            staffId={staff?.id}
+            isAdmin={isAdmin}
+          />
         </CardContent>
       </Card>
 
+      {/* Leave Balances — allowance editable for admin */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Leave Balances</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
-          <div className="flex justify-between">
-            <span className="text-slate-600">Holiday Allowance:</span>
-            <span className="text-slate-900">{staff?.holiday_allowance_days || 0} days</span>
-          </div>
+          <EditableRowField
+            label="Holiday Allowance"
+            value={staff?.holiday_allowance_days ?? null}
+            field="holiday_allowance_days"
+            staffId={staff?.id}
+            isAdmin={isAdmin}
+            type="number"
+            suffix=" days"
+            placeholder="Not set"
+          />
           <div className="flex justify-between">
             <span className="text-slate-600">Used:</span>
             <span className="text-slate-900">{staff?.holiday_used_days || 0} days</span>
@@ -361,6 +380,7 @@ export default function StaffBasicInfo({ staff, isAdmin, isOwnProfile }) {
           </div>
         </CardContent>
       </Card>
+
     </div>
   );
 }
