@@ -15,7 +15,44 @@ const EXAMPLE_PROMPTS = [
   'Build a fire safety and evacuation training for residential care',
 ];
 
-const JSON_SCHEMA = `{"course":{"title":"string","description":"string","category":"mandatory|specialist|refresher|induction|compliance","difficulty_level":"beginner|intermediate|advanced","duration_minutes":60,"passing_score":70},"modules":[{"title":"string","description":"one sentence","order_index":0,"lessons":[{"title":"string","description":"one sentence","content":"2-4 sentences of plain text training content for this lesson","content_type":"text","order_index":0}]}],"assessment":{"title":"string","passing_score":70,"questions":[{"question":"string","options":["option A","option B","option C","option D"],"correct_answer":"option A"}]}}`;
+const JSON_SCHEMA = `{
+  "course": {
+    "title": "string",
+    "description": "2-3 sentence course overview",
+    "category": "mandatory|specialist|refresher|induction|compliance",
+    "difficulty_level": "beginner|intermediate|advanced",
+    "duration_minutes": 60,
+    "passing_score": 70
+  },
+  "modules": [
+    {
+      "title": "string",
+      "description": "one sentence",
+      "order_index": 0,
+      "lessons": [
+        {
+          "title": "string",
+          "description": "one sentence summary",
+          "content": "FULL LESSON BODY in markdown. Must include: opening paragraph (3-5 sentences), ## Key Learning Points section with 5-6 bullet points of substantive content, ## UK Law & Guidance section referencing relevant UK legislation or HSE/CQC guidance, ## In Practice section with 3-4 concrete steps care staff should follow. Minimum 300 words.",
+          "content_type": "text",
+          "video_url": "https://www.youtube.com/results?search_query=RELEVANT+SEARCH+TERMS+uk+care+training (use for 1 in 3 lessons, null for others)",
+          "order_index": 0
+        }
+      ]
+    }
+  ],
+  "assessment": {
+    "title": "string",
+    "passing_score": 70,
+    "questions": [
+      {
+        "question": "string",
+        "options": ["option A", "option B", "option C", "option D"],
+        "correct_answer": "option A"
+      }
+    ]
+  }
+}`;
 
 export default function AICourseBuilder({ isOpen, onClose, onSuccess }) {
   const queryClient = useQueryClient();
@@ -74,16 +111,17 @@ export default function AICourseBuilder({ isOpen, onClose, onSuccess }) {
     setLoading(true);
     setError(null);
 
-    const prompt = `Create a training course for UK community care staff: "${userPrompt.trim()}"
+    const prompt = `Create a comprehensive training course for UK community care staff: "${userPrompt.trim()}"
 
 Rules:
-- 4-5 modules, 2-3 lessons each
-- Each lesson must have a content field: 2-4 sentences of plain text training content relevant to UK care staff
-- No video_url field — omit it entirely
-- 6 assessment questions, 4 options each, correct_answer is the exact option text
+- 4 modules, 3 lessons each (12 lessons total)
+- Each lesson MUST have a full "content" field: opening paragraph, ## Key Learning Points (5-6 bullets of real detail), ## UK Law & Guidance (cite actual legislation or HSE/CQC/Skills for Care guidance), ## In Practice (3-4 concrete steps). Minimum 300 words per lesson.
+- video_url: use a YouTube search URL (https://www.youtube.com/results?search_query=...) for 1 in every 3 lessons — search terms must be specific and relevant. Set to null for the other 2 in 3.
+- 8 assessment questions covering key content from across the course, 4 options each
+- correct_answer must be the exact text of the correct option
 - Infer category, difficulty, duration from the request
 
-Output ONLY this JSON (no text before or after):
+Output ONLY valid JSON matching this schema exactly (no text before or after, escape newlines as \\n inside string values):
 ${JSON_SCHEMA}`;
 
     try {
@@ -92,7 +130,7 @@ ${JSON_SCHEMA}`;
         systemPrompt: 'You are a JSON API for generating training courses. Output only raw valid JSON. Never include prose, explanation, or markdown formatting of any kind.',
         response_json_schema: { type: 'object' },
         temperature: 0,
-        max_tokens: 4096,
+        max_tokens: 8000,
       });
 
       if (!result?.course || !result?.modules) {
@@ -305,7 +343,7 @@ ${JSON_SCHEMA}`;
               className="bg-amber-600 hover:bg-amber-700"
             >
               {loading ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Building course… (30–60s)</>
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Building course… (up to 90s)</>
               ) : (
                 <><Sparkles className="w-4 h-4 mr-2" />Build Course</>
               )}
