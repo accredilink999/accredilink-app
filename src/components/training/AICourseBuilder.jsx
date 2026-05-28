@@ -15,20 +15,9 @@ const EXAMPLE_PROMPTS = [
   'Build a fire safety and evacuation training for residential care',
 ];
 
-const JSON_SCHEMA = `{
-  "course": { "title": "string", "description": "string", "category": "mandatory|specialist|refresher|induction|compliance", "difficulty_level": "beginner|intermediate|advanced", "duration_minutes": 60, "passing_score": 70 },
-  "modules": [
-    { "title": "string", "description": "string", "order_index": 0,
-      "lessons": [
-        { "title": "string", "description": "string", "content": "80-120 words", "content_type": "text|video", "video_url": "https://www.youtube.com/watch?v=ID_or_null", "order_index": 0 }
-      ]
-    }
-  ],
-  "assessment": {
-    "title": "string", "description": "string", "assessment_type": "multiple_choice", "passing_score": 70,
-    "questions": [ { "question": "string", "options": ["A text","B text","C text","D text"], "correct_answer": "A text" } ]
-  }
-}`;
+// Deliberately no "content" field — keeps the response small and reliable.
+// Lesson body text is added later via the Course Editor.
+const JSON_SCHEMA = `{"course":{"title":"string","description":"string","category":"mandatory|specialist|refresher|induction|compliance","difficulty_level":"beginner|intermediate|advanced","duration_minutes":60,"passing_score":70},"modules":[{"title":"string","description":"one sentence","order_index":0,"lessons":[{"title":"string","description":"one sentence","content_type":"text|video","video_url":"https://www.youtube.com/watch?v=ID or null","order_index":0}]}],"assessment":{"title":"string","passing_score":70,"questions":[{"question":"string","options":["option A","option B","option C","option D"],"correct_answer":"option A"}]}}`;
 
 export default function AICourseBuilder({ isOpen, onClose, onSuccess }) {
   const queryClient = useQueryClient();
@@ -94,23 +83,16 @@ export default function AICourseBuilder({ isOpen, onClose, onSuccess }) {
     setLoading(true);
     setError(null);
 
-    const prompt = `The user has requested: "${userPrompt.trim()}"
+    const prompt = `Create a training course for UK care settings: "${userPrompt.trim()}"
 
-Create a complete professional training course for UK care settings based on this request.
-Infer a suitable title, category, difficulty level, and duration from the context.
+Rules:
+- 4-5 modules, 2-3 lessons each
+- No lesson body text — titles and one-sentence descriptions only
+- 6 assessment questions, 4 options each, correct_answer is the exact option text
+- Add a YouTube video_url (official UK care channel) in roughly 1 in 3 lessons; null for the rest
+- Infer category, difficulty, duration from the request
 
-COURSE STRUCTURE:
-- 4-6 modules covering all relevant topics
-- 2-3 lessons per module, each with 80-120 words of clear practical content
-- 8 multiple-choice assessment questions (4 options each; correct_answer must be the exact text of the correct option, not a letter)
-
-VIDEO REQUIREMENTS:
-- Add a YouTube video in roughly 1 in every 3 lessons — scatter throughout
-- Official UK care channels: Skills for Care, NHS England, CQC, SCIE, Health Education England
-- For video lessons: content_type "video", provide the YouTube URL
-- For text lessons: content_type "text", video_url null
-
-Respond with ONLY the JSON object below — no prose, no markdown, no explanation:
+Output ONLY this JSON (no text before or after):
 ${JSON_SCHEMA}`;
 
     try {
@@ -313,6 +295,9 @@ ${JSON_SCHEMA}`;
               <p className="font-semibold text-slate-900 text-lg">Course Created!</p>
               <p className="text-sm text-slate-500 mt-1">
                 "{generatedCourse?.title}" is now in your Course Library.
+              </p>
+              <p className="text-xs text-slate-400 mt-2">
+                Open it in the Course Editor to add detailed lesson content.
               </p>
             </div>
           </div>
