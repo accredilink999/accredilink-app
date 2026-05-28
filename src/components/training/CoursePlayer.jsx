@@ -5,16 +5,46 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Loader2, ChevronRight, ChevronLeft, Play, FileText, BookOpen, Menu, CheckCircle2, ExternalLink, Info } from 'lucide-react';
+import { Loader2, ChevronRight, ChevronLeft, Play, FileText, BookOpen, Menu, CheckCircle2, ExternalLink, Info, Award } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { toast } from 'sonner';
 
-// Convert any YouTube URL format to an embeddable URL
 function getYouTubeEmbedUrl(url) {
   if (!url) return null;
   const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
   if (!m) return null;
   return `https://www.youtube.com/embed/${m[1]}?rel=0&modestbranding=1`;
+}
+
+// Known UK training organisations → their websites
+const ORG_URLS = {
+  'health and safety executive': 'https://www.hse.gov.uk',
+  'hse': 'https://www.hse.gov.uk',
+  'care quality commission': 'https://www.cqc.org.uk',
+  'cqc': 'https://www.cqc.org.uk',
+  'skills for care': 'https://www.skillsforcare.org.uk',
+  'nhs england': 'https://www.england.nhs.uk',
+  'nhs': 'https://www.nhs.uk',
+  'social care institute for excellence': 'https://www.scie.org.uk',
+  'scie': 'https://www.scie.org.uk',
+  'st john ambulance': 'https://www.sja.org.uk',
+  'british red cross': 'https://www.redcross.org.uk',
+  'age uk': 'https://www.ageuk.org.uk',
+  'nice': 'https://www.nice.org.uk',
+  'department of health': 'https://www.gov.uk/government/organisations/department-of-health-and-social-care',
+  'dhsc': 'https://www.gov.uk/government/organisations/department-of-health-and-social-care',
+  'resuscitation council': 'https://www.resus.org.uk',
+  'uk resuscitation council': 'https://www.resus.org.uk',
+  'mencap': 'https://www.mencap.org.uk',
+  'mind': 'https://www.mind.org.uk',
+};
+
+function resolveOrgUrl(creditLine) {
+  const lower = creditLine.toLowerCase();
+  for (const [key, url] of Object.entries(ORG_URLS)) {
+    if (lower.includes(key)) return url;
+  }
+  return null;
 }
 
 export default function CoursePlayer({ isOpen, onClose, courseId }) {
@@ -23,6 +53,7 @@ export default function CoursePlayer({ isOpen, onClose, courseId }) {
   const [currentLessonIdx, setCurrentLessonIdx] = useState(0);
   const [completedLessons, setCompletedLessons] = useState(new Set());
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showCredits, setShowCredits] = useState(false);
 
   const { data: course, isLoading: courseLoading } = useQuery({
     queryKey: ['course', courseId],
@@ -138,17 +169,15 @@ export default function CoursePlayer({ isOpen, onClose, courseId }) {
   const handleNextLesson = () => {
     const updatedCompleted = new Set([...completedLessons, currentLesson?.id]);
     setCompletedLessons(updatedCompleted);
-    
-    // Check if this is the last lesson
+
     const isLastLesson = currentModuleIdx === modules.length - 1 && currentLessonIdx === moduleLessons.length - 1;
-    
-    // If this was the last lesson and we've now completed all lessons, trigger completion
+
     if (isLastLesson && updatedCompleted.size === totalLessons) {
-      completeMutation.mutate();
+      // Show credits before completing (legal requirement)
+      setShowCredits(true);
       return;
     }
-    
-    // Otherwise, navigate to next lesson
+
     if (currentLessonIdx < moduleLessons.length - 1) {
       setCurrentLessonIdx(currentLessonIdx + 1);
     } else if (currentModuleIdx < modules.length - 1) {
@@ -291,7 +320,67 @@ export default function CoursePlayer({ isOpen, onClose, courseId }) {
 
           {/* Main Content */}
           <div className="flex-1 overflow-y-auto flex flex-col p-3 sm:p-6">
-            {currentLesson ? (
+            {/* ── Credits screen ─────────────────────────────────────────── */}
+            {showCredits ? (
+              <div className="flex-1 space-y-6">
+                <div className="flex items-center gap-3">
+                  <Award className="w-8 h-8 text-teal-600 flex-shrink-0" />
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900">Sources &amp; Acknowledgements</h2>
+                    <p className="text-sm text-slate-500">Thank you to the following organisations whose guidance and materials informed this course.</p>
+                  </div>
+                </div>
+
+                <Card className="p-5 bg-slate-50 border-slate-200">
+                  {course?.credits?.length > 0 ? (
+                    <ul className="space-y-3">
+                      {course.credits.map((credit, i) => {
+                        const url = resolveOrgUrl(credit);
+                        const [name, ...rest] = credit.split('—');
+                        return (
+                          <li key={i} className="flex items-start gap-3 text-sm">
+                            <CheckCircle2 className="w-4 h-4 text-teal-500 mt-0.5 flex-shrink-0" />
+                            <div>
+                              {url ? (
+                                <a href={url} target="_blank" rel="noopener noreferrer"
+                                  className="font-semibold text-teal-700 hover:underline inline-flex items-center gap-1">
+                                  {name?.trim()} <ExternalLink className="w-3 h-3" />
+                                </a>
+                              ) : (
+                                <span className="font-semibold text-slate-800">{name?.trim()}</span>
+                              )}
+                              {rest.length > 0 && (
+                                <p className="text-slate-500 text-xs mt-0.5">{rest.join('—').trim()}</p>
+                              )}
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-slate-500 italic">No specific credits recorded for this course.</p>
+                  )}
+                </Card>
+
+                <p className="text-xs text-slate-400">
+                  This course was created using guidance from UK regulatory bodies and professional organisations. Content is for training purposes only. Always refer to current legislation and your organisation's policies.
+                </p>
+
+                <div className="pt-2">
+                  <Button
+                    onClick={() => completeMutation.mutate()}
+                    disabled={completeMutation.isPending}
+                    className="bg-teal-600 hover:bg-teal-700 w-full sm:w-auto"
+                  >
+                    {completeMutation.isPending ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Completing…</>
+                    ) : (
+                      <><CheckCircle2 className="w-4 h-4 mr-2" />I acknowledge these sources — Complete Course</>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            ) : currentLesson ? (
               <>
                 <div className="flex-1 space-y-4 sm:space-y-6">
                   {/* Lesson Header */}

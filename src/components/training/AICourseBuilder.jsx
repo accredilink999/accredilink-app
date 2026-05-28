@@ -15,15 +15,18 @@ const EXAMPLE_PROMPTS = [
   'Build a fire safety and evacuation training for residential care',
 ];
 
-// Phase 1 — skeleton only. Small JSON = never fails to parse.
+// Phase 1 — skeleton only. Tiny JSON = never fails to parse.
 const SKELETON_SCHEMA = `{"course":{"title":"string","description":"string","category":"mandatory|specialist|refresher|induction|compliance","difficulty_level":"beginner|intermediate|advanced","duration_minutes":60,"passing_score":70},"modules":[{"title":"string","description":"one sentence","order_index":0,"lessons":[{"title":"string","description":"one sentence","order_index":0}]}]}`;
 
-// Phase 2 — content. Every prose field is an ARRAY of short strings (never a long paragraph).
-// Arrays of short strings cannot contain newlines → JSON parse never fails.
-const CONTENT_SCHEMA = `{"lessons":[{"title":"matches skeleton lesson title exactly","overview":["sentence 1","sentence 2","sentence 3","sentence 4"],"key_points":["full informative sentence 1","sentence 2","sentence 3","sentence 4","sentence 5","sentence 6","sentence 7"],"uk_guidance":["sentence citing specific UK law or HSE/CQC/Skills for Care guidance","second sentence adding detail"],"in_practice":["concrete action step 1 for care staff","step 2","step 3","step 4","step 5"],"video_url":"https://www.youtube.com/embed/REAL_VIDEO_ID or null"}],"assessment":{"title":"string","passing_score":80,"questions":[{"question":"string","options":["option A text","option B text","option C text","option D text"],"correct_answer":"option A text"}]}}`;
+// Phase 2 — content. All prose fields are arrays of SHORT strings — no newlines possible → JSON never breaks.
+const CONTENT_SCHEMA = `{"lessons":[{"title":"exact lesson title from skeleton","overview":["intro sentence 1","sentence 2","sentence 3","sentence 4"],"key_points":["full informative sentence 1","sentence 2","sentence 3","sentence 4","sentence 5","sentence 6","sentence 7","sentence 8"],"uk_guidance":["sentence citing specific UK legislation or HSE/CQC/Skills for Care guidance","second supporting sentence"],"in_practice":["concrete action step 1 for care staff","step 2","step 3","step 4","step 5","step 6"]}]}`;
 
-// Converts the structured arrays from Phase 2 into rich markdown for the DB.
+// Phase 3 — enhance. Only small safe fields: video URLs, richer assessment, and credits.
+// No prose content in JSON strings → always reliable.
+const ENHANCE_SCHEMA = `{"video_urls":{"exact lesson title":"https://www.youtube.com/embed/REAL_VIDEO_ID or null"},"assessment":{"title":"string","passing_score":80,"questions":[{"question":"string","options":["option A text","option B text","option C text","option D text"],"correct_answer":"option A text"}]},"credits":["Organisation Name — what was sourced from them (one line per source)"]}`;
+
 function buildLessonContent(lesson) {
+  if (!lesson) return '';
   const parts = [];
   if (lesson.overview?.length) {
     parts.push(Array.isArray(lesson.overview) ? lesson.overview.join(' ') : lesson.overview);
@@ -32,8 +35,8 @@ function buildLessonContent(lesson) {
     parts.push('## Key Learning Points\n' + lesson.key_points.map(p => `- ${p}`).join('\n'));
   }
   if (lesson.uk_guidance?.length) {
-    const guidance = Array.isArray(lesson.uk_guidance) ? lesson.uk_guidance.join(' ') : lesson.uk_guidance;
-    parts.push('## UK Law & Guidance\n' + guidance);
+    const g = Array.isArray(lesson.uk_guidance) ? lesson.uk_guidance.join(' ') : lesson.uk_guidance;
+    parts.push('## UK Law & Guidance\n' + g);
   }
   if (lesson.in_practice?.length) {
     parts.push('## In Practice\n' + lesson.in_practice.map((s, i) => `${i + 1}. ${s}`).join('\n'));
@@ -41,8 +44,14 @@ function buildLessonContent(lesson) {
   return parts.join('\n\n');
 }
 
-// Saves the full merged course to Supabase.
-async function saveCourse({ skeleton, contentData }) {
+async function saveCourse({ skeleton, contentData, enhanceData }) {
+  // Index content by lesson title (lowercased) for fast lookup
+  const contentByTitle = {};
+  (contentData?.lessons || []).forEach(l => {
+    contentByTitle[l.title?.toLowerCase().trim()] = l;
+  });
+  const videoByTitle = enhanceData?.video_urls || {};
+
   const course = await base44.entities.Course.create({
     title:                    skeleton.course.title,
     description:              skeleton.course.description,
@@ -51,14 +60,11 @@ async function saveCourse({ skeleton, contentData }) {
     duration_minutes:         skeleton.course.duration_minutes,
     passing_score:            skeleton.course.passing_score || 70,
     is_active:                true,
-    assessment_title:         contentData.assessment?.title || null,
-    assessment_questions:     contentData.assessment?.questions || [],
-    assessment_passing_score: contentData.assessment?.passing_score || 80,
+    assessment_title:         enhanceData?.assessment?.title || null,
+    assessment_questions:     enhanceData?.assessment?.questions || [],
+    assessment_passing_score: enhanceData?.assessment?.passing_score || 80,
+    credits:                  enhanceData?.credits || [],
   });
-
-  // Flatten all lessons from content data for lookup by title
-  const contentByTitle = {};
-  (contentData.lessons || []).forEach(l => { contentByTitle[l.title?.toLowerCase().trim()] = l; });
 
   for (let mi = 0; mi < skeleton.modules.length; mi++) {
     const skelMod = skeleton.modules[mi];
@@ -70,7 +76,11 @@ async function saveCourse({ skeleton, contentData }) {
     });
     for (let li = 0; li < skelMod.lessons.length; li++) {
       const skelLesson = skelMod.lessons[li];
-      const enriched = contentByTitle[skelLesson.title?.toLowerCase().trim()] || {};
+      const key = skelLesson.title?.toLowerCase().trim();
+      const enriched = contentByTitle[key] || {};
+      // video_url: check enhance data by exact title, then by lowercase match
+      const videoUrl = videoByTitle[skelLesson.title] || videoByTitle[key] ||
+        Object.entries(videoByTitle).find(([k]) => k.toLowerCase().trim() === key)?.[1] || null;
       await base44.entities.Lesson.create({
         course_id:    course.id,
         module_id:    mod.id,
@@ -78,7 +88,7 @@ async function saveCourse({ skeleton, contentData }) {
         description:  skelLesson.description,
         content:      buildLessonContent(enriched),
         content_type: 'text',
-        video_url:    enriched.video_url || null,
+        video_url:    videoUrl || null,
         order_index:  li,
       });
     }
@@ -89,19 +99,18 @@ async function saveCourse({ skeleton, contentData }) {
 
 export default function AICourseBuilder({ isOpen, onClose, onSuccess }) {
   const queryClient = useQueryClient();
-  const [step, setStep] = useState(1);         // 1=prompt, 2=preview, 3=done
-  const [phase, setPhase] = useState(null);    // null | 'structure' | 'content' | 'saving'
+  const [step, setStep] = useState(1);       // 1=prompt+loading, 2=done
+  const [phase, setPhase] = useState(null);  // null | 'structure' | 'content' | 'enhance' | 'saving'
   const [userPrompt, setUserPrompt] = useState('');
   const [error, setError] = useState(null);
-  const [courseData, setCourseData] = useState(null); // { skeleton, contentData, savedCourse }
+  const [result, setResult] = useState(null);
 
   const isLoading = phase !== null;
 
-  // ── Generate ────────────────────────────────────────────────────────────────
   const handleGenerate = async () => {
     if (!userPrompt.trim()) { setError('Please describe the course you want to create.'); return; }
     setError(null);
-    setCourseData(null);
+    setResult(null);
 
     // ── Phase 1: skeleton ──────────────────────────────────────────────────
     setPhase('structure');
@@ -109,126 +118,152 @@ export default function AICourseBuilder({ isOpen, onClose, onSuccess }) {
     try {
       skeleton = await base44.integrations.Core.InvokeLLM({
         prompt: `Create a training course skeleton for UK community care staff: "${userPrompt.trim()}"
-Rules: 4 modules, 3 lessons each. Infer category, difficulty_level, duration_minutes. One-sentence descriptions only — no lesson content.
-Output ONLY raw JSON, no prose, no code fences: ${SKELETON_SCHEMA}`,
-        systemPrompt: 'Output only raw valid JSON.',
+4 modules, 3 lessons each. Infer category, difficulty_level, duration_minutes from the topic. One-sentence descriptions — no lesson content.
+Output ONLY raw JSON: ${SKELETON_SCHEMA}`,
+        systemPrompt: 'Output only raw valid JSON. No prose, no code fences.',
         response_json_schema: { type: 'object' },
         temperature: 0,
         max_tokens: 1500,
       });
     } catch (err) {
-      setError('Step 1 failed — could not build course structure. Please try again.');
+      setError('Step 1 failed — could not build structure. Please try again.');
       setPhase(null);
       return;
     }
-
     if (!skeleton?.course || !skeleton?.modules?.length) {
-      setError('Step 1 returned an incomplete structure — please try again.');
+      setError('Step 1 returned an incomplete response — please try again.');
       setPhase(null);
       return;
     }
 
     // ── Phase 2: lesson content ────────────────────────────────────────────
     setPhase('content');
-    const lessonList = skeleton.modules.flatMap(m => m.lessons.map(l => `- "${l.title}" (${l.description})`)).join('\n');
+    const lessonList = skeleton.modules.flatMap(m =>
+      m.lessons.map(l => `- "${l.title}" — ${l.description}`)
+    ).join('\n');
 
     let contentData;
     try {
       contentData = await base44.integrations.Core.InvokeLLM({
-        prompt: `Generate rich training content for each lesson in this UK care staff course.
+        prompt: `Generate structured training content for each lesson in this UK care staff course.
 
 Course: ${skeleton.course.title}
 Topic: "${userPrompt.trim()}"
 
-Lessons to fill (in order):
+Lessons (fill in this exact order):
 ${lessonList}
 
-Rules:
-- Return content for ALL ${skeleton.modules.flatMap(m => m.lessons).length} lessons in the lessons array
-- overview: array of 4 plain sentences — no newlines inside any string
-- key_points: array of 7 full informative sentences — real detail, no vague phrases
-- uk_guidance: array of 2 sentences citing SPECIFIC UK legislation, HSE/CQC/Skills for Care guidance
-- in_practice: array of 5 concrete action steps a care worker should follow
-- video_url: for every 3rd lesson provide a real https://www.youtube.com/embed/VIDEO_ID from a known UK training channel (Skills for Care, NHS England, HSE, SCIE, St John Ambulance, British Red Cross). Set null for others.
-- Every string in every array must be a single sentence with NO newline characters
-- 10 assessment questions, correct_answer must be the EXACT text of one of the 4 options
+Rules — every string must be single-line, NO newline characters inside any string:
+- overview: 4 informative sentences introducing the lesson
+- key_points: 8 full sentences with real detail and specifics (not vague phrases)
+- uk_guidance: 2 sentences citing SPECIFIC UK legislation, HSE/CQC/Skills for Care standards
+- in_practice: 6 concrete numbered action steps for care staff
 
-Output ONLY raw JSON, no prose, no code fences: ${CONTENT_SCHEMA}`,
-        systemPrompt: 'Output only raw valid JSON. Every string value must be single-line with no newline characters.',
+Output ONLY raw JSON for all ${skeleton.modules.flatMap(m => m.lessons).length} lessons: ${CONTENT_SCHEMA}`,
+        systemPrompt: 'Output only raw valid JSON. Every string value must be single-line — no newline characters inside strings.',
         response_json_schema: { type: 'object' },
         temperature: 0,
-        max_tokens: 8000,
+        max_tokens: 6000,
       });
     } catch (err) {
       setError('Step 2 failed — could not generate lesson content. Please try again.');
       setPhase(null);
       return;
     }
-
     if (!contentData?.lessons?.length) {
       setError('Step 2 returned incomplete content — please try again.');
       setPhase(null);
       return;
     }
 
-    // ── Phase 3: save to DB ────────────────────────────────────────────────
+    // ── Phase 3: enhance — videos, deep assessment, credits ────────────────
+    setPhase('enhance');
+    const lessonTitles = skeleton.modules.flatMap(m => m.lessons.map(l => `"${l.title}"`)).join(', ');
+    let enhanceData = null;
+    try {
+      enhanceData = await base44.integrations.Core.InvokeLLM({
+        prompt: `You are enhancing a UK care staff training course: "${skeleton.course.title}"
+
+Lesson titles: ${lessonTitles}
+
+Task 1 — VIDEO URLS: For every 3rd lesson (lessons 3, 6, 9, 12) provide a REAL YouTube embed URL (https://www.youtube.com/embed/VIDEO_ID) from a reputable UK training channel. Use videos you know exist from: Skills for Care, NHS England, HSE UK, SCIE, St John Ambulance, British Red Cross, Age UK. Set null for other lessons.
+
+Task 2 — ASSESSMENT: Create 15 varied assessment questions that test real knowledge from across the course. Each correct_answer must be the EXACT text of one of the 4 options.
+
+Task 3 — CREDITS: List every organisation whose guidance, legislation, or materials were referenced in this course. Format each as "Organisation Name — what was sourced". Include all relevant UK bodies (HSE, CQC, Skills for Care, NHS, relevant Acts of Parliament, etc).
+
+Output ONLY raw JSON: ${ENHANCE_SCHEMA}`,
+        systemPrompt: 'Output only raw valid JSON. No prose, no code fences.',
+        response_json_schema: { type: 'object' },
+        temperature: 0,
+        max_tokens: 4000,
+      });
+    } catch (err) {
+      // Enhance is best-effort — course still saves with Phase 2 content
+      console.warn('Enhance step failed, proceeding without it:', err.message);
+    }
+
+    // ── Phase 4: save ──────────────────────────────────────────────────────
     setPhase('saving');
     let savedCourse;
     try {
-      savedCourse = await saveCourse({ skeleton, contentData });
+      savedCourse = await saveCourse({ skeleton, contentData, enhanceData });
     } catch (err) {
-      setError('Step 3 failed — could not save course: ' + (err.message || 'Unknown error'));
+      setError('Step 4 failed — could not save to library: ' + (err.message || 'Unknown error'));
       setPhase(null);
       return;
     }
 
     queryClient.invalidateQueries({ queryKey: ['courses'] });
-    setCourseData({ skeleton, contentData, savedCourse });
+    setResult({ skeleton, contentData, enhanceData, savedCourse });
     setPhase(null);
-    setStep(3);
+    setStep(2);
     setTimeout(() => onSuccess?.(savedCourse), 1500);
   };
 
-  // ── Reset / close ───────────────────────────────────────────────────────────
   const handleClose = () => {
-    if (isLoading) return; // don't close mid-generation
+    if (isLoading) return;
     setStep(1);
     setUserPrompt('');
-    setCourseData(null);
+    setResult(null);
     setError(null);
     setPhase(null);
     onClose();
   };
 
-  const { skeleton, contentData } = courseData || {};
-  const totalLessons  = skeleton?.modules?.reduce((s, m) => s + m.lessons.length, 0) || 0;
-  const videoLessons  = (contentData?.lessons || []).filter(l => l.video_url).length;
-  const questionCount = contentData?.assessment?.questions?.length || 0;
-
-  const phasesDone = { structure: false, content: false, saving: false };
-  if (phase === 'content')  phasesDone.structure = true;
-  if (phase === 'saving')   { phasesDone.structure = true; phasesDone.content = true; }
-  if (step === 3)           { phasesDone.structure = true; phasesDone.content = true; phasesDone.saving = true; }
+  // Track which phases are complete for the progress UI
+  const done = {
+    structure: ['content', 'enhance', 'saving'].includes(phase) || step === 2,
+    content:   ['enhance', 'saving'].includes(phase) || step === 2,
+    enhance:   phase === 'saving' || step === 2,
+    saving:    step === 2,
+  };
 
   const PhaseRow = ({ id, label, sublabel }) => {
     const active = phase === id;
-    const done   = phasesDone[id];
+    const isDone = done[id];
     return (
       <div className="flex items-center gap-3">
         {active ? (
           <Loader2 className="w-5 h-5 animate-spin text-amber-500 flex-shrink-0" />
-        ) : done ? (
+        ) : isDone ? (
           <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
         ) : (
           <div className="w-5 h-5 rounded-full border-2 border-slate-200 flex-shrink-0" />
         )}
         <div>
-          <p className={`text-sm font-medium ${active ? 'text-slate-900' : done ? 'text-slate-500' : 'text-slate-300'}`}>{label}</p>
-          <p className={`text-xs ${active || done ? 'text-slate-400' : 'text-slate-300'}`}>{sublabel}</p>
+          <p className={`text-sm font-medium ${active ? 'text-slate-900' : isDone ? 'text-slate-600' : 'text-slate-300'}`}>{label}</p>
+          <p className={`text-xs ${active || isDone ? 'text-slate-400' : 'text-slate-300'}`}>{sublabel}</p>
         </div>
       </div>
     );
   };
+
+  const { skeleton, enhanceData } = result || {};
+  const videoCount    = Object.values(enhanceData?.video_urls || {}).filter(Boolean).length;
+  const questionCount = enhanceData?.assessment?.questions?.length || 0;
+  const creditCount   = enhanceData?.credits?.length || 0;
+  const totalLessons  = skeleton?.modules?.reduce((s, m) => s + m.lessons.length, 0) || 0;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -240,13 +275,13 @@ Output ONLY raw JSON, no prose, no code fences: ${CONTENT_SCHEMA}`,
           </DialogTitle>
         </DialogHeader>
 
-        {/* ── Step 1: prompt + loading ─────────────────────────────────────── */}
+        {/* ── Step 1: prompt + progress ────────────────────────────────────── */}
         {step === 1 && (
           <div className="space-y-4">
             {!isLoading ? (
               <>
                 <p className="text-sm text-slate-600">
-                  Describe the course you want — AI builds the full structure, rich lesson content, embedded videos, and assessment in three steps.
+                  Describe the course you want — AI builds the full structure, rich lesson content, embedded videos, deep assessment, and legal credits in four steps.
                 </p>
                 <Textarea
                   rows={4}
@@ -274,8 +309,9 @@ Output ONLY raw JSON, no prose, no code fences: ${CONTENT_SCHEMA}`,
               <div className="py-4 space-y-5">
                 <PhaseRow id="structure" label="Step 1 — Building course structure"   sublabel="Modules, lesson titles, course metadata" />
                 <PhaseRow id="content"   label="Step 2 — Writing lesson content"      sublabel="Key points, UK guidance, in-practice steps" />
-                <PhaseRow id="saving"    label="Step 3 — Enhancing &amp; saving"      sublabel="Adding videos, assessment, saving to library" />
-                <p className="text-xs text-slate-400 text-center pt-1">Please wait — this takes 60–120 seconds</p>
+                <PhaseRow id="enhance"   label="Step 3 — Enhancing"                   sublabel="Training videos, deep assessment, content credits" />
+                <PhaseRow id="saving"    label="Step 4 — Saving to library"           sublabel="Writing course to your training library" />
+                <p className="text-xs text-slate-400 text-center pt-1">Please wait — this takes 90–120 seconds</p>
               </div>
             )}
 
@@ -288,14 +324,14 @@ Output ONLY raw JSON, no prose, no code fences: ${CONTENT_SCHEMA}`,
           </div>
         )}
 
-        {/* ── Step 3: done ─────────────────────────────────────────────────── */}
-        {step === 3 && skeleton && (
+        {/* ── Step 2: done ─────────────────────────────────────────────────── */}
+        {step === 2 && skeleton && (
           <div className="space-y-4">
-            {/* All phases complete */}
-            <div className="space-y-3 mb-2">
+            <div className="space-y-3 pb-1">
               <PhaseRow id="structure" label="Step 1 — Building course structure"   sublabel="Modules, lesson titles, course metadata" />
               <PhaseRow id="content"   label="Step 2 — Writing lesson content"      sublabel="Key points, UK guidance, in-practice steps" />
-              <PhaseRow id="saving"    label="Step 3 — Enhancing &amp; saving"      sublabel="Adding videos, assessment, saving to library" />
+              <PhaseRow id="enhance"   label="Step 3 — Enhancing"                   sublabel="Training videos, deep assessment, content credits" />
+              <PhaseRow id="saving"    label="Step 4 — Saving to library"           sublabel="Writing course to your training library" />
             </div>
 
             <Card className="p-4 bg-emerald-50 border-emerald-200">
@@ -305,20 +341,21 @@ Output ONLY raw JSON, no prose, no code fences: ${CONTENT_SCHEMA}`,
               </div>
               <p className="text-sm font-medium text-slate-800 mb-1">{skeleton.course?.title}</p>
               <p className="text-xs text-slate-500 mb-3">{skeleton.course?.description}</p>
-              <div className="flex flex-wrap gap-2 text-xs">
+              <div className="flex flex-wrap gap-2 text-xs mb-3">
                 <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full capitalize">{skeleton.course?.category}</span>
                 <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full capitalize">{skeleton.course?.difficulty_level}</span>
                 <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full">{skeleton.course?.duration_minutes} min</span>
               </div>
-              <div className="flex gap-4 text-xs text-emerald-700 border-t border-emerald-200 pt-2 mt-3">
+              <div className="flex flex-wrap gap-4 text-xs text-emerald-700 border-t border-emerald-200 pt-2">
                 <span className="flex items-center gap-1"><BookOpen className="w-3 h-3" />{skeleton.modules?.length} modules · {totalLessons} lessons</span>
-                <span className="flex items-center gap-1 text-red-600"><Play className="w-3 h-3" />{videoLessons} videos</span>
+                <span className="flex items-center gap-1 text-red-600"><Play className="w-3 h-3" />{videoCount} videos</span>
                 <span className="flex items-center gap-1"><FileText className="w-3 h-3" />{questionCount} questions</span>
+                {creditCount > 0 && <span className="flex items-center gap-1">✓ {creditCount} credits</span>}
               </div>
             </Card>
 
             <p className="text-xs text-slate-500">
-              Course is live in your library. Open it in the Course Editor to review content or swap any video links.
+              Course is live in your library. Open it in the Course Editor to review or adjust any content.
             </p>
           </div>
         )}
@@ -332,7 +369,7 @@ Output ONLY raw JSON, no prose, no code fences: ${CONTENT_SCHEMA}`,
               </Button>
             </>
           )}
-          {step === 3 && (
+          {step === 2 && (
             <Button variant="outline" onClick={handleClose}>Close</Button>
           )}
         </DialogFooter>
