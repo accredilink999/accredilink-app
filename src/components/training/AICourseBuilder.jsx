@@ -9,7 +9,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 const EXAMPLE_PROMPTS = [
   'Create a safeguarding adults course for UK care workers',
-  'Build a medication administration training for care home staff',
+  'Build a medication administration training for care staff',
   'Make a moving and handling course — intermediate level, 90 minutes',
   'Create a mental health awareness course for community care workers',
   'Build a fire safety and evacuation training for residential care',
@@ -30,7 +30,7 @@ export default function AICourseBuilder({ isOpen, onClose, onSuccess }) {
   // ── Save to DB ──────────────────────────────────────────────────────────────
   const createCourseMutation = useMutation({
     mutationFn: async (courseData) => {
-      const { modules_data, assessment_data, ...courseFields } = courseData;
+      const { modules_data, ...courseFields } = courseData;
 
       const course = await base44.entities.Course.create(courseFields);
 
@@ -51,13 +51,6 @@ export default function AICourseBuilder({ isOpen, onClose, onSuccess }) {
             }
           }
         }
-      }
-
-      if (assessment_data) {
-        await base44.entities.Assessment.create({
-          course_id: course.id,
-          ...assessment_data,
-        });
       }
 
       return course;
@@ -83,7 +76,7 @@ export default function AICourseBuilder({ isOpen, onClose, onSuccess }) {
     setLoading(true);
     setError(null);
 
-    const prompt = `Create a training course for UK care settings: "${userPrompt.trim()}"
+    const prompt = `Create a training course for UK community care staff: "${userPrompt.trim()}"
 
 Rules:
 - 4-5 modules, 2-3 lessons each
@@ -118,18 +111,18 @@ ${JSON_SCHEMA}`;
   // ── Save ────────────────────────────────────────────────────────────────────
   const handleSave = () => {
     if (!generatedCourse) return;
-    const videoCount = generatedCourse.modules?.reduce(
-      (sum, m) => sum + (m.lessons?.filter(l => l.video_url && l.content_type === 'video').length || 0), 0
-    ) || 0;
 
     createCourseMutation.mutate({
-      title:            generatedCourse.course.title,
-      description:      generatedCourse.course.description,
-      category:         generatedCourse.course.category,
-      difficulty_level: generatedCourse.course.difficulty_level,
-      duration_minutes: generatedCourse.course.duration_minutes,
-      passing_score:    generatedCourse.course.passing_score || 70,
-      is_active:        true,
+      title:                      generatedCourse.course.title,
+      description:                generatedCourse.course.description,
+      category:                   generatedCourse.course.category,
+      difficulty_level:           generatedCourse.course.difficulty_level,
+      duration_minutes:           generatedCourse.course.duration_minutes,
+      passing_score:              generatedCourse.course.passing_score || 70,
+      is_active:                  true,
+      assessment_title:           generatedCourse.assessment?.title || null,
+      assessment_questions:       generatedCourse.assessment?.questions || [],
+      assessment_passing_score:   generatedCourse.assessment?.passing_score || 70,
       modules_data: generatedCourse.modules?.map((m, idx) => ({
         title:       m.title,
         description: m.description,
@@ -143,13 +136,6 @@ ${JSON_SCHEMA}`;
           order_index:  lidx,
         })) || [],
       })) || [],
-      assessment_data: generatedCourse.assessment ? {
-        title:           generatedCourse.assessment.title,
-        description:     generatedCourse.assessment.description,
-        assessment_type: generatedCourse.assessment.assessment_type || 'multiple_choice',
-        questions:       JSON.stringify(generatedCourse.assessment.questions || []),
-        passing_score:   generatedCourse.assessment.passing_score || 70,
-      } : null,
     });
   };
 
