@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Sparkles, CheckCircle2, AlertCircle, Play, BookOpen, FileText } from 'lucide-react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 
 const EXAMPLE_PROMPTS = [
   'Create a safeguarding adults course for UK care workers',
@@ -15,22 +15,25 @@ const EXAMPLE_PROMPTS = [
   'Build a fire safety and evacuation training for residential care',
 ];
 
-// Phase 1 — skeleton only (titles + descriptions, no content).
-// Small response = reliable JSON.
+// Phase 1 — skeleton only. Small JSON = never fails to parse.
 const SKELETON_SCHEMA = `{"course":{"title":"string","description":"string","category":"mandatory|specialist|refresher|induction|compliance","difficulty_level":"beginner|intermediate|advanced","duration_minutes":60,"passing_score":70},"modules":[{"title":"string","description":"one sentence","order_index":0,"lessons":[{"title":"string","description":"one sentence","order_index":0}]}]}`;
 
-// Phase 2 — content per lesson, still structured arrays to avoid multiline JSON issues.
-// video_url uses real embed format from known UK channels.
-const CONTENT_SCHEMA = `{"modules":[{"title":"string","lessons":[{"title":"string","overview":"3-4 sentence plain text intro — no newlines","key_points":["full sentence with real detail 1","full sentence 2","full sentence 3","full sentence 4","full sentence 5","full sentence 6","full sentence 7"],"uk_guidance":"2-3 sentences citing specific UK legislation or HSE/CQC/Skills for Care guidance — no newlines","in_practice":["concrete numbered step 1 for care staff","step 2","step 3","step 4","step 5"],"video_url":"https://www.youtube.com/embed/REAL_VIDEO_ID or null"}]}],"assessment":{"title":"string","passing_score":80,"questions":[{"question":"string","options":["option A","option B","option C","option D"],"correct_answer":"option A"}]}}`;
+// Phase 2 — content. Every prose field is an ARRAY of short strings (never a long paragraph).
+// Arrays of short strings cannot contain newlines → JSON parse never fails.
+const CONTENT_SCHEMA = `{"lessons":[{"title":"matches skeleton lesson title exactly","overview":["sentence 1","sentence 2","sentence 3","sentence 4"],"key_points":["full informative sentence 1","sentence 2","sentence 3","sentence 4","sentence 5","sentence 6","sentence 7"],"uk_guidance":["sentence citing specific UK law or HSE/CQC/Skills for Care guidance","second sentence adding detail"],"in_practice":["concrete action step 1 for care staff","step 2","step 3","step 4","step 5"],"video_url":"https://www.youtube.com/embed/REAL_VIDEO_ID or null"}],"assessment":{"title":"string","passing_score":80,"questions":[{"question":"string","options":["option A text","option B text","option C text","option D text"],"correct_answer":"option A text"}]}}`;
 
+// Converts the structured arrays from Phase 2 into rich markdown for the DB.
 function buildLessonContent(lesson) {
   const parts = [];
-  if (lesson.overview) parts.push(lesson.overview);
+  if (lesson.overview?.length) {
+    parts.push(Array.isArray(lesson.overview) ? lesson.overview.join(' ') : lesson.overview);
+  }
   if (lesson.key_points?.length) {
     parts.push('## Key Learning Points\n' + lesson.key_points.map(p => `- ${p}`).join('\n'));
   }
-  if (lesson.uk_guidance) {
-    parts.push('## UK Law & Guidance\n' + lesson.uk_guidance);
+  if (lesson.uk_guidance?.length) {
+    const guidance = Array.isArray(lesson.uk_guidance) ? lesson.uk_guidance.join(' ') : lesson.uk_guidance;
+    parts.push('## UK Law & Guidance\n' + guidance);
   }
   if (lesson.in_practice?.length) {
     parts.push('## In Practice\n' + lesson.in_practice.map((s, i) => `${i + 1}. ${s}`).join('\n'));
@@ -38,179 +41,194 @@ function buildLessonContent(lesson) {
   return parts.join('\n\n');
 }
 
-export default function AICourseBuilder({ isOpen, onClose, onSuccess }) {
-  const queryClient = useQueryClient();
-  const [step, setStep] = useState(1); // 1=prompt, 2=preview, 3=complete
-  const [loadingPhase, setLoadingPhase] = useState(null); // null | 'structure' | 'content'
-  const [userPrompt, setUserPrompt] = useState('');
-  const [error, setError] = useState(null);
-  const [generatedCourse, setGeneratedCourse] = useState(null); // holds skeleton + enriched data
-
-  // ── Save to DB ──────────────────────────────────────────────────────────────
-  const createCourseMutation = useMutation({
-    mutationFn: async (courseData) => {
-      const { modules_data, ...courseFields } = courseData;
-      const course = await base44.entities.Course.create(courseFields);
-
-      if (modules_data) {
-        for (const moduleData of modules_data) {
-          const { lessons_data, ...moduleFields } = moduleData;
-          const mod = await base44.entities.Module.create({ course_id: course.id, ...moduleFields });
-          if (lessons_data) {
-            for (const lessonData of lessons_data) {
-              await base44.entities.Lesson.create({ course_id: course.id, module_id: mod.id, ...lessonData });
-            }
-          }
-        }
-      }
-      return course;
-    },
-    onSuccess: (course) => {
-      queryClient.invalidateQueries({ queryKey: ['courses'] });
-      setStep(3);
-      setGeneratedCourse(prev => ({ ...prev, savedCourse: course }));
-      setTimeout(() => onSuccess?.(course), 2000);
-    },
-    onError: (err) => {
-      setError('Failed to save course: ' + (err.message || 'Unknown error'));
-    },
+// Saves the full merged course to Supabase.
+async function saveCourse({ skeleton, contentData }) {
+  const course = await base44.entities.Course.create({
+    title:                    skeleton.course.title,
+    description:              skeleton.course.description,
+    category:                 skeleton.course.category,
+    difficulty_level:         skeleton.course.difficulty_level,
+    duration_minutes:         skeleton.course.duration_minutes,
+    passing_score:            skeleton.course.passing_score || 70,
+    is_active:                true,
+    assessment_title:         contentData.assessment?.title || null,
+    assessment_questions:     contentData.assessment?.questions || [],
+    assessment_passing_score: contentData.assessment?.passing_score || 80,
   });
 
-  // ── Two-phase generation ────────────────────────────────────────────────────
+  // Flatten all lessons from content data for lookup by title
+  const contentByTitle = {};
+  (contentData.lessons || []).forEach(l => { contentByTitle[l.title?.toLowerCase().trim()] = l; });
+
+  for (let mi = 0; mi < skeleton.modules.length; mi++) {
+    const skelMod = skeleton.modules[mi];
+    const mod = await base44.entities.Module.create({
+      course_id:   course.id,
+      title:       skelMod.title,
+      description: skelMod.description,
+      order_index: mi,
+    });
+    for (let li = 0; li < skelMod.lessons.length; li++) {
+      const skelLesson = skelMod.lessons[li];
+      const enriched = contentByTitle[skelLesson.title?.toLowerCase().trim()] || {};
+      await base44.entities.Lesson.create({
+        course_id:    course.id,
+        module_id:    mod.id,
+        title:        skelLesson.title,
+        description:  skelLesson.description,
+        content:      buildLessonContent(enriched),
+        content_type: 'text',
+        video_url:    enriched.video_url || null,
+        order_index:  li,
+      });
+    }
+  }
+
+  return course;
+}
+
+export default function AICourseBuilder({ isOpen, onClose, onSuccess }) {
+  const queryClient = useQueryClient();
+  const [step, setStep] = useState(1);         // 1=prompt, 2=preview, 3=done
+  const [phase, setPhase] = useState(null);    // null | 'structure' | 'content' | 'saving'
+  const [userPrompt, setUserPrompt] = useState('');
+  const [error, setError] = useState(null);
+  const [courseData, setCourseData] = useState(null); // { skeleton, contentData, savedCourse }
+
+  const isLoading = phase !== null;
+
+  // ── Generate ────────────────────────────────────────────────────────────────
   const handleGenerate = async () => {
     if (!userPrompt.trim()) { setError('Please describe the course you want to create.'); return; }
     setError(null);
+    setCourseData(null);
 
     // ── Phase 1: skeleton ──────────────────────────────────────────────────
-    setLoadingPhase('structure');
+    setPhase('structure');
     let skeleton;
     try {
       skeleton = await base44.integrations.Core.InvokeLLM({
         prompt: `Create a training course skeleton for UK community care staff: "${userPrompt.trim()}"
-Rules: 4 modules, 3 lessons each. Infer category, difficulty_level, duration_minutes. Titles and one-sentence descriptions only — no content.
-Output ONLY raw JSON: ${SKELETON_SCHEMA}`,
-        systemPrompt: 'You are a JSON API. Output only raw valid JSON with no prose, explanation, or code fences.',
+Rules: 4 modules, 3 lessons each. Infer category, difficulty_level, duration_minutes. One-sentence descriptions only — no lesson content.
+Output ONLY raw JSON, no prose, no code fences: ${SKELETON_SCHEMA}`,
+        systemPrompt: 'Output only raw valid JSON.',
         response_json_schema: { type: 'object' },
         temperature: 0,
         max_tokens: 1500,
       });
     } catch (err) {
-      setError('Failed to build course structure — please try again.');
-      setLoadingPhase(null);
+      setError('Step 1 failed — could not build course structure. Please try again.');
+      setPhase(null);
       return;
     }
 
     if (!skeleton?.course || !skeleton?.modules?.length) {
-      setError('AI returned an incomplete structure — please try again.');
-      setLoadingPhase(null);
+      setError('Step 1 returned an incomplete structure — please try again.');
+      setPhase(null);
       return;
     }
 
-    // ── Phase 2: rich content + videos ─────────────────────────────────────
-    setLoadingPhase('content');
-    const structureSummary = skeleton.modules.map(m =>
-      `Module: ${m.title}\n` + m.lessons.map(l => `  - Lesson: ${l.title} — ${l.description}`).join('\n')
-    ).join('\n\n');
+    // ── Phase 2: lesson content ────────────────────────────────────────────
+    setPhase('content');
+    const lessonList = skeleton.modules.flatMap(m => m.lessons.map(l => `- "${l.title}" (${l.description})`)).join('\n');
 
-    let enriched;
+    let contentData;
     try {
-      enriched = await base44.integrations.Core.InvokeLLM({
-        prompt: `Generate detailed training content for this UK care staff course:
+      contentData = await base44.integrations.Core.InvokeLLM({
+        prompt: `Generate rich training content for each lesson in this UK care staff course.
 
+Course: ${skeleton.course.title}
 Topic: "${userPrompt.trim()}"
-Course title: ${skeleton.course.title}
 
-EXACT STRUCTURE TO FILL (keep same module/lesson order and titles):
-${structureSummary}
+Lessons to fill (in order):
+${lessonList}
 
-Requirements:
-- overview: 3-4 sentence plain text (no newlines inside the string)
-- key_points: 7 items, each a full informative sentence — real detail, not just a phrase
-- uk_guidance: 2-3 sentences citing specific UK law/HSE/CQC/Skills for Care guidance (no newlines inside the string)
-- in_practice: 5 concrete action steps for care staff (no newlines inside any string)
-- video_url: for every 3rd lesson, provide a REAL YouTube embed URL (https://www.youtube.com/embed/VIDEO_ID) from a reputable UK training channel (Skills for Care, NHS England, HSE, SCIE, St John Ambulance, British Red Cross, Age UK). Set null for the other 2 in 3.
-- 10 assessment questions, correct_answer must be the exact text of one of the 4 options
-- All string values MUST be single-line — absolutely no \\n or newline characters inside any string value
+Rules:
+- Return content for ALL ${skeleton.modules.flatMap(m => m.lessons).length} lessons in the lessons array
+- overview: array of 4 plain sentences — no newlines inside any string
+- key_points: array of 7 full informative sentences — real detail, no vague phrases
+- uk_guidance: array of 2 sentences citing SPECIFIC UK legislation, HSE/CQC/Skills for Care guidance
+- in_practice: array of 5 concrete action steps a care worker should follow
+- video_url: for every 3rd lesson provide a real https://www.youtube.com/embed/VIDEO_ID from a known UK training channel (Skills for Care, NHS England, HSE, SCIE, St John Ambulance, British Red Cross). Set null for others.
+- Every string in every array must be a single sentence with NO newline characters
+- 10 assessment questions, correct_answer must be the EXACT text of one of the 4 options
 
-Output ONLY raw JSON: ${CONTENT_SCHEMA}`,
-        systemPrompt: 'You are a JSON API generating UK care staff training content. Output only raw valid JSON. No prose, no code fences, no newlines inside string values.',
+Output ONLY raw JSON, no prose, no code fences: ${CONTENT_SCHEMA}`,
+        systemPrompt: 'Output only raw valid JSON. Every string value must be single-line with no newline characters.',
         response_json_schema: { type: 'object' },
         temperature: 0,
         max_tokens: 8000,
       });
     } catch (err) {
-      setError('Failed to generate lesson content — please try again.');
-      setLoadingPhase(null);
+      setError('Step 2 failed — could not generate lesson content. Please try again.');
+      setPhase(null);
       return;
     }
 
-    if (!enriched?.modules?.length) {
-      setError('AI returned incomplete content — please try again.');
-      setLoadingPhase(null);
+    if (!contentData?.lessons?.length) {
+      setError('Step 2 returned incomplete content — please try again.');
+      setPhase(null);
       return;
     }
 
-    setLoadingPhase(null);
-    setGeneratedCourse({ skeleton, enriched });
-    setStep(2);
-  };
+    // ── Phase 3: save to DB ────────────────────────────────────────────────
+    setPhase('saving');
+    let savedCourse;
+    try {
+      savedCourse = await saveCourse({ skeleton, contentData });
+    } catch (err) {
+      setError('Step 3 failed — could not save course: ' + (err.message || 'Unknown error'));
+      setPhase(null);
+      return;
+    }
 
-  // ── Save ────────────────────────────────────────────────────────────────────
-  const handleSave = () => {
-    if (!generatedCourse) return;
-    const { skeleton, enriched } = generatedCourse;
-
-    // Merge skeleton titles with enriched content
-    const modules_data = skeleton.modules.map((skelMod, mi) => {
-      const enrichedMod = enriched.modules?.[mi] || {};
-      return {
-        title:       skelMod.title,
-        description: skelMod.description,
-        order_index: mi,
-        lessons_data: skelMod.lessons.map((skelLesson, li) => {
-          const enrichedLesson = enrichedMod.lessons?.[li] || {};
-          return {
-            title:        skelLesson.title,
-            description:  skelLesson.description,
-            content:      buildLessonContent(enrichedLesson),
-            content_type: 'text',
-            video_url:    enrichedLesson.video_url || null,
-            order_index:  li,
-          };
-        }),
-      };
-    });
-
-    createCourseMutation.mutate({
-      title:                    skeleton.course.title,
-      description:              skeleton.course.description,
-      category:                 skeleton.course.category,
-      difficulty_level:         skeleton.course.difficulty_level,
-      duration_minutes:         skeleton.course.duration_minutes,
-      passing_score:            skeleton.course.passing_score || 70,
-      is_active:                true,
-      assessment_title:         enriched.assessment?.title || null,
-      assessment_questions:     enriched.assessment?.questions || [],
-      assessment_passing_score: enriched.assessment?.passing_score || 80,
-      modules_data,
-    });
+    queryClient.invalidateQueries({ queryKey: ['courses'] });
+    setCourseData({ skeleton, contentData, savedCourse });
+    setPhase(null);
+    setStep(3);
+    setTimeout(() => onSuccess?.(savedCourse), 1500);
   };
 
   // ── Reset / close ───────────────────────────────────────────────────────────
   const handleClose = () => {
+    if (isLoading) return; // don't close mid-generation
     setStep(1);
     setUserPrompt('');
-    setGeneratedCourse(null);
+    setCourseData(null);
     setError(null);
-    setLoadingPhase(null);
+    setPhase(null);
     onClose();
   };
 
-  const isLoading = loadingPhase !== null;
-  const { skeleton, enriched } = generatedCourse || {};
+  const { skeleton, contentData } = courseData || {};
   const totalLessons  = skeleton?.modules?.reduce((s, m) => s + m.lessons.length, 0) || 0;
-  const videoLessons  = enriched?.modules?.reduce((s, m) => s + (m.lessons?.filter(l => l.video_url).length || 0), 0) || 0;
-  const questionCount = enriched?.assessment?.questions?.length || 0;
+  const videoLessons  = (contentData?.lessons || []).filter(l => l.video_url).length;
+  const questionCount = contentData?.assessment?.questions?.length || 0;
+
+  const phasesDone = { structure: false, content: false, saving: false };
+  if (phase === 'content')  phasesDone.structure = true;
+  if (phase === 'saving')   { phasesDone.structure = true; phasesDone.content = true; }
+  if (step === 3)           { phasesDone.structure = true; phasesDone.content = true; phasesDone.saving = true; }
+
+  const PhaseRow = ({ id, label, sublabel }) => {
+    const active = phase === id;
+    const done   = phasesDone[id];
+    return (
+      <div className="flex items-center gap-3">
+        {active ? (
+          <Loader2 className="w-5 h-5 animate-spin text-amber-500 flex-shrink-0" />
+        ) : done ? (
+          <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+        ) : (
+          <div className="w-5 h-5 rounded-full border-2 border-slate-200 flex-shrink-0" />
+        )}
+        <div>
+          <p className={`text-sm font-medium ${active ? 'text-slate-900' : done ? 'text-slate-500' : 'text-slate-300'}`}>{label}</p>
+          <p className={`text-xs ${active || done ? 'text-slate-400' : 'text-slate-300'}`}>{sublabel}</p>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -222,13 +240,13 @@ Output ONLY raw JSON: ${CONTENT_SCHEMA}`,
           </DialogTitle>
         </DialogHeader>
 
-        {/* ── Step 1: prompt ───────────────────────────────────────────────── */}
+        {/* ── Step 1: prompt + loading ─────────────────────────────────────── */}
         {step === 1 && (
           <div className="space-y-4">
-            {!isLoading && (
+            {!isLoading ? (
               <>
                 <p className="text-sm text-slate-600">
-                  Describe the course you want — the AI builds the full structure, rich lesson content, embedded videos, and assessment in two steps.
+                  Describe the course you want — AI builds the full structure, rich lesson content, embedded videos, and assessment in three steps.
                 </p>
                 <Textarea
                   rows={4}
@@ -244,52 +262,20 @@ Output ONLY raw JSON: ${CONTENT_SCHEMA}`,
                   <p className="text-xs text-slate-400 mb-2">Examples — click to use:</p>
                   <div className="flex flex-wrap gap-1.5">
                     {EXAMPLE_PROMPTS.map(ex => (
-                      <button
-                        key={ex}
-                        onClick={() => setUserPrompt(ex)}
-                        className="text-xs px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors"
-                      >
+                      <button key={ex} onClick={() => setUserPrompt(ex)}
+                        className="text-xs px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors">
                         {ex}
                       </button>
                     ))}
                   </div>
                 </div>
               </>
-            )}
-
-            {isLoading && (
-              <div className="py-6 space-y-5">
-                {/* Step 1 */}
-                <div className="flex items-center gap-3">
-                  {loadingPhase === 'structure' ? (
-                    <Loader2 className="w-5 h-5 animate-spin text-amber-500 flex-shrink-0" />
-                  ) : (
-                    <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                  )}
-                  <div>
-                    <p className={`text-sm font-medium ${loadingPhase === 'structure' ? 'text-slate-900' : 'text-slate-400'}`}>
-                      Step 1 — Building course structure
-                    </p>
-                    <p className="text-xs text-slate-400">Modules, lesson titles, and course metadata</p>
-                  </div>
-                </div>
-                {/* Step 2 */}
-                <div className="flex items-center gap-3">
-                  {loadingPhase === 'content' ? (
-                    <Loader2 className="w-5 h-5 animate-spin text-amber-500 flex-shrink-0" />
-                  ) : loadingPhase === null && step === 2 ? (
-                    <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                  ) : (
-                    <div className="w-5 h-5 rounded-full border-2 border-slate-200 flex-shrink-0" />
-                  )}
-                  <div>
-                    <p className={`text-sm font-medium ${loadingPhase === 'content' ? 'text-slate-900' : 'text-slate-400'}`}>
-                      Step 2 — Generating lesson content &amp; videos
-                    </p>
-                    <p className="text-xs text-slate-400">Rich content, UK guidance references, embedded training videos</p>
-                  </div>
-                </div>
-                <p className="text-xs text-slate-400 text-center pt-2">This takes 60–120 seconds — please wait</p>
+            ) : (
+              <div className="py-4 space-y-5">
+                <PhaseRow id="structure" label="Step 1 — Building course structure"   sublabel="Modules, lesson titles, course metadata" />
+                <PhaseRow id="content"   label="Step 2 — Writing lesson content"      sublabel="Key points, UK guidance, in-practice steps" />
+                <PhaseRow id="saving"    label="Step 3 — Enhancing &amp; saving"      sublabel="Adding videos, assessment, saving to library" />
+                <p className="text-xs text-slate-400 text-center pt-1">Please wait — this takes 60–120 seconds</p>
               </div>
             )}
 
@@ -302,116 +288,52 @@ Output ONLY raw JSON: ${CONTENT_SCHEMA}`,
           </div>
         )}
 
-        {/* ── Step 2: preview ──────────────────────────────────────────────── */}
-        {step === 2 && skeleton && (
+        {/* ── Step 3: done ─────────────────────────────────────────────────── */}
+        {step === 3 && skeleton && (
           <div className="space-y-4">
-            <Card className="p-4 bg-amber-50 border-amber-200">
-              <h3 className="font-semibold text-amber-900 text-base mb-0.5">{skeleton.course?.title}</h3>
-              <p className="text-xs text-amber-600 mb-3">{skeleton.course?.description}</p>
-              <div className="flex flex-wrap gap-2 text-xs mb-3">
-                <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full capitalize">{skeleton.course?.category}</span>
-                <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full capitalize">{skeleton.course?.difficulty_level}</span>
-                <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full">{skeleton.course?.duration_minutes} min</span>
+            {/* All phases complete */}
+            <div className="space-y-3 mb-2">
+              <PhaseRow id="structure" label="Step 1 — Building course structure"   sublabel="Modules, lesson titles, course metadata" />
+              <PhaseRow id="content"   label="Step 2 — Writing lesson content"      sublabel="Key points, UK guidance, in-practice steps" />
+              <PhaseRow id="saving"    label="Step 3 — Enhancing &amp; saving"      sublabel="Adding videos, assessment, saving to library" />
+            </div>
+
+            <Card className="p-4 bg-emerald-50 border-emerald-200">
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                <p className="font-semibold text-emerald-900">Course Created!</p>
               </div>
-              <div className="flex gap-4 text-xs text-amber-700 border-t border-amber-200 pt-2">
-                <span className="flex items-center gap-1">
-                  <BookOpen className="w-3 h-3" />
-                  {skeleton.modules?.length} modules · {totalLessons} lessons
-                </span>
-                <span className="flex items-center gap-1 text-red-600">
-                  <Play className="w-3 h-3" />
-                  {videoLessons} videos
-                </span>
-                <span className="flex items-center gap-1">
-                  <FileText className="w-3 h-3" />
-                  {questionCount} questions
-                </span>
+              <p className="text-sm font-medium text-slate-800 mb-1">{skeleton.course?.title}</p>
+              <p className="text-xs text-slate-500 mb-3">{skeleton.course?.description}</p>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full capitalize">{skeleton.course?.category}</span>
+                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full capitalize">{skeleton.course?.difficulty_level}</span>
+                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full">{skeleton.course?.duration_minutes} min</span>
+              </div>
+              <div className="flex gap-4 text-xs text-emerald-700 border-t border-emerald-200 pt-2 mt-3">
+                <span className="flex items-center gap-1"><BookOpen className="w-3 h-3" />{skeleton.modules?.length} modules · {totalLessons} lessons</span>
+                <span className="flex items-center gap-1 text-red-600"><Play className="w-3 h-3" />{videoLessons} videos</span>
+                <span className="flex items-center gap-1"><FileText className="w-3 h-3" />{questionCount} questions</span>
               </div>
             </Card>
 
-            <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
-              {skeleton.modules?.map((m, i) => (
-                <div key={i} className="p-2.5 bg-slate-50 rounded-lg">
-                  <p className="text-xs font-semibold text-slate-700">{i + 1}. {m.title}</p>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {m.lessons?.map((l, j) => {
-                      const hasVideo = !!enriched?.modules?.[i]?.lessons?.[j]?.video_url;
-                      return (
-                        <span key={j} className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded ${hasVideo ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-500'}`}>
-                          {hasVideo ? <Play className="w-2.5 h-2.5" /> : <BookOpen className="w-2.5 h-2.5" />}
-                          {l.title}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex gap-2 text-sm text-red-700">
-                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                {error}
-              </div>
-            )}
             <p className="text-xs text-slate-500">
-              Happy with the structure? Save it — you can refine content and swap video links in the Course Editor.
+              Course is live in your library. Open it in the Course Editor to review content or swap any video links.
             </p>
-          </div>
-        )}
-
-        {/* ── Step 3: done ─────────────────────────────────────────────────── */}
-        {step === 3 && (
-          <div className="space-y-4 text-center py-8">
-            <CheckCircle2 className="w-14 h-14 text-emerald-500 mx-auto" />
-            <div>
-              <p className="font-semibold text-slate-900 text-lg">Course Created!</p>
-              <p className="text-sm text-slate-500 mt-1">
-                "{skeleton?.course?.title}" is now in your Course Library.
-              </p>
-              <p className="text-xs text-slate-400 mt-2">
-                Open it in the Course Editor to review or adjust any content.
-              </p>
-            </div>
           </div>
         )}
 
         <DialogFooter className="gap-2">
           {step === 1 && !isLoading && (
-            <Button variant="outline" onClick={handleClose}>Cancel</Button>
-          )}
-          {step === 2 && (
-            <Button variant="outline" onClick={() => { setStep(1); setGeneratedCourse(null); setError(null); }}>
-              ← Edit Prompt
-            </Button>
+            <>
+              <Button variant="outline" onClick={handleClose}>Cancel</Button>
+              <Button onClick={handleGenerate} disabled={!userPrompt.trim()} className="bg-amber-600 hover:bg-amber-700">
+                <Sparkles className="w-4 h-4 mr-2" />Build Course
+              </Button>
+            </>
           )}
           {step === 3 && (
             <Button variant="outline" onClick={handleClose}>Close</Button>
-          )}
-          {step === 1 && (
-            <Button
-              onClick={handleGenerate}
-              disabled={isLoading || !userPrompt.trim()}
-              className="bg-amber-600 hover:bg-amber-700"
-            >
-              {isLoading ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Building…</>
-              ) : (
-                <><Sparkles className="w-4 h-4 mr-2" />Build Course</>
-              )}
-            </Button>
-          )}
-          {step === 2 && (
-            <Button
-              onClick={handleSave}
-              disabled={createCourseMutation.isPending}
-              className="bg-emerald-600 hover:bg-emerald-700"
-            >
-              {createCourseMutation.isPending
-                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</>
-                : '✓ Save to Library'
-              }
-            </Button>
           )}
         </DialogFooter>
       </DialogContent>
