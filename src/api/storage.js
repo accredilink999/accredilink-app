@@ -59,9 +59,15 @@ async function InvokeLLM(options) {
     add_context_from_internet, response_json_schema,
   } = options || {}
 
+  // Don't forward response_json_schema to the edge function — it's not a
+  // standard parameter and may cause unexpected behaviour. We handle JSON
+  // parsing client-side instead.
   const result = await invokeFunction('invokeLLM', {
-    prompt, messages, systemPrompt, includeAppContext,
-    add_context_from_internet, response_json_schema,
+    prompt,
+    messages,
+    systemPrompt,
+    includeAppContext,
+    add_context_from_internet,
   })
 
   // If the edge function already returned a parsed object (not a reply wrapper), use it directly
@@ -76,20 +82,40 @@ async function InvokeLLM(options) {
     if (!reply || !reply.trim()) {
       throw new Error('AI returned an empty response — please try again.')
     }
+
     // 1. Direct parse
     try { return JSON.parse(reply.trim()) } catch {}
+
     // 2. Strip markdown code fences (```json ... ```)
-    const fenceMatch = reply.match(/```(?:json)?\s*([\s\S]*?)```/)
+    const fenceMatch = reply.match(/```(?:json)?\s*([\s\S]*?)```/s)
     if (fenceMatch) {
       try { return JSON.parse(fenceMatch[1].trim()) } catch {}
     }
-    // 3. Extract outermost JSON object
-    const start = reply.indexOf('{')
-    const end   = reply.lastIndexOf('}')
-    if (start !== -1 && end > start) {
-      try { return JSON.parse(reply.slice(start, end + 1)) } catch {}
+
+    // 3. Walk brackets to find the first complete, balanced JSON object
+    const firstBrace = reply.indexOf('{')
+    if (firstBrace !== -1) {
+      let depth = 0
+      let inString = false
+      let escape = false
+      for (let i = firstBrace; i < reply.length; i++) {
+        const ch = reply[i]
+        if (escape) { escape = false; continue }
+        if (ch === '\\' && inString) { escape = true; continue }
+        if (ch === '"') { inString = !inString; continue }
+        if (inString) continue
+        if (ch === '{') depth++
+        else if (ch === '}') {
+          depth--
+          if (depth === 0) {
+            try { return JSON.parse(reply.slice(firstBrace, i + 1)) } catch {}
+            break
+          }
+        }
+      }
     }
-    console.error('[InvokeLLM] Could not parse JSON from reply:', reply.substring(0, 500))
+
+    console.error('[InvokeLLM] Could not parse JSON. Raw reply (first 800):', reply.substring(0, 800))
     throw new Error('AI returned an unreadable response — please try again.')
   }
 

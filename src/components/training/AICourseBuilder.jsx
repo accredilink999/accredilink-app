@@ -16,39 +16,17 @@ const EXAMPLE_PROMPTS = [
 ];
 
 const JSON_SCHEMA = `{
-  "course": {
-    "title": "string",
-    "description": "string",
-    "category": "mandatory|specialist|refresher|induction|compliance",
-    "difficulty_level": "beginner|intermediate|advanced",
-    "duration_minutes": 60,
-    "passing_score": 70
-  },
+  "course": { "title": "string", "description": "string", "category": "mandatory|specialist|refresher|induction|compliance", "difficulty_level": "beginner|intermediate|advanced", "duration_minutes": 60, "passing_score": 70 },
   "modules": [
-    {
-      "title": "string",
-      "description": "string",
-      "order_index": 0,
+    { "title": "string", "description": "string", "order_index": 0,
       "lessons": [
-        {
-          "title": "string",
-          "description": "string",
-          "content": "150-300 words of plain text content",
-          "content_type": "text|video",
-          "video_url": "https://www.youtube.com/watch?v=VIDEO_ID or null",
-          "order_index": 0
-        }
+        { "title": "string", "description": "string", "content": "80-120 words", "content_type": "text|video", "video_url": "https://www.youtube.com/watch?v=ID_or_null", "order_index": 0 }
       ]
     }
   ],
   "assessment": {
-    "title": "string",
-    "description": "string",
-    "assessment_type": "multiple_choice",
-    "passing_score": 70,
-    "questions": [
-      { "question": "string", "options": ["A text", "B text", "C text", "D text"], "correct_answer": "A text" }
-    ]
+    "title": "string", "description": "string", "assessment_type": "multiple_choice", "passing_score": 70,
+    "questions": [ { "question": "string", "options": ["A text","B text","C text","D text"], "correct_answer": "A text" } ]
   }
 }`;
 
@@ -116,39 +94,30 @@ export default function AICourseBuilder({ isOpen, onClose, onSuccess }) {
     setLoading(true);
     setError(null);
 
-    const prompt = `You are an expert UK care sector training designer.
-
-The user has requested: "${userPrompt.trim()}"
+    const prompt = `The user has requested: "${userPrompt.trim()}"
 
 Create a complete professional training course for UK care settings based on this request.
 Infer a suitable title, category, difficulty level, and duration from the context.
 
 COURSE STRUCTURE:
-- 5-8 modules covering all relevant topics
-- 2-4 lessons per module, each with 150-300 words of clear practical content
-- 10 multiple-choice assessment questions (4 options each; correct_answer must be the exact text of the correct option)
+- 4-6 modules covering all relevant topics
+- 2-3 lessons per module, each with 80-120 words of clear practical content
+- 8 multiple-choice assessment questions (4 options each; correct_answer must be the exact text of the correct option, not a letter)
 
-VIDEO REQUIREMENTS (important):
-- Scatter YouTube videos throughout — roughly 1 in every 3 lessons
-- Use real YouTube video IDs from official UK care channels: Skills for Care, NHS England, CQC, SCIE, Health Education England
-- For video lessons set content_type to "video" and provide the full YouTube URL
-- For text lessons set content_type to "text" and set video_url to null
+VIDEO REQUIREMENTS:
+- Add a YouTube video in roughly 1 in every 3 lessons — scatter throughout
+- Official UK care channels: Skills for Care, NHS England, CQC, SCIE, Health Education England
+- For video lessons: content_type "video", provide the YouTube URL
+- For text lessons: content_type "text", video_url null
 
-IMPORTANT: Respond with ONLY valid JSON, no markdown, no explanation. Use this exact structure:
+Respond with ONLY the JSON object below — no prose, no markdown, no explanation:
 ${JSON_SCHEMA}`;
 
     try {
       const result = await base44.integrations.Core.InvokeLLM({
         prompt,
-        add_context_from_internet: true,
-        response_json_schema: {
-          type: 'object',
-          properties: {
-            course:     { type: 'object', additionalProperties: true },
-            modules:    { type: 'array',  items: { type: 'object', additionalProperties: true } },
-            assessment: { type: 'object', additionalProperties: true },
-          },
-        },
+        systemPrompt: 'You are a JSON API for generating training courses. Output only raw valid JSON. Never include prose, explanation, or markdown formatting of any kind.',
+        response_json_schema: { type: 'object' },
       });
 
       if (!result?.course || !result?.modules) {
