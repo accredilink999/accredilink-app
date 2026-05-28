@@ -15,9 +15,7 @@ const EXAMPLE_PROMPTS = [
   'Build a fire safety and evacuation training for residential care',
 ];
 
-// Deliberately no "content" field — keeps the response small and reliable.
-// Lesson body text is added later via the Course Editor.
-const JSON_SCHEMA = `{"course":{"title":"string","description":"string","category":"mandatory|specialist|refresher|induction|compliance","difficulty_level":"beginner|intermediate|advanced","duration_minutes":60,"passing_score":70},"modules":[{"title":"string","description":"one sentence","order_index":0,"lessons":[{"title":"string","description":"one sentence","content_type":"text|video","video_url":"https://www.youtube.com/watch?v=ID or null","order_index":0}]}],"assessment":{"title":"string","passing_score":70,"questions":[{"question":"string","options":["option A","option B","option C","option D"],"correct_answer":"option A"}]}}`;
+const JSON_SCHEMA = `{"course":{"title":"string","description":"string","category":"mandatory|specialist|refresher|induction|compliance","difficulty_level":"beginner|intermediate|advanced","duration_minutes":60,"passing_score":70},"modules":[{"title":"string","description":"one sentence","order_index":0,"lessons":[{"title":"string","description":"one sentence","content":"2-4 sentences of plain text training content for this lesson","content_type":"text","order_index":0}]}],"assessment":{"title":"string","passing_score":70,"questions":[{"question":"string","options":["option A","option B","option C","option D"],"correct_answer":"option A"}]}}`;
 
 export default function AICourseBuilder({ isOpen, onClose, onSuccess }) {
   const queryClient = useQueryClient();
@@ -80,9 +78,9 @@ export default function AICourseBuilder({ isOpen, onClose, onSuccess }) {
 
 Rules:
 - 4-5 modules, 2-3 lessons each
-- No lesson body text — titles and one-sentence descriptions only
+- Each lesson must have a content field: 2-4 sentences of plain text training content relevant to UK care staff
+- No video_url field — omit it entirely
 - 6 assessment questions, 4 options each, correct_answer is the exact option text
-- Add a YouTube video_url (official UK care channel) in roughly 1 in 3 lessons; null for the rest
 - Infer category, difficulty, duration from the request
 
 Output ONLY this JSON (no text before or after):
