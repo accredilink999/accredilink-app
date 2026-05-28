@@ -57,6 +57,7 @@ async function InvokeLLM(options) {
   const {
     prompt, messages, systemPrompt, includeAppContext,
     add_context_from_internet, response_json_schema,
+    temperature, max_tokens,
   } = options || {}
 
   // Don't forward response_json_schema to the edge function — it's not a
@@ -68,6 +69,8 @@ async function InvokeLLM(options) {
     systemPrompt,
     includeAppContext,
     add_context_from_internet,
+    ...(temperature !== undefined && { temperature }),
+    ...(max_tokens !== undefined && { max_tokens }),
   })
 
   // If the edge function already returned a parsed object (not a reply wrapper), use it directly

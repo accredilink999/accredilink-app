@@ -168,7 +168,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json()
-    const { prompt, messages, systemPrompt, includeAppContext } = body
+    const { prompt, messages, systemPrompt, includeAppContext, max_tokens, temperature } = body
 
     // Optionally fetch live app data
     let enrichedSystemPrompt = systemPrompt || ''
@@ -205,8 +205,8 @@ Deno.serve(async (req) => {
         messages: chatMessages
           .filter((m) => m.role !== 'system')
           .map((m) => ({ role: m.role, content: m.content })),
-        temperature: 0.7,
-        max_tokens: 2048,
+        temperature: temperature ?? 0.7,
+        max_tokens: max_tokens ?? 4096,
       }),
     })
 

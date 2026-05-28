@@ -93,6 +93,8 @@ ${JSON_SCHEMA}`;
         prompt,
         systemPrompt: 'You are a JSON API for generating training courses. Output only raw valid JSON. Never include prose, explanation, or markdown formatting of any kind.',
         response_json_schema: { type: 'object' },
+        temperature: 0,
+        max_tokens: 4096,
       });
 
       if (!result?.course || !result?.modules) {
