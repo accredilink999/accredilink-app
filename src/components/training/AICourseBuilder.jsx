@@ -15,44 +15,24 @@ const EXAMPLE_PROMPTS = [
   'Build a fire safety and evacuation training for residential care',
 ];
 
-const JSON_SCHEMA = `{
-  "course": {
-    "title": "string",
-    "description": "2-3 sentence course overview",
-    "category": "mandatory|specialist|refresher|induction|compliance",
-    "difficulty_level": "beginner|intermediate|advanced",
-    "duration_minutes": 60,
-    "passing_score": 70
-  },
-  "modules": [
-    {
-      "title": "string",
-      "description": "one sentence",
-      "order_index": 0,
-      "lessons": [
-        {
-          "title": "string",
-          "description": "one sentence summary",
-          "content": "FULL LESSON BODY in markdown. Must include: opening paragraph (3-5 sentences), ## Key Learning Points section with 5-6 bullet points of substantive content, ## UK Law & Guidance section referencing relevant UK legislation or HSE/CQC guidance, ## In Practice section with 3-4 concrete steps care staff should follow. Minimum 300 words.",
-          "content_type": "text",
-          "video_url": "https://www.youtube.com/results?search_query=RELEVANT+SEARCH+TERMS+uk+care+training (use for 1 in 3 lessons, null for others)",
-          "order_index": 0
-        }
-      ]
-    }
-  ],
-  "assessment": {
-    "title": "string",
-    "passing_score": 70,
-    "questions": [
-      {
-        "question": "string",
-        "options": ["option A", "option B", "option C", "option D"],
-        "correct_answer": "option A"
-      }
-    ]
+// Structured arrays avoid multiline string JSON-escaping issues.
+// buildLessonContent() converts to markdown before saving to DB.
+const JSON_SCHEMA = `{"course":{"title":"string","description":"string","category":"mandatory|specialist|refresher|induction|compliance","difficulty_level":"beginner|intermediate|advanced","duration_minutes":60,"passing_score":70},"modules":[{"title":"string","description":"string","order_index":0,"lessons":[{"title":"string","description":"string","overview":"2-3 sentence plain-text paragraph introducing the lesson topic","key_points":["substantive point 1","substantive point 2","substantive point 3","substantive point 4","substantive point 5"],"uk_guidance":"1-2 sentences citing specific UK legislation, HSE guidance, CQC standard, or Skills for Care guidance relevant to this lesson","in_practice":["concrete step 1 care staff should take","concrete step 2","concrete step 3","concrete step 4"],"content_type":"text","video_url":"https://www.youtube.com/results?search_query=SPECIFIC+TERMS+uk+care or null","order_index":0}]}],"assessment":{"title":"string","passing_score":70,"questions":[{"question":"string","options":["A","B","C","D"],"correct_answer":"A"}]}}`;
+
+function buildLessonContent(lesson) {
+  const parts = [];
+  if (lesson.overview) parts.push(lesson.overview);
+  if (lesson.key_points?.length) {
+    parts.push('## Key Learning Points\n' + lesson.key_points.map(p => `- ${p}`).join('\n'));
   }
-}`;
+  if (lesson.uk_guidance) {
+    parts.push('## UK Law & Guidance\n' + lesson.uk_guidance);
+  }
+  if (lesson.in_practice?.length) {
+    parts.push('## In Practice\n' + lesson.in_practice.map((s, i) => `${i + 1}. ${s}`).join('\n'));
+  }
+  return parts.join('\n\n');
+}
 
 export default function AICourseBuilder({ isOpen, onClose, onSuccess }) {
   const queryClient = useQueryClient();
@@ -115,13 +95,13 @@ export default function AICourseBuilder({ isOpen, onClose, onSuccess }) {
 
 Rules:
 - 4 modules, 3 lessons each (12 lessons total)
-- Each lesson MUST have a full "content" field: opening paragraph, ## Key Learning Points (5-6 bullets of real detail), ## UK Law & Guidance (cite actual legislation or HSE/CQC/Skills for Care guidance), ## In Practice (3-4 concrete steps). Minimum 300 words per lesson.
-- video_url: use a YouTube search URL (https://www.youtube.com/results?search_query=...) for 1 in every 3 lessons — search terms must be specific and relevant. Set to null for the other 2 in 3.
-- 8 assessment questions covering key content from across the course, 4 options each
-- correct_answer must be the exact text of the correct option
-- Infer category, difficulty, duration from the request
+- Every lesson must have: overview (2-3 sentences), key_points (5 substantive bullet strings), uk_guidance (cite real UK law/HSE/CQC/Skills for Care), in_practice (4 concrete action strings)
+- video_url: for every 3rd lesson use https://www.youtube.com/results?search_query=SPECIFIC+TERMS+uk+care (replace spaces with +), null for others
+- 8 assessment questions, correct_answer must exactly match one of the 4 options
+- All string values must be single-line (no newlines inside strings)
+- Infer category, difficulty_level, duration_minutes from the request
 
-Output ONLY valid JSON matching this schema exactly (no text before or after, escape newlines as \\n inside string values):
+Output ONLY raw JSON. No markdown, no explanation, no code fences:
 ${JSON_SCHEMA}`;
 
     try {
@@ -168,8 +148,8 @@ ${JSON_SCHEMA}`;
         lessons_data: m.lessons?.map((l, lidx) => ({
           title:        l.title,
           description:  l.description,
-          content:      l.content,
-          content_type: l.content_type || 'text',
+          content:      buildLessonContent(l),
+          content_type: 'text',
           video_url:    l.video_url || null,
           order_index:  lidx,
         })) || [],
