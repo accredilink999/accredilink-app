@@ -49,13 +49,51 @@ export async function createSignedUrl({ path, expiresIn = 3600 }) {
 
 /**
  * Calls the invokeLLM edge function.
- * Mirrors: base44.integrations.Core.InvokeLLM({ prompt, messages, systemPrompt })
- * Returns the plain-text reply string.
+ * Mirrors: base44.integrations.Core.InvokeLLM({ prompt, messages, systemPrompt, response_json_schema })
+ * When response_json_schema is provided, parses the reply as JSON and returns the object.
+ * Otherwise returns the plain-text reply string.
  */
 async function InvokeLLM(options) {
-  const { prompt, messages, systemPrompt, includeAppContext } = options || {}
-  const result = await invokeFunction('invokeLLM', { prompt, messages, systemPrompt, includeAppContext })
-  return result?.reply ?? ''
+  const {
+    prompt, messages, systemPrompt, includeAppContext,
+    add_context_from_internet, response_json_schema,
+  } = options || {}
+
+  const result = await invokeFunction('invokeLLM', {
+    prompt, messages, systemPrompt, includeAppContext,
+    add_context_from_internet, response_json_schema,
+  })
+
+  // If the edge function already returned a parsed object (not a reply wrapper), use it directly
+  if (response_json_schema && result && typeof result === 'object' && !('reply' in result)) {
+    return result
+  }
+
+  const reply = result?.reply ?? (typeof result === 'string' ? result : '')
+
+  // When a JSON schema was requested, parse the LLM's text reply as JSON
+  if (response_json_schema) {
+    if (!reply || !reply.trim()) {
+      throw new Error('AI returned an empty response — please try again.')
+    }
+    // 1. Direct parse
+    try { return JSON.parse(reply.trim()) } catch {}
+    // 2. Strip markdown code fences (```json ... ```)
+    const fenceMatch = reply.match(/```(?:json)?\s*([\s\S]*?)```/)
+    if (fenceMatch) {
+      try { return JSON.parse(fenceMatch[1].trim()) } catch {}
+    }
+    // 3. Extract outermost JSON object
+    const start = reply.indexOf('{')
+    const end   = reply.lastIndexOf('}')
+    if (start !== -1 && end > start) {
+      try { return JSON.parse(reply.slice(start, end + 1)) } catch {}
+    }
+    console.error('[InvokeLLM] Could not parse JSON from reply:', reply.substring(0, 500))
+    throw new Error('AI returned an unreadable response — please try again.')
+  }
+
+  return reply
 }
 
 export const Core = { UploadFile, InvokeLLM }

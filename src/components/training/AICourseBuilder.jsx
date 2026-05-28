@@ -30,35 +30,39 @@ export default function AICourseBuilder({ isOpen, onClose, onSuccess, editCourse
 
   const createCourseMutation = useMutation({
     mutationFn: async (courseData) => {
+      // Strip helper fields — they don't exist as columns in the courses table
+      const { modules_data, assessment_data, ...courseFields } = courseData;
+
       // Create Course
-      const course = await base44.entities.Course.create(courseData);
-      
-      // Create Modules
-      if (courseData.modules_data) {
-        for (const moduleData of courseData.modules_data) {
+      const course = await base44.entities.Course.create(courseFields);
+
+      // Create Modules + Lessons
+      if (modules_data) {
+        for (const moduleData of modules_data) {
+          // Strip lessons_data — not a column in the modules table
+          const { lessons_data, ...moduleFields } = moduleData;
           const module = await base44.entities.Module.create({
             course_id: course.id,
-            ...moduleData
+            ...moduleFields,
           });
 
-          // Create Lessons
-          if (moduleData.lessons_data) {
-            for (const lessonData of moduleData.lessons_data) {
+          if (lessons_data) {
+            for (const lessonData of lessons_data) {
               await base44.entities.Lesson.create({
                 course_id: course.id,
                 module_id: module.id,
-                ...lessonData
+                ...lessonData,
               });
             }
           }
         }
       }
 
-      // Create Assessment if needed
-      if (courseData.assessment_data) {
+      // Create Assessment
+      if (assessment_data) {
         await base44.entities.Assessment.create({
           course_id: course.id,
-          ...courseData.assessment_data
+          ...assessment_data,
         });
       }
 
@@ -71,7 +75,11 @@ export default function AICourseBuilder({ isOpen, onClose, onSuccess, editCourse
       setTimeout(() => {
         onSuccess?.(course);
       }, 2000);
-    }
+    },
+    onError: (err) => {
+      setError('Failed to save course: ' + (err.message || 'Unknown error'));
+      setStep(1);
+    },
   });
 
   const handleGenerateWithAI = async () => {
@@ -86,143 +94,73 @@ export default function AICourseBuilder({ isOpen, onClose, onSuccess, editCourse
     try {
       const hasContentToParse = questions.courseContent && questions.courseContent.trim().length > 100;
       
-      const prompt = hasContentToParse 
-        ? `Analyze and structure the following course content into a comprehensive training course:
-
-Title: ${questions.title}
-Description: ${questions.description}
-Category: ${questions.category}
-Difficulty Level: ${questions.difficulty}
-
-COURSE CONTENT TO ORGANIZE:
-${questions.courseContent}
-
-CRITICAL: Extensively search the internet for additional content to enrich this course:
-- Research latest industry standards, best practices, and regulations
-- Find authoritative articles, guides, and case studies
-- Locate relevant YouTube training videos from OFFICIAL UK care sector channels only:
-  * Skills for Care, NHS England, CQC, Social Care Institute for Excellence (SCIE)
-  * Health Education England, Royal College of Nursing, Care Forum Wales
-  * Other verified official/educational channels
-- Include real-world examples and scenarios from trusted sources
-- Add expert tips and professional insights from healthcare/care industry
-- Include downloadable resources and reference materials
-
-Your task:
-- Parse the content and organize it into 8-15 logical modules
-- Create 3-5 lessons per module, enriched with internet research
-- Each lesson should have substantial content (300-500 words minimum)
-- Include YouTube video URLs from official/reputable channels where relevant (these will open externally, not embed)
-- Always include the channel name in the lesson description for attribution
-- Generate 15-20 practical assessment questions based on real scenarios
-- Add references to authoritative sources and materials
-
-Return ONLY valid JSON (no markdown, no extra text) with this structure:
-{
-  "course": {
-    "title": "...",
-    "description": "...",
-    "category": "...",
-    "difficulty_level": "...",
-    "duration_minutes": ...,
-    "passing_score": 70
-  },
+      const jsonSchema = `{
+  "course": { "title": "string", "description": "string", "category": "string", "difficulty_level": "string", "duration_minutes": 60, "passing_score": 70 },
   "modules": [
     {
-      "title": "...",
-      "description": "...",
+      "title": "string",
+      "description": "string",
+      "order_index": 0,
       "lessons": [
         {
-          "title": "...",
-          "description": "...",
-          "content": "...",
-          "content_type": "text|video|document",
-          "video_url": "https://www.youtube.com/watch?v=VIDEO_ID" (if video - use full YouTube URLs),
-          "document_url": "https://..." (if document)
+          "title": "string",
+          "description": "string",
+          "content": "string (150-300 words of plain text)",
+          "content_type": "text",
+          "video_url": "https://www.youtube.com/watch?v=ID_or_null",
+          "order_index": 0
         }
       ]
     }
   ],
   "assessment": {
-    "title": "Course Assessment",
-    "description": "...",
-    "assessment_type": "...",
+    "title": "string",
+    "description": "string",
+    "assessment_type": "multiple_choice",
     "passing_score": 70,
     "questions": [
-      {
-        "question": "...",
-        "options": ["..."],
-        "correct_answer": "..."
-      }
-    ]
-  }
-}`
-        : `Create a comprehensive training course based on these specifications:
-
-Title: ${questions.title}
-Description: ${questions.description}
-Category: ${questions.category}
-Difficulty Level: ${questions.difficulty}
-
-CRITICAL: Extensively research the internet to create rich, professional training content:
-- Search for the latest industry standards, regulations, and best practices
-- Find authoritative training materials, guides, and resources
-- Locate relevant YouTube training videos from OFFICIAL UK care sector channels only:
-  * Skills for Care, NHS England, CQC, Social Care Institute for Excellence (SCIE)
-  * Health Education England, Royal College of Nursing, Care Forum Wales
-  * Other verified official/educational channels
-- Research real-world case studies and practical examples
-- Include expert insights from healthcare/care professionals
-- Find downloadable resources, templates, and reference materials
-
-Generate a complete course with:
-- 8-15 modules covering all key topics comprehensively
-- 3-5 lessons per module with detailed, research-backed content (300-500 words each)
-- Video resources from official/reputable channels (these will open externally, not embed) — include channel name for attribution
-- Mix of text, video, and document resources
-- 15-20 practical assessment questions based on real scenarios
-- References to authoritative sources throughout
-
-Return ONLY valid JSON (no markdown, no extra text) with this structure:
-{
-  "course": {
-    "title": "...",
-    "description": "...",
-    "category": "...",
-    "difficulty_level": "...",
-    "duration_minutes": ...,
-    "passing_score": 70
-  },
-  "modules": [
-    {
-      "title": "...",
-      "description": "...",
-      "lessons": [
-        {
-          "title": "...",
-          "description": "...",
-          "content": "...",
-          "content_type": "text|video|document",
-          "video_url": "https://www.youtube.com/watch?v=VIDEO_ID" (if video - use full YouTube URLs),
-          "document_url": "https://..." (if document)
-        }
-      ]
-    }
-  ],
-  "assessment": {
-    "title": "Course Assessment",
-    "description": "...",
-    "assessment_type": "...",
-    "passing_score": 70,
-    "questions": [
-      {
-        "question": "...",
-        "options": ["..."],
-        "correct_answer": "..."
-      }
+      { "question": "string", "options": ["A", "B", "C", "D"], "correct_answer": "A" }
     ]
   }
 }`;
+
+      const prompt = hasContentToParse
+        ? `You are an expert UK care sector training designer. Structure the following content into a professional training course.
+
+Title: ${questions.title}
+Description: ${questions.description}
+Category: ${questions.category}
+Difficulty: ${questions.difficulty}
+
+CONTENT TO STRUCTURE:
+${questions.courseContent.substring(0, 3000)}
+
+Requirements:
+- Organise into 5-8 logical modules with 2-4 lessons each
+- Each lesson: 150-300 words of clear, practical content
+- Where relevant add a YouTube video URL from Skills for Care, NHS England, CQC or SCIE
+- Generate 10 multiple-choice assessment questions (4 options each, mark the correct answer)
+- content_type must be exactly "text", "video", or "document"
+
+IMPORTANT: Respond with ONLY valid JSON, no markdown, no explanation. Use this exact structure:
+${jsonSchema}`
+        : `You are an expert UK care sector training designer. Create a professional training course.
+
+Title: ${questions.title}
+Description: ${questions.description}
+Category: ${questions.category}
+Difficulty: ${questions.difficulty}${questions.duration ? `\nTarget duration: ${questions.duration} minutes` : ''}
+
+Requirements:
+- Create 5-8 modules covering all key topics, with 2-4 lessons per module
+- Each lesson: 150-300 words of clear, practical content relevant to UK care settings
+- Where genuinely relevant, include a YouTube video URL from official UK channels (Skills for Care, NHS England, CQC, SCIE)
+- Generate 10 multiple-choice assessment questions (4 options each, mark the correct answer)
+- content_type must be exactly "text", "video", or "document"
+- video_url is only required when content_type is "video"; omit or set null otherwise
+
+IMPORTANT: Respond with ONLY valid JSON, no markdown, no explanation. Use this exact structure:
+${jsonSchema}`;
 
       const result = await base44.integrations.Core.InvokeLLM({
         prompt,
@@ -464,7 +402,7 @@ Return ONLY valid JSON (no markdown, no extra text) with this structure:
             {step === 3 ? 'Close' : 'Cancel'}
           </Button>
           {step === 1 && (
-            <Button 
+            <Button
               onClick={handleGenerateWithAI}
               disabled={loading || !questions.title}
               className="bg-amber-600 hover:bg-amber-700"
@@ -472,7 +410,7 @@ Return ONLY valid JSON (no markdown, no extra text) with this structure:
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Generating...
+                  Generating… (30–60s)
                 </>
               ) : (
                 <>
