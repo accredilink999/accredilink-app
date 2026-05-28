@@ -18,8 +18,33 @@ const EXAMPLE_PROMPTS = [
 // Phase 1 — skeleton only. Tiny JSON = never fails to parse.
 const SKELETON_SCHEMA = `{"course":{"title":"string","description":"string","category":"mandatory|specialist|refresher|induction|compliance","difficulty_level":"beginner|intermediate|advanced","duration_minutes":60,"passing_score":70},"modules":[{"title":"string","description":"one sentence","order_index":0,"lessons":[{"title":"string","description":"one sentence","order_index":0}]}]}`;
 
-// Phase 2 — content. All prose fields are arrays of SHORT strings — no newlines possible → JSON never breaks.
-const CONTENT_SCHEMA = `{"lessons":[{"title":"exact lesson title from skeleton","overview":["intro sentence 1","sentence 2","sentence 3","sentence 4"],"key_points":["full informative sentence 1","sentence 2","sentence 3","sentence 4","sentence 5","sentence 6","sentence 7","sentence 8"],"uk_guidance":["sentence citing specific UK legislation or HSE/CQC/Skills for Care guidance","second supporting sentence"],"in_practice":["concrete action step 1 for care staff","step 2","step 3","step 4","step 5","step 6"]}]}`;
+// Phase 2 uses plain TEXT — no JSON at all, so no parse failures ever.
+// Format per lesson (repeated for all 12):
+// ##LESSON## Title
+// OVERVIEW: sentence 1. sentence 2. sentence 3.
+// POINTS: point1 | point2 | point3 | point4 | point5 | point6 | point7 | point8
+// GUIDANCE: UK law sentence 1. Sentence 2.
+// STEPS: step1 | step2 | step3 | step4 | step5 | step6
+// ##END##
+function parseContentText(text) {
+  const lessons = [];
+  const blocks = text.split('##LESSON##').slice(1);
+  for (const block of blocks) {
+    const endIdx = block.indexOf('##END##');
+    const content = (endIdx >= 0 ? block.slice(0, endIdx) : block).trim();
+    const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+    if (!lines.length) continue;
+    const lesson = { title: lines[0], overview: [], key_points: [], uk_guidance: [], in_practice: [] };
+    for (const line of lines.slice(1)) {
+      if (line.startsWith('OVERVIEW: '))  lesson.overview     = [line.slice(10).trim()];
+      else if (line.startsWith('POINTS: '))   lesson.key_points  = line.slice(8).split('|').map(s => s.trim()).filter(Boolean);
+      else if (line.startsWith('GUIDANCE: ')) lesson.uk_guidance = [line.slice(10).trim()];
+      else if (line.startsWith('STEPS: '))    lesson.in_practice = line.slice(7).split('|').map(s => s.trim()).filter(Boolean);
+    }
+    lessons.push(lesson);
+  }
+  return lessons;
+}
 
 // Phase 3 — enhance. Only small safe fields: video URLs, richer assessment, and credits.
 // No prose content in JSON strings → always reliable.
@@ -44,10 +69,10 @@ function buildLessonContent(lesson) {
   return parts.join('\n\n');
 }
 
-async function saveCourse({ skeleton, contentData, enhanceData }) {
+async function saveCourse({ skeleton, contentLessons, enhanceData }) {
   // Index content by lesson title (lowercased) for fast lookup
   const contentByTitle = {};
-  (contentData?.lessons || []).forEach(l => {
+  (contentLessons || []).forEach(l => {
     contentByTitle[l.title?.toLowerCase().trim()] = l;
   });
   const videoByTitle = enhanceData?.video_urls || {};
@@ -136,42 +161,49 @@ Output ONLY raw JSON: ${SKELETON_SCHEMA}`,
       return;
     }
 
-    // ── Phase 2: lesson content ────────────────────────────────────────────
+    // ── Phase 2: lesson content (plain text — no JSON, no parse failures) ──
     setPhase('content');
-    const lessonList = skeleton.modules.flatMap(m =>
-      m.lessons.map(l => `- "${l.title}" — ${l.description}`)
-    ).join('\n');
+    const allLessons = skeleton.modules.flatMap(m => m.lessons);
+    const lessonList = allLessons.map(l => `- ${l.title}`).join('\n');
 
-    let contentData;
+    let contentLessons = [];
     try {
-      contentData = await base44.integrations.Core.InvokeLLM({
-        prompt: `Generate structured training content for each lesson in this UK care staff course.
+      const rawText = await base44.integrations.Core.InvokeLLM({
+        prompt: `Write training content for each lesson in this UK care staff course.
 
 Course: ${skeleton.course.title}
 Topic: "${userPrompt.trim()}"
 
-Lessons (fill in this exact order):
+Lessons to cover:
 ${lessonList}
 
-Rules — every string must be single-line, NO newline characters inside any string:
-- overview: 4 informative sentences introducing the lesson
-- key_points: 8 full sentences with real detail and specifics (not vague phrases)
-- uk_guidance: 2 sentences citing SPECIFIC UK legislation, HSE/CQC/Skills for Care standards
-- in_practice: 6 concrete numbered action steps for care staff
+For EACH lesson output this exact block (repeat for all ${allLessons.length} lessons):
 
-Output ONLY raw JSON for all ${skeleton.modules.flatMap(m => m.lessons).length} lessons: ${CONTENT_SCHEMA}`,
-        systemPrompt: 'Output only raw valid JSON. Every string value must be single-line — no newline characters inside strings.',
-        response_json_schema: { type: 'object' },
+##LESSON## [exact lesson title]
+OVERVIEW: [3-4 sentences introducing the topic — all on ONE line]
+POINTS: [point 1] | [point 2] | [point 3] | [point 4] | [point 5] | [point 6] | [point 7] | [point 8]
+GUIDANCE: [1-2 sentences citing specific UK legislation or HSE/CQC/Skills for Care guidance — all on ONE line]
+STEPS: [step 1 for care staff] | [step 2] | [step 3] | [step 4] | [step 5] | [step 6]
+##END##
+
+Rules:
+- OVERVIEW, GUIDANCE must each be a single line (no line breaks within them)
+- POINTS and STEPS use | as separator between items
+- Points and steps should be specific and detailed, not vague
+- UK legislation references must be real (e.g. Health and Safety at Work Act 1974, Care Act 2014)
+- Output ALL ${allLessons.length} lessons in order`,
+        systemPrompt: 'You are a UK care staff training content writer. Follow the exact format specified.',
         temperature: 0,
-        max_tokens: 6000,
+        max_tokens: 8000,
       });
+      contentLessons = parseContentText(rawText || '');
     } catch (err) {
       setError('Step 2 failed — could not generate lesson content. Please try again.');
       setPhase(null);
       return;
     }
-    if (!contentData?.lessons?.length) {
-      setError('Step 2 returned incomplete content — please try again.');
+    if (!contentLessons.length) {
+      setError('Step 2 returned no content — please try again.');
       setPhase(null);
       return;
     }
@@ -207,7 +239,7 @@ Output ONLY raw JSON: ${ENHANCE_SCHEMA}`,
     setPhase('saving');
     let savedCourse;
     try {
-      savedCourse = await saveCourse({ skeleton, contentData, enhanceData });
+      savedCourse = await saveCourse({ skeleton, contentLessons, enhanceData });
     } catch (err) {
       setError('Step 4 failed — could not save to library: ' + (err.message || 'Unknown error'));
       setPhase(null);
@@ -215,7 +247,7 @@ Output ONLY raw JSON: ${ENHANCE_SCHEMA}`,
     }
 
     queryClient.invalidateQueries({ queryKey: ['courses'] });
-    setResult({ skeleton, contentData, enhanceData, savedCourse });
+    setResult({ skeleton, contentLessons, enhanceData, savedCourse });
     setPhase(null);
     setStep(2);
     setTimeout(() => onSuccess?.(savedCourse), 1500);
