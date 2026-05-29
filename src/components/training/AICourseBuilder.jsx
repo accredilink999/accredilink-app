@@ -23,23 +23,47 @@ const SKELETON_SCHEMA = `{"course":{"title":"string","description":"string","cat
 async function generateLessonContent(lesson, mod, courseTitle, topic) {
   try {
     const content = await base44.integrations.Core.InvokeLLM({
-      prompt: `Write full training course material for this lesson. UK community care staff audience.
+      prompt: `Write professional eLearning lesson content for UK community care staff.
 
 Course: ${courseTitle}
 Module: ${mod.title}
 Lesson: ${lesson.title} — ${lesson.description}
 Topic: "${topic}"
 
-Write 400-500 words of rich, detailed lesson content. You MUST include:
-- An opening paragraph (3-4 sentences) explaining what this lesson covers and why it matters to care staff
-- ## Key Learning Points — 6-8 bullet points with **bold** key terms and real detail
-- ## [A topic-specific section heading] — detailed explanation with UK-relevant examples, scenarios, or comparisons. Use tables if helpful.
-- ## UK Law & Guidance — cite specific UK legislation or regulatory guidance (e.g. Health and Safety at Work Act 1974, Care Act 2014, COSHH Regulations 2002, HSE guidance) and explain what it requires of care workers
-- ## In Practice — 5-6 numbered steps written directly to the care worker ("You should...", "Always...")
-- > A blockquote with the single most important takeaway or rule to remember
+Use this exact structure (all sections required):
 
-Write in second person. Use **bold** for key terms. Output ONLY the markdown content — no title line, no commentary.`,
-      systemPrompt: 'You are a professional UK care staff training writer. Write detailed, accurate training material.',
+## Learning Outcomes
+3-4 bullet points starting with "By the end of this lesson, you will be able to:" — use action verbs (identify, understand, apply, explain, carry out)
+
+## Overview
+2-3 sentences introducing the topic and why it matters to community care workers.
+
+## [Main Content Section — use a relevant heading e.g. "What is Manual Handling?" or "The 5-Step Risk Assessment Process"]
+Detailed explanation with **bold** key terms. Use a table if comparing items or showing steps. Include real community care examples (service users' homes, lone working, etc).
+
+## [Second Content Section — another relevant heading]
+Further detail, expanding on a key aspect. Use bullet points with **bold** lead-ins and explanations. Include a real-world scenario — "Imagine you arrive at Mrs Smith's home and notice..."
+
+## UK Law & Guidance
+> Blockquote with the key legislation or regulation name and what it requires.
+
+1-2 sentences explaining what this means in practice for care workers. Cite specific Acts or Regulations (e.g. Health and Safety at Work Act 1974, COSHH Regulations 2002, Manual Handling Operations Regulations 1992, Care Act 2014).
+
+## In Practice
+5-6 numbered steps written directly to the care worker. Start each with a verb ("Check...", "Report...", "Always...", "Never...").
+
+## Knowledge Check
+**Question:** [A clear multiple-choice question testing the key point of this lesson]
+
+- A) [Option]
+- B) [Option]
+- C) [Option]
+- D) [Option]
+
+✅ **Correct answer: [Letter]** — [One sentence explaining why this is correct and reinforcing the key message.]
+
+Output ONLY the markdown content — no title line at the top, no commentary.`,
+      systemPrompt: 'You are a professional UK eLearning content writer specialising in care staff training. Write structured, accurate, engaging training material.',
       temperature: 0.3,
       max_tokens: 2000,
     });
