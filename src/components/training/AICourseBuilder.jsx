@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
+import { getCurrentOrgId } from '@/lib/orgContext';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -182,15 +183,18 @@ export default function AICourseBuilder({ isOpen, onClose, onSuccess }) {
   const [phase, setPhase] = useState(null);  // null | 'structure' | 'content' | 'enhance' | 'saving'
 
   const { data: matrixItems = [] } = useQuery({
-    queryKey: ['trainingMatrixItemsDirect'],
+    queryKey: ['staffMatrixTrainingColumns', isOpen],
     queryFn: async () => {
-      // Query Supabase directly — bypasses entity org-filter which may exclude
-      // items that were created before org isolation was enforced
-      const { data, error } = await supabase
-        .from('training_matrix_items')
+      // The staff training matrix uses staff_matrix_columns (matrix_type='training')
+      // not training_matrix_items — fetch all training columns visible to this user
+      const orgId = getCurrentOrgId();
+      let q = supabase
+        .from('staff_matrix_columns')
         .select('*')
-        .neq('is_active', false)
-        .order('created_at', { ascending: false });
+        .eq('matrix_type', 'training')
+        .order('sort_order', { ascending: true });
+      if (orgId) q = q.eq('organization_id', orgId);
+      const { data, error } = await q;
       if (error) return [];
       return data || [];
     },
