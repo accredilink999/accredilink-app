@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Sparkles, CheckCircle2, AlertCircle, Play, BookOpen, FileText } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
+import { Loader2, Sparkles, CheckCircle2, AlertCircle, Play, BookOpen, FileText, ClipboardList } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 const EXAMPLE_PROMPTS = [
   'Create a safeguarding adults course for UK care workers',
@@ -179,6 +179,12 @@ export default function AICourseBuilder({ isOpen, onClose, onSuccess }) {
   const queryClient = useQueryClient();
   const [step, setStep] = useState(1);       // 1=prompt+loading, 2=done
   const [phase, setPhase] = useState(null);  // null | 'structure' | 'content' | 'enhance' | 'saving'
+
+  const { data: matrixItems = [] } = useQuery({
+    queryKey: ['trainingMatrixItems'],
+    queryFn: () => base44.entities.TrainingMatrixItem.filter({ is_active: true }, 'title'),
+    enabled: isOpen,
+  });
   const [userPrompt, setUserPrompt] = useState('');
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
@@ -393,6 +399,28 @@ Output ONLY the list — one item per line, no numbering, no intro text.`,
                     ))}
                   </div>
                 </div>
+
+                {matrixItems.length > 0 && (
+                  <div>
+                    <p className="text-xs text-slate-500 mb-2 flex items-center gap-1">
+                      <ClipboardList className="w-3 h-3" />
+                      From your Training Matrix — click to build:
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                      {matrixItems.map(item => (
+                        <button
+                          key={item.id}
+                          onClick={() => setUserPrompt(
+                            `Create a ${item.title} course for UK community care staff${item.description ? ', covering ' + item.description : ''}${item.is_mandatory ? ' — mandatory compliance training' : ''}`
+                          )}
+                          className="text-xs px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 transition-colors"
+                        >
+                          {item.title}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </>
             ) : (
               <div className="py-4 space-y-5">
