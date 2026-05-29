@@ -35,17 +35,44 @@ function parseContentText(text) {
   return lessons;
 }
 
-// Phase 3 — enhance. Only small safe fields: video URLs, richer assessment, and credits.
-// No prose content in JSON strings → always reliable.
-const ENHANCE_SCHEMA = `{"video_urls":{"exact lesson title":"https://www.youtube.com/embed/REAL_VIDEO_ID or null"},"assessment":{"title":"string","passing_score":80,"questions":[{"question":"string","options":["option A text","option B text","option C text","option D text"],"correct_answer":"option A text"}]},"credits":["Organisation Name — what was sourced from them (one line per source)"]}`;
+// Phase 3 — assessment + credits only. Videos handled separately via YouTube API.
+const ENHANCE_SCHEMA = `{"assessment":{"title":"string","passing_score":80,"questions":[{"question":"string","options":["option A text","option B text","option C text","option D text"],"correct_answer":"option A text"}]},"credits":["Organisation Name — what was sourced from them (one line per source)"]}`;
 
-async function saveCourse({ skeleton, contentLessons, enhanceData }) {
+// Search YouTube Data API for a real, guaranteed-embeddable video.
+// Uses VITE_YOUTUBE_API_KEY (preferred) or VITE_GOOGLE_MAPS_API_KEY as fallback.
+async function searchYouTubeVideo(lessonTitle, courseTitle) {
+  const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY || import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  if (!apiKey) return null;
+  try {
+    const q = `${lessonTitle} ${courseTitle} UK care training`;
+    const params = new URLSearchParams({
+      part: 'snippet',
+      q,
+      type: 'video',
+      videoEmbeddable: 'true',
+      safeSearch: 'strict',
+      relevanceLanguage: 'en',
+      regionCode: 'GB',
+      maxResults: '5',
+      key: apiKey,
+    });
+    const res = await fetch(`https://www.googleapis.com/youtube/v3/search?${params}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const videoId = data.items?.[0]?.id?.videoId;
+    return videoId ? `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1` : null;
+  } catch {
+    return null;
+  }
+}
+
+async function saveCourse({ skeleton, contentLessons, enhanceData, videoUrls }) {
   // Index content by lesson title (lowercased) for fast lookup
   const contentByTitle = {};
   (contentLessons || []).forEach(l => {
     contentByTitle[l.title?.toLowerCase().trim()] = l;
   });
-  const videoByTitle = enhanceData?.video_urls || {};
+  const videoByTitle = videoUrls || {};
 
   const course = await base44.entities.Course.create({
     title:                    skeleton.course.title,
@@ -185,38 +212,53 @@ Repeat for all ${mod.lessons.length} lessons. Write genuine educational content 
       contentLessons = [...contentLessons, ...parsed];
     }
 
-    // ── Phase 3: enhance — videos, deep assessment, credits ────────────────
+    // ── Phase 3: YouTube video search + assessment + credits (parallel) ──────
     setPhase('enhance');
-    const lessonTitles = skeleton.modules.flatMap(m => m.lessons.map(l => `"${l.title}"`)).join(', ');
-    let enhanceData = null;
-    try {
-      enhanceData = await base44.integrations.Core.InvokeLLM({
-        prompt: `You are enhancing a UK care staff training course: "${skeleton.course.title}"
+    const allLessonsList = skeleton.modules.flatMap(m => m.lessons);
+    const lessonTitles = allLessonsList.map(l => `"${l.title}"`).join(', ');
 
-Lesson titles: ${lessonTitles}
+    // Search YouTube for every 3rd lesson (indices 2, 5, 8, 11) in parallel
+    const videoSearchPromises = allLessonsList.map((lesson, i) =>
+      (i + 1) % 3 === 0
+        ? searchYouTubeVideo(lesson.title, skeleton.course.title)
+        : Promise.resolve(null)
+    );
 
-Task 1 — VIDEO URLS: For every 3rd lesson (lessons 3, 6, 9, 12) provide a REAL YouTube embed URL (https://www.youtube.com/embed/VIDEO_ID) from a reputable UK training channel. Use videos you know exist from: Skills for Care, NHS England, HSE UK, SCIE, St John Ambulance, British Red Cross, Age UK. Set null for other lessons.
+    // AI call for assessment + credits — runs in parallel with video searches
+    const assessmentPromise = base44.integrations.Core.InvokeLLM({
+      prompt: `Generate assessment questions and content credits for this UK care staff training course.
 
-Task 2 — ASSESSMENT: Create 15 varied assessment questions that test real knowledge from across the course. Each correct_answer must be the EXACT text of one of the 4 options.
+Course: "${skeleton.course.title}"
+Lessons: ${lessonTitles}
 
-Task 3 — CREDITS: List every organisation whose guidance, legislation, or materials were referenced in this course. Format each as "Organisation Name — what was sourced". Include all relevant UK bodies (HSE, CQC, Skills for Care, NHS, relevant Acts of Parliament, etc).
+Task 1 — ASSESSMENT: Create 15 varied questions testing real knowledge from across the course. Each correct_answer must be the EXACT text of one of the 4 options.
+
+Task 2 — CREDITS: List every organisation whose guidance, legislation, or materials were referenced. Format each as "Organisation Name — what was sourced". Include all relevant UK bodies (HSE, CQC, Skills for Care, NHS, relevant Acts of Parliament, etc).
 
 Output ONLY raw JSON: ${ENHANCE_SCHEMA}`,
-        systemPrompt: 'Output only raw valid JSON. No prose, no code fences.',
-        response_json_schema: { type: 'object' },
-        temperature: 0,
-        max_tokens: 4000,
-      });
-    } catch (err) {
-      // Enhance is best-effort — course still saves with Phase 2 content
-      console.warn('Enhance step failed, proceeding without it:', err.message);
-    }
+      systemPrompt: 'Output only raw valid JSON. No prose, no code fences.',
+      response_json_schema: { type: 'object' },
+      temperature: 0,
+      max_tokens: 3000,
+    }).catch(err => { console.warn('Assessment generation failed:', err.message); return null; });
+
+    // Wait for both to complete
+    const [videoResults, enhanceData] = await Promise.all([
+      Promise.all(videoSearchPromises),
+      assessmentPromise,
+    ]);
+
+    // Map video results back to lesson titles
+    const videoUrls = {};
+    allLessonsList.forEach((lesson, i) => {
+      if (videoResults[i]) videoUrls[lesson.title] = videoResults[i];
+    });
 
     // ── Phase 4: save ──────────────────────────────────────────────────────
     setPhase('saving');
     let savedCourse;
     try {
-      savedCourse = await saveCourse({ skeleton, contentLessons, enhanceData });
+      savedCourse = await saveCourse({ skeleton, contentLessons, enhanceData, videoUrls });
     } catch (err) {
       setError('Step 4 failed — could not save to library: ' + (err.message || 'Unknown error'));
       setPhase(null);
@@ -224,7 +266,7 @@ Output ONLY raw JSON: ${ENHANCE_SCHEMA}`,
     }
 
     queryClient.invalidateQueries({ queryKey: ['courses'] });
-    setResult({ skeleton, contentLessons, enhanceData, savedCourse });
+    setResult({ skeleton, contentLessons, enhanceData, videoUrls, savedCourse });
     setPhase(null);
     setStep(2);
     setTimeout(() => onSuccess?.(savedCourse), 1500);
@@ -268,8 +310,8 @@ Output ONLY raw JSON: ${ENHANCE_SCHEMA}`,
     );
   };
 
-  const { skeleton, enhanceData } = result || {};
-  const videoCount    = Object.values(enhanceData?.video_urls || {}).filter(Boolean).length;
+  const { skeleton, enhanceData, videoUrls } = result || {};
+  const videoCount    = Object.values(videoUrls || {}).filter(Boolean).length;
   const questionCount = enhanceData?.assessment?.questions?.length || 0;
   const creditCount   = enhanceData?.credits?.length || 0;
   const totalLessons  = skeleton?.modules?.reduce((s, m) => s + m.lessons.length, 0) || 0;
