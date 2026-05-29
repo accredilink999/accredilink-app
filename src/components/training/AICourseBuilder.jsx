@@ -413,12 +413,12 @@ Output ONLY the list — one item per line, no numbering, no intro text.`,
                   </div>
                 </div>
 
-                {matrixItems.length > 0 && (
-                  <div>
-                    <p className="text-xs text-slate-500 mb-2 flex items-center gap-1">
-                      <ClipboardList className="w-3 h-3" />
-                      From your Training Matrix — click to build:
-                    </p>
+                <div>
+                  <p className="text-xs text-slate-500 mb-2 flex items-center gap-1">
+                    <ClipboardList className="w-3 h-3" />
+                    From your Training Matrix — click to build:
+                  </p>
+                  {matrixItems.length > 0 ? (
                     <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
                       {matrixItems.map(item => (
                         <button
@@ -432,8 +432,10 @@ Output ONLY the list — one item per line, no numbering, no intro text.`,
                         </button>
                       ))}
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <p className="text-xs text-slate-400 italic">No training matrix items yet — add some in the Training Matrix page to see them here.</p>
+                  )}
+                </div>
               </>
             ) : (
               <div className="py-4 space-y-5">
