@@ -184,6 +184,8 @@ export default function AICourseBuilder({ isOpen, onClose, onSuccess }) {
     queryKey: ['trainingMatrixItems'],
     queryFn: () => base44.entities.TrainingMatrixItem.filter({ is_active: true }, 'title'),
     enabled: isOpen,
+    staleTime: 0,           // always treat as stale — refetch whenever builder opens
+    refetchOnMount: 'always', // and whenever the component mounts/becomes enabled
   });
   const [userPrompt, setUserPrompt] = useState('');
   const [error, setError] = useState(null);
