@@ -18,30 +18,19 @@ const EXAMPLE_PROMPTS = [
 // Phase 1 — skeleton only. Tiny JSON = never fails to parse.
 const SKELETON_SCHEMA = `{"course":{"title":"string","description":"string","category":"mandatory|specialist|refresher|induction|compliance","difficulty_level":"beginner|intermediate|advanced","duration_minutes":60,"passing_score":70},"modules":[{"title":"string","description":"one sentence","order_index":0,"lessons":[{"title":"string","description":"one sentence","order_index":0}]}]}`;
 
-// Phase 2 uses plain TEXT — no JSON at all, so no parse failures ever.
-// Format per lesson (repeated for all 12):
-// ##LESSON## Title
-// OVERVIEW: sentence 1. sentence 2. sentence 3.
-// POINTS: point1 | point2 | point3 | point4 | point5 | point6 | point7 | point8
-// GUIDANCE: UK law sentence 1. Sentence 2.
-// STEPS: step1 | step2 | step3 | step4 | step5 | step6
-// ##END##
+// Phase 2 uses plain TEXT — no JSON, so no parse failures ever.
+// Full rich markdown is extracted directly as the lesson body.
+// Format: ##LESSON## Title\n[full markdown content]\n##END##
 function parseContentText(text) {
   const lessons = [];
   const blocks = text.split('##LESSON##').slice(1);
   for (const block of blocks) {
-    const endIdx = block.indexOf('##END##');
-    const content = (endIdx >= 0 ? block.slice(0, endIdx) : block).trim();
-    const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
-    if (!lines.length) continue;
-    const lesson = { title: lines[0], overview: [], key_points: [], uk_guidance: [], in_practice: [] };
-    for (const line of lines.slice(1)) {
-      if (line.startsWith('OVERVIEW: '))  lesson.overview     = [line.slice(10).trim()];
-      else if (line.startsWith('POINTS: '))   lesson.key_points  = line.slice(8).split('|').map(s => s.trim()).filter(Boolean);
-      else if (line.startsWith('GUIDANCE: ')) lesson.uk_guidance = [line.slice(10).trim()];
-      else if (line.startsWith('STEPS: '))    lesson.in_practice = line.slice(7).split('|').map(s => s.trim()).filter(Boolean);
-    }
-    lessons.push(lesson);
+    const newlineIdx = block.indexOf('\n');
+    if (newlineIdx === -1) continue;
+    const title = block.slice(0, newlineIdx).trim();
+    const endIdx = block.indexOf('\n##END##');
+    const content = (endIdx >= 0 ? block.slice(newlineIdx + 1, endIdx) : block.slice(newlineIdx + 1)).trim();
+    if (title && content) lessons.push({ title, content });
   }
   return lessons;
 }
@@ -49,25 +38,6 @@ function parseContentText(text) {
 // Phase 3 — enhance. Only small safe fields: video URLs, richer assessment, and credits.
 // No prose content in JSON strings → always reliable.
 const ENHANCE_SCHEMA = `{"video_urls":{"exact lesson title":"https://www.youtube.com/embed/REAL_VIDEO_ID or null"},"assessment":{"title":"string","passing_score":80,"questions":[{"question":"string","options":["option A text","option B text","option C text","option D text"],"correct_answer":"option A text"}]},"credits":["Organisation Name — what was sourced from them (one line per source)"]}`;
-
-function buildLessonContent(lesson) {
-  if (!lesson) return '';
-  const parts = [];
-  if (lesson.overview?.length) {
-    parts.push(Array.isArray(lesson.overview) ? lesson.overview.join(' ') : lesson.overview);
-  }
-  if (lesson.key_points?.length) {
-    parts.push('## Key Learning Points\n' + lesson.key_points.map(p => `- ${p}`).join('\n'));
-  }
-  if (lesson.uk_guidance?.length) {
-    const g = Array.isArray(lesson.uk_guidance) ? lesson.uk_guidance.join(' ') : lesson.uk_guidance;
-    parts.push('## UK Law & Guidance\n' + g);
-  }
-  if (lesson.in_practice?.length) {
-    parts.push('## In Practice\n' + lesson.in_practice.map((s, i) => `${i + 1}. ${s}`).join('\n'));
-  }
-  return parts.join('\n\n');
-}
 
 async function saveCourse({ skeleton, contentLessons, enhanceData }) {
   // Index content by lesson title (lowercased) for fast lookup
@@ -111,7 +81,7 @@ async function saveCourse({ skeleton, contentLessons, enhanceData }) {
         module_id:    mod.id,
         title:        skelLesson.title,
         description:  skelLesson.description,
-        content:      buildLessonContent(enriched),
+        content:      enriched?.content || '',
         content_type: 'text',
         video_url:    videoUrl || null,
         order_index:  li,
@@ -161,51 +131,58 @@ Output ONLY raw JSON: ${SKELETON_SCHEMA}`,
       return;
     }
 
-    // ── Phase 2: lesson content (plain text — no JSON, no parse failures) ──
+    // ── Phase 2: full rich markdown per lesson (plain text — no JSON) ────────
     setPhase('content');
     const allLessons = skeleton.modules.flatMap(m => m.lessons);
-    const lessonList = allLessons.map(l => `- ${l.title}`).join('\n');
 
+    // Generate per module (3 lessons each) — keeps each call small and reliable
     let contentLessons = [];
-    try {
-      const rawText = await base44.integrations.Core.InvokeLLM({
-        prompt: `Write training content for each lesson in this UK care staff course.
+    for (let mi = 0; mi < skeleton.modules.length; mi++) {
+      const mod = skeleton.modules[mi];
+      const modLessonList = mod.lessons.map(l => `- ${l.title}`).join('\n');
+      let rawText = '';
+      try {
+        rawText = await base44.integrations.Core.InvokeLLM({
+          prompt: `Write full training course content for UK community care staff.
 
 Course: ${skeleton.course.title}
-Topic: "${userPrompt.trim()}"
+Module: ${mod.title} — ${mod.description}
+Topic context: "${userPrompt.trim()}"
 
-Lessons to cover:
-${lessonList}
+Write rich lesson content for these ${mod.lessons.length} lessons:
+${modLessonList}
 
-For EACH lesson output this exact block (repeat for all ${allLessons.length} lessons):
+For EACH lesson use EXACTLY this format:
 
-##LESSON## [exact lesson title]
-OVERVIEW: [3-4 sentences introducing the topic — all on ONE line]
-POINTS: [point 1] | [point 2] | [point 3] | [point 4] | [point 5] | [point 6] | [point 7] | [point 8]
-GUIDANCE: [1-2 sentences citing specific UK legislation or HSE/CQC/Skills for Care guidance — all on ONE line]
-STEPS: [step 1 for care staff] | [step 2] | [step 3] | [step 4] | [step 5] | [step 6]
+##LESSON## [exact lesson title as listed above]
+[Full lesson body — minimum 400 words of proper training material]
+[MUST include all of the following sections:]
+[- An opening paragraph explaining what the lesson covers and why it matters to care staff]
+[- ## Key Learning Points — bullet list of 6-8 substantive points using **bold** for key terms]
+[- ## [Topic-specific section] — detailed explanation with real examples, scenarios, or case studies relevant to UK care]
+[- ## UK Law & Guidance — cite specific legislation (e.g. Health and Safety at Work Act 1974, Care Act 2014, COSHH Regulations 2002) with explanation of what it requires]
+[- ## In Practice — numbered steps of exactly what a care worker should do, written in second person ("You should...")]
+[- > A blockquote callout with the single most important rule or takeaway]
+[Use **bold** for key terms, tables where comparisons help, real UK examples throughout]
 ##END##
 
-Rules:
-- OVERVIEW, GUIDANCE must each be a single line (no line breaks within them)
-- POINTS and STEPS use | as separator between items
-- Points and steps should be specific and detailed, not vague
-- UK legislation references must be real (e.g. Health and Safety at Work Act 1974, Care Act 2014)
-- Output ALL ${allLessons.length} lessons in order`,
-        systemPrompt: 'You are a UK care staff training content writer. Follow the exact format specified.',
-        temperature: 0,
-        max_tokens: 8000,
-      });
-      contentLessons = parseContentText(rawText || '');
-    } catch (err) {
-      setError('Step 2 failed — could not generate lesson content. Please try again.');
-      setPhase(null);
-      return;
-    }
-    if (!contentLessons.length) {
-      setError('Step 2 returned no content — please try again.');
-      setPhase(null);
-      return;
+Repeat for all ${mod.lessons.length} lessons. Write genuine educational content — not summaries.`,
+          systemPrompt: 'You are a professional UK care staff training writer producing high-quality course material. Write in full detail.',
+          temperature: 0.3,
+          max_tokens: 6000,
+        });
+      } catch (err) {
+        setError(`Step 2 failed on module ${mi + 1} — please try again.`);
+        setPhase(null);
+        return;
+      }
+      const parsed = parseContentText(rawText || '');
+      if (!parsed.length) {
+        setError(`Step 2 returned no content for module ${mi + 1} — please try again.`);
+        setPhase(null);
+        return;
+      }
+      contentLessons = [...contentLessons, ...parsed];
     }
 
     // ── Phase 3: enhance — videos, deep assessment, credits ────────────────
