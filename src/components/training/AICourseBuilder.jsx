@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -181,18 +182,17 @@ export default function AICourseBuilder({ isOpen, onClose, onSuccess }) {
   const [phase, setPhase] = useState(null);  // null | 'structure' | 'content' | 'enhance' | 'saving'
 
   const { data: matrixItems = [] } = useQuery({
-    queryKey: ['trainingMatrixItems'],
+    queryKey: ['trainingMatrixItemsDirect'],
     queryFn: async () => {
-      // Mirror exact query from TrainingMatrix page — proven to work
-      try {
-        const active = await base44.entities.TrainingMatrixItem.filter({ is_active: true }, '-created_date');
-        if (active.length > 0) return active;
-        // Fallback: some items may have is_active=null (never explicitly set)
-        const all = await base44.entities.TrainingMatrixItem.filter({}, '-created_date');
-        return all.filter(item => item.is_active !== false);
-      } catch {
-        return [];
-      }
+      // Query Supabase directly — bypasses entity org-filter which may exclude
+      // items that were created before org isolation was enforced
+      const { data, error } = await supabase
+        .from('training_matrix_items')
+        .select('*')
+        .neq('is_active', false)
+        .order('created_at', { ascending: false });
+      if (error) return [];
+      return data || [];
     },
     enabled: isOpen,
     staleTime: 0,
