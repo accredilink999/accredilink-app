@@ -76,35 +76,44 @@ Output ONLY the markdown content — no title line at the top, no commentary.`,
 // Phase 3 — assessment + credits only. Videos handled separately via YouTube API.
 const ENHANCE_SCHEMA = `{"assessment":{"title":"string","passing_score":80,"questions":[{"question":"string","options":["option A text","option B text","option C text","option D text"],"correct_answer":"option A text"}]},"credits":["Organisation Name — what was sourced from them (one line per source)"]}`;
 
-// Search YouTube Data API for a real, guaranteed-embeddable video.
-// Uses VITE_YOUTUBE_API_KEY (preferred) or VITE_GOOGLE_MAPS_API_KEY as fallback.
-async function searchYouTubeVideo(lessonTitle, courseTitle) {
+// Search YouTube Data API for a UK-only, guaranteed-embeddable video.
+async function searchYouTubeVideo(moduleTitle, courseTitle) {
   const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY || import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   if (!apiKey) return null;
   try {
-    const q = `${lessonTitle} ${courseTitle} UK care training`;
+    // Explicitly UK-focused query — module topic gives better results than lesson title
+    const q = `${moduleTitle} UK care workers training`;
     const params = new URLSearchParams({
       part: 'snippet',
       q,
       type: 'video',
       videoEmbeddable: 'true',
+      videoSyndicated: 'true',  // only videos allowed outside YouTube
       safeSearch: 'strict',
       relevanceLanguage: 'en',
       regionCode: 'GB',
-      maxResults: '5',
+      maxResults: '10',
       key: apiKey,
     });
     const res = await fetch(`https://www.googleapis.com/youtube/v3/search?${params}`);
     if (!res.ok) return null;
     const data = await res.json();
-    const videoId = data.items?.[0]?.id?.videoId;
+    if (!data.items?.length) return null;
+
+    // Filter to prefer videos with UK-related channel titles or descriptions
+    const ukKeywords = ['uk', 'united kingdom', 'england', 'wales', 'scotland', 'nhs', 'care quality', 'skills for care', 'hse', 'british'];
+    const preferred = data.items.find(item => {
+      const text = `${item.snippet?.channelTitle} ${item.snippet?.title} ${item.snippet?.description}`.toLowerCase();
+      return ukKeywords.some(kw => text.includes(kw));
+    });
+    const videoId = (preferred || data.items[0])?.id?.videoId;
     return videoId ? `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1` : null;
   } catch {
     return null;
   }
 }
 
-async function saveCourse({ skeleton, contentLessons, enhanceData, videoUrls }) {
+async function saveCourse({ skeleton, contentLessons, enhanceData, videoUrls, credits }) {
   // Index content by lesson title (lowercased) for fast lookup
   const contentByTitle = {};
   (contentLessons || []).forEach(l => {
@@ -123,7 +132,7 @@ async function saveCourse({ skeleton, contentLessons, enhanceData, videoUrls }) 
     assessment_title:         enhanceData?.assessment?.title || null,
     assessment_questions:     enhanceData?.assessment?.questions || [],
     assessment_passing_score: enhanceData?.assessment?.passing_score || 80,
-    credits:                  enhanceData?.credits || [],
+    credits:                  credits?.length ? credits : (enhanceData?.credits || []),
   });
 
   for (let mi = 0; mi < skeleton.modules.length; mi++) {
@@ -214,48 +223,61 @@ Output ONLY raw JSON: ${SKELETON_SCHEMA}`,
     const allLessonsList = skeleton.modules.flatMap(m => m.lessons);
     const lessonTitles = allLessonsList.map(l => `"${l.title}"`).join(', ');
 
-    // Search YouTube for every 3rd lesson (indices 2, 5, 8, 11) in parallel
-    const videoSearchPromises = allLessonsList.map((lesson, i) =>
-      (i + 1) % 3 === 0
-        ? searchYouTubeVideo(lesson.title, skeleton.course.title)
-        : Promise.resolve(null)
+    // Search YouTube once per MODULE — UK-only, one embeddable video per module
+    // assigned to the first lesson of each module
+    const videoSearchPromises = skeleton.modules.map(m =>
+      searchYouTubeVideo(m.title, skeleton.course.title)
     );
 
-    // AI call for assessment + credits — runs in parallel with video searches
+    // Assessment — JSON (small, reliable)
     const assessmentPromise = base44.integrations.Core.InvokeLLM({
-      prompt: `Generate assessment questions and content credits for this UK care staff training course.
-
-Course: "${skeleton.course.title}"
-Lessons: ${lessonTitles}
-
-Task 1 — ASSESSMENT: Create 15 varied questions testing real knowledge from across the course. Each correct_answer must be the EXACT text of one of the 4 options.
-
-Task 2 — CREDITS: List every organisation whose guidance, legislation, or materials were referenced. Format each as "Organisation Name — what was sourced". Include all relevant UK bodies (HSE, CQC, Skills for Care, NHS, relevant Acts of Parliament, etc).
-
+      prompt: `Generate 15 assessment questions for this UK care staff course: "${skeleton.course.title}"
+Lessons covered: ${lessonTitles}
+Each correct_answer must be the EXACT text of one of the 4 options.
 Output ONLY raw JSON: ${ENHANCE_SCHEMA}`,
       systemPrompt: 'Output only raw valid JSON. No prose, no code fences.',
       response_json_schema: { type: 'object' },
       temperature: 0,
-      max_tokens: 3000,
-    }).catch(err => { console.warn('Assessment generation failed:', err.message); return null; });
+      max_tokens: 2500,
+    }).catch(() => null);
 
-    // Wait for both to complete
-    const [videoResults, enhanceData] = await Promise.all([
+    // Credits — plain text, one line per source (cannot fail, no JSON)
+    const creditsPromise = base44.integrations.Core.InvokeLLM({
+      prompt: `List every UK organisation, legislation, and regulatory guidance that would be referenced in a "${skeleton.course.title}" training course for community care staff.
+Format each as: Organisation or Act name — brief description of what was sourced
+Include relevant Acts of Parliament, HSE, CQC, Skills for Care, NHS England, NICE, and other UK bodies.
+Output ONLY the list — one item per line, no numbering, no intro text.`,
+      systemPrompt: 'Output only the credits list, one item per line.',
+      temperature: 0,
+      max_tokens: 500,
+    }).catch(() => '');
+
+    // Wait for all three in parallel
+    const [videoResults, enhanceData, creditsText] = await Promise.all([
       Promise.all(videoSearchPromises),
       assessmentPromise,
+      creditsPromise,
     ]);
 
-    // Map video results back to lesson titles
+    // Parse plain-text credits — split by newline, filter blanks
+    const credits = (creditsText || '')
+      .split('\n')
+      .map(l => l.trim())
+      .filter(l => l.length > 3);
+
+    // Map each module's video to the first lesson of that module
     const videoUrls = {};
-    allLessonsList.forEach((lesson, i) => {
-      if (videoResults[i]) videoUrls[lesson.title] = videoResults[i];
+    skeleton.modules.forEach((m, mi) => {
+      if (videoResults[mi] && m.lessons[0]) {
+        videoUrls[m.lessons[0].title] = videoResults[mi];
+      }
     });
 
     // ── Phase 4: save ──────────────────────────────────────────────────────
     setPhase('saving');
     let savedCourse;
     try {
-      savedCourse = await saveCourse({ skeleton, contentLessons, enhanceData, videoUrls });
+      savedCourse = await saveCourse({ skeleton, contentLessons, enhanceData, videoUrls, credits });
     } catch (err) {
       setError('Step 4 failed — could not save to library: ' + (err.message || 'Unknown error'));
       setPhase(null);
