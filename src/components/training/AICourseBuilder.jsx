@@ -182,10 +182,14 @@ export default function AICourseBuilder({ isOpen, onClose, onSuccess }) {
 
   const { data: matrixItems = [] } = useQuery({
     queryKey: ['trainingMatrixItems'],
-    queryFn: () => base44.entities.TrainingMatrixItem.filter({ is_active: true }, 'title'),
+    queryFn: async () => {
+      const all = await base44.entities.TrainingMatrixItem.list('title');
+      // Include items where is_active is true OR null (only exclude explicitly deleted)
+      return all.filter(item => item.is_active !== false);
+    },
     enabled: isOpen,
-    staleTime: 0,           // always treat as stale — refetch whenever builder opens
-    refetchOnMount: 'always', // and whenever the component mounts/becomes enabled
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
   const [userPrompt, setUserPrompt] = useState('');
   const [error, setError] = useState(null);
