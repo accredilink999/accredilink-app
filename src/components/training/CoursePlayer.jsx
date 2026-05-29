@@ -397,10 +397,16 @@ export default function CoursePlayer({ isOpen, onClose, courseId }) {
                   {/* Video content */}
                   {currentLesson.video_url && (() => {
                     const embedUrl = getYouTubeEmbedUrl(currentLesson.video_url);
+                    // Build a direct watch URL from any YouTube URL format
+                    const videoIdMatch = currentLesson.video_url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+                    const watchUrl = videoIdMatch
+                      ? `https://www.youtube.com/watch?v=${videoIdMatch[1]}`
+                      : currentLesson.video_url;
+                    const isYouTube = !!videoIdMatch;
+
                     return (
-                      <div className="space-y-1.5">
+                      <div className="space-y-2">
                         {embedUrl ? (
-                          /* Inline YouTube embed */
                           <div className="rounded-lg overflow-hidden border border-slate-200 bg-black aspect-video">
                             <iframe
                               src={embedUrl}
@@ -410,40 +416,26 @@ export default function CoursePlayer({ isOpen, onClose, courseId }) {
                               allowFullScreen
                             />
                           </div>
-                        ) : (
-                          /* Non-YouTube video — external link fallback */
-                          <div className="rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
-                            <a
-                              href={currentLesson.video_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-3 p-4 hover:bg-slate-100 transition-colors"
-                            >
-                              <div className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center flex-shrink-0">
-                                <Play className="w-6 h-6 text-white fill-white" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-slate-900 truncate">{currentLesson.title}</p>
-                                <p className="text-xs text-slate-500">Watch video</p>
-                              </div>
-                              <ExternalLink className="w-5 h-5 text-slate-400 flex-shrink-0" />
-                            </a>
+                        ) : null}
+
+                        {/* Always show a Watch on YouTube button — works even if embed has Error 153 */}
+                        <a
+                          href={watchUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-3 p-3 rounded-lg border border-red-100 bg-red-50 hover:bg-red-100 transition-colors"
+                        >
+                          <div className="w-9 h-9 rounded-full bg-red-600 flex items-center justify-center flex-shrink-0">
+                            <Play className="w-4 h-4 text-white fill-white" />
                           </div>
-                        )}
-                        <div className="flex items-center gap-2 px-1">
-                          <Info className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                          <p className="text-xs text-slate-400">
-                            Video hosted externally.{' '}
-                            <a
-                              href={currentLesson.video_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-teal-600 hover:underline"
-                            >
-                              Open in YouTube
-                            </a>
-                          </p>
-                        </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-red-900">
+                              {embedUrl ? 'Also available on YouTube' : 'Watch on YouTube'}
+                            </p>
+                            <p className="text-xs text-red-600">Opens in a new tab</p>
+                          </div>
+                          <ExternalLink className="w-4 h-4 text-red-400 flex-shrink-0" />
+                        </a>
                       </div>
                     );
                   })()}
