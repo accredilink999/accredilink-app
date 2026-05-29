@@ -18,21 +18,35 @@ const EXAMPLE_PROMPTS = [
 // Phase 1 — skeleton only. Tiny JSON = never fails to parse.
 const SKELETON_SCHEMA = `{"course":{"title":"string","description":"string","category":"mandatory|specialist|refresher|induction|compliance","difficulty_level":"beginner|intermediate|advanced","duration_minutes":60,"passing_score":70},"modules":[{"title":"string","description":"one sentence","order_index":0,"lessons":[{"title":"string","description":"one sentence","order_index":0}]}]}`;
 
-// Phase 2 uses plain TEXT — no JSON, so no parse failures ever.
-// Full rich markdown is extracted directly as the lesson body.
-// Format: ##LESSON## Title\n[full markdown content]\n##END##
-function parseContentText(text) {
-  const lessons = [];
-  const blocks = text.split('##LESSON##').slice(1);
-  for (const block of blocks) {
-    const newlineIdx = block.indexOf('\n');
-    if (newlineIdx === -1) continue;
-    const title = block.slice(0, newlineIdx).trim();
-    const endIdx = block.indexOf('\n##END##');
-    const content = (endIdx >= 0 ? block.slice(newlineIdx + 1, endIdx) : block.slice(newlineIdx + 1)).trim();
-    if (title && content) lessons.push({ title, content });
+// Phase 2 generates one lesson per API call — entire response IS the content.
+// No format parsing, no delimiters, cannot fail regardless of AI output style.
+async function generateLessonContent(lesson, mod, courseTitle, topic) {
+  try {
+    const content = await base44.integrations.Core.InvokeLLM({
+      prompt: `Write full training course material for this lesson. UK community care staff audience.
+
+Course: ${courseTitle}
+Module: ${mod.title}
+Lesson: ${lesson.title} — ${lesson.description}
+Topic: "${topic}"
+
+Write 400-500 words of rich, detailed lesson content. You MUST include:
+- An opening paragraph (3-4 sentences) explaining what this lesson covers and why it matters to care staff
+- ## Key Learning Points — 6-8 bullet points with **bold** key terms and real detail
+- ## [A topic-specific section heading] — detailed explanation with UK-relevant examples, scenarios, or comparisons. Use tables if helpful.
+- ## UK Law & Guidance — cite specific UK legislation or regulatory guidance (e.g. Health and Safety at Work Act 1974, Care Act 2014, COSHH Regulations 2002, HSE guidance) and explain what it requires of care workers
+- ## In Practice — 5-6 numbered steps written directly to the care worker ("You should...", "Always...")
+- > A blockquote with the single most important takeaway or rule to remember
+
+Write in second person. Use **bold** for key terms. Output ONLY the markdown content — no title line, no commentary.`,
+      systemPrompt: 'You are a professional UK care staff training writer. Write detailed, accurate training material.',
+      temperature: 0.3,
+      max_tokens: 2000,
+    });
+    return { title: lesson.title, content: content || '' };
+  } catch {
+    return { title: lesson.title, content: '' };
   }
-  return lessons;
 }
 
 // Phase 3 — assessment + credits only. Videos handled separately via YouTube API.
@@ -158,58 +172,17 @@ Output ONLY raw JSON: ${SKELETON_SCHEMA}`,
       return;
     }
 
-    // ── Phase 2: full rich markdown per lesson (plain text — no JSON) ────────
+    // ── Phase 2: one lesson per call, 3 in parallel per module ───────────────
+    // Entire response = lesson content. No format to parse, cannot fail.
     setPhase('content');
-    const allLessons = skeleton.modules.flatMap(m => m.lessons);
-
-    // Generate per module (3 lessons each) — keeps each call small and reliable
     let contentLessons = [];
-    for (let mi = 0; mi < skeleton.modules.length; mi++) {
-      const mod = skeleton.modules[mi];
-      const modLessonList = mod.lessons.map(l => `- ${l.title}`).join('\n');
-      let rawText = '';
-      try {
-        rawText = await base44.integrations.Core.InvokeLLM({
-          prompt: `Write full training course content for UK community care staff.
-
-Course: ${skeleton.course.title}
-Module: ${mod.title} — ${mod.description}
-Topic context: "${userPrompt.trim()}"
-
-Write rich lesson content for these ${mod.lessons.length} lessons:
-${modLessonList}
-
-For EACH lesson use EXACTLY this format:
-
-##LESSON## [exact lesson title as listed above]
-[Full lesson body — minimum 400 words of proper training material]
-[MUST include all of the following sections:]
-[- An opening paragraph explaining what the lesson covers and why it matters to care staff]
-[- ## Key Learning Points — bullet list of 6-8 substantive points using **bold** for key terms]
-[- ## [Topic-specific section] — detailed explanation with real examples, scenarios, or case studies relevant to UK care]
-[- ## UK Law & Guidance — cite specific legislation (e.g. Health and Safety at Work Act 1974, Care Act 2014, COSHH Regulations 2002) with explanation of what it requires]
-[- ## In Practice — numbered steps of exactly what a care worker should do, written in second person ("You should...")]
-[- > A blockquote callout with the single most important rule or takeaway]
-[Use **bold** for key terms, tables where comparisons help, real UK examples throughout]
-##END##
-
-Repeat for all ${mod.lessons.length} lessons. Write genuine educational content — not summaries.`,
-          systemPrompt: 'You are a professional UK care staff training writer producing high-quality course material. Write in full detail.',
-          temperature: 0.3,
-          max_tokens: 6000,
-        });
-      } catch (err) {
-        setError(`Step 2 failed on module ${mi + 1} — please try again.`);
-        setPhase(null);
-        return;
-      }
-      const parsed = parseContentText(rawText || '');
-      if (!parsed.length) {
-        setError(`Step 2 returned no content for module ${mi + 1} — please try again.`);
-        setPhase(null);
-        return;
-      }
-      contentLessons = [...contentLessons, ...parsed];
+    for (const mod of skeleton.modules) {
+      const modResults = await Promise.all(
+        mod.lessons.map(lesson =>
+          generateLessonContent(lesson, mod, skeleton.course.title, userPrompt.trim())
+        )
+      );
+      contentLessons = [...contentLessons, ...modResults];
     }
 
     // ── Phase 3: YouTube video search + assessment + credits (parallel) ──────
