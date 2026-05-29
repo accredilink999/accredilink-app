@@ -183,9 +183,16 @@ export default function AICourseBuilder({ isOpen, onClose, onSuccess }) {
   const { data: matrixItems = [] } = useQuery({
     queryKey: ['trainingMatrixItems'],
     queryFn: async () => {
-      const all = await base44.entities.TrainingMatrixItem.list('title');
-      // Include items where is_active is true OR null (only exclude explicitly deleted)
-      return all.filter(item => item.is_active !== false);
+      // Mirror exact query from TrainingMatrix page — proven to work
+      try {
+        const active = await base44.entities.TrainingMatrixItem.filter({ is_active: true }, '-created_date');
+        if (active.length > 0) return active;
+        // Fallback: some items may have is_active=null (never explicitly set)
+        const all = await base44.entities.TrainingMatrixItem.filter({}, '-created_date');
+        return all.filter(item => item.is_active !== false);
+      } catch {
+        return [];
+      }
     },
     enabled: isOpen,
     staleTime: 0,
