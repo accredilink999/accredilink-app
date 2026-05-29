@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -54,6 +54,14 @@ export default function CoursePlayer({ isOpen, onClose, courseId }) {
   const [completedLessons, setCompletedLessons] = useState(new Set());
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showCredits, setShowCredits] = useState(false);
+
+  // Reset all navigation state when a different course is opened
+  useEffect(() => {
+    setCurrentModuleIdx(0);
+    setCurrentLessonIdx(0);
+    setCompletedLessons(new Set());
+    setShowCredits(false);
+  }, [courseId]);
 
   const { data: course, isLoading: courseLoading } = useQuery({
     queryKey: ['course', courseId],
@@ -335,22 +343,29 @@ export default function CoursePlayer({ isOpen, onClose, courseId }) {
                   {course?.credits?.length > 0 ? (
                     <ul className="space-y-3">
                       {course.credits.map((credit, i) => {
-                        const url = resolveOrgUrl(credit);
-                        const [name, ...rest] = credit.split('—');
+                        // Extract URL embedded in credit string e.g. "HSE — guidance (hse.gov.uk)"
+                        const embeddedUrl = credit.match(/\(([a-z0-9.-]+\.[a-z]{2,}(?:\/[^\s)]*)?)\)/i);
+                        const resolvedUrl = embeddedUrl
+                          ? `https://${embeddedUrl[1]}`
+                          : resolveOrgUrl(credit);
+                        // Split on em-dash, en-dash, or " - "
+                        const parts = credit.split(/\s*[—–-]\s(.+)/s);
+                        const name = parts[0]?.trim();
+                        const description = parts[1]?.trim();
                         return (
                           <li key={i} className="flex items-start gap-3 text-sm">
                             <CheckCircle2 className="w-4 h-4 text-teal-500 mt-0.5 flex-shrink-0" />
                             <div>
-                              {url ? (
-                                <a href={url} target="_blank" rel="noopener noreferrer"
+                              {resolvedUrl ? (
+                                <a href={resolvedUrl} target="_blank" rel="noopener noreferrer"
                                   className="font-semibold text-teal-700 hover:underline inline-flex items-center gap-1">
-                                  {name?.trim()} <ExternalLink className="w-3 h-3" />
+                                  {name} <ExternalLink className="w-3 h-3" />
                                 </a>
                               ) : (
-                                <span className="font-semibold text-slate-800">{name?.trim()}</span>
+                                <span className="font-semibold text-slate-800">{name}</span>
                               )}
-                              {rest.length > 0 && (
-                                <p className="text-slate-500 text-xs mt-0.5">{rest.join('—').trim()}</p>
+                              {description && (
+                                <p className="text-slate-500 text-xs mt-0.5">{description.replace(/\s*\([a-z0-9.-]+\.[a-z]{2,}[^)]*\)/gi, '').trim()}</p>
                               )}
                             </div>
                           </li>

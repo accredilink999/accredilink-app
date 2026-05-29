@@ -73,8 +73,17 @@ Output ONLY the markdown content — no title line at the top, no commentary.`,
   }
 }
 
-// Phase 3 — assessment + credits only. Videos handled separately via YouTube API.
-const ENHANCE_SCHEMA = `{"assessment":{"title":"string","passing_score":80,"questions":[{"question":"string","options":["option A text","option B text","option C text","option D text"],"correct_answer":"option A text"}]},"credits":["Organisation Name — what was sourced from them (one line per source)"]}`;
+// Phase 3 — assessment only. Credits and videos handled separately.
+const ENHANCE_SCHEMA = `{"assessment":{"title":"string","passing_score":80,"questions":[{"question":"string","options":["option A text","option B text","option C text","option D text"],"correct_answer":"option A text"}]}}`;
+
+// These bodies are relevant to every UK care training course — always included.
+const STANDARD_CREDITS = [
+  'Health and Safety Executive (HSE) — workplace safety regulations and guidance (hse.gov.uk)',
+  'Care Quality Commission (CQC) — care quality standards and regulatory requirements (cqc.org.uk)',
+  'Skills for Care — workforce development standards and best practice guidance (skillsforcare.org.uk)',
+  'NHS England — health and care guidance and clinical standards (england.nhs.uk)',
+  'Department of Health and Social Care — health and social care policy and legislation (gov.uk)',
+];
 
 // Search YouTube Data API for a UK-only, guaranteed-embeddable video.
 async function searchYouTubeVideo(moduleTitle, courseTitle) {
@@ -223,11 +232,12 @@ Output ONLY raw JSON: ${SKELETON_SCHEMA}`,
     const allLessonsList = skeleton.modules.flatMap(m => m.lessons);
     const lessonTitles = allLessonsList.map(l => `"${l.title}"`).join(', ');
 
-    // Search YouTube once per MODULE — UK-only, one embeddable video per module
-    // assigned to the first lesson of each module
-    const videoSearchPromises = skeleton.modules.map(m =>
-      searchYouTubeVideo(m.title, skeleton.course.title)
-    );
+    // Search YouTube for 2 videos per module — one per module (first lesson)
+    // and one per module (last lesson) — UK-only, guaranteed embeddable
+    const videoSearchPromises = skeleton.modules.flatMap(m => [
+      searchYouTubeVideo(m.title, skeleton.course.title),
+      searchYouTubeVideo(`${m.title} practical examples`, skeleton.course.title),
+    ]);
 
     // Assessment — JSON (small, reliable)
     const assessmentPromise = base44.integrations.Core.InvokeLLM({
@@ -259,17 +269,26 @@ Output ONLY the list — one item per line, no numbering, no intro text.`,
       creditsPromise,
     ]);
 
-    // Parse plain-text credits — split by newline, filter blanks
-    const credits = (creditsText || '')
+    // Merge AI credits with standard credits — standard ones always included
+    const aiCredits = (creditsText || '')
       .split('\n')
       .map(l => l.trim())
-      .filter(l => l.length > 3);
+      .filter(l => l.length > 5);
+    // Deduplicate: skip AI credits that overlap with standard ones
+    const standardLower = STANDARD_CREDITS.map(c => c.toLowerCase());
+    const uniqueAiCredits = aiCredits.filter(c =>
+      !standardLower.some(s => s.includes(c.toLowerCase().slice(0, 20)))
+    );
+    const credits = [...STANDARD_CREDITS, ...uniqueAiCredits];
 
-    // Map each module's video to the first lesson of that module
+    // Map 2 videos per module — first and last lesson of each module
     const videoUrls = {};
     skeleton.modules.forEach((m, mi) => {
-      if (videoResults[mi] && m.lessons[0]) {
-        videoUrls[m.lessons[0].title] = videoResults[mi];
+      const first = m.lessons[0];
+      const last  = m.lessons[m.lessons.length - 1];
+      if (videoResults[mi * 2]     && first) videoUrls[first.title] = videoResults[mi * 2];
+      if (videoResults[mi * 2 + 1] && last && last.title !== first?.title) {
+        videoUrls[last.title] = videoResults[mi * 2 + 1];
       }
     });
 
@@ -440,7 +459,12 @@ Output ONLY the list — one item per line, no numbering, no intro text.`,
             </>
           )}
           {step === 2 && (
-            <Button variant="outline" onClick={handleClose}>Close</Button>
+            <>
+              <Button variant="outline" onClick={() => { setStep(1); setUserPrompt(''); setResult(null); setError(null); }}>
+                <Sparkles className="w-4 h-4 mr-2" />Build Another Course
+              </Button>
+              <Button variant="outline" onClick={handleClose}>Close</Button>
+            </>
           )}
         </DialogFooter>
       </DialogContent>
