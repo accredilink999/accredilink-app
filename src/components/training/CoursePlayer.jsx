@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Loader2, ChevronRight, ChevronLeft, Play, FileText, BookOpen, Menu, CheckCircle2, ExternalLink, Info, Award } from 'lucide-react';
+import { Loader2, ChevronRight, ChevronLeft, Play, FileText, BookOpen, Menu, CheckCircle2, ExternalLink, Info, Award, ClipboardCheck, XCircle, RotateCcw } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { toast } from 'sonner';
 
@@ -54,6 +54,11 @@ export default function CoursePlayer({ isOpen, onClose, courseId }) {
   const [completedLessons, setCompletedLessons] = useState(new Set());
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showCredits, setShowCredits] = useState(false);
+  const [showAssessment, setShowAssessment] = useState(false);
+  const [assessmentQuestions, setAssessmentQuestions] = useState([]);
+  const [assessmentAnswers, setAssessmentAnswers] = useState({});  // index → chosen option
+  const [assessmentIdx, setAssessmentIdx] = useState(0);           // current question
+  const [assessmentResult, setAssessmentResult] = useState(null);  // { score, passed }
 
   // Reset all navigation state when a different course is opened
   useEffect(() => {
@@ -61,6 +66,11 @@ export default function CoursePlayer({ isOpen, onClose, courseId }) {
     setCurrentLessonIdx(0);
     setCompletedLessons(new Set());
     setShowCredits(false);
+    setShowAssessment(false);
+    setAssessmentQuestions([]);
+    setAssessmentAnswers({});
+    setAssessmentIdx(0);
+    setAssessmentResult(null);
   }, [courseId]);
 
   const { data: course, isLoading: courseLoading } = useQuery({
@@ -119,14 +129,15 @@ export default function CoursePlayer({ isOpen, onClose, courseId }) {
   });
 
   const completeMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (score = null) => {
       const completionData = {
         course_id: courseId,
         staff_id: user.id,
         staff_name: user.staff_full_name || user.full_name,
         status: 'completed',
         progress_percent: 100,
-        completed_date: new Date().toISOString()
+        completed_date: new Date().toISOString(),
+        ...(score !== null && { score }),
       };
 
       let completionId;
@@ -181,8 +192,19 @@ export default function CoursePlayer({ isOpen, onClose, courseId }) {
     const isLastLesson = currentModuleIdx === modules.length - 1 && currentLessonIdx === moduleLessons.length - 1;
 
     if (isLastLesson && updatedCompleted.size === totalLessons) {
-      // Show credits before completing (legal requirement)
-      setShowCredits(true);
+      // Show assessment before certificate — must pass to complete
+      const allQuestions = course?.assessment_questions || [];
+      if (allQuestions.length > 0) {
+        const shuffled = [...allQuestions].sort(() => Math.random() - 0.5);
+        setAssessmentQuestions(shuffled.slice(0, Math.min(10, shuffled.length)));
+        setAssessmentAnswers({});
+        setAssessmentIdx(0);
+        setAssessmentResult(null);
+        setShowAssessment(true);
+      } else {
+        // No questions — go straight to credits
+        setShowCredits(true);
+      }
       return;
     }
 
@@ -328,6 +350,120 @@ export default function CoursePlayer({ isOpen, onClose, courseId }) {
 
           {/* Main Content */}
           <div className="flex-1 overflow-y-auto flex flex-col p-3 sm:p-6">
+
+            {/* ── Assessment screen ───────────────────────────────────────── */}
+            {showAssessment && !showCredits ? (
+              <div className="flex-1 space-y-6 max-w-2xl mx-auto w-full">
+                <div className="flex items-center gap-3">
+                  <ClipboardCheck className="w-8 h-8 text-teal-600 flex-shrink-0" />
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900">Final Assessment</h2>
+                    <p className="text-sm text-slate-500">Answer all {assessmentQuestions.length} questions — you need 80% to pass and receive your certificate.</p>
+                  </div>
+                </div>
+
+                {!assessmentResult ? (
+                  /* ── Question view ── */
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between text-xs text-slate-500">
+                      <span>Question {assessmentIdx + 1} of {assessmentQuestions.length}</span>
+                      <span>{Object.keys(assessmentAnswers).length} answered</span>
+                    </div>
+                    <div className="w-full bg-slate-200 rounded-full h-1.5">
+                      <div className="bg-teal-500 h-1.5 rounded-full transition-all"
+                        style={{ width: `${((assessmentIdx + 1) / assessmentQuestions.length) * 100}%` }} />
+                    </div>
+
+                    {assessmentQuestions[assessmentIdx] && (
+                      <Card className="p-5 bg-slate-50">
+                        <p className="font-semibold text-slate-900 text-base mb-4">
+                          {assessmentQuestions[assessmentIdx].question}
+                        </p>
+                        <div className="space-y-2">
+                          {assessmentQuestions[assessmentIdx].options?.map((opt, oi) => (
+                            <button key={oi} onClick={() => setAssessmentAnswers(prev => ({ ...prev, [assessmentIdx]: opt }))}
+                              className={`w-full text-left px-4 py-3 rounded-lg border-2 text-sm transition-all ${
+                                assessmentAnswers[assessmentIdx] === opt
+                                  ? 'border-teal-500 bg-teal-50 text-teal-800 font-medium'
+                                  : 'border-slate-200 bg-white hover:border-slate-300 text-slate-700'
+                              }`}>
+                              {opt}
+                            </button>
+                          ))}
+                        </div>
+                      </Card>
+                    )}
+
+                    <div className="flex justify-between pt-2">
+                      <Button variant="outline" onClick={() => setAssessmentIdx(i => Math.max(0, i - 1))}
+                        disabled={assessmentIdx === 0}>
+                        <ChevronLeft className="w-4 h-4 mr-1" /> Previous
+                      </Button>
+
+                      {assessmentIdx < assessmentQuestions.length - 1 ? (
+                        <Button onClick={() => setAssessmentIdx(i => i + 1)}
+                          disabled={!assessmentAnswers[assessmentIdx]}
+                          className="bg-teal-600 hover:bg-teal-700">
+                          Next <ChevronRight className="w-4 h-4 ml-1" />
+                        </Button>
+                      ) : (
+                        <Button
+                          disabled={Object.keys(assessmentAnswers).length < assessmentQuestions.length || completeMutation.isPending}
+                          className="bg-teal-600 hover:bg-teal-700"
+                          onClick={() => {
+                            const correct = assessmentQuestions.filter((q, i) =>
+                              assessmentAnswers[i] === q.correct_answer
+                            ).length;
+                            const score = Math.round((correct / assessmentQuestions.length) * 100);
+                            const passed = score >= 80;
+                            setAssessmentResult({ score, passed, correct });
+                            if (passed) completeMutation.mutate(score);
+                          }}>
+                          {completeMutation.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Submitting…</> : 'Submit Assessment'}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  /* ── Result view ── */
+                  <Card className={`p-6 text-center ${assessmentResult.passed ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+                    {assessmentResult.passed ? (
+                      <>
+                        <CheckCircle2 className="w-14 h-14 text-emerald-500 mx-auto mb-3" />
+                        <p className="text-2xl font-bold text-emerald-800 mb-1">{assessmentResult.score}% — Pass!</p>
+                        <p className="text-sm text-emerald-600 mb-4">
+                          You answered {assessmentResult.correct} out of {assessmentQuestions.length} questions correctly.
+                        </p>
+                        <p className="text-sm text-emerald-700 mb-4">Your certificate is being generated.</p>
+                        <Button onClick={() => setShowCredits(true)} className="bg-emerald-600 hover:bg-emerald-700">
+                          <Award className="w-4 h-4 mr-2" /> View Credits & Complete
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="w-14 h-14 text-red-400 mx-auto mb-3" />
+                        <p className="text-2xl font-bold text-red-700 mb-1">{assessmentResult.score}% — Not Passed</p>
+                        <p className="text-sm text-red-600 mb-2">
+                          You need 80% to pass. You answered {assessmentResult.correct} out of {assessmentQuestions.length} correctly.
+                        </p>
+                        <p className="text-sm text-red-500 mb-4">Review the course material and try again.</p>
+                        <Button variant="outline" className="border-red-300 text-red-700"
+                          onClick={() => {
+                            const shuffled = [...(course?.assessment_questions || [])].sort(() => Math.random() - 0.5);
+                            setAssessmentQuestions(shuffled.slice(0, Math.min(10, shuffled.length)));
+                            setAssessmentAnswers({});
+                            setAssessmentIdx(0);
+                            setAssessmentResult(null);
+                          }}>
+                          <RotateCcw className="w-4 h-4 mr-2" /> Try Again
+                        </Button>
+                      </>
+                    )}
+                  </Card>
+                )}
+              </div>
+            ) : null}
+
             {/* ── Credits screen ─────────────────────────────────────────── */}
             {showCredits ? (
               <div className="flex-1 space-y-6">
@@ -395,7 +531,7 @@ export default function CoursePlayer({ isOpen, onClose, courseId }) {
                   </Button>
                 </div>
               </div>
-            ) : currentLesson ? (
+            ) : !showAssessment && currentLesson ? (
               <>
                 <div className="flex-1 space-y-4 sm:space-y-6">
                   {/* Lesson Header */}
