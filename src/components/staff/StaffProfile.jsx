@@ -15,9 +15,10 @@ import RotaAreaPermissions from '@/components/staff/RotaAreaPermissions';
 import StaffHRManagement from '@/components/staff/StaffHRManagement';
 import StaffLeaveBalance from '@/components/staff/StaffLeaveBalance';
 import StaffSupervisions from '@/components/staff/StaffSupervisions';
+import StaffCompetencyManagement from '@/components/competencies/StaffCompetencyManagement';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from 'sonner';
-import { ArrowLeft, Edit, Shield, MapPin, UserX, UserCheck, Trash2, Mail, Loader2, User, Briefcase, Calendar, FileText, ClipboardList, ChevronLeft, Palmtree, Trophy } from 'lucide-react';
+import { ArrowLeft, Edit, Shield, MapPin, UserX, UserCheck, Trash2, Mail, Loader2, User, Briefcase, Calendar, FileText, ClipboardList, ClipboardCheck, ChevronLeft, Palmtree, Trophy } from 'lucide-react';
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -572,6 +573,7 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
           {activeTab === 'leave' && <StaffLeaveBalance staffId={staffId} isAdmin={isAdmin} staffName={staff?.full_name} />}
           {activeTab === 'hr' && <StaffHRManagement staffId={staffId} isAdmin={isAdmin} isOwnProfile={isOwnProfile} />}
           {activeTab === 'supervision' && <StaffSupervisions staffId={staffId} isAdmin={isAdmin} staffName={staff?.full_name} />}
+          {activeTab === 'competencies' && <StaffCompetencyManagement staffId={staffId} staffName={staff?.full_name} isAdmin={isAdmin} />}
           {activeTab === 'awards' && (
             <Card className="p-4 sm:p-6">
               <div className="flex items-center justify-between mb-4">
@@ -619,6 +621,7 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
             { value: 'leave', label: 'Leave', icon: Palmtree, bg: 'from-green-400 to-green-600', desc: 'Holiday balance & requests' },
             { value: 'hr', label: 'HR & Docs', icon: FileText, bg: 'from-indigo-400 to-indigo-600', desc: 'Documents, DBS & training' },
             { value: 'supervision', label: 'Supervision', icon: ClipboardList, bg: 'from-rose-400 to-rose-600', desc: '12-weekly supervision records' },
+            { value: 'competencies', label: 'Competencies', icon: ClipboardCheck, bg: 'from-violet-400 to-violet-600', desc: 'Probationary & skills assessments' },
             { value: 'awards', label: 'Awards', icon: Trophy, bg: 'from-amber-400 to-yellow-500', desc: 'Recognition & achievements' },
           ].map(section => {
             const Icon = section.icon;

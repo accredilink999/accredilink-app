@@ -435,4 +435,8 @@ export const entities = {
 
   // Archived MAR Charts
   ArchivedMARChart:            buildEntity('archived_mar_charts'),
+
+  // Competency Assessments
+  CompetencyFramework:         buildEntity('competency_frameworks'),
+  CompetencyAssessment:        buildEntity('competency_assessments'),
 }

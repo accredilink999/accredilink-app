@@ -1,0 +1,30 @@
+-- Seed: Probationary Domiciliary Care Worker Competency Checklist (Wales)
+-- is_system = true so it is available to all organisations
+
+INSERT INTO competency_frameworks (title, description, category, region, is_system, sections, observation_areas, final_review_items)
+VALUES (
+  'Probationary Domiciliary Care Worker Competency Checklist (Wales)',
+  'Covers the key competency areas expected of adult domiciliary care workers in Wales during their probationary period. Can be used as a formal probation workbook or competency assessment document.',
+  'probation',
+  'Wales',
+  true,
+  $sections$[
+    {"title":"1. Professional Values and Conduct","items":["Understands the role and responsibilities of a domiciliary care worker.","Demonstrates dignity, respect, and compassion.","Maintains professional boundaries.","Understands duty of care.","Follows the employer''s code of conduct.","Demonstrates reliability and punctuality.","Maintains confidentiality.","Understands data protection requirements.","Uses respectful and person-centred language.","Demonstrates equality, diversity, inclusion, and anti-discriminatory practice."]},
+    {"title":"2. Person-Centred Care and Support","items":["Understands person-centred approaches.","Supports individuals according to care plans.","Promotes independence and choice.","Respects individual preferences and routines.","Supports dignity in personal care.","Encourages participation in decision-making.","Recognises individual strengths and abilities.","Records changes in needs accurately.","Understands outcome-focused care."]},
+    {"title":"3. Communication Skills","items":["Communicates clearly and professionally.","Uses active listening skills.","Adapts communication to individual needs.","Uses non-verbal communication appropriately.","Communicates effectively with family members.","Reports concerns appropriately.","Completes documentation accurately.","Maintains professional telephone etiquette.","Understands communication barriers and solutions."]},
+    {"title":"4. Safeguarding Adults","items":["Understands safeguarding responsibilities.","Recognises signs of abuse and neglect.","Understands types of abuse.","Knows how to report safeguarding concerns.","Understands whistleblowing procedures.","Understands Mental Capacity principles.","Understands consent.","Demonstrates safe working practices.","Reports concerns immediately and appropriately."]},
+    {"title":"5. Health and Safety","items":["Understands health and safety policies.","Identifies hazards in service users'' homes.","Completes risk assessments where required.","Reports accidents and incidents.","Understands fire safety procedures.","Uses PPE correctly.","Demonstrates infection prevention and control.","Maintains safe working environments.","Understands lone working procedures.","Follows moving and handling guidance."]},
+    {"title":"6. Medication Support","items":["Understands medication policies.","Administers medication safely (if authorised).","Follows MAR charts correctly.","Identifies medication errors.","Reports medication concerns promptly.","Maintains accurate medication records.","Demonstrates safe storage practices.","Understands covert medication procedures."]},
+    {"title":"7. Personal Care Skills","items":["Supports washing and bathing safely.","Supports dressing and grooming.","Supports oral care.","Maintains dignity during personal care.","Promotes independence where possible.","Uses PPE appropriately.","Identifies skin integrity concerns.","Reports concerns appropriately."]},
+    {"title":"8. Nutrition and Hydration","items":["Supports meal preparation safely.","Understands dietary requirements.","Encourages adequate fluid intake.","Monitors nutrition concerns.","Records food and fluid intake where required.","Follows food hygiene principles.","Reports concerns regarding eating or drinking."]},
+    {"title":"9. Moving and Handling","items":["Understands moving and handling principles.","Uses equipment safely.","Follows risk assessments.","Demonstrates correct techniques.","Recognises unsafe situations.","Requests assistance appropriately.","Maintains individual dignity and comfort."]},
+    {"title":"10. Infection Prevention and Control","items":["Demonstrates effective hand hygiene.","Uses PPE correctly.","Understands cross-contamination risks.","Disposes of clinical waste correctly.","Follows cleaning procedures.","Reports infectious illness appropriately.","Understands outbreak procedures."]},
+    {"title":"11. Record Keeping and Documentation","items":["Completes daily records accurately.","Records care delivered appropriately.","Documents concerns clearly.","Maintains confidentiality.","Completes incident forms correctly.","Demonstrates factual and objective recording.","Submits records on time."]},
+    {"title":"12. Supporting Well-being","items":["Promotes emotional well-being.","Supports social inclusion.","Encourages meaningful activities.","Recognises signs of loneliness.","Demonstrates empathy and compassion.","Supports mental well-being.","Reports concerns regarding mood or behaviour."]},
+    {"title":"13. Dementia Awareness","items":["Demonstrates understanding of dementia.","Uses dementia-friendly communication.","Responds appropriately to distress.","Promotes familiarity and reassurance.","Understands person-centred dementia care.","Reports changes in cognition or behaviour."]},
+    {"title":"14. Professional Development","items":["Completes induction requirements.","Attends mandatory training.","Participates in supervision.","Accepts feedback positively.","Demonstrates reflective practice.","Identifies learning needs.","Works towards required qualifications."]}
+  ]$sections$::jsonb,
+  '["Personal Care","Medication","Communication","Record Keeping","Infection Control","Moving & Handling","Safeguarding","Person-Centred Care"]'::jsonb,
+  '["Successfully completed induction.","Demonstrated required competencies.","Safe to work unsupervised.","Suitable for confirmation in post.","Additional probation period required."]'::jsonb
+)
+ON CONFLICT DO NOTHING;
