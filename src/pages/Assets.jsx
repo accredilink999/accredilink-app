@@ -32,7 +32,12 @@ import {
   Folder,
   Users,
   LayoutList,
-  Wallet
+  Wallet,
+  PoundSterling,
+  MessageSquare,
+  Star,
+  Bot,
+  ClipboardCheck
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
@@ -234,14 +239,16 @@ export default function Assets() {
           { to: 'ApprovalsAndFinancials', label: 'Approvals', icon: Wallet, bg: 'from-amber-400 to-amber-600', desc: 'Approvals & financials' },
           { to: 'Training', label: 'Training', icon: GraduationCap, bg: 'from-purple-400 to-purple-600', desc: 'Training & CPD' },
           { to: 'Documents', label: 'Documents', icon: Folder, bg: 'from-blue-400 to-blue-600', desc: 'My docs & compliance' },
+          { to: 'Payroll', label: 'Payslips', icon: PoundSterling, bg: 'from-green-400 to-emerald-600', desc: 'Payslips & pay history' },
+          { to: 'Feedback', label: 'Feedback', icon: Star, bg: 'from-amber-400 to-yellow-500', desc: 'Share your feedback' },
+          { to: 'AIAssistant', label: 'AI', icon: Bot, bg: 'from-purple-400 to-purple-600', desc: 'AI care assistant' },
+          { to: 'Competencies', label: 'Competencies', icon: ClipboardCheck, bg: 'from-violet-400 to-violet-600', desc: 'Probationary & skills' },
+          { href: 'https://carecallai.co.uk/forum', label: 'Forum', icon: MessageSquare, bg: 'from-cyan-400 to-teal-600', desc: 'Community forum' },
         ].map(section => {
           const Icon = section.icon;
-          return (
-            <Link
-              key={section.to}
-              to={createPageUrl(section.to)}
-              className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-4 sm:p-5 min-h-[110px] active:scale-95"
-            >
+          const cls = "flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-4 sm:p-5 min-h-[110px] active:scale-95";
+          const content = (
+            <>
               <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${section.bg} flex items-center justify-center mb-2 shadow-sm`}>
                 <Icon className="w-6 h-6 text-white" strokeWidth={1.8} />
               </div>
@@ -251,6 +258,18 @@ export default function Assets() {
               <span className="text-[10px] text-slate-400 text-center mt-1 leading-tight line-clamp-2">
                 {section.desc}
               </span>
+            </>
+          );
+          if (section.href) {
+            return (
+              <a key={section.label} href={section.href} target="_blank" rel="noopener noreferrer" className={cls}>
+                {content}
+              </a>
+            );
+          }
+          return (
+            <Link key={section.to} to={createPageUrl(section.to)} className={cls}>
+              {content}
             </Link>
           );
         })}

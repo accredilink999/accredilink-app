@@ -750,7 +750,7 @@ export default function Dashboard() {
             { to: 'ApprovalsAndFinancials', label: 'My Admin', icon: FileText, bg: 'from-indigo-400 to-indigo-600' },
             { to: 'Feedback', label: 'Feedback', icon: Star, bg: 'from-amber-400 to-yellow-500' },
             { to: 'AIAssistant', label: 'AI', icon: Bot, bg: 'from-purple-400 to-purple-600' },
-            { to: 'Profile', label: 'Competencies', icon: ClipboardCheck, bg: 'from-violet-400 to-violet-600' },
+            { to: 'Competencies', label: 'Competencies', icon: ClipboardCheck, bg: 'from-violet-400 to-violet-600' },
           ].map(section => {
             const Icon = section.icon;
             const content = (

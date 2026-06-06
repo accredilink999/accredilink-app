@@ -1,4 +1,6 @@
 import React, { useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { ShiftApi } from '@/api/rotaApi';
@@ -42,7 +44,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import AppDownloadGuide from '@/components/profile/AppDownloadGuide';
 import StaffMyMatrix from '@/components/profile/StaffMyMatrix';
-import StaffCompetencies from '@/components/profile/StaffCompetencies';
 
 export default function Profile() {
   const queryClient = useQueryClient();
@@ -656,9 +657,6 @@ export default function Profile() {
                 <StaffMyMatrix userId={user?.id} />
               )}
 
-              {activeSection === 'competencies' && (
-                <StaffCompetencies userId={user?.id} />
-              )}
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
@@ -668,7 +666,6 @@ export default function Profile() {
                 { value: 'training', label: 'Training', icon: Award, bg: 'from-purple-400 to-purple-600', desc: 'Certificates & CPD' },
                 { value: 'activity', label: 'Activity', icon: Clock, bg: 'from-amber-400 to-amber-600', desc: 'Recent shift history' },
                 { value: 'matrix', label: 'My Matrix', icon: LayoutGrid, bg: 'from-rose-400 to-rose-600', desc: 'Compliance & training docs' },
-                { value: 'competencies', label: 'Competencies', icon: ClipboardCheck, bg: 'from-violet-400 to-violet-600', desc: 'Probationary & skills assessments' },
               ].map(section => {
                 const Icon = section.icon;
                 return (
@@ -689,6 +686,17 @@ export default function Profile() {
                   </button>
                 );
               })}
+              {/* Competencies links directly to its own page */}
+              <Link
+                to={createPageUrl('Competencies')}
+                className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-4 sm:p-5 min-h-[110px] active:scale-95"
+              >
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-400 to-violet-600 flex items-center justify-center mb-2 shadow-sm">
+                  <ClipboardCheck className="w-6 h-6 text-white" strokeWidth={1.8} />
+                </div>
+                <span className="text-sm font-semibold text-slate-700 text-center leading-tight">Competencies</span>
+                <span className="text-[10px] text-slate-400 text-center mt-1 leading-tight line-clamp-2">Probationary &amp; skills assessments</span>
+              </Link>
             </div>
           )}
         </Card>

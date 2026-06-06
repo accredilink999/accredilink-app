@@ -31,6 +31,7 @@ import LeaveRequests from './pages/LeaveRequests';
 import Messages from './pages/Messages';
 import NotificationCenter from './pages/NotificationCenter';
 import Payroll from './pages/Payroll';
+import Competencies from './pages/Competencies';
 import Profile from './pages/Profile';
 import Reports from './pages/Reports';
 import RequestsManagement from './pages/RequestsManagement';
@@ -62,6 +63,7 @@ export const PAGES = {
     "Assets": Assets,
     "CareLogs": CareLogs,
     "Chat": Chat,
+    "Competencies": Competencies,
     "ClientManagement": ClientManagement,
     "ClockInOut": ClockInOut,
     "CommunicationArchive": CommunicationArchive,
