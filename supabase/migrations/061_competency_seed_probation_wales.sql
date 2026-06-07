@@ -3,7 +3,7 @@
 
 INSERT INTO competency_frameworks (title, description, category, region, is_system, sections, observation_areas, final_review_items)
 VALUES (
-  'Probationary Domiciliary Care Worker Competency Checklist (Wales)',
+  'Care Clinician Skills Competency Framework',
   'Covers the key competency areas expected of adult domiciliary care workers in Wales during their probationary period. Can be used as a formal probation workbook or competency assessment document.',
   'probation',
   'Wales',
