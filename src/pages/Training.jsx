@@ -22,6 +22,7 @@ import AICourseBuilder from '@/components/training/AICourseBuilder';
 import CoursePlayer from '@/components/training/CoursePlayer';
 import AssignCourses from '@/components/training/AssignCourses';
 import MyMentoring from '@/pages/MyMentoring';
+import StaffMatrix from '@/components/staff/StaffMatrix';
 import {
   Plus,
   Search,
@@ -37,7 +38,9 @@ import {
   BarChart3,
   Sparkles,
   Loader2,
-  Users
+  Users,
+  ClipboardCheck,
+  LayoutGrid
 } from 'lucide-react';
 import { toast } from 'sonner';
 import HelpTip from '@/components/ui/HelpTip';
@@ -455,7 +458,28 @@ Return ONLY valid JSON (no markdown) with this COMPLETE structure:
 
         {/* My Mentoring Tab */}
         <TabsContent value="mentoring" className="mt-6">
-          <MyMentoring embedded />
+          {isAdmin ? (
+            <Tabs defaultValue="assessments" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsTrigger value="assessments" className="flex items-center gap-1.5 text-xs sm:text-sm">
+                  <Users className="w-3.5 h-3.5" />
+                  <span>My Mentoring</span>
+                </TabsTrigger>
+                <TabsTrigger value="matrix" className="flex items-center gap-1.5 text-xs sm:text-sm">
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <span>Staff Matrix</span>
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="assessments">
+                <MyMentoring embedded />
+              </TabsContent>
+              <TabsContent value="matrix">
+                <StaffMatrix isAdmin={isAdmin} isSuperAdmin={user?.role === 'super_admin'} />
+              </TabsContent>
+            </Tabs>
+          ) : (
+            <MyMentoring embedded />
+          )}
         </TabsContent>
 
         {/* Legacy Training Records */}
