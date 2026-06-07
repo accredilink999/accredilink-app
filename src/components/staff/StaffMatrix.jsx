@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Plus, Trash2, FileText, Upload, ExternalLink, CheckCircle2, AlertTriangle, XCircle, X, ClipboardCheck, User, Users, Award } from 'lucide-react';
+import { Loader2, Plus, Trash2, FileText, Upload, ExternalLink, CheckCircle2, AlertTriangle, XCircle, X, ClipboardCheck, User, Users, Award, Download } from 'lucide-react';
 import { format, parseISO, addMonths } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -173,18 +173,17 @@ function MatrixCell({ entry, column, staff, isAdmin, onClick }) {
 
 // ── Skills cell ───────────────────────────────────────────────────────────────
 function SkillsCell({ assessment, framework, staff, onClick }) {
-  const key = assessment ? (
-    assessment.status === 'completed' ? 'completed' :
-    assessment.status === 'awaiting_signoff' ? 'awaiting_signoff' : 'in_progress'
-  ) : 'unassigned';
-  const { bg, border, dot } = SKILL_STATUS[key];
+  // Use the same STATUS colour palette as all other matrix cells
+  const statusKey = !assessment ? 'empty' :
+    assessment.status === 'awaiting_signoff' ? 'expiring' : 'valid';
+  const { bg, border, dot } = STATUS[statusKey];
   const pct = getSkillProgress(assessment, framework);
 
   return (
     <div
       onClick={() => onClick({ staff, framework, assessment })}
       title={assessment
-        ? `${SKILL_STATUS[key].label} · ${pct}% met\nMentor: ${assessment.mentor_name}`
+        ? `${SKILL_STATUS[assessment.status === 'completed' ? 'completed' : assessment.status === 'awaiting_signoff' ? 'awaiting_signoff' : 'in_progress'].label} · ${pct}% met\nMentor: ${assessment.mentor_name}`
         : 'Not yet assigned — manage in Staff Profile'
       }
       style={{
@@ -583,8 +582,12 @@ export default function StaffMatrix({ isAdmin, isSuperAdmin = false }) {
       {/* Legend */}
       {matrixType === 'skills' ? (
         <div className="flex gap-3 flex-wrap text-xs">
-          {Object.entries(SKILL_STATUS).map(([key, { dot, label }]) => (
-            <div key={key} className="flex items-center gap-1.5">
+          {[
+            { dot: STATUS.empty.dot,    label: 'Not Assigned' },
+            { dot: STATUS.valid.dot,    label: 'In Progress / Completed' },
+            { dot: STATUS.expiring.dot, label: 'Awaiting Sign-Off' },
+          ].map(({ dot, label }) => (
+            <div key={label} className="flex items-center gap-1.5">
               <div style={{ width: 10, height: 10, borderRadius: '50%', background: dot, flexShrink: 0 }} />
               <span className="text-slate-500">{label}</span>
             </div>
@@ -1218,13 +1221,51 @@ export default function StaffMatrix({ isAdmin, isSuperAdmin = false }) {
 
                   <div className="pt-2 border-t border-slate-100">
                     <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
-                      <span>Progress</span>
+                      <span>Overall Progress</span>
                       <span>{pct}%</span>
                     </div>
                     <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
                       <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: `${pct}%` }} />
                     </div>
                   </div>
+
+                  {/* Per-section breakdown with certificate links */}
+                  {fw?.sections?.length > 0 && (
+                    <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                      <p className="text-xs font-semibold text-slate-500">Sections</p>
+                      {fw.sections.map((sec, si) => {
+                        const sectionItems = a.responses?.sections?.[si]?.items || {};
+                        const total = sec.items?.length || 0;
+                        const met = (sec.items || []).filter((_, ii) => getItemStatusVal(sectionItems[ii]) === 'met').length;
+                        const certUrl = a.responses?.sections?.[si]?.certificate_url;
+                        const allMet = total > 0 && met === total;
+                        return (
+                          <div key={si} className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                              <div style={{
+                                width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                                background: allMet ? STATUS.valid.dot : met > 0 ? STATUS.expiring.dot : STATUS.empty.dot,
+                              }} />
+                              <span className="text-xs text-slate-600 truncate">{sec.title}</span>
+                              <span className="text-[10px] text-slate-400 flex-shrink-0">{met}/{total}</span>
+                            </div>
+                            {certUrl && (
+                              <a
+                                href={certUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={e => e.stopPropagation()}
+                                title="Download section certificate"
+                                className="flex items-center gap-0.5 text-[10px] text-violet-600 hover:text-violet-800 flex-shrink-0 font-medium"
+                              >
+                                <Download style={{ width: 10, height: 10 }} /> Cert
+                              </a>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
 
                   <p className="text-[11px] text-slate-400 pt-1">
                     To manage this assessment, open the staff member's profile and go to the Competencies tab.
