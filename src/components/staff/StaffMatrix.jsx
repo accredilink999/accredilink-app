@@ -9,15 +9,16 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Plus, Trash2, FileText, Upload, ExternalLink, CheckCircle2, AlertTriangle, XCircle, X, ChevronDown } from 'lucide-react';
+import { Loader2, Plus, Trash2, FileText, Upload, ExternalLink, CheckCircle2, AlertTriangle, XCircle, X, ClipboardCheck, User, Users, Award } from 'lucide-react';
 import { format, parseISO, addMonths } from 'date-fns';
 import { toast } from 'sonner';
 
 // ── Matrix type definitions ───────────────────────────────────────────────────
 const MATRIX_TYPES = [
-  { key: 'onboarding',  label: 'Onboarding Documents',   emoji: '📋', accent: '#3b82f6' },
-  { key: 'compliance',  label: 'Compliance',              emoji: '✅', accent: '#0d9488', yearly: true },
-  { key: 'training',    label: 'Training & Development',  emoji: '🎓', accent: '#8b5cf6' },
+  { key: 'onboarding',  label: 'Onboarding Documents',        emoji: '📋', accent: '#3b82f6' },
+  { key: 'compliance',  label: 'Compliance',                  emoji: '✅', accent: '#0d9488', yearly: true },
+  { key: 'training',    label: 'Training & Development',      emoji: '🎓', accent: '#8b5cf6' },
+  { key: 'skills',      label: 'Clinical Skills & Standards', emoji: '⚕️', accent: '#7c3aed' },
 ];
 
 // ── Cell status helpers ────────────────────────────────────────────────────────
@@ -25,7 +26,6 @@ function getStatus(entry, matrixType) {
   if (!entry) return 'empty';
   const today = new Date(); today.setHours(0,0,0,0);
 
-  // Compliance: yearly cycle — expires Dec 31 of the year it was completed
   if (matrixType === 'compliance') {
     let exp;
     if (entry.expiry_date) {
@@ -33,15 +33,14 @@ function getStatus(entry, matrixType) {
     } else if (entry.record_date) {
       exp = new Date(`${new Date(entry.record_date).getFullYear()}-12-31`);
     } else {
-      return 'valid'; // entry exists but no dates yet
+      return 'valid';
     }
     if (exp < today) return 'expired';
     if (exp < addMonths(today, 2)) return 'expiring';
     return 'valid';
   }
 
-  // Standard: use expiry_date if present
-  if (!entry.expiry_date) return 'valid';          // filed, no expiry
+  if (!entry.expiry_date) return 'valid';
   const exp = new Date(entry.expiry_date);
   if (exp < today) return 'expired';
   if (exp < addMonths(today, 2)) return 'expiring';
@@ -54,6 +53,33 @@ const STATUS = {
   expiring: { bg: '#fffbeb', border: '#fde68a', dot: '#f59e0b', label: 'Expiring soon',  Icon: AlertTriangle },
   expired:  { bg: '#fef2f2', border: '#fca5a5', dot: '#ef4444', label: 'Expired',        Icon: XCircle },
 };
+
+// ── Skills status helpers ─────────────────────────────────────────────────────
+const SKILL_STATUS = {
+  unassigned:       { bg: '#f8fafc', border: '#e2e8f0', dot: '#cbd5e1', label: 'Not Assigned' },
+  in_progress:      { bg: '#eff6ff', border: '#93c5fd', dot: '#3b82f6', label: 'In Progress' },
+  awaiting_signoff: { bg: '#fffbeb', border: '#fde68a', dot: '#f59e0b', label: 'Awaiting Sign-Off' },
+  completed:        { bg: '#f0fdf4', border: '#86efac', dot: '#22c55e', label: 'Completed' },
+};
+
+function getItemStatusVal(val) {
+  if (!val) return null;
+  return typeof val === 'string' ? val : val?.status || null;
+}
+
+function getSkillProgress(assessment, framework) {
+  if (!assessment || !framework) return 0;
+  const sections = framework.sections || [];
+  const responses = assessment.responses?.sections || {};
+  let total = 0, done = 0;
+  sections.forEach((s, si) => {
+    (s.items || []).forEach((_, ii) => {
+      total++;
+      if (getItemStatusVal(responses[si]?.items?.[ii]) === 'met') done++;
+    });
+  });
+  return total > 0 ? Math.round((done / total) * 100) : 0;
+}
 
 // ── SQL shown when tables haven't been created yet ───────────────────────────
 const SETUP_SQL = `-- Run this in your Supabase SQL editor (Database > SQL Editor)
@@ -145,22 +171,79 @@ function MatrixCell({ entry, column, staff, isAdmin, onClick }) {
   );
 }
 
+// ── Skills cell ───────────────────────────────────────────────────────────────
+function SkillsCell({ assessment, framework, staff, onClick }) {
+  const key = assessment ? (
+    assessment.status === 'completed' ? 'completed' :
+    assessment.status === 'awaiting_signoff' ? 'awaiting_signoff' : 'in_progress'
+  ) : 'unassigned';
+  const { bg, border, dot } = SKILL_STATUS[key];
+  const pct = getSkillProgress(assessment, framework);
+
+  return (
+    <div
+      onClick={() => onClick({ staff, framework, assessment })}
+      title={assessment
+        ? `${SKILL_STATUS[key].label} · ${pct}% met\nMentor: ${assessment.mentor_name}`
+        : 'Not yet assigned — manage in Staff Profile'
+      }
+      style={{
+        width: 72, height: 56,
+        background: bg, border: `2px solid ${border}`,
+        borderRadius: 10, cursor: 'pointer',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        gap: 2, flexShrink: 0,
+        transition: 'transform 0.1s, box-shadow 0.1s',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.12)'; }}
+      onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = 'none'; }}
+    >
+      {!assessment ? (
+        <span style={{ fontSize: 11, color: '#94a3b8' }}>—</span>
+      ) : assessment.status === 'completed' ? (
+        <>
+          <CheckCircle2 style={{ width: 16, height: 16, color: dot }} />
+          <span style={{ fontSize: 9, color: dot, fontWeight: 700 }}>Done</span>
+        </>
+      ) : assessment.status === 'awaiting_signoff' ? (
+        <>
+          <AlertTriangle style={{ width: 15, height: 15, color: dot }} />
+          <span style={{ fontSize: 9, color: dot, fontWeight: 600 }}>Sign-off</span>
+        </>
+      ) : (
+        <>
+          <span style={{ fontSize: 13, fontWeight: 700, color: dot, lineHeight: 1 }}>{pct}%</span>
+          <span style={{ fontSize: 9, color: dot }}>met</span>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function StaffMatrix({ isAdmin }) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef(null);
 
   const [matrixType, setMatrixType] = useState('onboarding');
-  const [editDialog, setEditDialog] = useState(null); // { staff, column, entry }
+  const [editDialog, setEditDialog] = useState(null);
   const [showAddColumn, setShowAddColumn] = useState(false);
   const [newColumnTitle, setNewColumnTitle] = useState('');
   const [form, setForm] = useState({});
   const [uploading, setUploading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [skillsDialog, setSkillsDialog] = useState(null); // { staff, framework, assessment }
+  const [initiateConfirm, setInitiateConfirm] = useState(null); // framework to initiate
 
   const orgId = getCurrentOrgId();
 
   // ── Queries ────────────────────────────────────────────────────────────────
+  const { data: currentUser } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: () => base44.auth.me(),
+  });
+
   const { data: allStaff = [] } = useQuery({
     queryKey: ['allStaff'],
     queryFn: () => base44.entities.User.list(),
@@ -180,6 +263,7 @@ export default function StaffMatrix({ isAdmin }) {
       return data || [];
     },
     retry: false,
+    enabled: matrixType !== 'skills',
   });
 
   const { data: entries = [], isLoading: entryLoading } = useQuery({
@@ -195,7 +279,31 @@ export default function StaffMatrix({ isAdmin }) {
       if (error) throw error;
       return data || [];
     },
-    enabled: columns.length > 0,
+    enabled: columns.length > 0 && matrixType !== 'skills',
+  });
+
+  // ── Skills matrix data ─────────────────────────────────────────────────────
+  const { data: skillFrameworks = [], isLoading: fwLoading } = useQuery({
+    queryKey: ['skill-frameworks'],
+    queryFn: async () => {
+      const { data } = await supabase.from('competency_frameworks').select('*').eq('is_active', true);
+      return data || [];
+    },
+    enabled: matrixType === 'skills',
+  });
+
+  const { data: skillAssessments = [], isLoading: saLoading } = useQuery({
+    queryKey: ['skill-assessments-matrix', orgId],
+    queryFn: async () => {
+      let q = supabase
+        .from('competency_assessments')
+        .select('id,staff_id,framework_id,status,responses,mentor_name,mentor_id,second_mentor_name,second_mentor_id,created_at,completed_at');
+      if (orgId) q = q.eq('organization_id', orgId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: matrixType === 'skills',
   });
 
   // ── Derived: O(1) entry lookup ─────────────────────────────────────────────
@@ -205,7 +313,13 @@ export default function StaffMatrix({ isAdmin }) {
     return m;
   }, [entries]);
 
-  // ── Status summary for a staff member in this matrix ──────────────────────
+  const assessmentMap = useMemo(() => {
+    const m = {};
+    skillAssessments.forEach(a => { m[`${a.staff_id}:${a.framework_id}`] = a; });
+    return m;
+  }, [skillAssessments]);
+
+  // ── Status summary for a staff member ─────────────────────────────────────
   function staffSummary(staffId) {
     let valid = 0, expiring = 0, expired = 0, empty = 0;
     columns.forEach(col => {
@@ -216,6 +330,18 @@ export default function StaffMatrix({ isAdmin }) {
       else empty++;
     });
     return { valid, expiring, expired, empty };
+  }
+
+  function skillsSummary(staffId) {
+    let assigned = 0, completed = 0, inProgress = 0, unassigned = 0;
+    skillFrameworks.forEach(fw => {
+      const a = assessmentMap[`${staffId}:${fw.id}`];
+      if (!a) { unassigned++; return; }
+      assigned++;
+      if (a.status === 'completed') completed++;
+      else inProgress++;
+    });
+    return { assigned, completed, inProgress, unassigned };
   }
 
   // ── Mutations ──────────────────────────────────────────────────────────────
@@ -292,6 +418,40 @@ export default function StaffMatrix({ isAdmin }) {
     onError: (e) => toast.error('Failed to remove: ' + e.message),
   });
 
+  // ── Bulk initiate framework for all staff ─────────────────────────────────
+  const initiateFrameworkMutation = useMutation({
+    mutationFn: async (frameworkId) => {
+      const existingIds = new Set(
+        skillAssessments.filter(a => a.framework_id === frameworkId).map(a => a.staff_id)
+      );
+      const staffToAssign = allStaff.filter(s => !existingIds.has(s.id));
+      if (staffToAssign.length === 0) throw new Error('All staff already have this framework assigned.');
+      const mentorName = currentUser?.staff_full_name || currentUser?.full_name || 'Manager';
+      const now = new Date().toISOString();
+      const inserts = staffToAssign.map(s => ({
+        staff_id: s.id,
+        staff_name: s.staff_full_name || s.full_name || s.email,
+        framework_id: frameworkId,
+        mentor_id: currentUser?.id,
+        mentor_name: mentorName,
+        organization_id: orgId,
+        status: 'in_progress',
+        responses: {},
+        created_at: now,
+        updated_at: now,
+      }));
+      const { error } = await supabase.from('competency_assessments').insert(inserts);
+      if (error) throw error;
+      return staffToAssign.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ['skill-assessments-matrix'] });
+      setInitiateConfirm(null);
+      toast.success(`Framework assigned to ${count} staff member${count !== 1 ? 's' : ''}.`);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   // ── Document upload ────────────────────────────────────────────────────────
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -336,7 +496,7 @@ export default function StaffMatrix({ isAdmin }) {
   // ── Table-missing state ────────────────────────────────────────────────────
   const tablesMissing = colError?.code === '42P01' || colError?.message?.includes('does not exist');
 
-  if (tablesMissing) {
+  if (tablesMissing && matrixType !== 'skills') {
     return (
       <div className="space-y-4 p-4">
         <div className="rounded-xl border-2 border-amber-200 bg-amber-50 p-6">
@@ -366,7 +526,7 @@ export default function StaffMatrix({ isAdmin }) {
   }
 
   const activeType = MATRIX_TYPES.find(t => t.key === matrixType);
-  const isLoading = colLoading || entryLoading;
+  const isLoading = matrixType === 'skills' ? (fwLoading || saLoading) : (colLoading || entryLoading);
 
   return (
     <div className="space-y-4">
@@ -400,10 +560,13 @@ export default function StaffMatrix({ isAdmin }) {
             {activeType.emoji} {activeType.label}
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            {columns.length} column{columns.length !== 1 ? 's' : ''} · {allStaff.length} staff
+            {matrixType === 'skills'
+              ? `${skillFrameworks.length} framework${skillFrameworks.length !== 1 ? 's' : ''} · ${allStaff.length} staff`
+              : `${columns.length} column${columns.length !== 1 ? 's' : ''} · ${allStaff.length} staff`
+            }
           </p>
         </div>
-        {isAdmin && (
+        {isAdmin && matrixType !== 'skills' && (
           <Button
             size="sm"
             onClick={() => setShowAddColumn(true)}
@@ -417,14 +580,26 @@ export default function StaffMatrix({ isAdmin }) {
       </div>
 
       {/* Legend */}
-      <div className="flex gap-3 flex-wrap text-xs">
-        {Object.entries(STATUS).map(([key, { dot, label }]) => (
-          <div key={key} className="flex items-center gap-1.5">
-            <div style={{ width: 10, height: 10, borderRadius: '50%', background: dot, flexShrink: 0 }} />
-            <span className="text-slate-500">{label}</span>
-          </div>
-        ))}
-      </div>
+      {matrixType === 'skills' ? (
+        <div className="flex gap-3 flex-wrap text-xs">
+          {Object.entries(SKILL_STATUS).map(([key, { dot, label }]) => (
+            <div key={key} className="flex items-center gap-1.5">
+              <div style={{ width: 10, height: 10, borderRadius: '50%', background: dot, flexShrink: 0 }} />
+              <span className="text-slate-500">{label}</span>
+            </div>
+          ))}
+          <span className="text-slate-400 ml-1">· Click a cell for details</span>
+        </div>
+      ) : (
+        <div className="flex gap-3 flex-wrap text-xs">
+          {Object.entries(STATUS).map(([key, { dot, label }]) => (
+            <div key={key} className="flex items-center gap-1.5">
+              <div style={{ width: 10, height: 10, borderRadius: '50%', background: dot, flexShrink: 0 }} />
+              <span className="text-slate-500">{label}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Loading */}
       {isLoading && (
@@ -433,8 +608,8 @@ export default function StaffMatrix({ isAdmin }) {
         </div>
       )}
 
-      {/* Empty columns state */}
-      {!isLoading && columns.length === 0 && (
+      {/* ── Standard matrix (onboarding / compliance / training) ── */}
+      {matrixType !== 'skills' && !isLoading && columns.length === 0 && (
         <div className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 p-10 text-center">
           <div className="text-4xl mb-3">{activeType.emoji}</div>
           <p className="font-semibold text-slate-700">No columns yet</p>
@@ -455,14 +630,12 @@ export default function StaffMatrix({ isAdmin }) {
         </div>
       )}
 
-      {/* Matrix grid */}
-      {!isLoading && columns.length > 0 && allStaff.length > 0 && (
+      {matrixType !== 'skills' && !isLoading && columns.length > 0 && allStaff.length > 0 && (
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
           <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <table style={{ borderCollapse: 'separate', borderSpacing: 0, minWidth: 'max-content', width: '100%' }}>
               <thead>
                 <tr style={{ background: '#f8fafc' }}>
-                  {/* Sticky name column header */}
                   <th style={{
                     position: 'sticky', left: 0, zIndex: 10,
                     background: '#f8fafc', padding: '12px 16px',
@@ -472,7 +645,6 @@ export default function StaffMatrix({ isAdmin }) {
                   }}>
                     Staff Member
                   </th>
-                  {/* Column headers */}
                   {columns.map(col => (
                     <th key={col.id} style={{
                       padding: '8px 8px 8px',
@@ -481,10 +653,7 @@ export default function StaffMatrix({ isAdmin }) {
                       minWidth: 80, maxWidth: 80,
                     }}>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                        <span style={{
-                          wordBreak: 'break-word', lineHeight: 1.3,
-                          maxWidth: 70, display: 'block',
-                        }}>
+                        <span style={{ wordBreak: 'break-word', lineHeight: 1.3, maxWidth: 70, display: 'block' }}>
                           {col.title}
                         </span>
                         {isAdmin && (
@@ -511,7 +680,6 @@ export default function StaffMatrix({ isAdmin }) {
                       </div>
                     </th>
                   ))}
-                  {/* Summary column */}
                   <th style={{
                     padding: '12px 16px', textAlign: 'center',
                     fontSize: 12, fontWeight: 600, color: '#64748b',
@@ -526,11 +694,7 @@ export default function StaffMatrix({ isAdmin }) {
                   const name = staff.staff_full_name || staff.full_name || staff.email;
                   const summary = staffSummary(staff.id);
                   return (
-                    <tr
-                      key={staff.id}
-                      style={{ background: idx % 2 === 0 ? '#fff' : '#fafafa' }}
-                    >
-                      {/* Sticky staff name */}
+                    <tr key={staff.id} style={{ background: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
                       <td style={{
                         position: 'sticky', left: 0, zIndex: 5,
                         background: idx % 2 === 0 ? '#fff' : '#fafafa',
@@ -559,14 +723,8 @@ export default function StaffMatrix({ isAdmin }) {
                           </div>
                         </div>
                       </td>
-
-                      {/* Cells */}
                       {columns.map(col => (
-                        <td key={col.id} style={{
-                          padding: '8px 8px',
-                          borderBottom: '1px solid #f1f5f9',
-                          textAlign: 'center',
-                        }}>
+                        <td key={col.id} style={{ padding: '8px 8px', borderBottom: '1px solid #f1f5f9', textAlign: 'center' }}>
                           <MatrixCell
                             entry={entryMap[`${staff.id}:${col.id}`]}
                             column={col}
@@ -576,12 +734,7 @@ export default function StaffMatrix({ isAdmin }) {
                           />
                         </td>
                       ))}
-
-                      {/* Summary badges */}
-                      <td style={{
-                        padding: '8px 16px', borderBottom: '1px solid #f1f5f9',
-                        textAlign: 'center',
-                      }}>
+                      <td style={{ padding: '8px 16px', borderBottom: '1px solid #f1f5f9', textAlign: 'center' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center' }}>
                           {summary.expired > 0 && (
                             <span style={{ fontSize: 10, fontWeight: 600, color: '#dc2626', background: '#fee2e2', borderRadius: 4, padding: '1px 5px' }}>
@@ -612,6 +765,186 @@ export default function StaffMatrix({ isAdmin }) {
             </table>
           </div>
         </div>
+      )}
+
+      {/* ── Clinical Skills & Standards matrix ── */}
+      {matrixType === 'skills' && !isLoading && (
+        <>
+          {/* Info card — visible to all users on this tab */}
+          <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 space-y-3">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl flex-shrink-0">⚕️</span>
+              <div>
+                <h4 className="font-bold text-violet-900 text-sm">Care Clinician Skills Competency Framework</h4>
+                <p className="text-xs text-violet-700 mt-1 leading-relaxed">
+                  A standardised workplace assessment that evaluates and documents the core competencies expected of all care staff. It covers <strong>14 key areas</strong> — from professional values and safeguarding through to medication support, personal care, and professional development.
+                </p>
+                <p className="text-xs text-violet-700 mt-2 leading-relaxed">
+                  Each staff member works through the framework with their assigned <strong>primary mentor</strong> (and optional second mentor), who observes practice, records each competency as <em>Met</em>, <em>Deferred</em>, or requiring a <em>Development Plan</em>, and logs the date of observation. Once all sections are complete, both the staff member and their mentor e-sign the assessment and a full sign-off record is retained.
+                </p>
+                <p className="text-xs text-violet-700 mt-2 leading-relaxed">
+                  Mentors are assigned per staff member in the staff profile under the <strong>Competencies</strong> tab and can be changed or swapped at any time.
+                </p>
+              </div>
+            </div>
+            {currentUser?.role === 'super_admin' && skillFrameworks.length > 0 && (
+              <div className="border-t border-violet-200 pt-3 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs font-semibold text-violet-800">Initiate for all staff</p>
+                  <p className="text-[11px] text-violet-600">
+                    Bulk-assign the framework to every staff member in your organisation who hasn't been assigned one yet. Mentors can be updated per-person in their profile.
+                  </p>
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  {skillFrameworks.map(fw => {
+                    const unassigned = allStaff.filter(s => !assessmentMap[`${s.id}:${fw.id}`]).length;
+                    return (
+                      <Button
+                        key={fw.id}
+                        size="sm"
+                        disabled={unassigned === 0 || initiateFrameworkMutation.isPending}
+                        className="bg-violet-600 hover:bg-violet-700 text-xs"
+                        onClick={() => setInitiateConfirm(fw)}
+                      >
+                        <ClipboardCheck className="w-3.5 h-3.5 mr-1" />
+                        {unassigned === 0 ? 'All assigned' : `Assign to ${unassigned} staff`}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {skillFrameworks.length === 0 ? (
+            <div className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 p-10 text-center">
+              <ClipboardCheck className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+              <p className="font-semibold text-slate-700">No active competency frameworks</p>
+              <p className="text-sm text-slate-500 mt-1">The system framework should appear here automatically.</p>
+            </div>
+          ) : (
+            <>
+              <div className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                Assessment status is read-only here. To manage an individual assessment, open the staff member's profile and go to the <strong>Competencies</strong> tab.
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                  <table style={{ borderCollapse: 'separate', borderSpacing: 0, minWidth: 'max-content', width: '100%' }}>
+                    <thead>
+                      <tr style={{ background: '#f5f3ff' }}>
+                        <th style={{
+                          position: 'sticky', left: 0, zIndex: 10,
+                          background: '#f5f3ff', padding: '12px 16px',
+                          textAlign: 'left', fontSize: 12, fontWeight: 600,
+                          color: '#64748b', borderBottom: '1px solid #e2e8f0',
+                          minWidth: 180, whiteSpace: 'nowrap',
+                        }}>
+                          Staff Member
+                        </th>
+                        {skillFrameworks.map(fw => (
+                          <th key={fw.id} style={{
+                            padding: '8px 10px',
+                            textAlign: 'center', fontSize: 11, fontWeight: 600,
+                            color: '#6d28d9', borderBottom: '1px solid #e2e8f0',
+                            minWidth: 90, maxWidth: 100,
+                          }}>
+                            <span style={{ wordBreak: 'break-word', lineHeight: 1.3, maxWidth: 88, display: 'block' }}>
+                              {fw.title}
+                            </span>
+                          </th>
+                        ))}
+                        <th style={{
+                          padding: '12px 16px', textAlign: 'center',
+                          fontSize: 12, fontWeight: 600, color: '#64748b',
+                          borderBottom: '1px solid #e2e8f0', minWidth: 90,
+                        }}>
+                          Status
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allStaff.map((staff, idx) => {
+                        const name = staff.staff_full_name || staff.full_name || staff.email;
+                        const summary = skillsSummary(staff.id);
+                        return (
+                          <tr key={staff.id} style={{ background: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
+                            <td style={{
+                              position: 'sticky', left: 0, zIndex: 5,
+                              background: idx % 2 === 0 ? '#fff' : '#fafafa',
+                              padding: '10px 16px',
+                              borderBottom: '1px solid #f1f5f9',
+                              minWidth: 180,
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <div style={{
+                                  width: 30, height: 30, borderRadius: '50%',
+                                  background: `hsl(${(name.charCodeAt(0) * 47) % 360}, 55%, 60%)`,
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0,
+                                }}>
+                                  {name.charAt(0).toUpperCase()}
+                                </div>
+                                <div style={{ minWidth: 0 }}>
+                                  <p style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 130 }}>
+                                    {name}
+                                  </p>
+                                  {staff.job_title && (
+                                    <p style={{ fontSize: 11, color: '#94a3b8', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 130 }}>
+                                      {staff.job_title.replace(/_/g, ' ')}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+
+                            {skillFrameworks.map(fw => (
+                              <td key={fw.id} style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9', textAlign: 'center' }}>
+                                <SkillsCell
+                                  assessment={assessmentMap[`${staff.id}:${fw.id}`]}
+                                  framework={fw}
+                                  staff={staff}
+                                  onClick={setSkillsDialog}
+                                />
+                              </td>
+                            ))}
+
+                            <td style={{ padding: '8px 16px', borderBottom: '1px solid #f1f5f9', textAlign: 'center' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center' }}>
+                                {summary.completed === skillFrameworks.length && skillFrameworks.length > 0 ? (
+                                  <span style={{ fontSize: 10, fontWeight: 600, color: '#15803d', background: '#dcfce7', borderRadius: 4, padding: '1px 5px' }}>
+                                    ✓ All complete
+                                  </span>
+                                ) : (
+                                  <>
+                                    {summary.completed > 0 && (
+                                      <span style={{ fontSize: 10, fontWeight: 600, color: '#15803d', background: '#dcfce7', borderRadius: 4, padding: '1px 5px' }}>
+                                        {summary.completed} done
+                                      </span>
+                                    )}
+                                    {summary.inProgress > 0 && (
+                                      <span style={{ fontSize: 10, fontWeight: 600, color: '#1d4ed8', background: '#dbeafe', borderRadius: 4, padding: '1px 5px' }}>
+                                        {summary.inProgress} in progress
+                                      </span>
+                                    )}
+                                    {summary.unassigned > 0 && (
+                                      <span style={{ fontSize: 10, color: '#94a3b8', background: '#f1f5f9', borderRadius: 4, padding: '1px 5px' }}>
+                                        {summary.unassigned} unassigned
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </>
       )}
 
       {/* ── Add Column Dialog ─────────────────────────────────────────────── */}
@@ -668,15 +1001,12 @@ export default function StaffMatrix({ isAdmin }) {
             </DialogHeader>
 
             <div className="space-y-4 py-2">
-
-              {/* Compliance yearly note */}
               {editDialog.column.matrix_type === 'compliance' && (
                 <div className="text-xs text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2">
                   📅 Compliance items renew every January — expiry defaults to 31 Dec of the current year.
                 </div>
               )}
 
-              {/* Date & Expiry */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-xs">Date Obtained</Label>
@@ -698,7 +1028,6 @@ export default function StaffMatrix({ isAdmin }) {
                 </div>
               </div>
 
-              {/* Certificate / Registration Number */}
               <div>
                 <Label className="text-xs">Certificate / Registration Number</Label>
                 <Input
@@ -709,7 +1038,6 @@ export default function StaffMatrix({ isAdmin }) {
                 />
               </div>
 
-              {/* Document upload */}
               <div>
                 <Label className="text-xs">Document / Certificate Upload</Label>
                 <div className="mt-1 space-y-2">
@@ -743,7 +1071,6 @@ export default function StaffMatrix({ isAdmin }) {
                 </div>
               </div>
 
-              {/* Notes */}
               <div>
                 <Label className="text-xs">Notes (optional)</Label>
                 <Textarea
@@ -755,7 +1082,6 @@ export default function StaffMatrix({ isAdmin }) {
                 />
               </div>
 
-              {/* Status preview */}
               {(() => {
                 const preview = getStatus({ expiry_date: form.expiry_date, record_date: form.record_date }, editDialog?.column?.matrix_type);
                 const { bg, border, dot, label } = STATUS[form.expiry_date || form.record_date ? preview : 'valid'];
@@ -787,12 +1113,135 @@ export default function StaffMatrix({ isAdmin }) {
                 disabled={saveEntryMutation.isPending}
                 className="bg-teal-600 hover:bg-teal-700"
               >
-                {saveEntryMutation.isPending
-                  ? <Loader2 className="w-4 h-4 animate-spin mr-1" />
-                  : null
-                }
+                {saveEntryMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
                 Save Entry
               </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* ── Initiate confirm dialog ──────────────────────────────────────── */}
+      {initiateConfirm && (
+        <Dialog open={!!initiateConfirm} onOpenChange={() => setInitiateConfirm(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base">
+                <ClipboardCheck className="w-4 h-4 text-violet-600" />
+                Assign Framework to All Staff
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-2 space-y-3">
+              <p className="text-sm text-slate-700">
+                This will assign <strong>"{initiateConfirm.title}"</strong> to{' '}
+                <strong>{allStaff.filter(s => !assessmentMap[`${s.id}:${initiateConfirm.id}`]).length} staff members</strong> in your organisation who haven't been assigned it yet.
+              </p>
+              <div className="text-xs text-violet-700 bg-violet-50 border border-violet-200 rounded-lg px-3 py-2 space-y-1">
+                <p>• You will be set as the default mentor for each new assessment.</p>
+                <p>• You can update the assigned mentor per staff member via their profile → Competencies tab.</p>
+                <p>• Staff already assigned this framework will not be affected.</p>
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" size="sm" onClick={() => setInitiateConfirm(null)}>Cancel</Button>
+              <Button
+                size="sm"
+                className="bg-violet-600 hover:bg-violet-700"
+                disabled={initiateFrameworkMutation.isPending}
+                onClick={() => initiateFrameworkMutation.mutate(initiateConfirm.id)}
+              >
+                {initiateFrameworkMutation.isPending
+                  ? <><Loader2 className="w-4 h-4 animate-spin mr-1" /> Assigning…</>
+                  : <><ClipboardCheck className="w-4 h-4 mr-1" /> Confirm & Assign</>
+                }
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* ── Skills detail dialog ──────────────────────────────────────────── */}
+      {skillsDialog && (
+        <Dialog open={!!skillsDialog} onOpenChange={() => setSkillsDialog(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="text-base flex items-center gap-2">
+                <ClipboardCheck className="w-4 h-4 text-violet-600" />
+                {skillsDialog.framework?.title}
+              </DialogTitle>
+              <p className="text-sm text-slate-500 mt-0.5">
+                {skillsDialog.staff?.staff_full_name || skillsDialog.staff?.full_name || skillsDialog.staff?.email}
+              </p>
+            </DialogHeader>
+
+            {skillsDialog.assessment ? (() => {
+              const a = skillsDialog.assessment;
+              const fw = skillsDialog.framework;
+              const pct = getSkillProgress(a, fw);
+              const statusKey = a.status === 'completed' ? 'completed' : a.status === 'awaiting_signoff' ? 'awaiting_signoff' : 'in_progress';
+              const { bg, border, dot, label } = SKILL_STATUS[statusKey];
+              return (
+                <div className="space-y-3 py-2">
+                  <div style={{ padding: '8px 12px', background: bg, border: `1px solid ${border}`, borderRadius: 8 }}
+                    className="flex items-center justify-between">
+                    <span style={{ fontSize: 13, fontWeight: 600, color: dot }}>{label}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: dot }}>{pct}% met</span>
+                  </div>
+
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center gap-2 text-slate-600">
+                      <Award className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                      <span className="text-slate-500">Mentor:</span>
+                      <span className="font-medium">{a.mentor_name || '—'}</span>
+                    </div>
+                    {a.second_mentor_name && (
+                      <div className="flex items-center gap-2 text-slate-600">
+                        <Users className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                        <span className="text-slate-500">2nd Mentor:</span>
+                        <span className="font-medium">{a.second_mentor_name}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 text-slate-600">
+                      <User className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                      <span className="text-slate-500">Assigned:</span>
+                      <span className="font-medium">{format(new Date(a.created_at), 'dd MMM yyyy')}</span>
+                    </div>
+                    {a.completed_at && (
+                      <div className="flex items-center gap-2 text-slate-600">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                        <span className="text-slate-500">Completed:</span>
+                        <span className="font-medium text-emerald-700">{format(new Date(a.completed_at), 'dd MMM yyyy')}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100">
+                    <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+                      <span>Progress</span>
+                      <span>{pct}%</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+                      <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-slate-400 pt-1">
+                    To manage this assessment, open the staff member's profile and go to the Competencies tab.
+                  </p>
+                </div>
+              );
+            })() : (
+              <div className="py-4 text-center space-y-2">
+                <ClipboardCheck className="w-10 h-10 text-slate-200 mx-auto" />
+                <p className="text-sm text-slate-500">No assessment assigned yet.</p>
+                <p className="text-xs text-slate-400">
+                  Open this staff member's profile and go to the <strong>Competencies</strong> tab to assign one.
+                </p>
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button variant="outline" size="sm" onClick={() => setSkillsDialog(null)}>Close</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
