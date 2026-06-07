@@ -39,8 +39,7 @@ import {
   Sparkles,
   Loader2,
   Users,
-  ClipboardCheck,
-  LayoutGrid
+  ClipboardCheck
 } from 'lucide-react';
 import { toast } from 'sonner';
 import HelpTip from '@/components/ui/HelpTip';
@@ -466,7 +465,7 @@ Return ONLY valid JSON (no markdown) with this COMPLETE structure:
                   <span>My Mentoring</span>
                 </TabsTrigger>
                 <TabsTrigger value="matrix" className="flex items-center gap-1.5 text-xs sm:text-sm">
-                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <ClipboardCheck className="w-3.5 h-3.5" />
                   <span>Staff Matrix</span>
                 </TabsTrigger>
               </TabsList>
