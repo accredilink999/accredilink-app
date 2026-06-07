@@ -49,6 +49,7 @@ import OrgAdmin from './pages/OrgAdmin';
 import LegalPages from './pages/LegalPages';
 import PhotoGallery from './pages/PhotoGallery';
 import StaffAwards from './pages/StaffAwards';
+import MyMentoring from './pages/MyMentoring';
 import __Layout from './Layout.jsx';
 
 
@@ -82,6 +83,7 @@ export const PAGES = {
     "LeaveManagement": LeaveManagement,
     "LeaveRequests": LeaveRequests,
     "Messages": Messages,
+    "MyMentoring": MyMentoring,
     "NotificationCenter": NotificationCenter,
     "Payroll": Payroll,
     "Profile": Profile,

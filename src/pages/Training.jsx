@@ -21,9 +21,10 @@ import TrainingAnalytics from '@/components/training/TrainingAnalytics';
 import AICourseBuilder from '@/components/training/AICourseBuilder';
 import CoursePlayer from '@/components/training/CoursePlayer';
 import AssignCourses from '@/components/training/AssignCourses';
-import { 
-  Plus, 
-  Search, 
+import MyMentoring from '@/pages/MyMentoring';
+import {
+  Plus,
+  Search,
   GraduationCap,
   Calendar,
   AlertCircle,
@@ -35,7 +36,8 @@ import {
   BookOpen,
   BarChart3,
   Sparkles,
-  Loader2
+  Loader2,
+  Users
 } from 'lucide-react';
 import { toast } from 'sonner';
 import HelpTip from '@/components/ui/HelpTip';
@@ -382,7 +384,7 @@ Return ONLY valid JSON (no markdown) with this COMPLETE structure:
 
       {/* Tab Navigation */}
       <Tabs defaultValue="my-courses" className="w-full">
-        <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-5' : 'grid-cols-2'} overflow-x-auto`}>
+        <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-6' : 'grid-cols-3'} overflow-x-auto`}>
           <TabsTrigger value="my-courses" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm whitespace-nowrap">
             <BookOpen className="w-3 h-3 sm:w-4 sm:h-4" />
             <span className="hidden sm:inline">My Courses</span>
@@ -413,6 +415,11 @@ Return ONLY valid JSON (no markdown) with this COMPLETE structure:
           <TabsTrigger value="legacy" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm whitespace-nowrap">
             <Award className="w-3 h-3 sm:w-4 sm:h-4" />
             Records
+          </TabsTrigger>
+          <TabsTrigger value="mentoring" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm whitespace-nowrap">
+            <Users className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">My Mentoring</span>
+            <span className="sm:hidden">Mentoring</span>
           </TabsTrigger>
         </TabsList>
 
@@ -445,6 +452,11 @@ Return ONLY valid JSON (no markdown) with this COMPLETE structure:
             <TrainingAnalytics />
           </TabsContent>
         )}
+
+        {/* My Mentoring Tab */}
+        <TabsContent value="mentoring" className="mt-6">
+          <MyMentoring embedded />
+        </TabsContent>
 
         {/* Legacy Training Records */}
         <TabsContent value="legacy" className="mt-6 space-y-6">
