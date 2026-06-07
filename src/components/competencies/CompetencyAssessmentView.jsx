@@ -229,17 +229,24 @@ export default function CompetencyAssessmentView({ assessment, framework, onBack
             <div className="space-y-0.5 max-h-[65vh] overflow-y-auto">
               {navSections.map(nav => {
                 const active = activeSection === nav.key;
+                let bgClass = active ? 'bg-violet-100 text-violet-800 font-semibold' : 'text-slate-600 hover:bg-slate-50';
                 let indicator = null;
+
                 if (nav.key.startsWith('section-')) {
                   const si = parseInt(nav.key.replace('section-', ''));
                   const { met, total } = sectionSummary(si);
-                  if (met === total && total > 0) indicator = <CheckCircle2 className="w-3 h-3 text-emerald-500 flex-shrink-0" />;
+                  const anyAnswered = Object.values(responses?.sections?.[si]?.items || {}).some(v => v);
+                  if (met === total && total > 0) {
+                    bgClass = active ? 'bg-emerald-100 text-emerald-900 font-semibold' : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100';
+                    indicator = <CheckCircle2 className="w-3 h-3 text-emerald-500 flex-shrink-0" />;
+                  } else if (anyAnswered) {
+                    bgClass = active ? 'bg-amber-100 text-amber-900 font-semibold' : 'bg-amber-50 text-amber-800 hover:bg-amber-100';
+                  }
                 }
+
                 return (
                   <button key={nav.key} onClick={() => setActiveSection(nav.key)}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-xs flex items-center gap-2 transition-colors ${
-                      active ? 'bg-violet-100 text-violet-800 font-semibold' : 'text-slate-600 hover:bg-slate-50'
-                    }`}>
+                    className={`w-full text-left px-3 py-2 rounded-lg text-xs flex items-center gap-2 transition-colors ${bgClass}`}>
                     <span className="flex-shrink-0">{nav.icon}</span>
                     <span className="flex-1 truncate leading-tight">{nav.label}</span>
                     {indicator}
