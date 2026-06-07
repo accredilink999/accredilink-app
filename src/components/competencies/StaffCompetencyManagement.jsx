@@ -23,6 +23,11 @@ function statusBadge(status) {
   return <Badge className="bg-blue-100 text-blue-800 border-0 text-xs">In Progress</Badge>;
 }
 
+function getItemStatus(val) {
+  if (!val) return null;
+  return typeof val === 'string' ? val : val?.status || null;
+}
+
 function calcProgress(assessment, framework) {
   if (!framework) return 0;
   const sections = framework.sections || [];
@@ -31,7 +36,7 @@ function calcProgress(assessment, framework) {
   sections.forEach((s, si) => {
     s.items.forEach((_, ii) => {
       total++;
-      if (responses[si]?.items?.[ii] === 'met') done++;
+      if (getItemStatus(responses[si]?.items?.[ii]) === 'met') done++;
     });
   });
   return total > 0 ? Math.round((done / total) * 100) : 0;

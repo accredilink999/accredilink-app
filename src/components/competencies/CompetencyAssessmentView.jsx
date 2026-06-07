@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { base44 } from '@/api/base44Client';
 import { Card } from '@/components/ui/card';
@@ -19,11 +19,29 @@ import { format } from 'date-fns';
 const SECTION_ICONS = ['🏅','👤','💬','🛡️','⚠️','💊','🛁','🥗','🏋️','🧴','📝','💚','🧠','📚'];
 
 // Item status: null | 'met' | 'deferred' | 'development'
+// Items are stored as { status, signed_by, signed_at, observation_date }
+// Legacy string values ('met' etc.) are handled gracefully.
 const STATUS_OPTIONS = [
-  { value: 'met',         label: 'Competency Met',        icon: <CheckCircle2 className="w-3.5 h-3.5" />, active: 'bg-emerald-100 border-emerald-400 text-emerald-800', dot: 'bg-emerald-500' },
-  { value: 'deferred',    label: 'Deferred',              icon: <Clock className="w-3.5 h-3.5" />,        active: 'bg-amber-100 border-amber-400 text-amber-800',   dot: 'bg-amber-500'   },
-  { value: 'development', label: 'Development Plan',      icon: <BookOpen className="w-3.5 h-3.5" />,    active: 'bg-blue-100 border-blue-400 text-blue-800',      dot: 'bg-blue-500'    },
+  { value: 'met',         label: 'Competency Met',   icon: <CheckCircle2 className="w-3.5 h-3.5" />, active: 'bg-emerald-100 border-emerald-400 text-emerald-800', dot: 'bg-emerald-500' },
+  { value: 'deferred',    label: 'Deferred',          icon: <Clock className="w-3.5 h-3.5" />,        active: 'bg-amber-100 border-amber-400 text-amber-800',   dot: 'bg-amber-500'   },
+  { value: 'development', label: 'Development Plan',  icon: <BookOpen className="w-3.5 h-3.5" />,    active: 'bg-blue-100 border-blue-400 text-blue-800',      dot: 'bg-blue-500'    },
 ];
+
+// Safely read the status string from either legacy string or new object format
+function getItemStatus(val) {
+  if (!val) return null;
+  return typeof val === 'string' ? val : val?.status || null;
+}
+
+// Read attribution metadata (returns {} for legacy strings)
+function getItemMeta(val) {
+  if (!val || typeof val === 'string') return {};
+  return {
+    signed_by: val.signed_by,
+    signed_at: val.signed_at,
+    observation_date: val.observation_date,
+  };
+}
 
 function ItemStatusPicker({ value, onChange, readOnly }) {
   return (
@@ -51,7 +69,7 @@ function calcProgress(responses, framework) {
   sections.forEach((s, si) => {
     s.items.forEach((_, ii) => {
       total++;
-      if (responses?.sections?.[si]?.items?.[ii] === 'met') done++;
+      if (getItemStatus(responses?.sections?.[si]?.items?.[ii]) === 'met') done++;
     });
   });
   return total > 0 ? Math.round((done / total) * 100) : 0;
@@ -63,22 +81,67 @@ export default function CompetencyAssessmentView({ assessment, framework, onBack
   const [responses, setResponses] = useState(assessment.responses || {});
   const [dirty, setDirty] = useState(false);
 
+  const { data: currentUser } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: () => base44.auth.me(),
+  });
+
   const sections     = framework?.sections || [];
   const obsAreas     = framework?.observation_areas || [];
   const finalItems   = framework?.final_review_items || [];
   const pct          = calcProgress(responses, framework);
 
-  const setItemStatus = useCallback((si, ii, val) => {
+  const currentUserName = currentUser?.staff_full_name || currentUser?.full_name || assessment.mentor_name;
+
+  const setItemStatus = useCallback((si, ii, statusVal) => {
     if (readOnly) return;
-    setResponses(prev => ({
-      ...prev,
-      sections: {
-        ...prev?.sections,
-        [si]: { ...prev?.sections?.[si], items: { ...(prev?.sections?.[si]?.items || {}), [ii]: val } }
-      }
-    }));
+    setResponses(prev => {
+      const existing = prev?.sections?.[si]?.items?.[ii];
+      const existingMeta = (existing && typeof existing === 'object') ? existing : {};
+      return {
+        ...prev,
+        sections: {
+          ...prev?.sections,
+          [si]: {
+            ...prev?.sections?.[si],
+            items: {
+              ...(prev?.sections?.[si]?.items || {}),
+              [ii]: statusVal ? {
+                status: statusVal,
+                // Preserve existing attribution if user is just changing the status
+                signed_by: existingMeta.signed_by || currentUserName,
+                signed_at: existingMeta.signed_at || new Date().toISOString(),
+                observation_date: existingMeta.observation_date || new Date().toISOString().split('T')[0],
+              } : null,
+            }
+          }
+        }
+      };
+    });
     setDirty(true);
-  }, [readOnly]);
+  }, [readOnly, currentUserName]);
+
+  const setItemObservationDate = useCallback((si, ii, date) => {
+    if (readOnly) return;
+    setResponses(prev => {
+      const existing = prev?.sections?.[si]?.items?.[ii];
+      if (!existing) return prev;
+      const base = typeof existing === 'string'
+        ? { status: existing, signed_by: currentUserName, signed_at: new Date().toISOString() }
+        : existing;
+      return {
+        ...prev,
+        sections: {
+          ...prev.sections,
+          [si]: {
+            ...prev.sections?.[si],
+            items: { ...prev.sections?.[si]?.items, [ii]: { ...base, observation_date: date } }
+          }
+        }
+      };
+    });
+    setDirty(true);
+  }, [readOnly, currentUserName]);
 
   const setSectionNote = useCallback((si, note) => {
     if (readOnly) return;
@@ -117,9 +180,7 @@ export default function CompetencyAssessmentView({ assessment, framework, onBack
     mutationFn: async (newStatus) => {
       const { error } = await supabase
         .from('competency_assessments')
-        .update({ responses, status: newStatus || assessment.status, updated_at: new Date().toISOString(),
-          ...(newStatus === 'awaiting_signoff' ? {} : {}),
-        })
+        .update({ responses, status: newStatus || assessment.status, updated_at: new Date().toISOString() })
         .eq('id', assessment.id);
       if (error) throw error;
     },
@@ -155,9 +216,8 @@ export default function CompetencyAssessmentView({ assessment, framework, onBack
       queryClient.invalidateQueries({ queryKey: ['myCompetencyAssessments'] });
       if (bothSigned) {
         toast.success('Assessment completed and signed off!');
-        const recipientIds = [staffId, mentorId, secondMentorId].filter(Boolean);
         base44.functions.invoke('createNotification', {
-          recipient_ids: recipientIds,
+          recipient_ids: [staffId, mentorId, secondMentorId].filter(Boolean),
           type: 'competency_completed',
           title: '✅ Competency Assessment Completed',
           message: `${assessment.staff_name}'s "${framework?.title}" has been fully signed off.`,
@@ -185,9 +245,9 @@ export default function CompetencyAssessmentView({ assessment, framework, onBack
     const items = responses?.sections?.[si]?.items || {};
     return {
       total: sec.items.length,
-      met: sec.items.filter((_, ii) => items[ii] === 'met').length,
-      deferred: sec.items.filter((_, ii) => items[ii] === 'deferred').length,
-      development: sec.items.filter((_, ii) => items[ii] === 'development').length,
+      met:         sec.items.filter((_, ii) => getItemStatus(items[ii]) === 'met').length,
+      deferred:    sec.items.filter((_, ii) => getItemStatus(items[ii]) === 'deferred').length,
+      development: sec.items.filter((_, ii) => getItemStatus(items[ii]) === 'development').length,
     };
   };
 
@@ -221,7 +281,7 @@ export default function CompetencyAssessmentView({ assessment, framework, onBack
             const colors = ['bg-emerald-400','bg-amber-400','bg-blue-400'];
             const counts = sections.reduce((acc, sec, si) => {
               const items = responses?.sections?.[si]?.items || {};
-              sec.items.forEach((_, ii) => { if (items[ii] === s) acc++; });
+              sec.items.forEach((_, ii) => { if (getItemStatus(items[ii]) === s) acc++; });
               return acc;
             }, 0);
             const total = sections.reduce((a, sec) => a + sec.items.length, 0);
@@ -250,7 +310,7 @@ export default function CompetencyAssessmentView({ assessment, framework, onBack
                 if (nav.key.startsWith('section-')) {
                   const si = parseInt(nav.key.replace('section-', ''));
                   const { met, total } = sectionSummary(si);
-                  const anyAnswered = Object.values(responses?.sections?.[si]?.items || {}).some(v => v);
+                  const anyAnswered = Object.values(responses?.sections?.[si]?.items || {}).some(v => getItemStatus(v));
                   if (met === total && total > 0) {
                     bgClass = active ? 'bg-emerald-100 text-emerald-900 font-semibold' : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100';
                     indicator = <CheckCircle2 className="w-3 h-3 text-emerald-500 flex-shrink-0" />;
@@ -281,7 +341,6 @@ export default function CompetencyAssessmentView({ assessment, framework, onBack
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {sections.map((s, si) => {
                   const { met, deferred, development, total } = sectionSummary(si);
-                  const pctMet = Math.round((met / total) * 100);
                   return (
                     <button key={si} onClick={() => setActiveSection(`section-${si}`)}
                       className="text-left p-3 rounded-lg border border-slate-200 hover:border-violet-200 hover:bg-violet-50 transition-colors">
@@ -320,12 +379,46 @@ export default function CompetencyAssessmentView({ assessment, framework, onBack
 
                 <div className="space-y-3">
                   {section.items.map((item, ii) => {
-                    const status = responses?.sections?.[si]?.items?.[ii] || null;
+                    const rawVal = responses?.sections?.[si]?.items?.[ii] ?? null;
+                    const status = getItemStatus(rawVal);
+                    const meta = getItemMeta(rawVal);
                     const opt = STATUS_OPTIONS.find(o => o.value === status);
                     return (
                       <div key={ii} className={`p-3 rounded-lg border transition-colors ${opt ? opt.active : 'bg-white border-slate-200'}`}>
                         <p className={`text-sm mb-2 ${opt ? '' : 'text-slate-700'}`}>{item}</p>
                         <ItemStatusPicker value={status} onChange={v => setItemStatus(si, ii, v)} readOnly={readOnly} />
+
+                        {/* Attribution row — shown once an item has a status */}
+                        {status && (
+                          <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 pl-1 border-t border-black/5 pt-2">
+                            <div className="flex items-center gap-1.5">
+                              <CalendarDays className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                              <span className="text-[10px] text-slate-500">Observed:</span>
+                              {readOnly ? (
+                                <span className="text-[11px] font-medium text-slate-700">{meta.observation_date || '—'}</span>
+                              ) : (
+                                <input
+                                  type="date"
+                                  className="text-[11px] border border-slate-200 rounded px-1.5 py-0.5 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-violet-300"
+                                  value={meta.observation_date || ''}
+                                  onChange={e => setItemObservationDate(si, ii, e.target.value)}
+                                />
+                              )}
+                            </div>
+                            {meta.signed_by && (
+                              <div className="flex items-center gap-1.5">
+                                <User className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                                <span className="text-[10px] text-slate-500">Signed by:</span>
+                                <span className="text-[11px] font-medium text-slate-700">{meta.signed_by}</span>
+                                {meta.signed_at && (
+                                  <span className="text-[10px] text-slate-400">
+                                    · {format(new Date(meta.signed_at), 'dd MMM yyyy, HH:mm')}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
