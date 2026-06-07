@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
+import { base44 } from '@/api/base44Client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -134,7 +135,7 @@ export default function CompetencyAssessmentView({ assessment, framework, onBack
   const signOffMutation = useMutation({
     mutationFn: async ({ field, name }) => {
       const res = await supabase.from('competency_assessments')
-        .select('mentor_signature,staff_signature').eq('id', assessment.id).single();
+        .select('mentor_signature,staff_signature,staff_id,mentor_id,second_mentor_id').eq('id', assessment.id).single();
       const current = res.data || {};
       const bothSigned =
         (field === 'mentor_signature' && current.staff_signature) ||
@@ -147,11 +148,25 @@ export default function CompetencyAssessmentView({ assessment, framework, onBack
         updated_at: new Date().toISOString(),
       }).eq('id', assessment.id);
       if (error) throw error;
+      return { bothSigned, staffId: current.staff_id, mentorId: current.mentor_id, secondMentorId: current.second_mentor_id };
     },
-    onSuccess: () => {
+    onSuccess: ({ bothSigned, staffId, mentorId, secondMentorId }) => {
       queryClient.invalidateQueries({ queryKey: ['competencyAssessments'] });
       queryClient.invalidateQueries({ queryKey: ['myCompetencyAssessments'] });
-      toast.success('Signed successfully.');
+      if (bothSigned) {
+        toast.success('Assessment completed and signed off!');
+        const recipientIds = [staffId, mentorId, secondMentorId].filter(Boolean);
+        base44.functions.invoke('createNotification', {
+          recipient_ids: recipientIds,
+          type: 'competency_completed',
+          title: '✅ Competency Assessment Completed',
+          message: `${assessment.staff_name}'s "${framework?.title}" has been fully signed off.`,
+          action_url: '/Competencies',
+          send_push: true,
+        }).catch(() => {});
+      } else {
+        toast.success('Signed successfully — awaiting countersignature.');
+      }
     },
   });
 

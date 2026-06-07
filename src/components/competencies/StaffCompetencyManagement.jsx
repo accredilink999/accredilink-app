@@ -148,6 +148,17 @@ export default function StaffCompetencyManagement({ staffId, staffName, isAdmin 
       setNewForm({ framework_id: '', mentor_name: '', second_mentor_id: '' });
       toast.success('Assessment started.');
       setViewingId(data.id);
+      // Notify the staff member they've been assigned a competency assessment
+      const fw = frameworks.find(f => f.id === data.framework_id);
+      const recipientIds = [staffId, data.second_mentor_id].filter(Boolean);
+      base44.functions.invoke('createNotification', {
+        recipient_ids: recipientIds,
+        type: 'competency_assigned',
+        title: '📋 Competency Assessment Assigned',
+        message: `You have been assigned the "${fw?.title || 'Competency Assessment'}" — tap to open it.`,
+        action_url: '/Competencies',
+        send_push: true,
+      }).catch(() => {});
     },
     onError: (err) => toast.error(err.message || 'Failed to create assessment.'),
   });
