@@ -222,7 +222,7 @@ function SkillsCell({ assessment, framework, staff, onClick }) {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function StaffMatrix({ isAdmin }) {
+export default function StaffMatrix({ isAdmin, isSuperAdmin = false }) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef(null);
 
@@ -242,6 +242,7 @@ export default function StaffMatrix({ isAdmin }) {
   const { data: currentUser } = useQuery({
     queryKey: ['currentUser'],
     queryFn: () => base44.auth.me(),
+    enabled: isSuperAdmin,
   });
 
   const { data: allStaff = [] } = useQuery({
@@ -787,7 +788,7 @@ export default function StaffMatrix({ isAdmin }) {
                 </p>
               </div>
             </div>
-            {currentUser?.role === 'super_admin' && skillFrameworks.length > 0 && (
+            {isSuperAdmin && skillFrameworks.length > 0 && (
               <div className="border-t border-violet-200 pt-3 flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <p className="text-xs font-semibold text-violet-800">Initiate for all staff</p>

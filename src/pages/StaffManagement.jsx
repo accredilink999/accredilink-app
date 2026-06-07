@@ -20,6 +20,7 @@ export default function StaffManagement() {
   });
 
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || ['admin', 'manager', 'supervisor'].includes(user?.job_title);
+  const isSuperAdmin = user?.role === 'super_admin';
 
   if (selectedStaffId) {
     return (
@@ -74,7 +75,7 @@ export default function StaffManagement() {
 
         {isAdmin && (
           <TabsContent value="matrix" className="mt-6">
-            <StaffMatrix isAdmin={isAdmin} />
+            <StaffMatrix isAdmin={isAdmin} isSuperAdmin={isSuperAdmin} />
           </TabsContent>
         )}
       </Tabs>
