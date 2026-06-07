@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   ChevronLeft, ChevronRight, Save, CheckCircle2, Clock, BookOpen,
-  User, Users, CalendarDays, Award
+  User, Users, CalendarDays, Award, Download, Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -80,6 +80,7 @@ export default function CompetencyAssessmentView({ assessment, framework, onBack
   const [activeSection, setActiveSection] = useState('overview');
   const [responses, setResponses] = useState(assessment.responses || {});
   const [dirty, setDirty] = useState(false);
+  const [certGenerating, setCertGenerating] = useState(false);
 
   const { data: currentUser } = useQuery({
     queryKey: ['currentUser'],
@@ -177,18 +178,61 @@ export default function CompetencyAssessmentView({ assessment, framework, onBack
   }, [readOnly]);
 
   const saveMutation = useMutation({
-    mutationFn: async (newStatus) => {
+    mutationFn: async ({ newStatus, snapshot }) => {
       const { error } = await supabase
         .from('competency_assessments')
-        .update({ responses, status: newStatus || assessment.status, updated_at: new Date().toISOString() })
+        .update({ responses: snapshot, status: newStatus || assessment.status, updated_at: new Date().toISOString() })
         .eq('id', assessment.id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: async (_, { snapshot }) => {
       queryClient.invalidateQueries({ queryKey: ['competencyAssessments'] });
       queryClient.invalidateQueries({ queryKey: ['myCompetencyAssessments'] });
       setDirty(false);
       toast.success('Progress saved.');
+
+      // Check for sections that just became fully met without a certificate
+      const secs = framework?.sections || [];
+      const newlyComplete = secs
+        .map((sec, si) => {
+          if (snapshot?.sections?.[si]?.certificate_url) return null;
+          const items = snapshot?.sections?.[si]?.items || {};
+          const allMet = sec.items.length > 0 && sec.items.every((_, ii) => getItemStatus(items[ii]) === 'met');
+          return allMet ? si : null;
+        })
+        .filter(si => si !== null);
+
+      if (newlyComplete.length > 0) {
+        setCertGenerating(true);
+        try {
+          const results = await Promise.all(
+            newlyComplete.map(si =>
+              base44.functions.invoke('generateCompetencyCertificate', {
+                assessmentId: assessment.id,
+                sectionIndex: si,
+              }).then(res => ({ si, url: res?.certificate_url })).catch(() => ({ si, url: null }))
+            )
+          );
+          const valid = results.filter(r => r.url);
+          if (valid.length > 0) {
+            setResponses(prev => {
+              const updated = { ...prev, sections: { ...(prev?.sections || {}) } };
+              valid.forEach(({ si, url }) => {
+                updated.sections[si] = { ...(updated.sections[si] || {}), certificate_url: url };
+              });
+              return updated;
+            });
+            toast.success(`Certificate${valid.length > 1 ? 's' : ''} issued for completed section${valid.length > 1 ? 's' : ''}!`);
+            queryClient.invalidateQueries({ queryKey: ['competencyAssessments'] });
+            queryClient.invalidateQueries({ queryKey: ['myCompetencyAssessments'] });
+            queryClient.invalidateQueries({ queryKey: ['staff-matrix'] });
+          }
+        } catch {
+          // cert generation is best-effort; don't block the user
+        } finally {
+          setCertGenerating(false);
+        }
+      }
     },
     onError: () => toast.error('Failed to save.'),
   });
@@ -368,13 +412,30 @@ export default function CompetencyAssessmentView({ assessment, framework, onBack
             const { met, total } = sectionSummary(si);
             return (
               <div className="space-y-4">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-2xl">{SECTION_ICONS[si]}</span>
                   <div className="flex-1">
                     <h3 className="font-semibold text-slate-900">{section.title}</h3>
                     <p className="text-xs text-slate-500">{met}/{total} competencies met</p>
                   </div>
-                  {met === total && total > 0 && <Badge className="bg-emerald-100 text-emerald-700 border-0 text-xs">✓ All Met</Badge>}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {met === total && total > 0 && <Badge className="bg-emerald-100 text-emerald-700 border-0 text-xs">✓ All Met</Badge>}
+                    {responses?.sections?.[si]?.certificate_url ? (
+                      <a
+                        href={responses.sections[si].certificate_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-full border border-violet-300 bg-violet-50 text-violet-700 text-xs font-medium hover:bg-violet-100 transition-colors"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        <Download className="w-3 h-3" /> Certificate
+                      </a>
+                    ) : certGenerating && met === total && total > 0 ? (
+                      <span className="flex items-center gap-1 text-xs text-slate-400">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Generating…
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div className="space-y-3">
@@ -581,19 +642,19 @@ export default function CompetencyAssessmentView({ assessment, framework, onBack
               {!readOnly && dirty && (
                 <Button size="sm" variant="outline" className="border-violet-300 text-violet-700"
                   disabled={saveMutation.isPending}
-                  onClick={() => saveMutation.mutate(null)}>
+                  onClick={() => saveMutation.mutate({ newStatus: null, snapshot: responses })}>
                   <Save className="w-4 h-4 mr-1" /> Save Progress
                 </Button>
               )}
               {currentIdx < navSections.length - 1 ? (
                 <Button size="sm" className="bg-violet-600 hover:bg-violet-700"
-                  onClick={() => { if (dirty && !readOnly) saveMutation.mutate(null); setActiveSection(navSections[currentIdx + 1].key); }}>
+                  onClick={() => { if (dirty && !readOnly) saveMutation.mutate({ newStatus: null, snapshot: responses }); setActiveSection(navSections[currentIdx + 1].key); }}>
                   Next <ChevronRight className="w-4 h-4 ml-1" />
                 </Button>
               ) : !readOnly && assessment.status !== 'completed' ? (
                 <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700"
                   disabled={saveMutation.isPending}
-                  onClick={() => saveMutation.mutate('awaiting_signoff')}>
+                  onClick={() => saveMutation.mutate({ newStatus: 'awaiting_signoff', snapshot: responses })}>
                   <CheckCircle2 className="w-4 h-4 mr-1" /> Save & Submit for Sign-Off
                 </Button>
               ) : null}
