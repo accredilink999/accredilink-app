@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { ClipboardCheck, Plus, ChevronRight, User, Users } from 'lucide-react';
+import { ClipboardCheck, Plus, ChevronRight, User, Users, ArrowLeftRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import CompetencyAssessmentView from '@/components/competencies/CompetencyAssessmentView';
@@ -97,6 +97,25 @@ export default function StaffCompetencyManagement({ staffId, staffName, isAdmin 
 
   const frameworkMap = Object.fromEntries(frameworks.map(f => [f.id, f]));
   const viewing = assessments.find(a => a.id === viewingId);
+
+  const swapMutation = useMutation({
+    mutationFn: async (assessment) => {
+      if (!assessment.second_mentor_id) throw new Error('No second mentor to swap with.');
+      const { error } = await supabase.from('competency_assessments').update({
+        mentor_id: assessment.second_mentor_id,
+        mentor_name: assessment.second_mentor_name,
+        second_mentor_id: assessment.mentor_id,
+        second_mentor_name: assessment.mentor_name,
+        updated_at: new Date().toISOString(),
+      }).eq('id', assessment.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['competencyAssessments', staffId] });
+      toast.success('Mentors swapped.');
+    },
+    onError: (err) => toast.error(err.message || 'Failed to swap mentors.'),
+  });
   const viewingFramework = viewing ? frameworkMap[viewing.framework_id] : null;
 
   const secondMentorStaff = adminStaff.filter(s => s.id !== currentUser?.id);
@@ -183,9 +202,8 @@ export default function StaffCompetencyManagement({ staffId, staffName, isAdmin 
             const fw = frameworkMap[a.framework_id];
             const pct = calcProgress(a, fw);
             return (
-              <Card key={a.id} className="p-4 hover:shadow-sm transition-shadow cursor-pointer"
-                onClick={() => setViewingId(a.id)}>
-                <div className="flex items-start justify-between gap-3">
+              <Card key={a.id} className="p-4 hover:shadow-sm transition-shadow">
+                <div className="flex items-start justify-between gap-3 cursor-pointer" onClick={() => setViewingId(a.id)}>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-slate-900 text-sm truncate">
                       {fw?.title || 'Competency Assessment'}
@@ -213,6 +231,18 @@ export default function StaffCompetencyManagement({ staffId, staffName, isAdmin 
                     <ChevronRight className="w-4 h-4 text-slate-400" />
                   </div>
                 </div>
+                {isAdmin && a.second_mentor_id && (
+                  <div className="mt-3 pt-3 border-t border-slate-100 flex justify-end">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs text-violet-700 border-violet-200 hover:bg-violet-50 h-7 px-2"
+                      disabled={swapMutation.isPending}
+                      onClick={(e) => { e.stopPropagation(); swapMutation.mutate(a); }}>
+                      <ArrowLeftRight className="w-3 h-3 mr-1" /> Swap Mentors
+                    </Button>
+                  </div>
+                )}
               </Card>
             );
           })}
