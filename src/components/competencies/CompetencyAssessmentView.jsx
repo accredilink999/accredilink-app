@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   ChevronLeft, ChevronRight, Save, CheckCircle2, Clock, BookOpen,
-  User, CalendarDays, Award
+  User, Users, CalendarDays, Award
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -190,6 +190,9 @@ export default function CompetencyAssessmentView({ assessment, framework, onBack
             <div className="flex flex-wrap gap-3 mt-1 text-xs text-violet-700">
               <span className="flex items-center gap-1"><User className="w-3 h-3" /> Staff: <strong>{assessment.staff_name}</strong></span>
               <span className="flex items-center gap-1"><Award className="w-3 h-3" /> Mentor: <strong>{assessment.mentor_name}</strong></span>
+              {assessment.second_mentor_name && (
+                <span className="flex items-center gap-1"><Users className="w-3 h-3" /> 2nd Mentor: <strong>{assessment.second_mentor_name}</strong></span>
+              )}
               <span className="flex items-center gap-1"><CalendarDays className="w-3 h-3" /> {format(new Date(assessment.created_at), 'dd MMM yyyy')}</span>
             </div>
           </div>

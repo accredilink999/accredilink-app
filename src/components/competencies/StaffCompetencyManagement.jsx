@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { ClipboardCheck, Plus, ChevronRight, CheckCircle2, Clock, AlertCircle, User } from 'lucide-react';
+import { ClipboardCheck, Plus, ChevronRight, User, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import CompetencyAssessmentView from '@/components/competencies/CompetencyAssessmentView';
@@ -41,7 +41,11 @@ export default function StaffCompetencyManagement({ staffId, staffName, isAdmin 
   const queryClient = useQueryClient();
   const [viewingId, setViewingId] = useState(null);
   const [showNewDialog, setShowNewDialog] = useState(false);
-  const [newForm, setNewForm] = useState({ framework_id: '', mentor_name: '' });
+  const [newForm, setNewForm] = useState({
+    framework_id: '',
+    mentor_name: '',
+    second_mentor_id: '',
+  });
 
   const { data: currentUser } = useQuery({
     queryKey: ['currentUser'],
@@ -70,20 +74,46 @@ export default function StaffCompetencyManagement({ staffId, staffName, isAdmin 
     },
   });
 
+  // Fetch all admin/manager staff for second mentor dropdown
+  const { data: adminStaff = [] } = useQuery({
+    queryKey: ['adminStaffList'],
+    queryFn: async () => {
+      try {
+        const response = await base44.functions.invoke('getAllStaff', {});
+        const list = response.staffList || response.data?.staffList || [];
+        return list.filter(s =>
+          ['admin', 'super_admin', 'manager', 'supervisor'].includes(s.role) ||
+          ['admin', 'super_admin', 'manager', 'supervisor'].includes(s.job_title)
+        );
+      } catch {
+        const profiles = await base44.entities.User.list();
+        return profiles
+          .filter(p => ['admin', 'super_admin', 'manager', 'supervisor'].includes(p.role))
+          .map(p => ({ id: p.id, name: p.staff_full_name || p.full_name || p.email, role: p.role }));
+      }
+    },
+    enabled: !!isAdmin,
+  });
+
   const frameworkMap = Object.fromEntries(frameworks.map(f => [f.id, f]));
   const viewing = assessments.find(a => a.id === viewingId);
   const viewingFramework = viewing ? frameworkMap[viewing.framework_id] : null;
+
+  const secondMentorStaff = adminStaff.filter(s => s.id !== currentUser?.id);
 
   const createMutation = useMutation({
     mutationFn: async () => {
       if (!newForm.framework_id) throw new Error('Select a framework');
       const orgId = getCurrentOrgId();
+      const secondMentor = secondMentorStaff.find(s => s.id === newForm.second_mentor_id);
       const { data, error } = await supabase.from('competency_assessments').insert({
         staff_id: staffId,
         staff_name: staffName,
         framework_id: newForm.framework_id,
         mentor_id: currentUser?.id,
         mentor_name: newForm.mentor_name || currentUser?.full_name || currentUser?.staff_full_name || 'Manager',
+        second_mentor_id: secondMentor?.id || null,
+        second_mentor_name: secondMentor ? (secondMentor.name || secondMentor.staff_full_name || secondMentor.full_name) : null,
         organization_id: orgId,
         status: 'in_progress',
         responses: {},
@@ -96,7 +126,7 @@ export default function StaffCompetencyManagement({ staffId, staffName, isAdmin 
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['competencyAssessments', staffId] });
       setShowNewDialog(false);
-      setNewForm({ framework_id: '', mentor_name: '' });
+      setNewForm({ framework_id: '', mentor_name: '', second_mentor_id: '' });
       toast.success('Assessment started.');
       setViewingId(data.id);
     },
@@ -107,6 +137,7 @@ export default function StaffCompetencyManagement({ staffId, staffName, isAdmin 
     setNewForm({
       framework_id: frameworks[0]?.id || '',
       mentor_name: currentUser?.full_name || currentUser?.staff_full_name || '',
+      second_mentor_id: '',
     });
     setShowNewDialog(true);
   };
@@ -159,11 +190,16 @@ export default function StaffCompetencyManagement({ staffId, staffName, isAdmin 
                     <p className="font-medium text-slate-900 text-sm truncate">
                       {fw?.title || 'Competency Assessment'}
                     </p>
-                    <div className="flex items-center gap-1 text-xs text-slate-500 mt-0.5">
-                      <User className="w-3 h-3" />
-                      <span>Mentor: {a.mentor_name}</span>
-                      <span className="mx-1">·</span>
-                      <span>{format(new Date(a.created_at), 'dd MMM yyyy')}</span>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500 mt-0.5">
+                      <span className="flex items-center gap-1">
+                        <User className="w-3 h-3" /> {a.mentor_name}
+                      </span>
+                      {a.second_mentor_name && (
+                        <span className="flex items-center gap-1">
+                          <Users className="w-3 h-3 text-violet-400" /> {a.second_mentor_name}
+                        </span>
+                      )}
+                      <span>· {format(new Date(a.created_at), 'dd MMM yyyy')}</span>
                     </div>
                     <div className="mt-2 flex items-center gap-2">
                       <div className="flex-1 bg-slate-100 rounded-full h-1.5">
@@ -197,7 +233,7 @@ export default function StaffCompetencyManagement({ staffId, staffName, isAdmin 
               <Label className="text-sm">Framework</Label>
               {frameworks.length === 0 ? (
                 <p className="text-xs text-slate-500 mt-1 p-3 bg-amber-50 rounded border border-amber-200">
-                  No active frameworks found. Ask your platform admin to create competency frameworks first.
+                  No active frameworks found.
                 </p>
               ) : (
                 <Select value={newForm.framework_id} onValueChange={v => setNewForm(f => ({ ...f, framework_id: v }))}>
@@ -212,11 +248,36 @@ export default function StaffCompetencyManagement({ staffId, staffName, isAdmin 
                 </Select>
               )}
             </div>
+
             <div>
-              <Label className="text-sm">Mentor / Assessor Name</Label>
+              <Label className="text-sm">Primary Mentor / Assessor</Label>
               <Input className="mt-1 text-sm" placeholder="Your name"
                 value={newForm.mentor_name}
                 onChange={e => setNewForm(f => ({ ...f, mentor_name: e.target.value }))} />
+            </div>
+
+            <div>
+              <Label className="text-sm">
+                Second Mentor <span className="text-slate-400 font-normal">(optional)</span>
+              </Label>
+              <Select
+                value={newForm.second_mentor_id}
+                onValueChange={v => setNewForm(f => ({ ...f, second_mentor_id: v === 'none' ? '' : v }))}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select a second mentor…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— None —</SelectItem>
+                  {secondMentorStaff.map(s => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name || s.staff_full_name || s.full_name || s.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-slate-400 mt-1">
+                The second mentor will have full access to view and edit this assessment.
+              </p>
             </div>
           </div>
           <DialogFooter className="gap-2">
