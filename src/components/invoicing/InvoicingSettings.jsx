@@ -32,6 +32,8 @@ export default function InvoicingSettings({ settings }) {
     currency: settings?.currency || 'GBP',
     default_tax_rate: settings?.default_tax_rate || 20,
     invoice_prefix: settings?.invoice_prefix || 'INV',
+    batch_prefix: settings?.batch_prefix || 'BATCH-',
+    next_batch_number: settings?.next_batch_number || 1,
     brand_color: settings?.brand_color || '#0f766e',
     invoice_notes: settings?.invoice_notes || '',
     bank_account_name: settings?.bank_account_name || '',
@@ -373,6 +375,26 @@ export default function InvoicingSettings({ settings }) {
                   placeholder="INV"
                 />
                 <p className="text-xs text-slate-500 mt-1">Invoices will be numbered like: {formData.invoice_prefix}-1001, {formData.invoice_prefix}-1002, etc.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-900 mb-2">Batch Prefix</label>
+                  <Input
+                    value={formData.batch_prefix}
+                    onChange={(e) => setFormData({ ...formData, batch_prefix: e.target.value })}
+                    placeholder="BATCH-"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-900 mb-2">Next Batch Number</label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={formData.next_batch_number}
+                    onChange={(e) => setFormData({ ...formData, next_batch_number: parseInt(e.target.value) || 1 })}
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Next combined PDF will be labelled {formData.batch_prefix}{String(formData.next_batch_number).padStart(4, '0')}</p>
+                </div>
               </div>
             </CardContent>
           </Card>
