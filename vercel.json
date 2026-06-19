@@ -27,6 +27,6 @@
   ],
   "rewrites": [
     { "source": "/functions/clear", "destination": "/clear-cache.html" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }

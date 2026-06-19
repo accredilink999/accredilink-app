@@ -147,7 +147,20 @@ export default function TwoWayRadio() {
     setJoining(true);
     try {
       if (joinedChannelRef.current) await leaveChannel();
-      await clientRef.current.join(AGORA_APP_ID, channelName, null, myUid);
+
+      // Fetch a signed Agora token (required when App Certificate is enabled)
+      const res = await fetch('/api/agora-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelName, uid: myUid }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Token request failed (${res.status})`);
+      }
+      const { token } = await res.json();
+
+      await clientRef.current.join(AGORA_APP_ID, channelName, token, myUid);
       joinedChannelRef.current = channelName;
       setIsJoined(true);
       toast.success(`Joined ${channelName}`);
