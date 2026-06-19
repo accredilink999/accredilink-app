@@ -48,6 +48,8 @@ export default function InvoiceManager({ invoices, clients, settings }) {
   const [generatingTemplateId, setGeneratingTemplateId] = useState(null);
   const [expandedBatches, setExpandedBatches] = useState(new Set());
   const [editingBatchDates, setEditingBatchDates] = useState(null); // { ids, periodFrom, periodTo }
+  const [batchAmountEdits, setBatchAmountEdits] = useState({}); // { templateId_idx: newAmount }
+  const [savingBatchAmounts, setSavingBatchAmounts] = useState(false);
   const queryClient = useQueryClient();
 
   // Real-time invoice updates via Supabase
@@ -338,10 +340,33 @@ export default function InvoiceManager({ invoices, clients, settings }) {
         const batchPeriodFrom = template.period_from || periodFrom;
         const batchPeriodTo = template.period_to || new Date(new Date(batchPeriodFrom).getTime() + ((template.invoice_period_days || 30) - 1) * 86400000).toISOString().split('T')[0];
         console.log(`Generating batch: ${batchInvoices.length} invoices, period ${batchPeriodFrom} to ${batchPeriodTo}`);
+        const roundPence = (n) => Math.round(n * 100) / 100;
+
         for (const invData of batchInvoices) {
           const invNumber = `${prefix}-${nextNumber}`;
           const payDays = parseInt(invData.payment_terms || template.payment_terms || '30') || 30;
           const dueDate = new Date(new Date(batchPeriodFrom).getTime() + payDays * 86400000).toISOString().split('T')[0];
+
+          // Recalculate total from stored item data (fixes stale/rounded amounts in template)
+          let computedTotal = invData.total_amount || 0;
+          const invDayItems = typeof invData.day_items === 'string' ? JSON.parse(invData.day_items) : (invData.day_items || null);
+          const invRepeatingDays = invData.repeating_days || [];
+          if (invDayItems && invRepeatingDays.length > 0) {
+            computedTotal = roundPence(invRepeatingDays.reduce((sum, dayIdx) => {
+              return sum + (invDayItems[dayIdx] || []).reduce((daySum, item) => {
+                return daySum + roundPence(((item.quantity || 0) * (item.unit_price || 0)) * (item.double_handed ? 2 : 1));
+              }, 0);
+            }, 0));
+          } else {
+            const liRaw = invData.line_items;
+            const liArr = typeof liRaw === 'string' ? JSON.parse(liRaw) : (Array.isArray(liRaw) ? liRaw : null);
+            if (liArr && liArr.length > 0) {
+              computedTotal = roundPence(liArr.reduce((sum, li) => {
+                const sub = roundPence((li.quantity || 0) * (li.unit_price || 0)) - (li.discount || 0);
+                return sum + roundPence(sub + roundPence(sub * (li.tax_rate || 0) / 100));
+              }, 0));
+            }
+          }
 
           // Build clean insert — exclude any fields that aren't invoice columns
           const insertData = {
@@ -356,14 +381,14 @@ export default function InvoiceManager({ invoices, clients, settings }) {
             period_to: batchPeriodTo,
             payment_terms: invData.payment_terms || template.payment_terms,
             notes: invData.notes || template.notes || '',
-            day_items: invData.day_items || null,
-            repeating_days: invData.repeating_days || null,
+            day_items: invDayItems,
+            repeating_days: invRepeatingDays.length > 0 ? invRepeatingDays : null,
             discount_type: invData.discount_type || 'fixed',
             discount_value: invData.discount_value || 0,
-            subtotal: invData.subtotal || invData.total_amount || 0,
+            subtotal: computedTotal,
             tax_amount: invData.tax_amount || 0,
-            total_amount: invData.total_amount || 0,
-            amount_due: invData.total_amount || 0,
+            total_amount: computedTotal,
+            amount_due: computedTotal,
             currency: invData.currency || template.currency || 'GBP',
             status: 'draft',
             is_recurring: true,
@@ -1288,9 +1313,33 @@ export default function InvoiceManager({ invoices, clients, settings }) {
     const dueDate = new Date(new Date(template.period_from || today).getTime() + payDays * 86400000).toISOString().split('T')[0];
 
     // Override dates AND assign new invoice numbers, then create real invoices in DB
+    const roundPence = (n) => Math.round(n * 100) / 100;
+
     const createdInvoices = [];
     for (const inv of lineItems) {
       const invNumber = `${prefix}-${nextNumber}`;
+
+      // Recalculate total from day_items if present (fixes stale/rounded amounts)
+      let computedTotal = inv.total_amount || 0;
+      const invDayItems = typeof inv.day_items === 'string' ? JSON.parse(inv.day_items) : (inv.day_items || null);
+      const invRepeatingDays = inv.repeating_days || [];
+      if (invDayItems && invRepeatingDays.length > 0) {
+        computedTotal = roundPence(invRepeatingDays.reduce((sum, dayIdx) => {
+          return sum + (invDayItems[dayIdx] || []).reduce((daySum, item) => {
+            return daySum + roundPence(((item.quantity || 0) * (item.unit_price || 0)) * (item.double_handed ? 2 : 1));
+          }, 0);
+        }, 0));
+      } else {
+        const liRaw = inv.line_items;
+        const liArr = typeof liRaw === 'string' ? JSON.parse(liRaw) : (Array.isArray(liRaw) ? liRaw : null);
+        if (liArr && liArr.length > 0) {
+          computedTotal = roundPence(liArr.reduce((sum, li) => {
+            const sub = roundPence((li.quantity || 0) * (li.unit_price || 0)) - (li.discount || 0);
+            return sum + roundPence(sub + roundPence(sub * (li.tax_rate || 0) / 100));
+          }, 0));
+        }
+      }
+
       const insertData = {
         invoice_number: invNumber,
         client_id: inv.client_id || template.client_id,
@@ -1303,19 +1352,19 @@ export default function InvoiceManager({ invoices, clients, settings }) {
         period_to: template.period_to || inv.period_to,
         payment_terms: inv.payment_terms || template.payment_terms,
         notes: inv.notes || template.notes || '',
-        day_items: inv.day_items || null,
-        repeating_days: inv.repeating_days || null,
+        day_items: invDayItems,
+        repeating_days: invRepeatingDays.length > 0 ? invRepeatingDays : null,
         discount_type: inv.discount_type || 'fixed',
         discount_value: inv.discount_value || 0,
-        subtotal: inv.subtotal || inv.total_amount || 0,
+        subtotal: computedTotal,
         tax_amount: inv.tax_amount || 0,
-        total_amount: inv.total_amount || 0,
-        amount_due: inv.total_amount || 0,
+        total_amount: computedTotal,
+        amount_due: computedTotal,
         currency: inv.currency || template.currency || 'GBP',
         status: markAsSent ? 'sent' : 'draft',
         sent_date: markAsSent ? today : null,
       };
-      if (!inv.day_items) {
+      if (!invDayItems) {
         const origItems = inv.line_items;
         if (origItems && Array.isArray(origItems)) {
           insertData.line_items = origItems;
@@ -1431,13 +1480,18 @@ export default function InvoiceManager({ invoices, clients, settings }) {
 
     let totalAmount = totals.subtotal + totals.tax - finalDiscount;
 
+    const roundPence = (n) => Math.round(n * 100) / 100;
+
+    let dayBasedSubtotal = null;
     if (repeatingDays.length > 0 && Object.keys(dayItems).length > 0) {
       const grandTotal = repeatingDays.reduce((sum, dayIdx) => {
         return sum + (dayItems[dayIdx] || []).reduce((daySum, item) => {
-          return daySum + (((item.quantity || 0) * (item.unit_price || 0)) * (item.double_handed ? 2 : 1));
+          const itemTotal = roundPence(((item.quantity || 0) * (item.unit_price || 0)) * (item.double_handed ? 2 : 1));
+          return daySum + itemTotal;
         }, 0);
       }, 0);
-      totalAmount = grandTotal;
+      totalAmount = roundPence(grandTotal);
+      dayBasedSubtotal = totalAmount; // subtotal must match for double-handed items
     }
 
     const invoiceData = {
@@ -1452,7 +1506,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
        client_name: recipientName,
        client_email: recipientEmail,
        line_items: allItems,
-       subtotal: totals.subtotal,
+       subtotal: dayBasedSubtotal !== null ? dayBasedSubtotal : totals.subtotal,
        tax_amount: totals.tax,
        total_amount: Math.max(0, totalAmount),
        amount_due: Math.max(0, totalAmount),
@@ -3048,6 +3102,28 @@ export default function InvoiceManager({ invoices, clients, settings }) {
             const t = viewingRecurringTemplate;
             const freqLabels = { weekly: 'Weekly', 'bi-weekly': 'Bi-Weekly', monthly: 'Monthly', quarterly: 'Quarterly', annually: 'Annually' };
             const lineItems = typeof t.line_items === 'string' ? JSON.parse(t.line_items) : (t.line_items || []);
+            const rp = (n) => Math.round(n * 100) / 100;
+            // Recalculate each batch item's amount from stored visit/line data (avoids stale stored amounts)
+            const getItemAmount = (item) => {
+              // 1. Day-based invoices: recalculate from day_items
+              const di = typeof item.day_items === 'string' ? JSON.parse(item.day_items) : (item.day_items || null);
+              const rd = item.repeating_days || [];
+              if (di && rd.length > 0) {
+                return rp(rd.reduce((sum, dayIdx) => sum + (di[dayIdx] || []).reduce((ds, it) => ds + rp(((it.quantity || 0) * (it.unit_price || 0)) * (it.double_handed ? 2 : 1)), 0), 0));
+              }
+              // 2. Regular line-item invoices: recalculate from nested line_items
+              const liRaw = item.line_items;
+              const liArr = typeof liRaw === 'string' ? JSON.parse(liRaw) : (Array.isArray(liRaw) ? liRaw : null);
+              if (liArr && liArr.length > 0) {
+                return rp(liArr.reduce((sum, li) => {
+                  const sub = rp((li.quantity || 0) * (li.unit_price || 0)) - (li.discount || 0);
+                  return sum + rp(sub + rp(sub * (li.tax_rate || 0) / 100));
+                }, 0));
+              }
+              // 3. Fallback to stored amount
+              return item.total_amount || item.amount || item.total || 0;
+            };
+            const batchDisplayTotal = t.is_batch ? rp(lineItems.reduce((s, item) => s + getItemAmount(item), 0)) : (t.total_amount || 0);
             return (
               <>
                 <DialogHeader>
@@ -3062,7 +3138,7 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                           {t.client_email && <p className="text-sm text-slate-500">{t.client_email}</p>}
                         </div>
                         <div className="text-right">
-                          <p className="text-2xl font-bold text-teal-700">£{(t.total_amount || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
+                          <p className="text-2xl font-bold text-teal-700">£{batchDisplayTotal.toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
                           <span className={`text-xs font-medium px-2 py-0.5 rounded ${t.is_active !== false ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'}`}>
                             {t.is_active !== false ? 'Active' : 'Paused'}
                           </span>
@@ -3088,9 +3164,12 @@ export default function InvoiceManager({ invoices, clients, settings }) {
 
                   {lineItems.length > 0 && (
                     <div>
-                      <h4 className="font-semibold text-slate-900 mb-2">
-                        {t.is_batch ? `Invoices in Batch (${lineItems.length})` : 'Line Items'}
-                      </h4>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-semibold text-slate-900">
+                          {t.is_batch ? `Invoices in Batch (${lineItems.length})` : 'Line Items'}
+                        </h4>
+                        {t.is_batch && <p className="text-xs text-slate-500">Click any amount to correct it</p>}
+                      </div>
                       <div className="border rounded overflow-hidden">
                         <table className="w-full text-sm">
                           <thead className="bg-slate-50">
@@ -3106,6 +3185,9 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                           <tbody>
                             {lineItems.map((item, idx) => {
                               const suName = item.service_user_id ? (serviceUsers.find(u => u.id === item.service_user_id)?.full_name || null) : null;
+                              const editKey = `${t.id}_${idx}`;
+                              const editVal = batchAmountEdits[editKey];
+                              const displayAmt = editVal !== undefined ? editVal : getItemAmount(item);
                               return (
                                 <tr key={idx} className="border-t">
                                   {t.is_batch && (
@@ -3118,7 +3200,20 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                                   </td>
                                   {!t.is_batch && <td className="text-right p-2">{item.quantity || item.qty || 1}</td>}
                                   {!t.is_batch && <td className="text-right p-2">£{(item.rate || item.unit_price || item.total_amount || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</td>}
-                                  <td className="text-right p-2 font-medium">£{(item.amount || item.total || item.total_amount || ((item.quantity || 1) * (item.rate || 0))).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</td>
+                                  <td className="text-right p-2 font-medium">
+                                    {t.is_batch ? (
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        className="w-24 text-right border border-slate-300 rounded px-1 py-0.5 text-sm focus:border-teal-500 focus:outline-none"
+                                        value={editVal !== undefined ? editVal : getItemAmount(item).toFixed(2)}
+                                        onChange={(e) => setBatchAmountEdits(prev => ({ ...prev, [editKey]: parseFloat(e.target.value) || 0 }))}
+                                      />
+                                    ) : (
+                                      `£${getItemAmount(item).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`
+                                    )}
+                                  </td>
                                   {t.is_batch && (
                                     <td className="text-right p-2">
                                       <div className="flex gap-1 justify-end">
@@ -3141,7 +3236,15 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                               <td className="p-2">Total</td>
                               {!t.is_batch && <td></td>}
                               {!t.is_batch && <td></td>}
-                              <td className="text-right p-2">£{(t.total_amount || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</td>
+                              <td className="text-right p-2">
+                                £{t.is_batch
+                                  ? rp(lineItems.reduce((s, item, idx) => {
+                                      const editVal = batchAmountEdits[`${t.id}_${idx}`];
+                                      return s + (editVal !== undefined ? editVal : getItemAmount(item));
+                                    }, 0)).toLocaleString('en-GB', { minimumFractionDigits: 2 })
+                                  : batchDisplayTotal.toLocaleString('en-GB', { minimumFractionDigits: 2 })
+                                }
+                              </td>
                               {t.is_batch && <td></td>}
                             </tr>
                           </tfoot>
@@ -3178,6 +3281,50 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                         {combineLoading ? 'Generating...' : 'Download & Mark Sent'}
                       </Button>
                     </>
+                  )}
+                  {t.is_batch && Object.keys(batchAmountEdits).some(k => k.startsWith(`${t.id}_`)) && (
+                    <Button
+                      className="bg-teal-600 hover:bg-teal-700"
+                      disabled={savingBatchAmounts}
+                      onClick={async () => {
+                        setSavingBatchAmounts(true);
+                        try {
+                          const currentLineItems = typeof t.line_items === 'string' ? JSON.parse(t.line_items) : (t.line_items || []);
+                          const updatedLineItems = currentLineItems.map((item, idx) => {
+                            const editKey = `${t.id}_${idx}`;
+                            const newAmt = batchAmountEdits[editKey];
+                            if (newAmt !== undefined) {
+                              return { ...item, total_amount: newAmt, subtotal: newAmt, amount_due: newAmt };
+                            }
+                            return item;
+                          });
+                          const newBatchTotal = rp(updatedLineItems.reduce((s, item) => s + (item.total_amount || 0), 0));
+                          const { error } = await supabase.from('recurring_invoices')
+                            .update({ line_items: updatedLineItems, total_amount: newBatchTotal })
+                            .eq('id', t.id);
+                          if (error) throw error;
+                          queryClient.invalidateQueries({ queryKey: ['recurringInvoices'] });
+                          setBatchAmountEdits(prev => {
+                            const next = { ...prev };
+                            Object.keys(next).forEach(k => { if (k.startsWith(`${t.id}_`)) delete next[k]; });
+                            return next;
+                          });
+                          setViewingRecurringTemplate(prev => ({
+                            ...prev,
+                            line_items: updatedLineItems,
+                            total_amount: newBatchTotal,
+                          }));
+                          toast.success('Batch amounts updated');
+                        } catch (err) {
+                          toast.error('Failed to save: ' + err.message);
+                        } finally {
+                          setSavingBatchAmounts(false);
+                        }
+                      }}
+                    >
+                      <Check className="w-4 h-4 mr-2" />
+                      {savingBatchAmounts ? 'Saving...' : 'Save Amounts'}
+                    </Button>
                   )}
                   <Button className="bg-teal-600 hover:bg-teal-700" onClick={() => { setViewingRecurringTemplate(null); setEditingRecurringTemplate(t); }}>
                     <Edit2 className="w-4 h-4 mr-2" /> Edit Template

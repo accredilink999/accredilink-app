@@ -127,16 +127,18 @@ export default function DaySpecificItems({ repeatingDays, dayItems, onDayItemsCh
   const sortedDays = [...repeatingDays].sort((a, b) => a - b);
   const firstDay = sortedDays[0];
 
+  const roundPence = (n) => Math.round(n * 100) / 100;
+
   const calculateGrandTotal = () => {
     let total = 0;
     sortedDays.forEach(dayIdx => {
       if (dayItems[dayIdx]) {
         total += dayItems[dayIdx].reduce((sum, item) => {
-          return sum + (((item.quantity || 0) * (item.unit_price || 0)) * (item.double_handed ? 2 : 1));
+          return sum + roundPence(((item.quantity || 0) * (item.unit_price || 0)) * (item.double_handed ? 2 : 1));
         }, 0);
       }
     });
-    return total;
+    return roundPence(total);
   };
 
   return (
@@ -409,7 +411,7 @@ export default function DaySpecificItems({ repeatingDays, dayItems, onDayItemsCh
                 <div className="mt-4 pt-4 border-t border-slate-200 flex justify-between items-center">
                   <span className="text-sm font-semibold text-slate-700">Day Total:</span>
                   <span className="text-lg font-bold text-teal-700">
-                    £{dayItems[dayIdx].reduce((sum, item) => sum + (((item.quantity || 0) * (item.unit_price || 0)) * (item.double_handed ? 2 : 1)), 0).toFixed(2)}
+                    £{roundPence(dayItems[dayIdx].reduce((sum, item) => sum + roundPence(((item.quantity || 0) * (item.unit_price || 0)) * (item.double_handed ? 2 : 1)), 0)).toFixed(2)}
                   </span>
                 </div>
               )}

@@ -150,7 +150,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
         {[
           { to: 'Training', label: 'Training', icon: GraduationCap, bg: 'from-cyan-400 to-cyan-600', desc: 'Training management' },
-          { to: 'TrainingMatrix', label: 'Training Matrix', icon: Grid3x3, bg: 'from-violet-400 to-violet-600', desc: 'Staff training grid' },
+          { to: 'StaffManagement', label: 'Staff Matrix', icon: Grid3x3, bg: 'from-violet-400 to-violet-600', desc: 'Onboarding, compliance & skills matrix' },
           { to: 'DocumentManagement', label: 'Documents', icon: FolderOpen, bg: 'from-indigo-400 to-indigo-600', desc: 'Document management' },
           { to: 'Archive', label: 'Archive', icon: Archive, bg: 'from-slate-400 to-slate-600', desc: 'Archived records' },
           { to: 'FormBuilder', label: 'Forms', icon: FileEdit, bg: 'from-fuchsia-400 to-fuchsia-600', desc: 'Custom form builder' },

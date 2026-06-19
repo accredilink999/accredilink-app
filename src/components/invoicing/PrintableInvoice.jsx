@@ -1,8 +1,14 @@
 import React from 'react';
 
 const PrintableInvoice = React.forwardRef(({ invoice, settings, serviceUser, client }, ref) => {
-  const lineItems = JSON.parse(invoice.line_items || '[]');
-  const dayItems = JSON.parse(invoice.day_items || '{}');
+  const parseField = (field, fallback) => {
+    if (!field) return fallback;
+    if (typeof field === 'string') { try { return JSON.parse(field); } catch { return fallback; } }
+    return field;
+  };
+  const lineItems = parseField(invoice.line_items, []);
+  const dayItems = parseField(invoice.day_items, {});
+  const roundPence = (n) => Math.round(n * 100) / 100;
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const brandColor = settings?.brand_color || '#0f766e';
 
@@ -109,7 +115,7 @@ const PrintableInvoice = React.forwardRef(({ invoice, settings, serviceUser, cli
                       <td style={{ padding: '8px', textAlign: 'right', width: '70px' }}>£{(item.unit_price || 0).toFixed(2)}</td>
                       {item.double_handed && <td style={{ padding: '8px', textAlign: 'center', width: '40px' }}>(x2)</td>}
                       <td style={{ padding: '8px', textAlign: 'right', width: '70px', fontWeight: 'bold' }}>
-                        £{((item.quantity || 0) * (item.unit_price || 0) * (item.double_handed ? 2 : 1)).toFixed(2)}
+                        £{roundPence(((item.quantity || 0) * (item.unit_price || 0)) * (item.double_handed ? 2 : 1)).toFixed(2)}
                       </td>
                     </tr>
                   ))}
@@ -135,7 +141,7 @@ const PrintableInvoice = React.forwardRef(({ invoice, settings, serviceUser, cli
                   <td style={{ padding: '8px', textAlign: 'center' }}>{item.quantity || 0}</td>
                   <td style={{ padding: '8px', textAlign: 'right' }}>£{(item.unit_price || 0).toFixed(2)}</td>
                   <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold' }}>
-                    £{((item.quantity || 0) * (item.unit_price || 0)).toFixed(2)}
+                    £{roundPence((item.quantity || 0) * (item.unit_price || 0)).toFixed(2)}
                   </td>
                 </tr>
               ))}
