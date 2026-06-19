@@ -2130,13 +2130,16 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
+                                  <DropdownMenuItem disabled={combineLoading} onClick={() => handleCombineInvoices(group)}>
+                                    <Layers className="w-4 h-4 mr-2" /> Combine & Download ({group.length})
+                                  </DropdownMenuItem>
                                   <DropdownMenuItem onClick={async () => {
                                     for (const inv of group) {
                                       await handleDownloadInvoice(inv);
                                     }
                                     toast.success(`${group.length} PDFs downloaded`);
                                   }}>
-                                    <Download className="w-4 h-4 mr-2" /> Download All PDFs ({group.length})
+                                    <Download className="w-4 h-4 mr-2" /> Download Separate PDFs ({group.length})
                                   </DropdownMenuItem>
                                   <DropdownMenuItem onSelect={async (e) => {
                                     e.preventDefault();
@@ -2275,8 +2278,11 @@ export default function InvoiceManager({ invoices, clients, settings }) {
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="ghost" size="sm"><MoreVertical className="w-4 h-4" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem disabled={combineLoading} onClick={() => handleCombineInvoices(grp)}>
+                            <Layers className="w-4 h-4 mr-2" /> Combine & Download ({grp.length})
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={async () => { for (const inv of grp) await handleDownloadInvoice(inv); toast.success(`${grp.length} PDFs downloaded`); }}>
-                            <Download className="w-4 h-4 mr-2" /> Download All PDFs ({grp.length})
+                            <Download className="w-4 h-4 mr-2" /> Download Separate PDFs ({grp.length})
                           </DropdownMenuItem>
                           {activeSection !== 'sent' && activeSection !== 'paid' && (
                             <DropdownMenuItem onSelect={async (e) => {
