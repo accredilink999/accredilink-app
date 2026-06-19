@@ -20,37 +20,52 @@ const AGORA_APP_CERT = 'e8dd782a9eac4d3385162b3a1f81d6c4';
 
 AgoraRTC.setLogLevel(4); // errors only
 
-// Agora AccessToken V1 — generated client-side using Web Crypto API
+// Agora AccessToken V1 — matches the official agora-token npm package byte-for-byte
+function _crc32(str) {
+  const table = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let j = 0; j < 8; j++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+    table[i] = c >>> 0;
+  }
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i);
+    c = table[(c ^ code) & 0xFF] ^ (c >>> 8);
+    if (code > 255) c = table[(c ^ (code >>> 8)) & 0xFF] ^ (c >>> 8);
+  }
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
 async function buildAgoraToken(channelName, uid) {
   const expireTs = (Math.floor(Date.now() / 1000) + 3600) >>> 0;
-  const salt     = (Math.floor(Math.random() * 0xFFFFFFFF) + 1) >>> 0;
-  const ts       = (Math.floor(Date.now() / 1000) + 100) >>> 0;
+  const salt     = (Math.floor(Math.random() * 0xFFFFFFFF)) >>> 0;
+  const ts       = (Math.floor(Date.now() / 1000) + 24 * 3600) >>> 0;
+  const uidStr   = uid === 0 ? '' : String(uid);
 
   const u16 = (n) => { const b = new Uint8Array(2); b[0] = n & 0xFF; b[1] = (n >> 8) & 0xFF; return b; };
   const u32 = (n) => { n = n >>> 0; const b = new Uint8Array(4); b[0] = n & 0xFF; b[1] = (n >> 8) & 0xFF; b[2] = (n >> 16) & 0xFF; b[3] = (n >> 24) & 0xFF; return b; };
   const cat = (...as) => { const o = new Uint8Array(as.reduce((s, a) => s + a.length, 0)); let p = 0; for (const a of as) { o.set(a, p); p += a.length; } return o; };
-  const ps  = (s) => { const e = new TextEncoder().encode(s); return cat(u16(e.length), e); };
+  const pb  = (b) => cat(u16(b.length), b); // putBytes: uint16LE(len) + raw bytes
 
-  const uidStr = uid === 0 ? '' : String(uid);
-  // kJoinChannel=1, kPublishAudio=2, kPublishVideo=3, kPublishData=4
+  // m = salt + ts + privileges map
   const privs = [[1, expireTs], [2, expireTs], [3, expireTs], [4, expireTs]];
   const privMap = cat(u16(privs.length), ...privs.flatMap(([k, v]) => [u16(k), u32(v)]));
+  const m = cat(u32(salt), u32(ts), privMap);
 
-  // content: ts + salt + channelName + uid + privileges
-  const m = cat(u32(ts), u32(salt), ps(channelName), ps(uidStr), privMap);
-
-  // HMAC-SHA256(key=fromHex(cert), msg=appId_bytes + m)
-  const fromHex = (h) => new Uint8Array(h.match(/../g).map(x => parseInt(x, 16)));
-  const keyBytes = fromHex(AGORA_APP_CERT);
-  const msgBytes = cat(new TextEncoder().encode(AGORA_APP_ID), m);
-
+  // HMAC-SHA256: key = cert as UTF-8 bytes (NOT hex-decoded)
+  //              msg = appId_utf8 + channelName_utf8 + uid_utf8 + m
+  const enc = new TextEncoder();
+  const keyBytes = enc.encode(AGORA_APP_CERT);
+  const msgBytes = cat(enc.encode(AGORA_APP_ID), enc.encode(channelName), enc.encode(uidStr), m);
   const cryptoKey = await crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const sig = new Uint8Array(await crypto.subtle.sign('HMAC', cryptoKey, msgBytes));
 
-  // pack: uint16(sig.length) + sig + m → base64
-  const packed = cat(u16(sig.length), sig, m);
+  // content = putBytes(sig) + uint32(crc32(channel)) + uint32(crc32(uid)) + putBytes(m)
+  const content = cat(pb(sig), u32(_crc32(channelName)), u32(_crc32(uidStr)), pb(m));
+
   let bin = '';
-  packed.forEach(b => { bin += String.fromCharCode(b); });
+  content.forEach(b => { bin += String.fromCharCode(b); });
   return '006' + AGORA_APP_ID + btoa(bin);
 }
 
