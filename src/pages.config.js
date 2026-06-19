@@ -50,6 +50,7 @@ import LegalPages from './pages/LegalPages';
 import PhotoGallery from './pages/PhotoGallery';
 import StaffAwards from './pages/StaffAwards';
 import MyMentoring from './pages/MyMentoring';
+import TwoWayRadio from './pages/TwoWayRadio';
 import __Layout from './Layout.jsx';
 
 
@@ -103,6 +104,7 @@ export const PAGES = {
     "LegalPages": LegalPages,
     "PhotoGallery": PhotoGallery,
     "StaffAwards": StaffAwards,
+    "TwoWayRadio": TwoWayRadio,
 }
 
 export const pagesConfig = {

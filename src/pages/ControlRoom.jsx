@@ -10,7 +10,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Navigation, Search, Check, AlertCircle, ChevronDown, Edit, Loader2, Mail, Clock, Plus, Users } from 'lucide-react';
+import { MapPin, Navigation, Search, Check, AlertCircle, ChevronDown, Edit, Loader2, Mail, Clock, Plus, Users, Radio } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -651,6 +651,13 @@ export default function ControlRoom() {
           <span className="hidden sm:inline">Email</span>
           <span className="sm:hidden">Mail</span>
         </button>
+        {user?.role === 'super_admin' && (
+          <button onClick={() => setActiveTab('radio-settings')} className={`flex items-center justify-center sm:justify-start gap-1 flex-1 text-xs sm:text-sm py-2 sm:py-3 rounded-lg font-medium transition-all shadow-md hover:shadow-lg ${activeTab === 'radio-settings' ? 'bg-gradient-to-r from-teal-500 to-teal-600 text-white' : 'bg-gradient-to-r from-teal-400 to-teal-500 text-white hover:from-teal-500 hover:to-teal-600'}`}>
+            <Radio className="w-4 h-4 flex-shrink-0" />
+            <span className="hidden sm:inline">Radio</span>
+            <span className="sm:hidden">Radio</span>
+          </button>
+        )}
       </div>
 
       {activeTab === 'tracking' && isAdmin && (
@@ -939,6 +946,10 @@ export default function ControlRoom() {
         <EmailNotificationCenter />
       )}
 
+      {activeTab === 'radio-settings' && user?.role === 'super_admin' && (
+        <RadioSettingsPanel queryClient={queryClient} />
+      )}
+
       {/* Edit Announcement Dialog */}
       {editingAnnouncement && (
         <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
@@ -1003,5 +1014,62 @@ export default function ControlRoom() {
         </Dialog>
       )}
     </div>
+  );
+}
+
+function RadioSettingsPanel({ queryClient }) {
+  const [saving, setSaving] = useState(false);
+
+  const { data: settings, isLoading } = useQuery({
+    queryKey: ['radioSettings'],
+    queryFn: async () => {
+      const { data } = await supabase.from('radio_settings').select('*').limit(1).single();
+      return data;
+    },
+  });
+
+  const toggle = async () => {
+    setSaving(true);
+    const newVal = !(settings?.is_enabled);
+    const orgId = localStorage.getItem('organizationId') || sessionStorage.getItem('organizationId') || '';
+    if (settings?.id) {
+      await supabase.from('radio_settings').update({ is_enabled: newVal }).eq('id', settings.id);
+    } else {
+      await supabase.from('radio_settings').insert({ is_enabled: newVal, organization_id: orgId });
+    }
+    queryClient.invalidateQueries({ queryKey: ['radioSettings'] });
+    setSaving(false);
+  };
+
+  return (
+    <Card className="p-6 max-w-md">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center">
+          <Radio className="w-5 h-5 text-teal-600" />
+        </div>
+        <div>
+          <h3 className="font-bold text-slate-900">Team Radio</h3>
+          <p className="text-sm text-slate-500">Two-way voice communication for staff</p>
+        </div>
+      </div>
+      <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+        <div>
+          <p className="font-medium text-slate-900">Enable Radio Button</p>
+          <p className="text-xs text-slate-500 mt-0.5">Shows radio icon in bottom nav for all staff</p>
+        </div>
+        <button
+          onClick={toggle}
+          disabled={saving || isLoading}
+          className={`relative w-12 h-6 rounded-full transition-colors focus:outline-none ${settings?.is_enabled ? 'bg-teal-500' : 'bg-slate-300'}`}
+        >
+          <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${settings?.is_enabled ? 'translate-x-6' : 'translate-x-0'}`} />
+        </button>
+      </div>
+      <p className="text-xs text-slate-400 mt-3">
+        Status: <strong className={settings?.is_enabled ? 'text-teal-600' : 'text-slate-500'}>
+          {isLoading ? 'Loading…' : settings?.is_enabled ? 'Radio ENABLED' : 'Radio DISABLED'}
+        </strong>
+      </p>
+    </Card>
   );
 }
