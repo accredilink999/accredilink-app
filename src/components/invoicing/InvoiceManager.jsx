@@ -50,6 +50,8 @@ export default function InvoiceManager({ invoices, clients, settings }) {
   const [editingBatchDates, setEditingBatchDates] = useState(null); // { ids, periodFrom, periodTo }
   const [batchAmountEdits, setBatchAmountEdits] = useState({}); // { templateId_idx: newAmount }
   const [savingBatchAmounts, setSavingBatchAmounts] = useState(false);
+  const [setAmountInvoice, setSetAmountInvoice] = useState(null); // invoice being manually amount-corrected
+  const [setAmountValue, setSetAmountValue] = useState('');
   const queryClient = useQueryClient();
 
   // Real-time invoice updates via Supabase
@@ -1722,6 +1724,9 @@ export default function InvoiceManager({ invoices, clients, settings }) {
               <DropdownMenuItem onClick={() => handleRecalculateInvoice(invoice)}>
                 <RefreshCw className="w-4 h-4 mr-2" /> Recalculate Amount
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setSetAmountInvoice(invoice); setSetAmountValue((invoice.total_amount || 0).toFixed(2)); }}>
+                <Edit2 className="w-4 h-4 mr-2" /> Set Exact Amount
+              </DropdownMenuItem>
               {activeSection !== 'recurring' && (
                 <DropdownMenuItem onClick={() => { setRecurringInvoiceData(invoice); setShowRecurringDialog(true); }}>
                   <RefreshCw className="w-4 h-4 mr-2" /> Make Recurring
@@ -3365,6 +3370,52 @@ export default function InvoiceManager({ invoices, clients, settings }) {
               </>
             );
           })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Set Exact Amount Dialog */}
+      <Dialog open={!!setAmountInvoice} onOpenChange={(open) => !open && setSetAmountInvoice(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Set Exact Amount</DialogTitle>
+          </DialogHeader>
+          {setAmountInvoice && (
+            <div className="space-y-4 py-2">
+              <p className="text-sm text-slate-500">
+                Invoice <strong>{setAmountInvoice.invoice_number}</strong> — {setAmountInvoice.client_name}
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Amount (£)</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={setAmountValue}
+                  onChange={(e) => setSetAmountValue(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setSetAmountInvoice(null)}>Cancel</Button>
+                <Button
+                  className="bg-teal-600 hover:bg-teal-700"
+                  onClick={async () => {
+                    const newAmt = Math.round(parseFloat(setAmountValue) * 100) / 100;
+                    if (isNaN(newAmt)) { toast.error('Invalid amount'); return; }
+                    const { error } = await supabase.from('invoices')
+                      .update({ total_amount: newAmt, subtotal: newAmt, amount_due: newAmt })
+                      .eq('id', setAmountInvoice.id);
+                    if (error) { toast.error('Failed: ' + error.message); return; }
+                    queryClient.invalidateQueries({ queryKey: ['invoices'] });
+                    toast.success(`Amount set to £${newAmt.toFixed(2)}`);
+                    setSetAmountInvoice(null);
+                  }}
+                >
+                  Save Amount
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
