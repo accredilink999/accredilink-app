@@ -48,7 +48,8 @@ import {
   Trophy,
   ListChecks,
   Share2,
-  ClipboardCheck } from
+  ClipboardCheck,
+  Radio } from
 'lucide-react';
 import ShiftSwapResponseModal from '@/components/rota/ShiftSwapResponseModal';
 import HelpTip from '@/components/ui/HelpTip';
@@ -328,6 +329,18 @@ export default function Dashboard() {
   });
 
   // Today's awards for the org
+  const { data: radioEnabled } = useQuery({
+    queryKey: ['radioSettings'],
+    queryFn: async () => {
+      try {
+        const { data } = await supabase.from('radio_settings').select('is_enabled').limit(1).single();
+        return data?.is_enabled || false;
+      } catch { return false; }
+    },
+    staleTime: 0,
+    refetchInterval: 30000,
+  });
+
   const { data: todayAwards = [] } = useQuery({
     queryKey: ['todayAwards', today],
     queryFn: async () => {
@@ -751,6 +764,7 @@ export default function Dashboard() {
             { to: 'Feedback', label: 'Feedback', icon: Star, bg: 'from-amber-400 to-yellow-500' },
             { to: 'AIAssistant', label: 'AI', icon: Bot, bg: 'from-purple-400 to-purple-600' },
             { to: 'Competencies', label: 'Competencies', icon: ClipboardCheck, bg: 'from-violet-400 to-violet-600' },
+            ...(radioEnabled ? [{ to: 'TwoWayRadio', label: 'Radio', icon: Radio, bg: 'from-red-500 to-rose-600' }] : []),
           ].map(section => {
             const Icon = section.icon;
             const content = (

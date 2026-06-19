@@ -32,7 +32,8 @@ export default function BottomNavigation({ currentPageName, unreadChatCount = 0,
         return data?.is_enabled || false;
       } catch { return false; }
     },
-    staleTime: 60000,
+    staleTime: 0,
+    refetchInterval: 30000,
   });
 
   const navigation = radioEnabled
