@@ -726,6 +726,35 @@ export default function InvoiceManager({ invoices, clients, settings }) {
     }
   };
 
+  const handleRecalculateInvoice = async (invoice) => {
+    const rp = (n) => Math.round(n * 100) / 100;
+    const di = typeof invoice.day_items === 'string' ? JSON.parse(invoice.day_items) : (invoice.day_items || null);
+    const rd = invoice.repeating_days || [];
+    let newTotal = invoice.total_amount || 0;
+    if (di && rd.length > 0) {
+      newTotal = rp(rd.reduce((sum, dayIdx) => {
+        return sum + (di[dayIdx] || []).reduce((ds, it) => {
+          return ds + rp(((it.quantity || 0) * (it.unit_price || 0)) * (it.double_handed ? 2 : 1));
+        }, 0);
+      }, 0));
+    } else {
+      const liRaw = invoice.line_items;
+      const liArr = typeof liRaw === 'string' ? JSON.parse(liRaw) : (Array.isArray(liRaw) ? liRaw : null);
+      if (liArr && liArr.length > 0) {
+        newTotal = rp(liArr.reduce((sum, li) => {
+          const sub = rp((li.quantity || 0) * (li.unit_price || 0)) - (li.discount || 0);
+          return sum + rp(sub + rp(sub * (li.tax_rate || 0) / 100));
+        }, 0));
+      }
+    }
+    const { error } = await supabase.from('invoices')
+      .update({ total_amount: newTotal, subtotal: newTotal, amount_due: newTotal })
+      .eq('id', invoice.id);
+    if (error) { toast.error('Failed to update: ' + error.message); return; }
+    queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    toast.success(`Amount updated to £${newTotal.toFixed(2)}`);
+  };
+
   const handleDownloadInvoice = async (invoice) => {
     try {
       const s = invoicingSettings; // shorthand
@@ -1689,6 +1718,9 @@ export default function InvoiceManager({ invoices, clients, settings }) {
               )}
               <DropdownMenuItem onClick={() => handleOpenDialog(invoice)}>
                 <Edit2 className="w-4 h-4 mr-2" /> Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleRecalculateInvoice(invoice)}>
+                <RefreshCw className="w-4 h-4 mr-2" /> Recalculate Amount
               </DropdownMenuItem>
               {activeSection !== 'recurring' && (
                 <DropdownMenuItem onClick={() => { setRecurringInvoiceData(invoice); setShowRecurringDialog(true); }}>
