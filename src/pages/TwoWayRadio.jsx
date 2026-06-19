@@ -16,8 +16,43 @@ import {
 } from 'lucide-react';
 
 const AGORA_APP_ID = 'ff9f260da10245a5ab4855ea3ec59500';
+const AGORA_APP_CERT = 'e8dd782a9eac4d3385162b3a1f81d6c4';
 
 AgoraRTC.setLogLevel(4); // errors only
+
+// Agora AccessToken V1 — generated client-side using Web Crypto API
+async function buildAgoraToken(channelName, uid) {
+  const expireTs = (Math.floor(Date.now() / 1000) + 3600) >>> 0;
+  const salt     = (Math.floor(Math.random() * 0xFFFFFFFF) + 1) >>> 0;
+  const ts       = (Math.floor(Date.now() / 1000) + 100) >>> 0;
+
+  const u16 = (n) => { const b = new Uint8Array(2); b[0] = n & 0xFF; b[1] = (n >> 8) & 0xFF; return b; };
+  const u32 = (n) => { n = n >>> 0; const b = new Uint8Array(4); b[0] = n & 0xFF; b[1] = (n >> 8) & 0xFF; b[2] = (n >> 16) & 0xFF; b[3] = (n >> 24) & 0xFF; return b; };
+  const cat = (...as) => { const o = new Uint8Array(as.reduce((s, a) => s + a.length, 0)); let p = 0; for (const a of as) { o.set(a, p); p += a.length; } return o; };
+  const ps  = (s) => { const e = new TextEncoder().encode(s); return cat(u16(e.length), e); };
+
+  const uidStr = uid === 0 ? '' : String(uid);
+  // kJoinChannel=1, kPublishAudio=2, kPublishVideo=3, kPublishData=4
+  const privs = [[1, expireTs], [2, expireTs], [3, expireTs], [4, expireTs]];
+  const privMap = cat(u16(privs.length), ...privs.flatMap(([k, v]) => [u16(k), u32(v)]));
+
+  // content: ts + salt + channelName + uid + privileges
+  const m = cat(u32(ts), u32(salt), ps(channelName), ps(uidStr), privMap);
+
+  // HMAC-SHA256(key=fromHex(cert), msg=appId_bytes + m)
+  const fromHex = (h) => new Uint8Array(h.match(/../g).map(x => parseInt(x, 16)));
+  const keyBytes = fromHex(AGORA_APP_CERT);
+  const msgBytes = cat(new TextEncoder().encode(AGORA_APP_ID), m);
+
+  const cryptoKey = await crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = new Uint8Array(await crypto.subtle.sign('HMAC', cryptoKey, msgBytes));
+
+  // pack: uint16(sig.length) + sig + m → base64
+  const packed = cat(u16(sig.length), sig, m);
+  let bin = '';
+  packed.forEach(b => { bin += String.fromCharCode(b); });
+  return '006' + AGORA_APP_ID + btoa(bin);
+}
 
 // Convert UUID to a stable Agora-compatible integer UID
 const toUid = (str = '') => {
@@ -147,19 +182,7 @@ export default function TwoWayRadio() {
     setJoining(true);
     try {
       if (joinedChannelRef.current) await leaveChannel();
-
-      // Fetch a signed Agora token (required when App Certificate is enabled)
-      const res = await fetch('/api/agora-token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channelName, uid: myUid }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `Token request failed (${res.status})`);
-      }
-      const { token } = await res.json();
-
+      const token = await buildAgoraToken(channelName, myUid);
       await clientRef.current.join(AGORA_APP_ID, channelName, token, myUid);
       joinedChannelRef.current = channelName;
       setIsJoined(true);
