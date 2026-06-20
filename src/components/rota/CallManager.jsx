@@ -1462,7 +1462,12 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                                 const incomplete = getIncompleteTasks(call);
                                 if (incomplete.length > 0) {
                                   setTaskWarningCall(call);
+                                } else if (shift?.paired_shift_id) {
+                                  setLogCompletorCall(call);
                                 } else {
+                                  ShiftCallApi.update(call.id, { clock_out_time: new Date().toISOString() })
+                                    .then(() => queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] }))
+                                    .catch(e => console.warn('Clock out failed:', e));
                                   setCareLogCall(call);
                                 }
                               }}
@@ -1501,14 +1506,16 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
         />
       )}
 
-      <CareLogForm
-        shift={shift}
-        serviceUser={{ id: careLogCall?.service_user_id, full_name: careLogCall?.service_user_name }}
-        open={!!careLogCall}
-        onClose={() => { setCareLogCall(null); window.dispatchEvent(new CustomEvent('unsuppress-overdue-alert')); }}
-        callId={careLogCall?.id}
-        scheduledTime={careLogCall?.scheduled_time}
-      />
+      {careLogCall && (
+        <CareLogForm
+          shift={shift}
+          serviceUser={{ id: careLogCall.service_user_id, full_name: careLogCall.service_user_name }}
+          open={!!careLogCall}
+          onClose={() => { setCareLogCall(null); window.dispatchEvent(new CustomEvent('unsuppress-overdue-alert')); }}
+          callId={careLogCall.id}
+          scheduledTime={careLogCall.scheduled_time}
+        />
+      )}
 
       {/* Delete call confirmation dialog */}
       <AlertDialog open={!!deleteConfirmCallId} onOpenChange={(open) => !open && setDeleteConfirmCallId(null)}>
@@ -1785,7 +1792,11 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
               onClick={() => {
                 const call = logCompletorCall;
                 setLogCompletorCall(null);
-                setTimeout(() => setCareLogCall(call), 80);
+                window.dispatchEvent(new CustomEvent('suppress-overdue-alert'));
+                ShiftCallApi.update(call.id, { clock_out_time: new Date().toISOString() })
+                  .then(() => queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] }))
+                  .catch(e => console.warn('Clock out failed:', e));
+                setCareLogCall(call);
               }}
               className="bg-blue-600 hover:bg-blue-700 h-12"
             >
@@ -1907,9 +1918,16 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
             <AlertDialogAction
               onClick={() => {
                 const call = taskWarningCall;
-                window.dispatchEvent(new CustomEvent('suppress-overdue-alert'));
                 setTaskWarningCall(null);
-                setCareLogCall(call);
+                window.dispatchEvent(new CustomEvent('suppress-overdue-alert'));
+                if (shift?.paired_shift_id) {
+                  setLogCompletorCall(call);
+                } else {
+                  ShiftCallApi.update(call.id, { clock_out_time: new Date().toISOString() })
+                    .then(() => queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] }))
+                    .catch(e => console.warn('Clock out failed:', e));
+                  setCareLogCall(call);
+                }
               }}
               className="bg-amber-600 hover:bg-amber-700"
             >
