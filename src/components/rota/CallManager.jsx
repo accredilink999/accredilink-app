@@ -224,6 +224,8 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
     },
     onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] });
+      // Hide overdue alert immediately when staff checks in to a call
+      window.dispatchEvent(new CustomEvent('suppress-overdue-alert'));
 
       // Auto-check-in the partner's matching call and notify them
       if (shift?.paired_shift_id && data.service_user_id) {
@@ -305,6 +307,8 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
     },
     onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] });
+      // Re-enable overdue alert after completing a call so it can check remaining overdue calls
+      window.dispatchEvent(new CustomEvent('unsuppress-overdue-alert'));
 
       // Notify paired shift partner of check-out (don't sync status — each partner checks out independently)
       if (shift?.paired_shift_id && data.service_user_id) {

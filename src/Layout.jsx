@@ -32,7 +32,7 @@ import OfflineManager from '@/components/OfflineManager';
 import ActiveShiftAutoOpen from '@/components/ActiveShiftAutoOpen';
 import HeaderIcons from '@/components/HeaderIcons';
 import LockScreen from '@/components/LockScreen';
-import OverdueCallAlert from '@/components/OverdueCallAlert';
+// OverdueCallAlert removed — screen lock caused app-wide issues; push notifications handle late call alerts
 import SickBookingDialog from '@/components/leave/SickBookingDialog';
 import { isBiometricEnabled, storeBiometricRefreshToken } from '@/utils/biometric';
 import { supabase } from '@/api/supabaseClient';
@@ -691,8 +691,7 @@ export default function Layout({ children, currentPageName }) {
           userName={user?.staff_full_name || user?.full_name}
         />
       )}
-      {/* Overdue call alert — full screen overlay for staff with late pending calls */}
-      <OverdueCallAlert userId={user?.id} />
+      {/* OverdueCallAlert removed — push notifications via edge function handle late call alerts */}
       {/* Unified Header — all devices */}
       <div className="z-50 bg-white border-b border-slate-200 shadow-sm flex-shrink-0" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="grid grid-cols-[auto_1fr_auto] items-center px-3 py-2 gap-1">

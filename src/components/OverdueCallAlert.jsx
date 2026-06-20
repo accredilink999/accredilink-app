@@ -83,15 +83,27 @@ export default function OverdueCallAlert({ userId }) {
 
       let callAlerts = [];
       if (myShifts?.length) {
-        const { data: calls } = await supabase
+        // Don't fire overdue call alerts while staff is actively in a call — let them finish
+        const { data: activeCall } = await supabase
           .from('shift_calls')
-          .select('*')
+          .select('id')
           .in('shift_id', myShifts.map(s => s.id))
-          .eq('status', 'pending')
-          .eq('call_date', today)
-          .lt('scheduled_time', cutoffTime)
-          .or(`delay_until.is.null,delay_until.lt.${now.toISOString()}`);
-        callAlerts = (calls || []).map(c => ({ ...c, _type: 'call' }));
+          .eq('status', 'in_progress')
+          .not('clock_in_time', 'is', null)
+          .is('clock_out_time', null)
+          .limit(1);
+
+        if (!activeCall?.length) {
+          const { data: calls } = await supabase
+            .from('shift_calls')
+            .select('*')
+            .in('shift_id', myShifts.map(s => s.id))
+            .eq('status', 'pending')
+            .eq('call_date', today)
+            .lt('scheduled_time', cutoffTime)
+            .or(`delay_until.is.null,delay_until.lt.${now.toISOString()}`);
+          callAlerts = (calls || []).map(c => ({ ...c, _type: 'call' }));
+        }
       }
 
       const found = [...shiftAlerts, ...callAlerts];
