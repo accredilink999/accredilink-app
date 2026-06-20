@@ -850,7 +850,7 @@ export default function TwoWayRadio() {
                 <button
                   disabled={!isJoined || joining}
                   onMouseDown={startTalking} onMouseUp={stopTalking} onMouseLeave={stopTalking}
-                  onTouchStart={e => { e.preventDefault(); startTalking(); }} onTouchEnd={e => { e.preventDefault(); stopTalking(); }}
+                  onTouchStart={e => { e.preventDefault(); startTalking(); }} onTouchEnd={e => { e.preventDefault(); stopTalking(); }} onTouchCancel={e => { e.preventDefault(); stopTalking(); }}
                   className={`relative w-48 h-48 rounded-full flex flex-col items-center justify-center gap-3 font-bold transition-all select-none touch-none shadow-2xl ${
                     !isJoined ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
                     : isTalking ? 'bg-red-600 text-white scale-95'
