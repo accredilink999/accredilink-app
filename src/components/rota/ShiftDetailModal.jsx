@@ -16,7 +16,7 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import CallManager from '@/components/rota/CallManager';
 import ShiftSittingLogs from '@/components/rota/ShiftSittingLogs';
 import ShiftSwapRequest from '@/components/rota/ShiftSwapRequest';
-import { Clock, MapPin, Calendar, User, Trash2, Play, Square, RefreshCw, Edit2, Save, X, Car, FileText, CheckCircle, AlertCircle } from 'lucide-react';
+import { Clock, MapPin, Calendar, User, Trash2, Play, Square, RefreshCw, Edit2, Save, X, Car, FileText, CheckCircle, AlertCircle, Home } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from 'date-fns';
 import { notifyAdminsOfActivity } from '@/utils/adminNotifications';
@@ -69,6 +69,12 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
   useEffect(() => {
     setCurrentShift(shift);
   }, [shift]);
+
+  // Hide bottom nav while this modal is open
+  useEffect(() => {
+    if (open) window.dispatchEvent(new CustomEvent('shift-modal-open'));
+    return () => window.dispatchEvent(new CustomEvent('shift-modal-close'));
+  }, [open]);
 
   // Real-time subscription to shift updates
   useEffect(() => {
@@ -662,8 +668,16 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
   return (
     <>
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="w-full h-[calc(100dvh-4rem)] md:max-w-3xl md:max-h-[90vh] p-0 md:p-6 md:rounded-lg rounded-none md:rounded-lg flex flex-col fixed bottom-16 md:bottom-auto md:top-[50%] md:translate-y-[-50%] top-auto translate-y-0">
-        <DialogHeader className="px-4 pt-4 md:px-0 md:pt-0">
+      <DialogContent className="w-full h-[100dvh] md:max-w-3xl md:max-h-[90vh] p-0 md:p-6 md:rounded-lg rounded-none flex flex-col fixed bottom-0 md:bottom-auto md:top-[50%] md:translate-y-[-50%] top-auto translate-y-0 z-[10000]">
+        {/* Mobile-only: full-width App Home bar replaces the bottom nav */}
+        <button
+          onClick={onClose}
+          className="md:hidden w-full flex items-center gap-3 px-5 py-3.5 bg-teal-600 text-white font-semibold text-base flex-shrink-0 active:bg-teal-700 touch-manipulation"
+        >
+          <Home className="w-5 h-5" />
+          App Home
+        </button>
+        <DialogHeader className="hidden md:block md:px-0 md:pt-0">
           <DialogTitle>Shift Details</DialogTitle>
         </DialogHeader>
 

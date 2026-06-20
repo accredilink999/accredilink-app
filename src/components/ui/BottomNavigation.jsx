@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
@@ -24,6 +24,19 @@ const baseNavigation = [
 const radioNav = { name: 'Radio', icon: Radio, page: 'TwoWayRadio' };
 
 export default function BottomNavigation({ currentPageName, unreadChatCount = 0, unreadAssetsCount = 0 }) {
+  const [hiddenByModal, setHiddenByModal] = useState(false);
+
+  useEffect(() => {
+    const show = () => setHiddenByModal(true);
+    const hide = () => setHiddenByModal(false);
+    window.addEventListener('shift-modal-open', show);
+    window.addEventListener('shift-modal-close', hide);
+    return () => {
+      window.removeEventListener('shift-modal-open', show);
+      window.removeEventListener('shift-modal-close', hide);
+    };
+  }, []);
+
   const { data: radioEnabled } = useQuery({
     queryKey: ['radioSettings'],
     queryFn: async () => {
@@ -39,6 +52,8 @@ export default function BottomNavigation({ currentPageName, unreadChatCount = 0,
   const navigation = radioEnabled
     ? [baseNavigation[0], baseNavigation[1], radioNav, baseNavigation[2], baseNavigation[3]]
     : baseNavigation;
+
+  if (hiddenByModal) return null;
 
   return createPortal(
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-[9999] shadow-[0_-2px_10px_rgba(0,0,0,0.05)]" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
