@@ -1017,8 +1017,37 @@ export default function ControlRoom() {
   );
 }
 
+function ToggleRow({ label, description, checked, onChange, disabled, color = 'teal' }) {
+  const colors = {
+    teal:   { on: 'bg-teal-500',   off: 'bg-slate-300' },
+    amber:  { on: 'bg-amber-500',  off: 'bg-slate-300' },
+    red:    { on: 'bg-red-500',    off: 'bg-slate-300' },
+  };
+  const c = colors[color] || colors.teal;
+  return (
+    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+      <div className="flex-1 min-w-0 pr-4">
+        <p className="font-medium text-slate-900 text-sm">{label}</p>
+        {description && <p className="text-xs text-slate-500 mt-0.5">{description}</p>}
+      </div>
+      <button
+        onClick={onChange}
+        disabled={disabled}
+        className={`relative w-12 h-6 rounded-full transition-colors focus:outline-none shrink-0 ${checked ? c.on : c.off} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+      >
+        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${checked ? 'translate-x-6' : 'translate-x-0'}`} />
+      </button>
+    </div>
+  );
+}
+
 function RadioSettingsPanel({ queryClient }) {
   const [saving, setSaving] = useState(false);
+  const [creatingTest, setCreatingTest] = useState(false);
+  const [testUser, setTestUser] = useState(null); // { email, password, name }
+  const [copied, setCopied] = useState(false);
+
+  const { data: currentUser } = useQuery({ queryKey: ['currentUser'], queryFn: () => base44.auth.me() });
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ['radioSettings'],
@@ -1028,47 +1057,134 @@ function RadioSettingsPanel({ queryClient }) {
     },
   });
 
-  const toggle = async () => {
+  const upsert = async (patch) => {
     setSaving(true);
-    const newVal = !(settings?.is_enabled);
     const orgId = localStorage.getItem('organizationId') || sessionStorage.getItem('organizationId') || '';
     if (settings?.id) {
-      await supabase.from('radio_settings').update({ is_enabled: newVal }).eq('id', settings.id);
+      await supabase.from('radio_settings').update(patch).eq('id', settings.id);
     } else {
-      await supabase.from('radio_settings').insert({ is_enabled: newVal, organization_id: orgId });
+      await supabase.from('radio_settings').insert({ ...patch, organization_id: orgId });
     }
     queryClient.invalidateQueries({ queryKey: ['radioSettings'] });
     setSaving(false);
   };
 
+  const createTestUser = async () => {
+    setCreatingTest(true);
+    setTestUser(null);
+    const password = 'RadioTest' + Math.floor(1000 + Math.random() * 9000) + '!';
+    const email    = 'teststaff.radio@carecallai.co.uk';
+    try {
+      const result = await base44.functions.invoke('createStaffUser', {
+        email,
+        password,
+        full_name: 'Test Staff (Radio)',
+        job_title: 'care_worker',
+        role: 'user',
+      });
+      if (result?.error) throw new Error(result.error);
+      setTestUser({ name: 'Test Staff (Radio)', email, password });
+    } catch (e) {
+      // User might already exist — still show credentials they can use
+      if (e.message?.includes('already') || e.message?.includes('exists')) {
+        setTestUser({ name: 'Test Staff (Radio)', email, password: 'Already exists — check existing password or delete and recreate' });
+      } else {
+        import('sonner').then(({ toast }) => toast.error('Could not create test user: ' + e.message));
+      }
+    }
+    setCreatingTest(false);
+  };
+
+  const copyCredentials = () => {
+    if (!testUser) return;
+    navigator.clipboard.writeText(`Name: ${testUser.name}\nEmail: ${testUser.email}\nPassword: ${testUser.password}\nLogin at: https://app.carecallai.co.uk`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
-    <Card className="p-6 max-w-md">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center">
+    <Card className="p-6 max-w-lg space-y-4">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
           <Radio className="w-5 h-5 text-teal-600" />
         </div>
         <div>
-          <h3 className="font-bold text-slate-900">Team Radio</h3>
-          <p className="text-sm text-slate-500">Two-way voice communication for staff</p>
+          <h3 className="font-bold text-slate-900">Team Radio Settings</h3>
+          <p className="text-sm text-slate-500">Manage radio features and test tools</p>
         </div>
       </div>
-      <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+
+      {/* Enable radio toggle */}
+      <ToggleRow
+        label="Enable Radio"
+        description="Shows the radio icon in the bottom nav for all staff"
+        checked={!!settings?.is_enabled}
+        onChange={() => upsert({ is_enabled: !settings?.is_enabled })}
+        disabled={saving || isLoading}
+        color="teal"
+      />
+
+      {/* Test mode toggle */}
+      <ToggleRow
+        label="🧪 Test Mode"
+        description="When ON — all radio alerts (All Call, P2P, SOS) only notify you (super admin). Safe to test without disturbing staff."
+        checked={!!settings?.test_mode}
+        onChange={() => upsert({ test_mode: !settings?.test_mode })}
+        disabled={saving || isLoading}
+        color="amber"
+      />
+
+      {settings?.test_mode && (
+        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3">
+          <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+          <p className="text-xs text-amber-700">
+            <strong>Test Mode is ON.</strong> All radio notifications will only be sent to your account. Disable before going live.
+          </p>
+        </div>
+      )}
+
+      {/* Create test user */}
+      <div className="border border-slate-200 rounded-xl p-4 space-y-3">
         <div>
-          <p className="font-medium text-slate-900">Enable Radio Button</p>
-          <p className="text-xs text-slate-500 mt-0.5">Shows radio icon in bottom nav for all staff</p>
+          <p className="font-medium text-slate-900 text-sm">Test Staff Account</p>
+          <p className="text-xs text-slate-500 mt-0.5">Creates a second login so you can test radio on a different device without involving real staff.</p>
         </div>
-        <button
-          onClick={toggle}
-          disabled={saving || isLoading}
-          className={`relative w-12 h-6 rounded-full transition-colors focus:outline-none ${settings?.is_enabled ? 'bg-teal-500' : 'bg-slate-300'}`}
-        >
-          <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${settings?.is_enabled ? 'translate-x-6' : 'translate-x-0'}`} />
-        </button>
+
+        {testUser ? (
+          <div className="bg-slate-900 rounded-lg p-3 space-y-1 font-mono text-xs">
+            <p className="text-green-400">✓ Account ready</p>
+            <p className="text-slate-300">Name: <span className="text-white">{testUser.name}</span></p>
+            <p className="text-slate-300">Email: <span className="text-white">{testUser.email}</span></p>
+            <p className="text-slate-300">Password: <span className="text-white">{testUser.password}</span></p>
+            <p className="text-slate-400 text-[10px] mt-1">Login at app.carecallai.co.uk on another device</p>
+            <button
+              onClick={copyCredentials}
+              className="mt-2 px-3 py-1 bg-teal-600 text-white rounded text-xs font-sans font-semibold"
+            >
+              {copied ? '✓ Copied!' : 'Copy credentials'}
+            </button>
+          </div>
+        ) : (
+          <Button
+            onClick={createTestUser}
+            disabled={creatingTest}
+            className="w-full bg-slate-800 hover:bg-slate-700 text-white text-sm"
+          >
+            {creatingTest ? (
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creating…</>
+            ) : (
+              'Create Test Staff Account'
+            )}
+          </Button>
+        )}
       </div>
-      <p className="text-xs text-slate-400 mt-3">
-        Status: <strong className={settings?.is_enabled ? 'text-teal-600' : 'text-slate-500'}>
-          {isLoading ? 'Loading…' : settings?.is_enabled ? 'Radio ENABLED' : 'Radio DISABLED'}
+
+      <p className="text-xs text-slate-400">
+        Radio: <strong className={settings?.is_enabled ? 'text-teal-600' : 'text-slate-500'}>
+          {isLoading ? 'Loading…' : settings?.is_enabled ? 'ENABLED' : 'DISABLED'}
         </strong>
+        {settings?.test_mode && <span className="text-amber-600 ml-2">· TEST MODE ON</span>}
       </p>
     </Card>
   );

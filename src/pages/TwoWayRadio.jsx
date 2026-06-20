@@ -163,12 +163,21 @@ export default function TwoWayRadio() {
     queryKey: ['radioChannels'],
     queryFn: async () => { const { data, error } = await withOrgFilter(supabase.from('radio_channels').select('*').order('created_at')); if (error) throw error; return data || []; },
   });
+  const { data: radioSettings } = useQuery({
+    queryKey: ['radioSettings'],
+    queryFn: async () => { const { data } = await supabase.from('radio_settings').select('*').limit(1).single(); return data; },
+    staleTime: 0, refetchInterval: 30000,
+  });
 
   const isSuperAdmin  = user?.role === 'super_admin' || user?.role === 'admin';
   const myUid         = user?.id ? toUid(user.id) : null;
   const otherStaff    = staff.filter(s => s.id !== user?.id);
   const staffByUid    = Object.fromEntries(staff.map(s => [toUid(s.id), s]));
   const speakingNames = [...speakingUids].filter(u => u !== myUid).map(u => staffByUid[u]?.full_name || `User ${u}`);
+
+  // When test mode is ON, only send notifications to the current super admin
+  const testMode = !!radioSettings?.test_mode;
+  const resolveRecipients = (ids) => testMode ? (user?.id ? [user.id] : []) : ids;
 
   const getStaffStatus = useCallback((staffId) => {
     const shifts = todayShifts.filter(s => s.staff_id === staffId && s.status !== 'cancelled');
@@ -322,7 +331,7 @@ export default function TwoWayRadio() {
     const recipientIds = otherStaff.map(s => s.id);
     if (recipientIds.length > 0) {
       base44.functions.invoke('createNotification', {
-        recipient_ids: recipientIds, type: 'radio_call', title: '📻 All Staff Radio',
+        recipient_ids: resolveRecipients(recipientIds), type: 'radio_call', title: '📻 All Staff Radio',
         message: `${callerName} is on the All Staff channel. Tap to join.`,
         priority: 'high', action_url: '/TwoWayRadio?join=allstaff-broadcast', send_push: true,
       }).catch(() => {});
@@ -343,7 +352,7 @@ export default function TwoWayRadio() {
     stopTone(); stopToneRef.current = playTone([400, 600, 800, 600, 400], true);
     const callerName = user?.full_name || user?.email || 'A team member';
     base44.functions.invoke('createNotification', {
-      recipient_ids: [selectedPerson.id], type: 'radio_call',
+      recipient_ids: resolveRecipients([selectedPerson.id]), type: 'radio_call',
       title: `📞 ${callerName} is calling you`, message: 'Tap to answer on Team Radio.',
       priority: 'high', action_url: `/TwoWayRadio?join=${chName}`, send_push: true,
     }).catch(() => {});
@@ -376,7 +385,7 @@ export default function TwoWayRadio() {
     const targets = selectedPerson ? [selectedPerson.id] : otherStaff.map(s => s.id);
     if (!targets.length) return;
     base44.functions.invoke('createNotification', {
-      recipient_ids: targets, type: 'radio_call',
+      recipient_ids: resolveRecipients(targets), type: 'radio_call',
       title: `🔔 Radio Alert from ${callerName}`,
       message: selectedPerson ? 'Please check your radio.' : 'All staff: please check radio.',
       priority: 'high', action_url: '/TwoWayRadio', send_push: true,
@@ -482,7 +491,7 @@ export default function TwoWayRadio() {
     const recipientIds = staff.filter(s => s.id !== user?.id).map(s => s.id);
     if (recipientIds.length > 0) {
       base44.functions.invoke('createNotification', {
-        recipient_ids: recipientIds, type: 'emergency',
+        recipient_ids: resolveRecipients(recipientIds), type: 'emergency',
         title: `🚨 EMERGENCY — ${staffName}`,
         message: `Staff needs help. Location: ${address}`,
         priority: 'high', action_url: '/TwoWayRadio', send_push: true,
@@ -840,6 +849,12 @@ export default function TwoWayRadio() {
       {IncomingEmergencyOverlay}
 
       <div className={`min-h-screen bg-slate-900 pb-56 ${emergencyActive ? 'pt-10' : ''}`}>
+        {/* Test mode banner */}
+        {testMode && (
+          <div className="bg-amber-500 px-4 py-2 flex items-center gap-2">
+            <span className="text-white text-xs font-bold">🧪 TEST MODE — alerts only go to you</span>
+          </div>
+        )}
         {/* Header */}
         <div className="bg-slate-800 px-4 pt-4 pb-3 flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-teal-500 flex items-center justify-center shrink-0">
