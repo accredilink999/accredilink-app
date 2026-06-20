@@ -5,7 +5,7 @@ import { base44 } from '@/api/base44Client';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { AlertTriangle, Clock, Play, Timer } from 'lucide-react';
+import { AlertTriangle, Clock, Play, Timer, XCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { notifyAdminsOfActivity } from '@/utils/adminNotifications';
@@ -39,6 +39,7 @@ export default function OverdueCallAlert({ userId }) {
   const [delayMinutes, setDelayMinutes] = useState('');
   const [checkingIn, setCheckingIn] = useState(false);
   const [reportingDelay, setReportingDelay] = useState(false);
+  const [removingCall, setRemovingCall] = useState(false);
   const audioInterval = useRef(null);
   const queryClient = useQueryClient();
 
@@ -241,6 +242,26 @@ export default function OverdueCallAlert({ userId }) {
     }
   };
 
+  const handleNotMyCall = async () => {
+    if (call._type !== 'call') return;
+    setRemovingCall(true);
+    try {
+      await ShiftCallApi.update(call.id, { status: 'missed' });
+      queryClient.invalidateQueries({ queryKey: ['shift-calls'] });
+      setDismissedIds(prev => new Set([...prev, call.id]));
+      toast.success('Call removed from your list — an admin has been notified');
+      notifyAdminsOfActivity({
+        title: `Call removed: ${call.service_user_name}`,
+        message: `Staff reported ${call.service_user_name}'s ${call.scheduled_time} call is not theirs and it has been flagged as missed.`,
+        excludeUserId: userId,
+      });
+    } catch (e) {
+      toast.error('Failed to remove call');
+    } finally {
+      setRemovingCall(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-[99999] bg-red-950/80 flex items-end sm:items-center justify-center p-4 pb-safe">
       <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
@@ -292,6 +313,17 @@ export default function OverdueCallAlert({ userId }) {
                 <Timer className="w-5 h-5 mr-2" />
                 Report a Delay
               </Button>
+              {call._type === 'call' && (
+                <Button
+                  onClick={handleNotMyCall}
+                  disabled={removingCall}
+                  variant="outline"
+                  className="w-full h-12 border-red-200 text-red-600 hover:bg-red-50 font-semibold disabled:opacity-50"
+                >
+                  <XCircle className="w-5 h-5 mr-2" />
+                  {removingCall ? 'Removing...' : 'Not My Call'}
+                </Button>
+              )}
               <button
                 onClick={() => setDismissedIds(prev => new Set([...prev, call.id]))}
                 className="w-full py-2.5 text-slate-400 text-sm hover:text-slate-600 transition-colors"
