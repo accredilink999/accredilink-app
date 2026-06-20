@@ -1164,130 +1164,141 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
 
           {/* Shift Summary / Clock Off popup */}
           <AlertDialog open={shiftSummaryOpen} onOpenChange={setShiftSummaryOpen}>
-          <AlertDialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-          <AlertDialogHeader>
-           <AlertDialogTitle className="text-lg">Shift Summary</AlertDialogTitle>
-           <AlertDialogDescription asChild>
-             <div className="space-y-4 text-sm">
-               {(() => {
-                 const summary = getShiftSummary();
-                 return (
-                   <>
-                     {/* Calls Breakdown */}
-                     <div className="bg-slate-50 rounded-lg p-3 space-y-2">
-                       <p className="font-semibold text-slate-900 text-sm">Calls Attended</p>
-                       {summary.callDetails.map((call, i) => {
-                         const hasLog = shiftCareLogs.some(log => {
-                           if (log.id === call.care_log_id || log.shift_call_id === call.id) return true;
-                           if (log.shift_call_id && log.status === 'submitted') {
-                             const partnerCall = pairedCalls.find(pc => pc.id === log.shift_call_id);
-                             if (partnerCall && partnerCall.service_user_id === call.service_user_id && partnerCall.scheduled_time === call.scheduled_time) return true;
-                           }
-                           return false;
-                         });
-                         return (
-                           <div key={call.id} className="flex items-center justify-between py-1 border-b border-slate-200 last:border-0">
-                             <div className="flex items-center gap-2 min-w-0">
-                               <span className="w-5 h-5 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-xs font-semibold flex-shrink-0">{i + 1}</span>
-                               <span className="text-slate-800 truncate">{call.service_user_name}</span>
-                             </div>
-                             <div className="flex items-center gap-2 flex-shrink-0">
-                               {call.status === 'completed' && <CheckCircle className="w-4 h-4 text-green-500" />}
-                               {call.status === 'in_progress' && <Play className="w-4 h-4 text-blue-500" />}
-                               {call.status === 'pending' && <Clock className="w-4 h-4 text-amber-500" />}
-                               {call.status === 'not_at_home' && <MapPin className="w-4 h-4 text-amber-500" />}
-                               {call.status === 'missed' && <AlertCircle className="w-4 h-4 text-red-500" />}
-                               {hasLog ? (
-                                 <FileText className="w-4 h-4 text-green-500" />
-                               ) : call.status !== 'missed' && call.status !== 'not_at_home' ? (
-                                 <FileText className="w-4 h-4 text-red-400" />
-                               ) : null}
-                             </div>
-                           </div>
-                         );
-                       })}
-                       <div className="grid grid-cols-2 gap-2 pt-2 text-xs">
-                         <div className="bg-green-50 rounded px-2 py-1">
-                           <span className="text-green-700 font-medium">{summary.completedCalls} completed</span>
-                         </div>
-                         {summary.pendingCalls > 0 && (
-                           <div className="bg-amber-50 rounded px-2 py-1">
-                             <span className="text-amber-700 font-medium">{summary.pendingCalls} pending</span>
-                           </div>
-                         )}
-                         {summary.inProgressCalls > 0 && (
-                           <div className="bg-blue-50 rounded px-2 py-1">
-                             <span className="text-blue-700 font-medium">{summary.inProgressCalls} in progress</span>
-                           </div>
-                         )}
-                         {summary.missedCalls > 0 && (
-                           <div className="bg-red-50 rounded px-2 py-1">
-                             <span className="text-red-700 font-medium">{summary.missedCalls} missed</span>
-                           </div>
-                         )}
-                       </div>
-                     </div>
+          <AlertDialogContent className="max-w-md flex flex-col p-0 gap-0 overflow-hidden" style={{ maxHeight: '90dvh' }}>
+            {/* Fixed header with X close button */}
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b flex-shrink-0">
+              <AlertDialogTitle className="text-lg font-semibold">Shift Summary</AlertDialogTitle>
+              <button
+                onClick={() => setShiftSummaryOpen(false)}
+                className="rounded-full p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors touch-manipulation"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-                     {/* Driving & Mileage */}
-                     <div className="bg-slate-50 rounded-lg p-3 space-y-1">
-                       <p className="font-semibold text-slate-900 text-sm flex items-center gap-1"><Car className="w-4 h-4" /> Mileage</p>
-                       <div className="flex justify-between text-slate-700">
-                         <span>Drove to calls:</span>
-                         <span className="font-medium">{summary.droveCalls}</span>
-                       </div>
-                       <div className="flex justify-between text-slate-700">
-                         <span>Did not drive:</span>
-                         <span className="font-medium">{summary.didNotDriveCalls}</span>
-                       </div>
-                       <div className="flex justify-between text-slate-900 font-semibold pt-1 border-t border-slate-200">
-                         <span>Total Miles:</span>
-                         <span>{summary.totalMiles} miles</span>
-                       </div>
-                     </div>
+            {/* Scrollable content */}
+            <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-4 min-h-0">
+              <AlertDialogDescription asChild>
+                <div className="space-y-4 text-sm">
+                  {(() => {
+                    const summary = getShiftSummary();
+                    return (
+                      <>
+                        {/* Calls Breakdown */}
+                        <div className="bg-slate-50 rounded-lg p-3 space-y-2">
+                          <p className="font-semibold text-slate-900 text-sm">Calls Attended</p>
+                          {summary.callDetails.map((call, i) => {
+                            const hasLog = shiftCareLogs.some(log => {
+                              if (log.id === call.care_log_id || log.shift_call_id === call.id) return true;
+                              if (log.shift_call_id && log.status === 'submitted') {
+                                const partnerCall = pairedCalls.find(pc => pc.id === log.shift_call_id);
+                                if (partnerCall && partnerCall.service_user_id === call.service_user_id && partnerCall.scheduled_time === call.scheduled_time) return true;
+                              }
+                              return false;
+                            });
+                            return (
+                              <div key={call.id} className="flex items-center justify-between py-1 border-b border-slate-200 last:border-0">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="w-5 h-5 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center text-xs font-semibold flex-shrink-0">{i + 1}</span>
+                                  <span className="text-slate-800 truncate">{call.service_user_name}</span>
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  {call.status === 'completed' && <CheckCircle className="w-4 h-4 text-green-500" />}
+                                  {call.status === 'in_progress' && <Play className="w-4 h-4 text-blue-500" />}
+                                  {call.status === 'pending' && <Clock className="w-4 h-4 text-amber-500" />}
+                                  {call.status === 'not_at_home' && <MapPin className="w-4 h-4 text-amber-500" />}
+                                  {call.status === 'missed' && <AlertCircle className="w-4 h-4 text-red-500" />}
+                                  {hasLog ? (
+                                    <FileText className="w-4 h-4 text-green-500" />
+                                  ) : call.status !== 'missed' && call.status !== 'not_at_home' ? (
+                                    <FileText className="w-4 h-4 text-red-400" />
+                                  ) : null}
+                                </div>
+                              </div>
+                            );
+                          })}
+                          <div className="grid grid-cols-2 gap-2 pt-2 text-xs">
+                            <div className="bg-green-50 rounded px-2 py-1">
+                              <span className="text-green-700 font-medium">{summary.completedCalls} completed</span>
+                            </div>
+                            {summary.pendingCalls > 0 && (
+                              <div className="bg-amber-50 rounded px-2 py-1">
+                                <span className="text-amber-700 font-medium">{summary.pendingCalls} pending</span>
+                              </div>
+                            )}
+                            {summary.inProgressCalls > 0 && (
+                              <div className="bg-blue-50 rounded px-2 py-1">
+                                <span className="text-blue-700 font-medium">{summary.inProgressCalls} in progress</span>
+                              </div>
+                            )}
+                            {summary.missedCalls > 0 && (
+                              <div className="bg-red-50 rounded px-2 py-1">
+                                <span className="text-red-700 font-medium">{summary.missedCalls} missed</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
 
-                     {/* Outstanding Logs Warning */}
-                     {summary.outstandingLogs.length > 0 && (
-                       <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                         <p className="font-semibold text-amber-800 text-sm flex items-center gap-1 mb-2">
-                           <AlertCircle className="w-4 h-4" />
-                           {summary.outstandingLogs.length} Outstanding Care Log{summary.outstandingLogs.length !== 1 ? 's' : ''}
-                         </p>
-                         <div className="space-y-1.5">
-                           {summary.outstandingLogs.map(call => (
-                             <button
-                               key={call.id}
-                               type="button"
-                               onClick={() => setSummaryLogCall(call)}
-                               className="w-full flex items-center justify-between px-2 py-1.5 rounded bg-white border border-amber-200 hover:bg-amber-100 transition-colors text-left"
-                             >
-                               <span className="text-xs text-amber-800">{call.service_user_name} ({call.scheduled_time})</span>
-                               <span className="text-xs text-teal-600 font-medium flex items-center gap-1">
-                                 <FileText className="w-3 h-3" />
-                                 Fill Log
-                               </span>
-                             </button>
-                           ))}
-                         </div>
-                       </div>
-                     )}
-                   </>
-                 );
-               })()}
-             </div>
-           </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="flex gap-3 pt-2">
-           <AlertDialogCancel>Cancel</AlertDialogCancel>
-           <AlertDialogAction
-             onClick={() => {
-               clockOffMutation.mutate();
-             }}
-             disabled={clockOffMutation.isPending}
-             className="bg-red-600 hover:bg-red-700"
-           >
-             {clockOffMutation.isPending ? 'Ending...' : 'Confirm End Shift'}
-           </AlertDialogAction>
-          </div>
+                        {/* Driving & Mileage */}
+                        <div className="bg-slate-50 rounded-lg p-3 space-y-1">
+                          <p className="font-semibold text-slate-900 text-sm flex items-center gap-1"><Car className="w-4 h-4" /> Mileage</p>
+                          <div className="flex justify-between text-slate-700">
+                            <span>Drove to calls:</span>
+                            <span className="font-medium">{summary.droveCalls}</span>
+                          </div>
+                          <div className="flex justify-between text-slate-700">
+                            <span>Did not drive:</span>
+                            <span className="font-medium">{summary.didNotDriveCalls}</span>
+                          </div>
+                          <div className="flex justify-between text-slate-900 font-semibold pt-1 border-t border-slate-200">
+                            <span>Total Miles:</span>
+                            <span>{summary.totalMiles} miles</span>
+                          </div>
+                        </div>
+
+                        {/* Outstanding Logs Warning */}
+                        {summary.outstandingLogs.length > 0 && (
+                          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                            <p className="font-semibold text-amber-800 text-sm flex items-center gap-1 mb-2">
+                              <AlertCircle className="w-4 h-4" />
+                              {summary.outstandingLogs.length} Outstanding Care Log{summary.outstandingLogs.length !== 1 ? 's' : ''}
+                            </p>
+                            <div className="space-y-1.5">
+                              {summary.outstandingLogs.map(call => (
+                                <button
+                                  key={call.id}
+                                  type="button"
+                                  onClick={() => setSummaryLogCall(call)}
+                                  className="w-full flex items-center justify-between px-2 py-1.5 rounded bg-white border border-amber-200 hover:bg-amber-100 transition-colors text-left"
+                                >
+                                  <span className="text-xs text-amber-800">{call.service_user_name} ({call.scheduled_time})</span>
+                                  <span className="text-xs text-teal-600 font-medium flex items-center gap-1">
+                                    <FileText className="w-3 h-3" />
+                                    Fill Log
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              </AlertDialogDescription>
+            </div>
+
+            {/* Fixed footer buttons — always reachable on iPhone */}
+            <div className="flex gap-3 px-6 py-4 border-t flex-shrink-0" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+              <AlertDialogCancel className="flex-1">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => clockOffMutation.mutate()}
+                disabled={clockOffMutation.isPending}
+                className="flex-1 bg-red-600 hover:bg-red-700"
+              >
+                {clockOffMutation.isPending ? 'Ending...' : 'Confirm End Shift'}
+              </AlertDialogAction>
+            </div>
           </AlertDialogContent>
           </AlertDialog>
 
