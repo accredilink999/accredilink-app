@@ -1,16 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { APIProvider, Map as GoogleMap, Marker, InfoWindow, useMap } from '@vis.gl/react-google-maps';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { ShiftApi, ShiftCallApi } from '@/api/rotaApi';
 import { supabase } from '@/api/supabaseClient';
-import { getServiceUserLocations } from '@/lib/gpsCache';
 import { format } from 'date-fns';
 import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Navigation, Search, Check, AlertCircle, ChevronDown, Edit, Loader2, Mail, Clock, Plus, Users, Radio } from 'lucide-react';
+import { Navigation, Search, Check, AlertCircle, ChevronDown, Edit, Loader2, Mail, Clock, Plus, Users, Radio } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -24,33 +22,14 @@ import ShiftStatusOverview from '@/components/admin/ShiftStatusOverview';
 import ShiftReminderSettings from '@/components/admin/ShiftReminderSettings';
 import { Trash2 } from 'lucide-react';
 
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
-
-// ── FlyTo helper (runs inside <Map>) ────────────────────────────────────────
-function FlyToLocation({ lat, lng, zoom, onComplete }) {
-  const map = useMap();
-  useEffect(() => {
-    if (map && lat && lng) {
-      map.panTo({ lat, lng });
-      if (zoom) map.setZoom(zoom);
-      const timer = setTimeout(() => onComplete?.(), 800);
-      return () => clearTimeout(timer);
-    }
-  }, [lat, lng, zoom, map, onComplete]);
-  return null;
-}
-
 export default function ControlRoom() {
   const queryClient = useQueryClient();
-  const [mapMaximized, setMapMaximized] = useState(false);
   const [activeTab, setActiveTab] = useState('tracking');
   const [showLogoUploader, setShowLogoUploader] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [flyToTarget, setFlyToTarget] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [editingAnnouncement, setEditingAnnouncement] = useState(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
-  const [openInfoWindow, setOpenInfoWindow] = useState(null); // track which marker info window is open
 
   const { data: user } = useQuery({
     queryKey: ['currentUser'],
@@ -99,74 +78,6 @@ export default function ControlRoom() {
     refetchInterval: 10000,
   });
 
-  // Get unique service user IDs from today's calls
-  const clientIds = [...new Set(todayCalls.map(c => c.service_user_id).filter(Boolean))];
-
-  // Build address fallback map for geocoding new clients
-  const addressFallbacks = React.useMemo(() => {
-    const map = new Map();
-    for (const call of todayCalls) {
-      if (call.service_user_id && call.service_user_address && !map.has(call.service_user_id)) {
-        map.set(call.service_user_id, call.service_user_address);
-      }
-    }
-    return map;
-  }, [todayCalls]);
-
-  // Fetch cached GPS locations for all clients on today's calls
-  const { data: clientLocations = new Map() } = useQuery({
-    queryKey: ['clientLocations', ...clientIds],
-    queryFn: () => getServiceUserLocations(clientIds, addressFallbacks),
-    enabled: clientIds.length > 0,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  // ── STAFF LIVE GPS (separate from client/calls code) ────────────
-  // Only show staff who are currently clocked in (not completed/cancelled)
-  const staffOnShiftIds = React.useMemo(() => {
-    return [...new Set(todayShifts
-      .filter(s => s.staff_id && s.status !== 'cancelled' && s.status !== 'completed')
-      .filter(s => s.status === 'in_progress' || s.clock_in_time)
-      .map(s => s.staff_id)
-    )];
-  }, [todayShifts]);
-
-  const { data: staffLocations = [] } = useQuery({
-    queryKey: ['staffLiveLocations', staffOnShiftIds.join(',')],
-    queryFn: async () => {
-      if (staffOnShiftIds.length === 0) return [];
-      const { data, error } = await supabase
-        .from('locations')
-        .select('staff_id, staff_name, latitude, longitude, accuracy, timestamp')
-        .in('staff_id', staffOnShiftIds);
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: staffOnShiftIds.length > 0,
-    refetchInterval: 10000,
-  });
-
-  const { data: lastKnownGPS = [] } = useQuery({
-    queryKey: ['staffLastKnownGPS', staffOnShiftIds.join(','), todayStr],
-    queryFn: async () => {
-      if (staffOnShiftIds.length === 0) return [];
-      const shiftIds = todayShifts
-        .filter(s => staffOnShiftIds.includes(s.staff_id) && s.status !== 'cancelled')
-        .map(s => s.id);
-      if (shiftIds.length === 0) return [];
-      const { data, error } = await supabase
-        .from('shift_calls')
-        .select('shift_id, checkin_latitude, checkin_longitude, clock_in_time')
-        .in('shift_id', shiftIds)
-        .not('checkin_latitude', 'is', null)
-        .not('checkin_longitude', 'is', null)
-        .order('clock_in_time', { ascending: false });
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: staffOnShiftIds.length > 0,
-    staleTime: 60000,
-  });
 
   // Subscribe to shift_calls for real-time updates
   useEffect(() => {
@@ -174,17 +85,6 @@ export default function ControlRoom() {
       queryClient.invalidateQueries({ queryKey: ['todayCalls'] });
     });
     return unsubscribe;
-  }, [queryClient]);
-
-  // Subscribe to locations table for live staff GPS updates
-  useEffect(() => {
-    const channel = supabase
-      .channel('staff-locations')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'locations' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['staffLiveLocations'] });
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
   }, [queryClient]);
 
   // Subscribe to shift updates
@@ -226,66 +126,6 @@ export default function ControlRoom() {
       queryClient.invalidateQueries({ queryKey: ['messages'] });
     },
   });
-
-  // Build client markers with call status
-  const clientMarkers = React.useMemo(() => {
-    const byClient = {};
-
-    for (const call of todayCalls) {
-      if (!call.service_user_id) continue;
-      const coords = clientLocations.get(call.service_user_id);
-      if (!coords) continue;
-
-      // Find which shift this call belongs to (for staff name)
-      const shift = todayShifts.find(s => s.id === call.shift_id);
-
-      if (!byClient[call.service_user_id]) {
-        byClient[call.service_user_id] = {
-          id: call.service_user_id,
-          name: call.service_user_name,
-          address: call.service_user_address,
-          lat: coords.latitude,
-          lng: coords.longitude,
-          calls: [],
-        };
-      }
-
-      byClient[call.service_user_id].calls.push({
-        ...call,
-        staff_name: shift?.staff_name || 'Unknown',
-        shift_name: shift?.shift_name || '',
-      });
-    }
-
-    // Determine overall status for each client marker
-    return Object.values(byClient).map(client => {
-      const calls = client.calls.sort((a, b) => (a.scheduled_time || '').localeCompare(b.scheduled_time || ''));
-      const realCalls = calls.filter(c => c.call_type !== 'sitin_cover');
-      // Only count as in_progress if staff has actually clocked in
-      const hasInProgress = realCalls.some(c => c.status === 'in_progress' && c.clock_in_time);
-      const allCompleted = realCalls.length > 0 && realCalls.every(c => c.status === 'completed' || c.status === 'missed' || c.status === 'not_at_home');
-      const latestCall = realCalls[realCalls.length - 1] || calls[calls.length - 1];
-
-      let markerStatus = 'pending';
-      let statusColor = '#10B981'; // green
-      if (hasInProgress) {
-        markerStatus = 'in_progress';
-        statusColor = '#F59E0B'; // amber
-      } else if (allCompleted) {
-        markerStatus = 'completed';
-        statusColor = '#10B981'; // green
-      }
-
-      return {
-        ...client,
-        calls,
-        markerStatus,
-        statusColor,
-        latestCall,
-        inProgressCall: realCalls.find(c => c.status === 'in_progress' && c.clock_in_time),
-      };
-    });
-  }, [todayCalls, clientLocations, todayShifts]);
 
   // Active staff: staff with shifts today who have activity in last hour
   const activeStaffList = React.useMemo(() => {
@@ -352,252 +192,11 @@ export default function ControlRoom() {
       .sort((a, b) => (a.staff_name || '').localeCompare(b.staff_name || ''));
   }, [todayShifts, todayCalls]);
 
-  // ── Staff map markers (live GPS + last known fallback) ──────────
-  const staffMarkers = React.useMemo(() => {
-    const markers = [];
-    const twoMinAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-
-    const gpsMap = new Map();
-    for (const loc of staffLocations) {
-      if (loc.latitude && loc.longitude) {
-        gpsMap.set(loc.staff_id, loc);
-      }
-    }
-    const shiftToStaff = new Map();
-    for (const s of todayShifts) {
-      if (s.staff_id) shiftToStaff.set(s.id, s.staff_id);
-    }
-    const lastKnownMap = new Map();
-    for (const call of lastKnownGPS) {
-      const sid = shiftToStaff.get(call.shift_id);
-      if (sid && !lastKnownMap.has(sid)) {
-        lastKnownMap.set(sid, {
-          latitude: call.checkin_latitude,
-          longitude: call.checkin_longitude,
-          timestamp: call.clock_in_time,
-        });
-      }
-    }
-    for (const staffId of staffOnShiftIds) {
-      const shift = todayShifts.find(s => s.staff_id === staffId && s.status !== 'cancelled');
-      if (!shift) continue;
-      const gps = gpsMap.get(staffId);
-      const lastKnown = lastKnownMap.get(staffId);
-      if (gps) {
-        // Has a GPS record — "live" only if updated within last 2 minutes
-        const isRecent = gps.timestamp && gps.timestamp > twoMinAgo;
-        markers.push({
-          staffId,
-          staffName: gps.staff_name || shift.staff_name || 'Unknown',
-          lat: Number(gps.latitude),
-          lng: Number(gps.longitude),
-          isLive: isRecent,
-          accuracy: gps.accuracy,
-          timestamp: gps.timestamp,
-        });
-      } else if (lastKnown) {
-        markers.push({
-          staffId,
-          staffName: shift.staff_name || 'Unknown',
-          lat: Number(lastKnown.latitude),
-          lng: Number(lastKnown.longitude),
-          isLive: false,
-          timestamp: lastKnown.timestamp,
-        });
-      }
-    }
-    return markers;
-  }, [staffOnShiftIds, staffLocations, lastKnownGPS, todayShifts]);
-
-  // Map center from all markers (clients + staff)
-  const allMapPoints = [
-    ...clientMarkers.map(m => ({ lat: m.lat, lng: m.lng })),
-    ...staffMarkers.map(m => ({ lat: m.lat, lng: m.lng })),
-  ];
-  const hasMarkers = allMapPoints.length > 0;
-  const centerLat = hasMarkers
-    ? allMapPoints.reduce((sum, m) => sum + m.lat, 0) / allMapPoints.length
-    : 52.82;
-  const centerLng = hasMarkers
-    ? allMapPoints.reduce((sum, m) => sum + m.lng, 0) / allMapPoints.length
-    : -3.40;
-
-  const handleFlyComplete = useCallback(() => setFlyToTarget(null), []);
-
-  // ── Render map content (shared between normal + maximized) ─────
-  const renderMapContent = () => (
-    <>
-      {/* Staff markers — blue pin (live) / grey pin (last known) */}
-      {staffMarkers.map(s => (
-        <Marker
-          key={`staff-${s.staffId}`}
-          position={{ lat: s.lat, lng: s.lng }}
-          title={s.staffName}
-          label={{ text: s.staffName.substring(0, 1), color: 'white', fontWeight: 'bold' }}
-          icon={{
-            path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z',
-            fillColor: s.isLive ? '#3B82F6' : '#9CA3AF',
-            fillOpacity: 1,
-            strokeColor: 'white',
-            strokeWeight: 2,
-            scale: 1.5,
-            anchor: { x: 12, y: 24 },
-            labelOrigin: { x: 12, y: 10 },
-          }}
-          onClick={() => setOpenInfoWindow(openInfoWindow === `staff-${s.staffId}` ? null : `staff-${s.staffId}`)}
-        />
-      ))}
-      {staffMarkers.map(s => openInfoWindow === `staff-${s.staffId}` && (
-        <InfoWindow
-          key={`staff-info-${s.staffId}`}
-          position={{ lat: s.lat, lng: s.lng }}
-          onCloseClick={() => setOpenInfoWindow(null)}
-        >
-          <div className="text-sm p-1 w-48">
-            <p className="font-bold text-slate-900">{s.staffName}</p>
-            <div className="flex items-center gap-1.5 mt-1">
-              <div className={`w-2 h-2 rounded-full ${s.isLive ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-              <span className="text-xs text-slate-500">
-                {s.isLive ? 'Live GPS' : 'Last known location'}
-              </span>
-            </div>
-            {s.timestamp && (
-              <p className="text-xs text-slate-400 mt-1">
-                Updated: {format(new Date(s.timestamp), 'HH:mm')}
-              </p>
-            )}
-            {s.accuracy && (
-              <p className="text-xs text-slate-400">Accuracy: ±{Math.round(s.accuracy)}m</p>
-            )}
-          </div>
-        </InfoWindow>
-      ))}
-
-      {/* Client markers — colored pin by status */}
-      {clientMarkers.map(client => (
-        <Marker
-          key={`client-${client.id}`}
-          position={{ lat: client.lat, lng: client.lng }}
-          title={client.name}
-          label={{ text: client.name.substring(0, 1), color: 'white', fontWeight: 'bold' }}
-          icon={{
-            path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z',
-            fillColor: client.statusColor,
-            fillOpacity: 1,
-            strokeColor: 'white',
-            strokeWeight: 2,
-            scale: 1.5,
-            anchor: { x: 12, y: 24 },
-            labelOrigin: { x: 12, y: 10 },
-          }}
-          onClick={() => setOpenInfoWindow(openInfoWindow === `client-${client.id}` ? null : `client-${client.id}`)}
-        />
-      ))}
-      {clientMarkers.map(client => openInfoWindow === `client-${client.id}` && (
-        <InfoWindow
-          key={`client-info-${client.id}`}
-          position={{ lat: client.lat, lng: client.lng }}
-          onCloseClick={() => setOpenInfoWindow(null)}
-        >
-          <div className="text-sm p-1 w-56 space-y-2">
-            <p className="font-bold text-slate-900">{client.name}</p>
-            {client.address && (
-              <p className="text-xs text-slate-500">{client.address}</p>
-            )}
-            <div className="space-y-1.5 border-t border-slate-100 pt-2">
-              {client.calls.map((call, idx) => {
-                const statusBg = call.status === 'in_progress' ? 'bg-amber-100 text-amber-700'
-                  : call.status === 'completed' ? 'bg-green-100 text-green-700'
-                  : call.status === 'not_at_home' ? 'bg-amber-100 text-amber-700'
-                  : call.status === 'missed' ? 'bg-red-100 text-red-700'
-                  : 'bg-slate-100 text-slate-600';
-                const statusText = call.status === 'in_progress' ? 'In Progress'
-                  : call.status === 'completed' ? 'Completed'
-                  : call.status === 'not_at_home' ? 'Not at Home'
-                  : call.status === 'missed' ? 'Missed'
-                  : 'Pending';
-
-                return (
-                  <div key={idx} className="text-xs space-y-0.5">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-slate-700">{call.scheduled_time || '—'}</span>
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${statusBg}`}>{statusText}</span>
-                    </div>
-                    <p className="text-slate-500">{call.staff_name}</p>
-                    {call.clock_in_time && (
-                      <p className="text-slate-400">In: {format(new Date(call.clock_in_time), 'HH:mm')}</p>
-                    )}
-                    {call.clock_out_time && (
-                      <p className="text-slate-400">Out: {format(new Date(call.clock_out_time), 'HH:mm')}</p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </InfoWindow>
-      ))}
-
-      {flyToTarget && <FlyToLocation lat={flyToTarget.lat} lng={flyToTarget.lng} zoom={16} onComplete={handleFlyComplete} />}
-    </>
-  );
-
-  // ── No API key fallback ────────────────────────────────────────
-  if (!GOOGLE_MAPS_API_KEY) {
-    const mapFallback = (
-      <div className="flex items-center justify-center h-full bg-slate-100 rounded-lg">
-        <div className="text-center p-6">
-          <MapPin className="w-10 h-10 text-slate-400 mx-auto mb-3" />
-          <p className="text-slate-600 font-medium">Google Maps API key not configured</p>
-          <p className="text-xs text-slate-400 mt-1">Set VITE_GOOGLE_MAPS_API_KEY in your .env file</p>
-        </div>
-      </div>
-    );
-
-    if (mapMaximized) {
-      return (
-        <div className="fixed inset-0 z-50 bg-white flex flex-col">
-          <div className="flex items-center justify-between p-4 border-b border-slate-200">
-            <h1 className="text-xl font-bold text-slate-900">Control Room — Live Map</h1>
-            <Button variant="outline" onClick={() => setMapMaximized(false)}>Minimize</Button>
-          </div>
-          <div className="flex-1">{mapFallback}</div>
-        </div>
-      );
-    }
-    // fall through to normal render with mapFallback in the card
-  }
-
-  if (mapMaximized) {
-    return (
-      <div className="fixed inset-0 z-50 bg-white flex flex-col">
-                <div className="flex items-center justify-between p-4 border-b border-slate-200">
-          <h1 className="text-xl font-bold text-slate-900">Control Room — Live Map</h1>
-          <Button variant="outline" onClick={() => setMapMaximized(false)}>Minimize</Button>
-        </div>
-        <div className="flex-1 overflow-hidden">
-          <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
-            <GoogleMap
-              defaultCenter={{ lat: centerLat, lng: centerLng }}
-              defaultZoom={13}
-
-              gestureHandling="greedy"
-              disableDefaultUI={false}
-              style={{ width: '100%', height: '100%' }}
-            >
-              {renderMapContent()}
-            </GoogleMap>
-          </APIProvider>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
-            <PageHeader
+      <PageHeader
         title="Control Room"
-        subtitle="Live client map & staff tracking"
+        subtitle="Staff monitoring & team overview"
         icon={Navigation}
         className="[&_h1]:text-slate-900 [&_svg]:text-slate-700 [&_svg]:fill-slate-700 flex-col sm:flex-row"
       >
@@ -632,9 +231,9 @@ export default function ControlRoom() {
       {/* Tabs */}
       <div className="w-full grid grid-cols-2 sm:grid-cols-4 h-auto p-1 gap-1">
         <button onClick={() => setActiveTab('tracking')} className={`flex items-center justify-center sm:justify-start gap-1 flex-1 text-xs sm:text-sm py-2 sm:py-3 rounded-lg font-medium transition-all shadow-md hover:shadow-lg ${activeTab === 'tracking' ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white' : 'bg-gradient-to-r from-blue-400 to-blue-500 text-white hover:from-blue-500 hover:to-blue-600'}`}>
-          <MapPin className="w-4 h-4 flex-shrink-0" />
-          <span className="hidden sm:inline">Tracking</span>
-          <span className="sm:hidden">Map</span>
+          <Users className="w-4 h-4 flex-shrink-0" />
+          <span className="hidden sm:inline">Staff Status</span>
+          <span className="sm:hidden">Staff</span>
         </button>
         <button onClick={() => setActiveTab('shifts')} className={`flex items-center justify-center sm:justify-start gap-1 flex-1 text-xs sm:text-sm py-2 sm:py-3 rounded-lg font-medium transition-all shadow-md hover:shadow-lg ${activeTab === 'shifts' ? 'bg-gradient-to-r from-red-500 to-red-600 text-white' : 'bg-gradient-to-r from-red-400 to-red-500 text-white hover:from-red-500 hover:to-red-600'}`}>
           <Clock className="w-4 h-4 flex-shrink-0" />
@@ -662,67 +261,18 @@ export default function ControlRoom() {
 
       {activeTab === 'tracking' && isAdmin && (
       <div className="max-w-4xl space-y-4">
-        {/* Map */}
-        <Card className="p-0 bg-white border-0 shadow-sm overflow-hidden relative group h-[350px] z-0">
-          {GOOGLE_MAPS_API_KEY ? (
-            <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
-              <GoogleMap
-                defaultCenter={{ lat: centerLat, lng: centerLng }}
-                defaultZoom={13}
-
-                gestureHandling="greedy"
-                disableDefaultUI={false}
-                style={{ width: '100%', height: '100%' }}
-              >
-                {renderMapContent()}
-              </GoogleMap>
-            </APIProvider>
-          ) : (
-            <div className="flex items-center justify-center h-full bg-slate-100">
-              <div className="text-center p-6">
-                <MapPin className="w-10 h-10 text-slate-400 mx-auto mb-3" />
-                <p className="text-slate-600 font-medium">Google Maps API key not configured</p>
-                <p className="text-xs text-slate-400 mt-1">Set VITE_GOOGLE_MAPS_API_KEY in your .env file</p>
-              </div>
-            </div>
-          )}
-          {clientMarkers.length === 0 && staffMarkers.length === 0 && GOOGLE_MAPS_API_KEY && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white/80 pointer-events-none">
-              <p className="text-slate-500 text-xs">No markers to show — client and staff markers will appear when shifts are active</p>
-            </div>
-          )}
-          <button
-            onClick={() => setMapMaximized(true)}
-            className="absolute top-2 right-2 bg-white p-2 rounded-lg shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-10"
-            title="Maximize map"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6v4m12-4h4v4M6 18h4v4m6-4h4v4" />
-            </svg>
-          </button>
-        </Card>
-
-        {/* Map Legend */}
-        <div className="flex flex-wrap gap-3 px-1">
-          <div className="flex items-center gap-1.5 text-xs text-slate-600">
-            <div className="w-3 h-3 rounded-full bg-amber-500"></div>
-            In Progress
-          </div>
-          <div className="flex items-center gap-1.5 text-xs text-slate-600">
-            <div className="w-3 h-3 rounded-full bg-green-500"></div>
-            Completed / Pending
-          </div>
-          <div className="flex items-center gap-1.5 text-xs text-slate-600">
-            <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-            Staff (Live)
-          </div>
-          <div className="flex items-center gap-1.5 text-xs text-slate-600">
-            <div className="w-3 h-3 rounded-full bg-gray-400"></div>
-            Staff (Last Known)
-          </div>
-          <div className="text-xs text-slate-400">
-            {clientMarkers.length} client{clientMarkers.length !== 1 ? 's' : ''} · {staffMarkers.length} staff on map
-          </div>
+        {/* Summary stats */}
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { label: 'Active Staff', value: activeStaffList.length, color: 'bg-blue-50 text-blue-700 border-blue-100' },
+            { label: 'On Call', value: activeStaffList.filter(s => s.statusLabel === 'On Call').length, color: 'bg-amber-50 text-amber-700 border-amber-100' },
+            { label: 'On Shift', value: activeStaffList.filter(s => s.statusLabel === 'On Shift').length, color: 'bg-green-50 text-green-700 border-green-100' },
+          ].map(stat => (
+            <Card key={stat.label} className={`p-4 border ${stat.color} shadow-sm`}>
+              <p className="text-2xl font-bold">{stat.value}</p>
+              <p className="text-xs font-medium mt-0.5">{stat.label}</p>
+            </Card>
+          ))}
         </div>
 
         {/* Active Staff List */}
@@ -732,27 +282,17 @@ export default function ControlRoom() {
             Active Staff ({activeStaffList.length})
           </h3>
           {activeStaffList.length === 0 ? (
-            <p className="text-sm text-slate-500">No active staff in the last hour</p>
+            <p className="text-sm text-slate-500">No active staff at the moment</p>
           ) : (
-            <div className="space-y-2 max-h-64 overflow-y-auto">
+            <div className="space-y-2">
               {activeStaffList.map(shift => {
-                const gpsMarker = staffMarkers.find(m => m.staffId === shift.staff_id);
+                const dotColor = shift.statusLabel === 'On Call' ? 'bg-amber-500 animate-pulse'
+                  : shift.statusLabel === 'On Shift' ? 'bg-blue-500'
+                  : 'bg-slate-300';
                 return (
-                  <div
-                    key={shift.staff_id}
-                    className={`flex items-center justify-between p-3 bg-slate-50 rounded-lg transition-colors ${gpsMarker ? 'cursor-pointer hover:bg-blue-50' : ''}`}
-                    onClick={() => {
-                      if (!gpsMarker) return;
-                      setFlyToTarget({ lat: gpsMarker.lat, lng: gpsMarker.lng });
-                      setMapMaximized(true);
-                    }}
-                  >
+                  <div key={shift.staff_id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
-                        gpsMarker?.isLive ? 'bg-blue-500 animate-pulse' :
-                        gpsMarker ? 'bg-gray-400' :
-                        'bg-transparent border border-dashed border-slate-300'
-                      }`} title={gpsMarker?.isLive ? 'Live GPS' : gpsMarker ? 'Last known' : 'No GPS'} />
+                      <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${dotColor}`} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-slate-900 truncate">{shift.staff_name}</p>
                         <p className="text-xs text-slate-500">{shift.shift_name} &middot; {shift.start_time}–{shift.end_time}</p>
