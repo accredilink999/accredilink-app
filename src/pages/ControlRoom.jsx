@@ -98,23 +98,42 @@ export default function ControlRoom() {
     refetchInterval: 10000,
   });
 
-  // Get unique service user IDs from today's calls
-  const clientIds = [...new Set(todayCalls.map(c => c.service_user_id).filter(Boolean))];
+  // Fetch ALL service users so the map always has waypoints
+  const { data: allServiceUsers = [] } = useQuery({
+    queryKey: ['allServiceUsers'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('service_users')
+        .select('id, full_name, address, postcode, is_active')
+        .eq('is_active', true);
+      return data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
-  // Build address fallback map for geocoding new clients
+  // Build address fallbacks from service_users + today's call addresses
   const addressFallbacks = React.useMemo(() => {
     const map = new Map();
+    for (const su of allServiceUsers) {
+      if (su.id && su.address) map.set(su.id, su.address);
+    }
     for (const call of todayCalls) {
       if (call.service_user_id && call.service_user_address && !map.has(call.service_user_id)) {
         map.set(call.service_user_id, call.service_user_address);
       }
     }
     return map;
-  }, [todayCalls]);
+  }, [allServiceUsers, todayCalls]);
 
-  // Fetch cached GPS locations for all clients on today's calls
+  const clientIds = React.useMemo(() => {
+    const fromCalls = todayCalls.map(c => c.service_user_id).filter(Boolean);
+    const fromUsers = allServiceUsers.map(su => su.id);
+    return [...new Set([...fromCalls, ...fromUsers])];
+  }, [todayCalls, allServiceUsers]);
+
+  // Geocode all client locations (postcode → coordinates via postcodes.io, then Nominatim)
   const { data: clientLocations = new Map() } = useQuery({
-    queryKey: ['clientLocations', ...clientIds],
+    queryKey: ['clientLocations', clientIds.join(',')],
     queryFn: () => getServiceUserLocations(clientIds, addressFallbacks),
     enabled: clientIds.length > 0,
     staleTime: 5 * 60 * 1000,
@@ -226,65 +245,84 @@ export default function ControlRoom() {
     },
   });
 
-  // Build client markers with call status
+  // Build client markers — all service users always on map, status from today's calls
   const clientMarkers = React.useMemo(() => {
-    const byClient = {};
-
+    // Build call lookup by service_user_id
+    const callsByClient = {};
     for (const call of todayCalls) {
       if (!call.service_user_id) continue;
-      const coords = clientLocations.get(call.service_user_id);
-      if (!coords) continue;
-
-      // Find which shift this call belongs to (for staff name)
       const shift = todayShifts.find(s => s.id === call.shift_id);
-
-      if (!byClient[call.service_user_id]) {
-        byClient[call.service_user_id] = {
-          id: call.service_user_id,
-          name: call.service_user_name,
-          address: call.service_user_address,
-          lat: coords.latitude,
-          lng: coords.longitude,
-          calls: [],
-        };
-      }
-
-      byClient[call.service_user_id].calls.push({
+      if (!callsByClient[call.service_user_id]) callsByClient[call.service_user_id] = [];
+      callsByClient[call.service_user_id].push({
         ...call,
         staff_name: shift?.staff_name || 'Unknown',
         shift_name: shift?.shift_name || '',
       });
     }
 
-    // Determine overall status for each client marker
-    return Object.values(byClient).map(client => {
-      const calls = client.calls.sort((a, b) => (a.scheduled_time || '').localeCompare(b.scheduled_time || ''));
+    const markers = [];
+
+    // All geocoded service users get a pin
+    for (const su of allServiceUsers) {
+      const coords = clientLocations.get(su.id);
+      if (!coords) continue;
+
+      const calls = (callsByClient[su.id] || []).sort((a, b) =>
+        (a.scheduled_time || '').localeCompare(b.scheduled_time || '')
+      );
       const realCalls = calls.filter(c => c.call_type !== 'sitin_cover');
-      // Only count as in_progress if staff has actually clocked in
       const hasInProgress = realCalls.some(c => c.status === 'in_progress' && c.clock_in_time);
-      const allCompleted = realCalls.length > 0 && realCalls.every(c => c.status === 'completed' || c.status === 'missed' || c.status === 'not_at_home');
-      const latestCall = realCalls[realCalls.length - 1] || calls[calls.length - 1];
+      const allCompleted = realCalls.length > 0 && realCalls.every(c =>
+        c.status === 'completed' || c.status === 'missed' || c.status === 'not_at_home'
+      );
 
-      let markerStatus = 'pending';
-      let statusColor = '#10B981'; // green
-      if (hasInProgress) {
-        markerStatus = 'in_progress';
-        statusColor = '#F59E0B'; // amber
-      } else if (allCompleted) {
-        markerStatus = 'completed';
-        statusColor = '#10B981'; // green
-      }
+      let markerStatus = calls.length > 0 ? 'scheduled' : 'no_calls';
+      let statusColor = '#64748B'; // slate — no calls today
+      if (hasInProgress) { markerStatus = 'in_progress'; statusColor = '#F59E0B'; }
+      else if (allCompleted) { markerStatus = 'completed'; statusColor = '#10B981'; }
+      else if (calls.length > 0) { markerStatus = 'pending'; statusColor = '#3B82F6'; }
 
-      return {
-        ...client,
+      markers.push({
+        id: su.id,
+        name: su.full_name || su.name || 'Client',
+        address: su.address || calls[0]?.service_user_address,
+        lat: coords.latitude,
+        lng: coords.longitude,
         calls,
         markerStatus,
         statusColor,
-        latestCall,
+        latestCall: realCalls[realCalls.length - 1] || calls[calls.length - 1],
         inProgressCall: realCalls.find(c => c.status === 'in_progress' && c.clock_in_time),
-      };
-    });
-  }, [todayCalls, clientLocations, todayShifts]);
+      });
+    }
+
+    // Also include any clients from today's calls not in service_users list
+    for (const [suId, calls] of Object.entries(callsByClient)) {
+      if (markers.find(m => m.id === suId)) continue;
+      const coords = clientLocations.get(suId);
+      if (!coords) continue;
+      const realCalls = calls.filter(c => c.call_type !== 'sitin_cover');
+      const hasInProgress = realCalls.some(c => c.status === 'in_progress' && c.clock_in_time);
+      const allCompleted = realCalls.length > 0 && realCalls.every(c =>
+        c.status === 'completed' || c.status === 'missed' || c.status === 'not_at_home'
+      );
+      let statusColor = hasInProgress ? '#F59E0B' : allCompleted ? '#10B981' : '#3B82F6';
+      markers.push({
+        id: suId,
+        name: calls[0]?.service_user_name || 'Client',
+        address: calls[0]?.service_user_address,
+        lat: coords.latitude,
+        lng: coords.longitude,
+        calls,
+        markerStatus: hasInProgress ? 'in_progress' : allCompleted ? 'completed' : 'pending',
+        statusColor,
+        latestCall: calls[calls.length - 1],
+        inProgressCall: realCalls.find(c => c.status === 'in_progress' && c.clock_in_time),
+      });
+    }
+
+    return markers;
+  }, [allServiceUsers, todayCalls, clientLocations, todayShifts]);
 
   // Active staff: staff with shifts today who have activity in last hour
   // Deduplicated by staff_id — multiple shifts for the same person are merged
