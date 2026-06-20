@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import Avatar from '@/components/ui/Avatar';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import CareLogViewer from '../careLogs/CareLogViewer';
+import CareLogForm from '../careLogs/CareLogForm';
 import HealthcareLogManager from '../careLogs/HealthcareLogManager';
 import MARChart from '../medications/MARChart';
 import CarePlanViewer from './CarePlanViewer';
@@ -140,6 +141,7 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
     const [syncingReviews, setSyncingReviews] = useState(false);
     const [feedbackUrl, setFeedbackUrl] = useState('');
     const [displayedLogs, setDisplayedLogs] = useState([]);
+    const [adHocLogOpen, setAdHocLogOpen] = useState(false);
     const [careLogDateRange, setCareLogDateRange] = useState({
        start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
        end: new Date().toISOString().split('T')[0]
@@ -560,7 +562,20 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
     clinical: 'Clinical Assessments',
   };
 
+  // Stub shift for ad-hoc logs — no real shift, just enough for CareLogForm to work
+  const buildAdHocShift = () => ({
+    id: null,
+    date: new Date().toISOString().split('T')[0],
+    start_time: new Date().toTimeString().slice(0, 5),
+    end_time: '',
+    staff_id: currentUser?.id || '',
+    staff_name: currentUser?.full_name || '',
+    branch: '',
+    paired_shift_id: null,
+  })
+
   return (
+    <>
     <div className="min-h-full">
       {/* Sticky Header */}
       <div className="sticky top-0 z-20 bg-white border-b border-slate-200 shadow-sm">
@@ -1193,6 +1208,13 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
           </TabsContent>
 
           <TabsContent value="logs" className="space-y-3 mt-4">
+           <Button
+             onClick={() => setAdHocLogOpen(true)}
+             className="w-full bg-teal-600 hover:bg-teal-700 min-h-[44px] touch-manipulation"
+           >
+             <Plus className="w-4 h-4 mr-2" />
+             Fill Ad-hoc Care Log
+           </Button>
            {isAdmin && (
              <Card className="p-4 bg-slate-50 border-slate-200">
                <div className="flex flex-col sm:flex-row gap-3 items-end">
@@ -1625,5 +1647,20 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
              onConfirm={() => deleteMutation.mutate()}
            />
            </div>
+
+    {adHocLogOpen && (
+      <CareLogForm
+        shift={buildAdHocShift()}
+        serviceUser={{ id: serviceUser?.id, full_name: serviceUser?.full_name }}
+        open={adHocLogOpen}
+        onClose={() => {
+          setAdHocLogOpen(false);
+          queryClient.invalidateQueries({ queryKey: ['allCareLogs'] });
+        }}
+        callId={null}
+        scheduledTime={new Date().toTimeString().slice(0, 5)}
+      />
+    )}
+    </>
            );
            }

@@ -771,35 +771,37 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
   ) || null;
 
   // If any of MY own calls have log_required set (partner said I'm filling it), block the whole UI
-  const pendingLogCalls = isMyShift
+  const pendingLogCalls = (isMyShift || isAdmin)
     ? (freshCalls || calls).filter(c => c.log_required === true && !c.care_log_id)
     : [];
 
   return (
     <div className="space-y-4">
-      {isMyShift && pendingLogCalls.length > 0 && (
-        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <FileText className="w-5 h-5 text-orange-600 flex-shrink-0" />
-            <p className="text-sm font-medium text-orange-800 truncate">
-              Care log needed: <strong>{pendingLogCalls[0].service_user_name}</strong>
-            </p>
-          </div>
-          <Button
-            size="sm"
-            onClick={() => {
-              const call = pendingLogCalls[0];
-              try { localStorage.removeItem(`draft:careLog:${shift?.id || 'new'}`); } catch (e) {}
-              if (!call.clock_out_time) {
-                ShiftCallApi.update(call.id, { clock_out_time: new Date().toISOString() })
-                  .catch(e => console.warn('Clock out failed:', e));
-              }
-              setTimeout(() => onOpenCareLog(call), 80);
-            }}
-            className="bg-orange-600 hover:bg-orange-700 flex-shrink-0"
-          >
-            Fill Log
-          </Button>
+      {(isMyShift || isAdmin) && pendingLogCalls.length > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 space-y-2">
+          <p className="text-sm font-semibold text-orange-800 flex items-center gap-2">
+            <FileText className="w-4 h-4 flex-shrink-0" />
+            {pendingLogCalls.length} outstanding care log{pendingLogCalls.length !== 1 ? 's' : ''}
+          </p>
+          {pendingLogCalls.map(call => (
+            <div key={call.id} className="flex items-center justify-between gap-3">
+              <p className="text-sm text-orange-800 truncate">{call.service_user_name} ({call.scheduled_time})</p>
+              <Button
+                size="sm"
+                onClick={() => {
+                  try { localStorage.removeItem(`draft:careLog:${shift?.id || 'new'}`); } catch (e) {}
+                  if (!call.clock_out_time) {
+                    ShiftCallApi.update(call.id, { clock_out_time: new Date().toISOString() })
+                      .catch(e => console.warn('Clock out failed:', e));
+                  }
+                  setTimeout(() => onOpenCareLog(call), 80);
+                }}
+                className="bg-orange-600 hover:bg-orange-700 flex-shrink-0"
+              >
+                Fill Log
+              </Button>
+            </div>
+          ))}
         </div>
       )}
       {isAdmin && (
