@@ -968,6 +968,10 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
                  isMyShift={isMyShift}
                  sameDayShifts={sameDayShifts}
                  userId={userId}
+                 onOpenCareLog={(call) => {
+                   try { localStorage.removeItem(`draft:careLog:${shift?.id || 'new'}`); } catch (e) {}
+                   setSummaryLogCall(call);
+                 }}
                />
                {/* Bottom Clock Off button — visible after calls, prominent when all done */}
                {canClockOff && (
@@ -1330,8 +1334,8 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
               scheduledTime={summaryLogCall.scheduled_time}
               onClose={() => {
                 setSummaryLogCall(null);
-                // Re-fetch care logs so the summary updates
                 queryClient.invalidateQueries({ queryKey: ['careLogs', shift.id, shift.paired_shift_id] });
+                queryClient.invalidateQueries({ queryKey: ['shift-calls', shift.id] });
               }}
               callId={summaryLogCall.id}
             />

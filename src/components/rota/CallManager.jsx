@@ -40,12 +40,11 @@ function parseSitinMeta(call) {
   }
 }
 
-export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayShifts = [], userId }) {
+export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayShifts = [], userId, onOpenCareLog }) {
   const queryClient = useQueryClient();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAddClientCallsOpen, setIsAddClientCallsOpen] = useState(false);
   const [editingCall, setEditingCall] = useState(null);
-  const [careLogCall, setCareLogCall] = useState(null);
   const [clockOutConfirmCall, setClockOutConfirmCall] = useState(null);
   const [notMyCallConfirm, setNotMyCallConfirm] = useState(null);
   const [driveToCallConfirm, setDriveToCallConfirm] = useState(null);
@@ -778,7 +777,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
 
   return (
     <div className="space-y-4">
-      {isMyShift && pendingLogCalls.length > 0 && !careLogCall && (
+      {isMyShift && pendingLogCalls.length > 0 && (
         <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <FileText className="w-5 h-5 text-orange-600 flex-shrink-0" />
@@ -795,7 +794,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                 ShiftCallApi.update(call.id, { clock_out_time: new Date().toISOString() })
                   .catch(e => console.warn('Clock out failed:', e));
               }
-              setTimeout(() => setCareLogCall(call), 80);
+              setTimeout(() => onOpenCareLog(call), 80);
             }}
             className="bg-orange-600 hover:bg-orange-700 flex-shrink-0"
           >
@@ -1497,16 +1496,6 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
         />
       )}
 
-      {careLogCall && (
-        <CareLogForm
-          shift={shift}
-          serviceUser={{ id: careLogCall.service_user_id, full_name: careLogCall.service_user_name }}
-          open={!!careLogCall}
-          onClose={() => setCareLogCall(null)}
-          callId={careLogCall.id}
-          scheduledTime={careLogCall.scheduled_time}
-        />
-      )}
 
       {/* Delete call confirmation dialog */}
       <AlertDialog open={!!deleteConfirmCallId} onOpenChange={(open) => !open && setDeleteConfirmCallId(null)}>
@@ -1784,7 +1773,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                 const call = logCompletorCall;
                 setLogCompletorCall(null);
                 try { localStorage.removeItem(`draft:careLog:${shift?.id || 'new'}`); } catch (e) {}
-                setTimeout(() => setCareLogCall(call), 80);
+                setTimeout(() => onOpenCareLog(call), 80);
               }}
               className="bg-blue-600 hover:bg-blue-700 h-12"
             >
@@ -1911,7 +1900,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                   if (shift?.paired_shift_id) {
                     setLogCompletorCall(call);
                   } else {
-                    setCareLogCall(call);
+                    onOpenCareLog(call);
                   }
                 }, 80);
               }}
