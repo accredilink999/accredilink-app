@@ -767,18 +767,18 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
   };
 
   // The currently active (in-progress + clocked-in, not yet complete) call — locks other pending calls
-  const activeInProgressCall = (freshCalls || calls).find(
+  const activeInProgressCall = (freshCalls || calls || []).find(
     c => c.status === 'in_progress' && !!c.clock_in_time && !c.clock_out_time
   ) || null;
 
   // If any of MY own calls have log_required set (partner said I'm filling it), block the whole UI
   const pendingLogCalls = isMyShift
-    ? (freshCalls || calls).filter(c => c.log_required === true && !c.care_log_id)
+    ? (freshCalls || calls || []).filter(c => c.log_required === true && !c.care_log_id)
     : [];
 
   return (
     <div className="space-y-4">
-      {isMyShift && pendingLogCalls.length > 0 && (
+      {isMyShift && pendingLogCalls.length > 0 && !careLogCall && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
             <div className="flex items-center gap-3 mb-4">
@@ -1457,19 +1457,14 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                           <div className="mt-2">
                             <button
                               onClick={() => {
+                                window.dispatchEvent(new CustomEvent('suppress-overdue-alert'));
                                 setExpandedCallId(null);
                                 const incomplete = getIncompleteTasks(call);
-                                const capturedCall = call;
-                                // Delay opening dialogs/forms to let touch events settle (Radix ghost-click fix)
-                                setTimeout(() => {
-                                  if (incomplete.length > 0) {
-                                    setTaskWarningCall(capturedCall);
-                                  } else if (shift?.paired_shift_id) {
-                                    setLogCompletorCall(capturedCall);
-                                  } else {
-                                    setCareLogCall(capturedCall);
-                                  }
-                                }, 80);
+                                if (incomplete.length > 0) {
+                                  setTaskWarningCall(call);
+                                } else {
+                                  setCareLogCall(call);
+                                }
                               }}
                               className="w-full py-3.5 px-4 bg-blue-50 border border-blue-200 text-blue-700 font-semibold rounded-xl flex items-center gap-3 active:scale-[0.99] touch-manipulation transition-all"
                             >
@@ -1506,16 +1501,14 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
         />
       )}
 
-      {careLogCall && (
-        <CareLogForm
-          shift={shift}
-          serviceUser={{ id: careLogCall.service_user_id, full_name: careLogCall.service_user_name }}
-          open={!!careLogCall}
-          onClose={() => setCareLogCall(null)}
-          callId={careLogCall.id}
-          scheduledTime={careLogCall.scheduled_time}
-        />
-      )}
+      <CareLogForm
+        shift={shift}
+        serviceUser={{ id: careLogCall?.service_user_id, full_name: careLogCall?.service_user_name }}
+        open={!!careLogCall}
+        onClose={() => { setCareLogCall(null); window.dispatchEvent(new CustomEvent('unsuppress-overdue-alert')); }}
+        callId={careLogCall?.id}
+        scheduledTime={careLogCall?.scheduled_time}
+      />
 
       {/* Delete call confirmation dialog */}
       <AlertDialog open={!!deleteConfirmCallId} onOpenChange={(open) => !open && setDeleteConfirmCallId(null)}>
@@ -1914,14 +1907,9 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
             <AlertDialogAction
               onClick={() => {
                 const call = taskWarningCall;
+                window.dispatchEvent(new CustomEvent('suppress-overdue-alert'));
                 setTaskWarningCall(null);
-                setTimeout(() => {
-                  if (shift?.paired_shift_id) {
-                    setLogCompletorCall(call);
-                  } else {
-                    setCareLogCall(call);
-                  }
-                }, 80);
+                setCareLogCall(call);
               }}
               className="bg-amber-600 hover:bg-amber-700"
             >

@@ -40,6 +40,7 @@ export default function OverdueCallAlert({ userId }) {
   const [checkingIn, setCheckingIn] = useState(false);
   const [reportingDelay, setReportingDelay] = useState(false);
   const [removingCall, setRemovingCall] = useState(false);
+  const [externalSuppress, setExternalSuppress] = useState(false);
   const audioInterval = useRef(null);
   const queryClient = useQueryClient();
 
@@ -82,27 +83,15 @@ export default function OverdueCallAlert({ userId }) {
 
       let callAlerts = [];
       if (myShifts?.length) {
-        // If staff is actively in a call right now, don't interrupt with the lock screen
-        const { data: activeCall } = await supabase
+        const { data: calls } = await supabase
           .from('shift_calls')
-          .select('id')
+          .select('*')
           .in('shift_id', myShifts.map(s => s.id))
-          .eq('status', 'in_progress')
-          .not('clock_in_time', 'is', null)
-          .is('clock_out_time', null)
-          .limit(1);
-
-        if (!activeCall?.length) {
-          const { data: calls } = await supabase
-            .from('shift_calls')
-            .select('*')
-            .in('shift_id', myShifts.map(s => s.id))
-            .eq('status', 'pending')
-            .eq('call_date', today)
-            .lt('scheduled_time', cutoffTime)
-            .or(`delay_until.is.null,delay_until.lt.${now.toISOString()}`);
-          callAlerts = (calls || []).map(c => ({ ...c, _type: 'call' }));
-        }
+          .eq('status', 'pending')
+          .eq('call_date', today)
+          .lt('scheduled_time', cutoffTime)
+          .or(`delay_until.is.null,delay_until.lt.${now.toISOString()}`);
+        callAlerts = (calls || []).map(c => ({ ...c, _type: 'call' }));
       }
 
       const found = [...shiftAlerts, ...callAlerts];
@@ -130,6 +119,17 @@ export default function OverdueCallAlert({ userId }) {
     return () => clearInterval(interval);
   }, [userId]);
 
+  useEffect(() => {
+    const suppress = () => setExternalSuppress(true);
+    const unsuppress = () => { setExternalSuppress(false); checkForOverdueCalls(); };
+    window.addEventListener('suppress-overdue-alert', suppress);
+    window.addEventListener('unsuppress-overdue-alert', unsuppress);
+    return () => {
+      window.removeEventListener('suppress-overdue-alert', suppress);
+      window.removeEventListener('unsuppress-overdue-alert', unsuppress);
+    };
+  }, []);
+
   const visibleCalls = overdueCalls.filter(c => !dismissedIds.has(c.id));
 
   useEffect(() => {
@@ -141,7 +141,7 @@ export default function OverdueCallAlert({ userId }) {
     return () => clearInterval(audioInterval.current);
   }, [visibleCalls.length]);
 
-  if (!visibleCalls.length) return null;
+  if (!visibleCalls.length || externalSuppress) return null;
 
   const call = visibleCalls[0];
 
