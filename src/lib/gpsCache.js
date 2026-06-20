@@ -1,4 +1,4 @@
-import { supabase } from '@/api/supabaseClient';
+﻿import { supabase } from '@/api/supabaseClient';
 
 // Re-export mileage utilities
 export { resolveCallAddresses, haversineMiles } from './addressMileage';
@@ -147,7 +147,7 @@ async function geocodeAddress(address) {
     try {
       const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=gb&limit=1`;
       const res = await fetch(url, {
-        headers: { 'User-Agent': 'CareCallAI/1.5' },
+        headers: { 'User-Agent': 'AccredilinkApp/1.0' },
       });
       if (!res.ok) continue;
       const results = await res.json();

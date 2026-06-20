@@ -1,4 +1,4 @@
-/**
+﻿/**
  * addressMileage.js — Calculate miles between service user postcodes
  *
  * Uses postcodes.io (free UK postcode API) to get coordinates,
