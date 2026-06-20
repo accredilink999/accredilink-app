@@ -1453,10 +1453,11 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                                 try { localStorage.removeItem(`draft:careLog:${shift?.id || 'new'}`); } catch (e) {}
                                 const incomplete = getIncompleteTasks(call);
                                 const capturedCall = call;
+                                const shiftDone = shift?.status === 'completed' || !!shift?.clock_out_time;
                                 setTimeout(() => {
-                                  if (incomplete.length > 0) {
+                                  if (!shiftDone && incomplete.length > 0) {
                                     setTaskWarningCall(capturedCall);
-                                  } else if (shift?.paired_shift_id) {
+                                  } else if (!shiftDone && shift?.paired_shift_id) {
                                     setLogCompletorCall(capturedCall);
                                   } else {
                                     onOpenCareLog(capturedCall);
