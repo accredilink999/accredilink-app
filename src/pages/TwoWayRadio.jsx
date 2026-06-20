@@ -114,7 +114,6 @@ export default function TwoWayRadio() {
   // Realtime channel refs (needed so we can .send() on them later)
   const rtAllCallRef   = useRef(null);
   const rtEmergencyRef = useRef(null);
-  const myUserChRef    = useRef(null); // per-user signal channel
 
   // Emergency refs
   const countdownTimerRef  = useRef(null);
@@ -327,51 +326,6 @@ export default function TwoWayRadio() {
     return () => { supabase.removeChannel(callSub); supabase.removeChannel(allCallCh); supabase.removeChannel(emergencyCh); };
   }, [user?.id]);
 
-  // ── Per-user broadcast signal channel ─────────────────────────────────────
-  // Primary path for P2P call signaling (more reliable than postgres_changes)
-  useEffect(() => {
-    if (!user?.id) return;
-    const ch = supabase.channel(`radio-user-${user.id}`)
-      .on('broadcast', { event: 'incoming_call' }, ({ payload }) => {
-        if (Date.now() - (payload.ts || 0) > 30000) return;
-        const caller = staffRef.current.find(s => s.id === payload.callerId)
-          || { full_name: payload.callerName, id: payload.callerId };
-        setIncomingCall({ callId: payload.callId, caller, channelName: payload.channelName });
-        stopTone(); stopToneRef.current = playTone([880, 1100, 880, 1100, 660], true);
-      })
-      .on('broadcast', { event: 'call_response' }, ({ payload }) => {
-        const cur = outgoingRef.current;
-        if (!cur || payload.callId !== cur.callId) return;
-        stopTone();
-        if (payload.status === 'accepted') {
-          setOutgoingCall(null); setCallDeclined(false);
-          joinChannel(payload.channelName || cur.channelName).then(() => {
-            setActiveChannel({ name: `📞 ${cur.callee?.full_name}`, id: '__ptp' }); setView('ptt');
-          });
-        } else if (payload.status === 'callback') {
-          setCallDeclined(true);
-          setTimeout(() => { setOutgoingCall(null); setCallDeclined(false); }, 4000);
-        } else if (payload.status === 'declined') {
-          setOutgoingCall(null); setCallDeclined(false);
-          toast(`${cur.callee?.full_name || 'They'} declined the call`);
-        }
-      })
-      .subscribe();
-    myUserChRef.current = ch;
-    return () => { supabase.removeChannel(ch); myUserChRef.current = null; };
-  }, [user?.id]);
-
-  // Fire-and-forget helper: subscribe to target user channel, send broadcast, clean up
-  const sendUserSignal = (toUserId, event, payload) => {
-    const ch = supabase.channel(`radio-user-${toUserId}`);
-    ch.subscribe(async (status) => {
-      if (status === 'SUBSCRIBED') {
-        await ch.send({ type: 'broadcast', event, payload }).catch(() => {});
-        setTimeout(() => supabase.removeChannel(ch), 300);
-      }
-    });
-  };
-
   // ── Radio action handlers ─────────────────────────────────────────────────
   const handleAllCall = async () => {
     await joinChannel('allstaff-broadcast');
@@ -402,12 +356,6 @@ export default function TwoWayRadio() {
     setCallDeclined(false);
     stopTone(); stopToneRef.current = playTone([400, 600, 800, 600, 400], true);
     const callerName = user?.full_name || user?.email || 'A team member';
-    // Broadcast to callee's user channel (instant if they're on the app)
-    sendUserSignal(selectedPerson.id, 'incoming_call', {
-      callId: callRecord.id, channelName: chName,
-      callerName, callerId: user.id, ts: Date.now(),
-    });
-    // Push notification as backup (wakes locked/backgrounded screen)
     base44.functions.invoke('createNotification', {
       recipient_ids: resolveRecipients([selectedPerson.id]), type: 'radio_call',
       title: `📞 ${callerName} is calling you`, message: 'Tap to answer on Team Radio.',
@@ -427,8 +375,6 @@ export default function TwoWayRadio() {
     const { caller, channelName, callId } = incomingCall;
     setIncomingCall(null);
     await supabase.from('radio_calls').update({ status: 'accepted' }).eq('id', callId);
-    // Signal the caller via broadcast so they stop ringing and join
-    if (caller?.id) sendUserSignal(caller.id, 'call_response', { callId, status: 'accepted', channelName });
     await joinChannel(channelName);
     setActiveChannel({ name: `📞 ${caller?.full_name || 'Call'}`, id: '__ptp' }); setView('ptt');
   };
@@ -436,10 +382,9 @@ export default function TwoWayRadio() {
   const declineIncomingCall = async (status = 'callback') => {
     stopTone();
     if (!incomingCall) return;
-    const { callId, caller } = incomingCall;
+    const { callId } = incomingCall;
     setIncomingCall(null);
     if (callId) await supabase.from('radio_calls').update({ status }).eq('id', callId);
-    if (caller?.id) sendUserSignal(caller.id, 'call_response', { callId, status });
   };
 
   const handleSendAlert = async () => {
@@ -664,11 +609,6 @@ export default function TwoWayRadio() {
           .maybeSingle();
         if (pending) {
           await supabase.from('radio_calls').update({ status: 'accepted' }).eq('id', pending.id);
-          if (pending.caller_id) {
-            sendUserSignal(pending.caller_id, 'call_response', {
-              callId: pending.id, status: 'accepted', channelName: target,
-            });
-          }
         }
       } else {
         setActiveChannel({ name: target, id: target });
