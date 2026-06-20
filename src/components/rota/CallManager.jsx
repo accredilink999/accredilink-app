@@ -658,6 +658,33 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
     }
   };
 
+  const handleNotAtHome = async (call) => {
+    updateStatusMutation.mutate({ callId: call.id, status: 'not_at_home' });
+    const partnerCall = getPartnerCall(call);
+    if (partnerCall) {
+      try {
+        await ShiftCallApi.update(partnerCall.id, { status: 'not_at_home' });
+        queryClient.invalidateQueries({ queryKey: ['paired-shift-calls', shift.paired_shift_id] });
+        if (shift?.paired_shift_id) {
+          const pairedShift = await base44.entities.Shift.read(shift.paired_shift_id);
+          if (pairedShift?.staff_id && pairedShift.staff_id !== shift?.staff_id) {
+            base44.functions.invoke('createNotification', {
+              recipient_ids: [pairedShift.staff_id],
+              type: 'shift_activity',
+              title: `Client not home: ${call.service_user_name}`,
+              message: `${shift?.staff_name || 'Your partner'} marked ${call.service_user_name} as not at home — your call has been updated automatically.`,
+              priority: 'normal',
+              action_url: '/Rota',
+              send_push: true,
+            }).catch(e => console.warn('Partner not-at-home notification failed:', e));
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to update partner call to not_at_home:', e);
+      }
+    }
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'completed': return 'bg-green-100 text-green-800';
@@ -1263,7 +1290,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                               Check In to Call
                             </button>
                             <button
-                              onClick={() => { updateStatusMutation.mutate({ callId: call.id, status: 'not_at_home' }); setExpandedCallId(null); }}
+                              onClick={() => { handleNotAtHome(call); setExpandedCallId(null); }}
                               className="w-full py-3.5 px-4 bg-amber-50 border border-amber-200 text-amber-700 font-semibold rounded-xl flex items-center gap-3 active:scale-[0.99] touch-manipulation transition-all"
                             >
                               <Home className="w-4 h-4 flex-shrink-0" />
