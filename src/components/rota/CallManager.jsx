@@ -1461,19 +1461,10 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                           <div className="mt-2">
                             <button
                               onClick={() => {
-                                window.dispatchEvent(new CustomEvent('suppress-overdue-alert'));
                                 setExpandedCallId(null);
-                                const incomplete = getIncompleteTasks(call);
-                                if (incomplete.length > 0) {
-                                  setTaskWarningCall(call);
-                                } else if (shift?.paired_shift_id) {
-                                  setLogCompletorCall(call);
-                                } else {
-                                  ShiftCallApi.update(call.id, { clock_out_time: new Date().toISOString() })
-                                    .then(() => queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] }))
-                                    .catch(e => console.warn('Clock out failed:', e));
-                                  setCareLogCall(call);
-                                }
+                                ShiftCallApi.update(call.id, { clock_out_time: new Date().toISOString() })
+                                  .catch(e => console.warn('Clock out failed:', e));
+                                setCareLogCall(call);
                               }}
                               className="w-full py-3.5 px-4 bg-blue-50 border border-blue-200 text-blue-700 font-semibold rounded-xl flex items-center gap-3 active:scale-[0.99] touch-manipulation transition-all"
                             >
