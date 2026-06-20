@@ -668,7 +668,7 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
   return (
     <>
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="w-full h-[100dvh] md:max-w-3xl md:max-h-[90vh] p-0 md:p-6 md:rounded-lg rounded-none flex flex-col fixed bottom-0 md:bottom-auto md:top-[50%] md:translate-y-[-50%] top-auto translate-y-0 z-[10000]">
+      <DialogContent className="w-full h-[100dvh] md:max-w-3xl md:max-h-[90vh] p-0 md:p-6 md:rounded-lg rounded-none flex flex-col fixed bottom-0 md:bottom-auto md:top-[50%] md:translate-y-[-50%] top-auto translate-y-0">
         {/* Mobile-only: full-width App Home bar replaces the bottom nav */}
         <button
           onClick={onClose}
