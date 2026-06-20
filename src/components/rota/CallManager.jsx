@@ -1351,6 +1351,38 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                       sched.setHours(h, m, 0, 0);
                       return Date.now() > sched.getTime() + 15 * 60 * 1000;
                     })();
+
+                    // Partner is already at this call — show amber "Check In Too?" bar
+                    const partnerIsInProgress = matchedPartnerCall?.status === 'in_progress' && !!matchedPartnerCall?.clock_in_time;
+                    if (partnerIsInProgress) {
+                      return (
+                        <div className="mt-1">
+                          <button
+                            onClick={() => setExpandedCallId(isExpanded ? null : call.id)}
+                            className="w-full py-4 px-5 bg-amber-500 hover:bg-amber-600 active:scale-[0.99] text-white font-semibold text-base rounded-xl flex items-center justify-between transition-all touch-manipulation"
+                          >
+                            <span className="flex items-center gap-3">
+                              <Users className="w-5 h-5 flex-shrink-0" />
+                              Partner In Progress — Check In Too?
+                            </span>
+                            <ChevronDown className={`w-5 h-5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                          </button>
+                          {isExpanded && (
+                            <div className="mt-2">
+                              <button
+                                onClick={() => { clockInMutation.mutate(call); setExpandedCallId(null); }}
+                                disabled={clockInMutation.isPending}
+                                className="w-full py-3.5 px-4 bg-green-50 border border-green-200 text-green-700 font-semibold rounded-xl flex items-center gap-3 active:scale-[0.99] touch-manipulation disabled:opacity-50 transition-all"
+                              >
+                                <Play className="w-4 h-4 flex-shrink-0" />
+                                Check In to Call
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+
                     return (
                       <div className="mt-1">
                         <button
