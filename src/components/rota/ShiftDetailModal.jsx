@@ -1165,16 +1165,14 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
           {/* Shift Summary / Clock Off popup */}
           <AlertDialog open={shiftSummaryOpen} onOpenChange={setShiftSummaryOpen}>
           <AlertDialogContent className="max-w-md flex flex-col p-0 gap-0 overflow-hidden" style={{ maxHeight: '90dvh' }}>
-            {/* Fixed header with X close button */}
-            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b flex-shrink-0">
-              <AlertDialogTitle className="text-lg font-semibold">Shift Summary</AlertDialogTitle>
-              <button
-                onClick={() => setShiftSummaryOpen(false)}
-                className="rounded-full p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors touch-manipulation"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+            {/* Full-width close bar — same pattern as the shift popup */}
+            <button
+              onClick={() => setShiftSummaryOpen(false)}
+              className="w-full flex items-center justify-between px-5 py-4 bg-teal-600 text-white flex-shrink-0 active:bg-teal-700 touch-manipulation"
+            >
+              <AlertDialogTitle className="text-base font-semibold text-white">Shift Summary</AlertDialogTitle>
+              <X className="w-5 h-5 text-white" />
+            </button>
 
             {/* Scrollable content */}
             <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-4 min-h-0">
