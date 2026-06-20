@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AgoraRTC from 'agora-rtc-sdk-ng';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
 import { supabase } from '@/api/supabaseClient';
 import { base44 } from '@/api/base44Client';
 import { ShiftApi } from '@/api/rotaApi';
@@ -83,6 +84,7 @@ const withOrgFilter = (q) => {
 
 export default function TwoWayRadio() {
   const queryClient = useQueryClient();
+  const location = useLocation();
   const clientRef = useRef(null);
   const micTrackRef = useRef(null);
   const joinedChannelRef = useRef(null);
@@ -250,6 +252,21 @@ export default function TwoWayRadio() {
     await joinChannel('allstaff-broadcast');
     setAllCallActive(true);
     setActiveChannel({ name: 'All Staff', id: '__allcall' });
+
+    // Alert all other staff — tapping the notification drops them straight into this channel
+    const callerName = user?.full_name || user?.email || 'A team member';
+    const recipientIds = otherStaff.map(s => s.id);
+    if (recipientIds.length > 0) {
+      base44.functions.invoke('createNotification', {
+        recipient_ids: recipientIds,
+        type: 'radio_call',
+        title: '📻 All Staff Radio',
+        message: `${callerName} is on the All Staff channel. Tap to join.`,
+        priority: 'high',
+        action_url: '/TwoWayRadio?join=allstaff-broadcast',
+        send_push: true,
+      }).catch(() => {}); // fire-and-forget
+    }
   };
 
   // Point-to-point: join a private channel with one other staff member
@@ -261,6 +278,18 @@ export default function TwoWayRadio() {
     setPtpTarget(targetUser);
     setAllCallActive(false);
     setActiveChannel({ name: `📞 ${targetUser.full_name}`, id: '__ptp' });
+
+    // Alert the specific staff member — tapping drops them into the same private channel
+    const callerName = user?.full_name || user?.email || 'A team member';
+    base44.functions.invoke('createNotification', {
+      recipient_ids: [targetUser.id],
+      type: 'radio_call',
+      title: `📞 ${callerName} is calling you`,
+      message: 'Tap to answer on Team Radio.',
+      priority: 'high',
+      action_url: `/TwoWayRadio?join=${chName}`,
+      send_push: true,
+    }).catch(() => {});
   };
 
   // Add channel mutation
@@ -286,6 +315,27 @@ export default function TwoWayRadio() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['radioChannels'] }),
   });
+
+  // Auto-join channel from notification deep link (?join=channelName)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const target = params.get('join');
+    if (!target || !myUid || !clientRef.current) return;
+    if (joinedChannelRef.current === target) return; // already in it
+
+    joinChannel(target).then(() => {
+      if (target === 'allstaff-broadcast') {
+        setAllCallActive(true);
+        setActiveChannel({ name: 'All Staff', id: '__allcall' });
+      } else if (target.startsWith('ptp_')) {
+        setActiveChannel({ name: 'Incoming Call', id: '__ptp' });
+      } else {
+        // named channel — match from channels list once loaded
+        setActiveChannel(ch => ch || { name: target, id: target });
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search, myUid]);
 
   // Keyboard: Space = PTT
   useEffect(() => {
