@@ -1459,7 +1459,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                                   } else if (shift?.paired_shift_id) {
                                     setLogCompletorCall(capturedCall);
                                   } else {
-                                    setCareLogCall(capturedCall);
+                                    onOpenCareLog(capturedCall);
                                   }
                                 }, 80);
                               }}
