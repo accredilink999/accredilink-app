@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import SpeechButton from '@/components/ui/SpeechButton';
-import { Clock, MapPin, CheckCircle, AlertCircle, Play, Square, Plus, Edit, Trash2, FileText, Car, ListChecks, ClipboardList, User, Users, Home, XCircle, SkipForward } from 'lucide-react';
+import { Clock, MapPin, CheckCircle, AlertCircle, Play, Square, Plus, Edit, Trash2, FileText, Car, ListChecks, ClipboardList, User, Users, Home, XCircle, SkipForward, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { notifyAdminsOfActivity } from '@/utils/adminNotifications';
 import { toast } from 'sonner';
@@ -55,6 +55,8 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
   const [sitinLogForm, setSitinLogForm] = useState({ visit_type: 'food_drink', notes: '', service_user_id: '' });
   const [deleteConfirmCallId, setDeleteConfirmCallId] = useState(null);
   const [holdExpiredConfirm, setHoldExpiredConfirm] = useState(null);
+  const [expandedCallId, setExpandedCallId] = useState(null);
+  const [logCompletorCall, setLogCompletorCall] = useState(null);
 
   const [freshCalls, setFreshCalls] = useState(calls);
 
@@ -612,6 +614,50 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
     },
   });
 
+  const handlePartnerCompletingLog = async (call) => {
+    try {
+      await ShiftCallApi.update(call.id, {
+        clock_out_time: new Date().toISOString(),
+        status: 'completed',
+      });
+      setFreshCalls(prev => prev.map(c => c.id === call.id
+        ? { ...c, status: 'completed', clock_out_time: new Date().toISOString() }
+        : c));
+
+      const partnerCall = getPartnerCall(call);
+      if (partnerCall) {
+        await supabase.from('shift_calls').update({ log_required: true }).eq('id', partnerCall.id);
+        if (shift?.paired_shift_id) {
+          try {
+            const pairedShift = await base44.entities.Shift.read(shift.paired_shift_id);
+            if (pairedShift?.staff_id && pairedShift.staff_id !== shift?.staff_id) {
+              base44.functions.invoke('createNotification', {
+                recipient_ids: [pairedShift.staff_id],
+                type: 'care_log',
+                title: `Care log required: ${call.service_user_name}`,
+                message: `${shift?.staff_name || 'Your partner'} has checked out of ${call.service_user_name}'s call. You must complete the care log before continuing.`,
+                priority: 'high',
+                action_url: '/Rota',
+                send_push: true,
+              }).catch(e => console.warn('Log required notification failed:', e));
+            }
+          } catch (e) {
+            console.warn('Could not notify partner of log requirement:', e);
+          }
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] });
+      if (shift?.paired_shift_id) {
+        queryClient.invalidateQueries({ queryKey: ['paired-shift-calls', shift.paired_shift_id] });
+      }
+      toast.success('Call complete — your partner will fill the care log');
+    } catch (err) {
+      console.error('Error completing call:', err);
+      toast.error('Failed to complete call');
+    }
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'completed': return 'bg-green-100 text-green-800';
@@ -633,8 +679,47 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
     }
   };
 
+  // If any of MY own calls have log_required set (partner said I'm filling it), block the whole UI
+  const pendingLogCalls = isMyShift
+    ? (freshCalls || calls).filter(c => c.log_required === true && !c.care_log_id)
+    : [];
+
   return (
     <div className="space-y-4">
+      {isMyShift && pendingLogCalls.length > 0 && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+                <FileText className="w-6 h-6 text-orange-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-lg">Care Log Required</h3>
+                <p className="text-sm text-slate-500">You must complete this before continuing</p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-700 mb-5">
+              Your partner has completed their part of{' '}
+              <strong>{pendingLogCalls[0].service_user_name}</strong>'s visit. You are required to fill in the care log before you can do anything else in the app.
+            </p>
+            <Button
+              onClick={() => {
+                const call = pendingLogCalls[0];
+                if (!call.clock_out_time) {
+                  ShiftCallApi.update(call.id, { clock_out_time: new Date().toISOString() })
+                    .then(() => queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] }))
+                    .catch(e => console.warn('Clock out failed:', e));
+                }
+                setCareLogCall(call);
+              }}
+              className="w-full bg-orange-600 hover:bg-orange-700 h-12 text-base"
+            >
+              <FileText className="w-5 h-5 mr-2" />
+              Fill Care Log Now
+            </Button>
+          </div>
+        </div>
+      )}
       {isAdmin && (
         <div className="flex gap-2">
           <Button
@@ -968,6 +1053,15 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                         {call.status === 'not_at_home' ? 'not at home' : call.status}
                       </span>
                     </Badge>
+                    {isAdmin && (
+                      <button
+                        onClick={() => setDeleteConfirmCallId(call.id)}
+                        className="text-slate-300 hover:text-red-400 transition-colors p-1 touch-manipulation"
+                        title="Delete call"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1084,144 +1178,153 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                       Partner Has Filled In The Log For This Call
                     </div>
                   )}
-                <div className="grid grid-cols-3 gap-2 w-full">
-                  {canClockIn && (
-                    <button
-                      onClick={() => clockInMutation.mutate(call)}
-                      disabled={clockInMutation.isPending}
-                      className="flex flex-col items-center justify-center rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-3 min-h-[80px] active:scale-95 touch-manipulation disabled:opacity-50"
-                    >
-                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center mb-1.5 shadow-sm">
-                        <Play className="w-5 h-5 text-white" strokeWidth={1.8} />
-                      </div>
-                      <span className="text-xs font-semibold text-slate-700">Check In</span>
-                    </button>
-                  )}
-                  {canClockOut && (
-                    <button
-                      onClick={() => {
-                        const incomplete = getIncompleteTasks(call);
-                        if (incomplete.length > 0) {
-                          setTaskWarningCall(call);
-                        } else if (hasCarLog || partnerHasLog) {
-                          clockOutMutation.mutate(call);
-                        } else {
-                          setClockOutConfirmCall(call);
-                        }
-                      }}
-                      disabled={clockOutMutation.isPending}
-                      className="flex flex-col items-center justify-center rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-3 min-h-[80px] active:scale-95 touch-manipulation disabled:opacity-50"
-                    >
-                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center mb-1.5 shadow-sm">
-                        <Square className="w-5 h-5 text-white" strokeWidth={1.8} />
-                      </div>
-                      <span className="text-xs font-semibold text-slate-700">Check Out</span>
-                    </button>
-                  )}
-                  {(isMyShift || isAdmin) && !hasCarLog && !partnerHasLog && !isOnHold && call.status !== 'completed' && call.status !== 'missed' && call.status !== 'not_at_home' && (
-                    <button
-                      onClick={() => setCareLogCall(call)}
-                      className="flex flex-col items-center justify-center rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-3 min-h-[80px] active:scale-95 touch-manipulation"
-                    >
-                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center mb-1.5 shadow-sm">
-                        <FileText className="w-5 h-5 text-white" strokeWidth={1.8} />
-                      </div>
-                      <span className="text-xs font-semibold text-slate-700">Care Log</span>
-                    </button>
-                  )}
-                  {(isMyShift || isAdmin) && call.status !== 'completed' && call.status !== 'missed' && call.status !== 'not_at_home' && (
-                    <button
-                      onClick={() => setNotMyCallConfirm(call)}
-                      className="flex flex-col items-center justify-center rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-3 min-h-[80px] active:scale-95 touch-manipulation"
-                    >
-                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center mb-1.5 shadow-sm">
-                        <XCircle className="w-5 h-5 text-white" strokeWidth={1.8} />
-                      </div>
-                      <span className="text-xs font-semibold text-slate-700 leading-tight">Not My Call</span>
-                    </button>
-                  )}
-                  {(isMyShift || isAdmin) && call.status !== 'completed' && call.status !== 'missed' && call.status !== 'not_at_home' && (
-                    <button
-                      onClick={() => updateStatusMutation.mutate({ callId: call.id, status: 'not_at_home' })}
-                      className="flex flex-col items-center justify-center rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-3 min-h-[80px] active:scale-95 touch-manipulation"
-                    >
-                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center mb-1.5 shadow-sm">
-                        <Home className="w-5 h-5 text-white" strokeWidth={1.8} />
-                      </div>
-                      <span className="text-xs font-semibold text-slate-700 leading-tight">Not Home</span>
-                    </button>
-                  )}
-                  {(isMyShift || isAdmin) && call.status !== 'completed' && call.status !== 'missed' && call.status !== 'not_at_home' && (
-                    <button
-                      onClick={() => updateStatusMutation.mutate({ callId: call.id, status: 'missed' })}
-                      className="flex flex-col items-center justify-center rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-3 min-h-[80px] active:scale-95 touch-manipulation"
-                    >
-                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-rose-400 to-rose-600 flex items-center justify-center mb-1.5 shadow-sm">
-                        <AlertCircle className="w-5 h-5 text-white" strokeWidth={1.8} />
-                      </div>
-                      <span className="text-xs font-semibold text-slate-700">Missed</span>
-                    </button>
-                  )}
-                  {(isMyShift || isAdmin) && call.status === 'pending' && !call.clock_in_time && !isOnHold && (
-                    <button
-                      onClick={() => updateStatusMutation.mutate({ callId: call.id, status: 'completed' })}
-                      className="flex flex-col items-center justify-center rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-3 min-h-[80px] active:scale-95 touch-manipulation"
-                    >
-                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center mb-1.5 shadow-sm">
-                        <CheckCircle className="w-5 h-5 text-white" strokeWidth={1.8} />
-                      </div>
-                      <span className="text-xs font-semibold text-slate-700 leading-tight">Complete</span>
-                    </button>
-                  )}
-                  {isOnHold && serviceUser?.hold_type === 'temporary' && serviceUser?.hold_remaining_calls > 0 && (isMyShift || isAdmin) && (
-                    <button
-                      onClick={() => decrementHoldMutation.mutate({
-                        serviceUserId: serviceUser.id,
-                        serviceUserName: call.service_user_name,
-                        currentRemaining: serviceUser.hold_remaining_calls
-                      })}
-                      disabled={decrementHoldMutation.isPending}
-                      className="flex flex-col items-center justify-center rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-3 min-h-[80px] active:scale-95 touch-manipulation col-span-3 disabled:opacity-50"
-                    >
-                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center mb-1.5 shadow-sm">
-                        <SkipForward className="w-5 h-5 text-white" strokeWidth={1.8} />
-                      </div>
-                      <span className="text-xs font-semibold text-slate-700">Skip Call (Decrement Hold)</span>
-                    </button>
-                  )}
-                  {isAdmin && (
-                    <button
-                      onClick={() => setDeleteConfirmCallId(call.id)}
-                      disabled={deleteCallMutation.isPending}
-                      className="flex flex-col items-center justify-center rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-3 min-h-[80px] active:scale-95 touch-manipulation disabled:opacity-50"
-                    >
-                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-400 to-slate-600 flex items-center justify-center mb-1.5 shadow-sm">
-                        <Trash2 className="w-5 h-5 text-white" strokeWidth={1.8} />
-                      </div>
-                      <span className="text-xs font-semibold text-slate-700">Delete</span>
-                    </button>
-                  )}
-                </div>
+                {/* Intelligent status bar — replaces all individual action buttons */}
+                {(isMyShift || isAdmin) && (() => {
+                  const isPending = call.status === 'pending' || (call.status === 'in_progress' && !call.clock_in_time);
+                  const isInProgress = call.status === 'in_progress' && !!call.clock_in_time;
+                  const isComplete = call.status === 'completed';
+                  const isNotHome = call.status === 'not_at_home';
+                  const isMissed = call.status === 'missed';
+                  const isExpanded = expandedCallId === call.id;
 
-                {/* Status indicator text for completed/missed/not_at_home calls */}
-                {call.status === 'not_at_home' && (
-                  <p className="text-xs text-amber-600 font-medium mt-2 flex items-center gap-1">
-                    <MapPin className="w-3 h-3" />
-                    Not at home — no care log required
-                  </p>
-                )}
-                {call.status === 'missed' && (
-                  <p className="text-xs text-red-600 font-medium mt-2 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" />
-                    Missed call
-                  </p>
-                )}
-                {call.status === 'completed' && !call.clock_out_time && (
-                  <p className="text-xs text-green-600 font-medium mt-2 flex items-center gap-1">
-                    <CheckCircle className="w-3 h-3" />
-                    Marked as complete
-                  </p>
-                )}
+                  if (isOnHold) {
+                    return (
+                      <div>
+                        <div className="w-full py-4 px-5 bg-slate-200 text-slate-600 font-semibold text-base rounded-xl flex items-center gap-3 mt-1">
+                          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                          <span>Client On Hold</span>
+                        </div>
+                        {isAdmin && serviceUser?.hold_type === 'temporary' && serviceUser?.hold_remaining_calls > 0 && (
+                          <button
+                            onClick={() => decrementHoldMutation.mutate({
+                              serviceUserId: serviceUser.id,
+                              serviceUserName: call.service_user_name,
+                              currentRemaining: serviceUser.hold_remaining_calls,
+                            })}
+                            disabled={decrementHoldMutation.isPending}
+                            className="mt-2 w-full py-3.5 px-4 bg-amber-50 border border-amber-200 text-amber-700 font-semibold rounded-xl flex items-center gap-3 active:scale-[0.99] touch-manipulation disabled:opacity-50 transition-all"
+                          >
+                            <SkipForward className="w-4 h-4 flex-shrink-0" />
+                            Skip Call (Decrement Hold)
+                          </button>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  if (isComplete) {
+                    return (
+                      <div className="w-full py-4 px-5 bg-green-500 text-white font-semibold text-base rounded-xl flex items-center gap-3 mt-1">
+                        <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                        <span>Call Complete</span>
+                      </div>
+                    );
+                  }
+
+                  if (isNotHome) {
+                    return (
+                      <div className="w-full py-4 px-5 bg-amber-100 text-amber-800 font-semibold text-base rounded-xl flex items-center gap-3 mt-1">
+                        <Home className="w-5 h-5 flex-shrink-0" />
+                        <span>Client Not Home</span>
+                      </div>
+                    );
+                  }
+
+                  if (isMissed) {
+                    return (
+                      <div className="w-full py-4 px-5 bg-red-100 text-red-800 font-semibold text-base rounded-xl flex items-center gap-3 mt-1">
+                        <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                        <span>Call Missed</span>
+                      </div>
+                    );
+                  }
+
+                  if (isPending) {
+                    return (
+                      <div className="mt-1">
+                        <button
+                          onClick={() => setExpandedCallId(isExpanded ? null : call.id)}
+                          className="w-full py-4 px-5 bg-blue-500 hover:bg-blue-600 active:scale-[0.99] text-white font-semibold text-base rounded-xl flex items-center justify-between transition-all touch-manipulation"
+                        >
+                          <span className="flex items-center gap-3">
+                            <Clock className="w-5 h-5 flex-shrink-0" />
+                            Pending Check In
+                          </span>
+                          <ChevronDown className={`w-5 h-5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                        </button>
+                        {isExpanded && (
+                          <div className="mt-2 space-y-2">
+                            <button
+                              onClick={() => { clockInMutation.mutate(call); setExpandedCallId(null); }}
+                              disabled={clockInMutation.isPending}
+                              className="w-full py-3.5 px-4 bg-green-50 border border-green-200 text-green-700 font-semibold rounded-xl flex items-center gap-3 active:scale-[0.99] touch-manipulation disabled:opacity-50 transition-all"
+                            >
+                              <Play className="w-4 h-4 flex-shrink-0" />
+                              Check In to Call
+                            </button>
+                            <button
+                              onClick={() => { updateStatusMutation.mutate({ callId: call.id, status: 'not_at_home' }); setExpandedCallId(null); }}
+                              className="w-full py-3.5 px-4 bg-amber-50 border border-amber-200 text-amber-700 font-semibold rounded-xl flex items-center gap-3 active:scale-[0.99] touch-manipulation transition-all"
+                            >
+                              <Home className="w-4 h-4 flex-shrink-0" />
+                              Client Not Home
+                            </button>
+                            <button
+                              onClick={() => { setNotMyCallConfirm(call); setExpandedCallId(null); }}
+                              className="w-full py-3.5 px-4 bg-red-50 border border-red-200 text-red-700 font-semibold rounded-xl flex items-center gap-3 active:scale-[0.99] touch-manipulation transition-all"
+                            >
+                              <XCircle className="w-4 h-4 flex-shrink-0" />
+                              Remove This Call from My List
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  if (isInProgress) {
+                    return (
+                      <div className="mt-1">
+                        <button
+                          onClick={() => setExpandedCallId(isExpanded ? null : call.id)}
+                          className="w-full py-4 px-5 bg-amber-500 hover:bg-amber-600 active:scale-[0.99] text-white font-semibold text-base rounded-xl flex items-center justify-between transition-all touch-manipulation"
+                        >
+                          <span className="flex items-center gap-3">
+                            <Play className="w-5 h-5 flex-shrink-0" />
+                            Call In Progress • Check Out?
+                          </span>
+                          <ChevronDown className={`w-5 h-5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                        </button>
+                        {isExpanded && (
+                          <div className="mt-2">
+                            <button
+                              onClick={() => {
+                                setExpandedCallId(null);
+                                const incomplete = getIncompleteTasks(call);
+                                if (incomplete.length > 0) {
+                                  setTaskWarningCall(call);
+                                } else if (shift?.paired_shift_id) {
+                                  setLogCompletorCall(call);
+                                } else {
+                                  ShiftCallApi.update(call.id, { clock_out_time: new Date().toISOString() })
+                                    .then(() => queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] }))
+                                    .catch(e => console.warn('Clock out failed:', e));
+                                  setCareLogCall(call);
+                                }
+                              }}
+                              className="w-full py-3.5 px-4 bg-blue-50 border border-blue-200 text-blue-700 font-semibold rounded-xl flex items-center gap-3 active:scale-[0.99] touch-manipulation transition-all"
+                            >
+                              <FileText className="w-4 h-4 flex-shrink-0" />
+                              Complete Call &amp; Fill Log
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  return null;
+                })()}
               </Card>
             );
           })}
@@ -1514,6 +1617,50 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Who is completing the care log? */}
+      <AlertDialog open={!!logCompletorCall} onOpenChange={(open) => !open && setLogCompletorCall(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Who is completing the care log?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {shift?.paired_shift_id
+                ? 'This is a double-handed call. Who will be filling in the care log for this visit?'
+                : 'Please confirm who is completing the care log.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex flex-col gap-3 pt-2">
+            <Button
+              onClick={() => {
+                const call = logCompletorCall;
+                setLogCompletorCall(null);
+                ShiftCallApi.update(call.id, { clock_out_time: new Date().toISOString() })
+                  .then(() => queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] }))
+                  .catch(e => console.warn('Clock out failed:', e));
+                setCareLogCall(call);
+              }}
+              className="bg-blue-600 hover:bg-blue-700 h-12"
+            >
+              <User className="w-4 h-4 mr-2" />
+              I Am Completing It
+            </Button>
+            {shift?.paired_shift_id && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const call = logCompletorCall;
+                  setLogCompletorCall(null);
+                  handlePartnerCompletingLog(call);
+                }}
+                className="h-12 border-slate-300"
+              >
+                <Users className="w-4 h-4 mr-2" />
+                My Partner Is Completing It
+              </Button>
+            )}
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Hold expired confirmation dialog */}
       <AlertDialog open={!!holdExpiredConfirm} onOpenChange={(open) => !open && setHoldExpiredConfirm(null)}>
         <AlertDialogContent>
@@ -1557,11 +1704,13 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
               onClick={() => {
                 const call = taskWarningCall;
                 setTaskWarningCall(null);
-                const callHasLog = careLogs.some(log => log.id === call.care_log_id || (log.shift_call_id === call.id));
-                if (callHasLog) {
-                  clockOutMutation.mutate(call);
+                if (shift?.paired_shift_id) {
+                  setLogCompletorCall(call);
                 } else {
-                  setClockOutConfirmCall(call);
+                  ShiftCallApi.update(call.id, { clock_out_time: new Date().toISOString() })
+                    .then(() => queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] }))
+                    .catch(e => console.warn('Clock out failed:', e));
+                  setCareLogCall(call);
                 }
               }}
               className="bg-amber-600 hover:bg-amber-700"
