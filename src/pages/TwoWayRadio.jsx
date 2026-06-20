@@ -114,13 +114,18 @@ export default function TwoWayRadio() {
   // Realtime channel refs (needed so we can .send() on them later)
   const rtAllCallRef   = useRef(null);
   const rtEmergencyRef = useRef(null);
+  const myUserChRef    = useRef(null); // per-user signal channel
 
   // Emergency refs
   const countdownTimerRef  = useRef(null);
+  const countdownAudioRef  = useRef(null);
   const mediaRecorderRef   = useRef(null);
   const recordingChunksRef = useRef([]);
   const locationRef        = useRef(null);
   const stopAlarmRef       = useRef(null);
+
+  // Staff ref so Realtime subscription doesn't re-create when staff list refetches
+  const staffRef = useRef([]);
 
   // ── State ─────────────────────────────────────────────────────────────────
   const [view, setView]                     = useState('main');
@@ -151,6 +156,7 @@ export default function TwoWayRadio() {
   const [showAddChannel, setShowAddChannel] = useState(false);
 
   useEffect(() => { outgoingRef.current = outgoingCall; }, [outgoingCall]);
+  useEffect(() => { staffRef.current = staff; }, [staff]);
 
   // ── Queries ───────────────────────────────────────────────────────────────
   const { data: user }         = useQuery({ queryKey: ['currentUser'], queryFn: () => base44.auth.me() });
@@ -263,12 +269,12 @@ export default function TwoWayRadio() {
 
     // P2P incoming call inserts
     const callSub = supabase
-      .channel('radio-calls-in')
+      .channel(`radio-calls-in-${user.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'radio_calls', filter: `callee_id=eq.${user.id}` }, payload => {
         const call = payload.new;
         if (call.status !== 'pending') return;
         if (Date.now() - new Date(call.created_at).getTime() > 30000) return;
-        const caller = staff.find(s => s.id === call.caller_id);
+        const caller = staffRef.current.find(s => s.id === call.caller_id);
         setIncomingCall({ callId: call.id, caller, channelName: call.channel_name });
         stopTone(); stopToneRef.current = playTone([880, 1100, 880, 1100, 660], true);
       })
@@ -319,7 +325,52 @@ export default function TwoWayRadio() {
     rtEmergencyRef.current = emergencyCh;
 
     return () => { supabase.removeChannel(callSub); supabase.removeChannel(allCallCh); supabase.removeChannel(emergencyCh); };
-  }, [user?.id, staff]);
+  }, [user?.id]);
+
+  // ── Per-user broadcast signal channel ─────────────────────────────────────
+  // Primary path for P2P call signaling (more reliable than postgres_changes)
+  useEffect(() => {
+    if (!user?.id) return;
+    const ch = supabase.channel(`radio-user-${user.id}`)
+      .on('broadcast', { event: 'incoming_call' }, ({ payload }) => {
+        if (Date.now() - (payload.ts || 0) > 30000) return;
+        const caller = staffRef.current.find(s => s.id === payload.callerId)
+          || { full_name: payload.callerName, id: payload.callerId };
+        setIncomingCall({ callId: payload.callId, caller, channelName: payload.channelName });
+        stopTone(); stopToneRef.current = playTone([880, 1100, 880, 1100, 660], true);
+      })
+      .on('broadcast', { event: 'call_response' }, ({ payload }) => {
+        const cur = outgoingRef.current;
+        if (!cur || payload.callId !== cur.callId) return;
+        stopTone();
+        if (payload.status === 'accepted') {
+          setOutgoingCall(null); setCallDeclined(false);
+          joinChannel(payload.channelName || cur.channelName).then(() => {
+            setActiveChannel({ name: `📞 ${cur.callee?.full_name}`, id: '__ptp' }); setView('ptt');
+          });
+        } else if (payload.status === 'callback') {
+          setCallDeclined(true);
+          setTimeout(() => { setOutgoingCall(null); setCallDeclined(false); }, 4000);
+        } else if (payload.status === 'declined') {
+          setOutgoingCall(null); setCallDeclined(false);
+          toast(`${cur.callee?.full_name || 'They'} declined the call`);
+        }
+      })
+      .subscribe();
+    myUserChRef.current = ch;
+    return () => { supabase.removeChannel(ch); myUserChRef.current = null; };
+  }, [user?.id]);
+
+  // Fire-and-forget helper: subscribe to target user channel, send broadcast, clean up
+  const sendUserSignal = (toUserId, event, payload) => {
+    const ch = supabase.channel(`radio-user-${toUserId}`);
+    ch.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await ch.send({ type: 'broadcast', event, payload }).catch(() => {});
+        setTimeout(() => supabase.removeChannel(ch), 300);
+      }
+    });
+  };
 
   // ── Radio action handlers ─────────────────────────────────────────────────
   const handleAllCall = async () => {
@@ -351,6 +402,12 @@ export default function TwoWayRadio() {
     setCallDeclined(false);
     stopTone(); stopToneRef.current = playTone([400, 600, 800, 600, 400], true);
     const callerName = user?.full_name || user?.email || 'A team member';
+    // Broadcast to callee's user channel (instant if they're on the app)
+    sendUserSignal(selectedPerson.id, 'incoming_call', {
+      callId: callRecord.id, channelName: chName,
+      callerName, callerId: user.id, ts: Date.now(),
+    });
+    // Push notification as backup (wakes locked/backgrounded screen)
     base44.functions.invoke('createNotification', {
       recipient_ids: resolveRecipients([selectedPerson.id]), type: 'radio_call',
       title: `📞 ${callerName} is calling you`, message: 'Tap to answer on Team Radio.',
@@ -367,17 +424,22 @@ export default function TwoWayRadio() {
   const acceptIncomingCall = async () => {
     if (!incomingCall) return;
     stopTone();
-    await supabase.from('radio_calls').update({ status: 'accepted' }).eq('id', incomingCall.callId);
-    const { caller, channelName } = incomingCall;
+    const { caller, channelName, callId } = incomingCall;
     setIncomingCall(null);
+    await supabase.from('radio_calls').update({ status: 'accepted' }).eq('id', callId);
+    // Signal the caller via broadcast so they stop ringing and join
+    if (caller?.id) sendUserSignal(caller.id, 'call_response', { callId, status: 'accepted', channelName });
     await joinChannel(channelName);
     setActiveChannel({ name: `📞 ${caller?.full_name || 'Call'}`, id: '__ptp' }); setView('ptt');
   };
 
-  const declineIncomingCall = async () => {
+  const declineIncomingCall = async (status = 'callback') => {
     stopTone();
-    if (incomingCall?.callId) await supabase.from('radio_calls').update({ status: 'callback' }).eq('id', incomingCall.callId);
+    if (!incomingCall) return;
+    const { callId, caller } = incomingCall;
     setIncomingCall(null);
+    if (callId) await supabase.from('radio_calls').update({ status }).eq('id', callId);
+    if (caller?.id) sendUserSignal(caller.id, 'call_response', { callId, status });
   };
 
   const handleSendAlert = async () => {
@@ -394,9 +456,29 @@ export default function TwoWayRadio() {
   };
 
   // ── Emergency ─────────────────────────────────────────────────────────────
+  const playCountdownTick = (remaining) => {
+    const ctx = countdownAudioRef.current;
+    if (!ctx) return;
+    try {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = remaining <= 3 ? 1200 : 880;
+      osc.type = remaining <= 3 ? 'square' : 'sine';
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.12);
+    } catch {}
+  };
+
   const startEmergencyCountdown = () => {
     if (emergencyCountdown !== null || emergencyActive) return;
     setEmergencyCountdown(COUNTDOWN_SECS);
+
+    // Create AudioContext during user gesture so iOS allows it
+    try { countdownAudioRef.current = new (window.AudioContext || window.webkitAudioContext)(); } catch {}
+    playCountdownTick(COUNTDOWN_SECS);
 
     // Grab GPS immediately while countdown runs
     locationRef.current = null;
@@ -412,10 +494,13 @@ export default function TwoWayRadio() {
     countdownTimerRef.current = setInterval(() => {
       remaining -= 1;
       setEmergencyCountdown(remaining);
+      if (remaining > 0) playCountdownTick(remaining);
       if (remaining <= 0) {
         clearInterval(countdownTimerRef.current);
         countdownTimerRef.current = null;
         setEmergencyCountdown(null);
+        try { countdownAudioRef.current?.close(); } catch {}
+        countdownAudioRef.current = null;
         fireEmergency();
       }
     }, 1000);
@@ -423,6 +508,8 @@ export default function TwoWayRadio() {
 
   const cancelEmergencyCountdown = () => {
     if (countdownTimerRef.current) { clearInterval(countdownTimerRef.current); countdownTimerRef.current = null; }
+    try { countdownAudioRef.current?.close(); } catch {}
+    countdownAudioRef.current = null;
     setEmergencyCountdown(null);
     locationRef.current = null;
   };
@@ -560,17 +647,35 @@ export default function TwoWayRadio() {
     const target = params.get('join');
     if (!target || !myUid || !clientRef.current) return;
     if (joinedChRef.current === target) return;
-    joinChannel(target).then(() => {
-      if (target === 'allstaff-broadcast') setActiveChannel({ name: 'All Staff', id: '__allcall' });
-      else if (target.startsWith('ptp_')) {
+    const doJoin = async () => {
+      await joinChannel(target);
+      if (target === 'allstaff-broadcast') {
+        setActiveChannel({ name: 'All Staff', id: '__allcall' });
+      } else if (target.startsWith('ptp_')) {
         setActiveChannel({ name: 'Radio Call', id: '__ptp' });
-        if (incomingCall?.channelName === target) {
-          supabase.from('radio_calls').update({ status: 'accepted' }).eq('id', incomingCall.callId).then(() => {});
-          stopTone(); setIncomingCall(null);
+        stopTone(); setIncomingCall(null);
+        // Accept the pending call and signal the caller
+        const { data: pending } = await supabase
+          .from('radio_calls')
+          .select('id, caller_id')
+          .eq('callee_id', user?.id)
+          .eq('channel_name', target)
+          .eq('status', 'pending')
+          .maybeSingle();
+        if (pending) {
+          await supabase.from('radio_calls').update({ status: 'accepted' }).eq('id', pending.id);
+          if (pending.caller_id) {
+            sendUserSignal(pending.caller_id, 'call_response', {
+              callId: pending.id, status: 'accepted', channelName: target,
+            });
+          }
         }
-      } else setActiveChannel({ name: target, id: target });
+      } else {
+        setActiveChannel({ name: target, id: target });
+      }
       setView('ptt');
-    });
+    };
+    doJoin();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search, myUid]);
 
@@ -649,12 +754,18 @@ export default function TwoWayRadio() {
         <p className="text-slate-400 text-sm uppercase tracking-widest mb-1">Incoming Radio Call</p>
         <p className="text-white text-3xl font-bold">{incomingCall.caller?.full_name || 'Unknown'}</p>
       </div>
-      <div className="flex gap-6 w-full max-w-xs">
-        <button onClick={declineIncomingCall} className="flex-1 py-5 rounded-2xl bg-amber-500 text-white font-bold text-sm flex flex-col items-center gap-1 active:scale-95 transition-transform">
-          <Phone className="w-6 h-6" />I WILL<br />CALL BACK
+      <div className="flex gap-3 w-full max-w-sm">
+        <button onClick={() => declineIncomingCall('declined')}
+          className="flex-1 py-5 rounded-2xl bg-red-600 text-white font-bold text-sm flex flex-col items-center gap-1 active:scale-95 transition-transform">
+          <PhoneOff className="w-6 h-6" />DECLINE
         </button>
-        <button onClick={acceptIncomingCall} className="flex-1 py-5 rounded-2xl bg-green-500 text-white font-bold text-sm flex flex-col items-center gap-1 active:scale-95 transition-transform">
-          <Mic className="w-6 h-6" />ACCEPT
+        <button onClick={() => declineIncomingCall('callback')}
+          className="flex-1 py-5 rounded-2xl bg-amber-500 text-white font-bold text-sm flex flex-col items-center gap-1 active:scale-95 transition-transform">
+          <Phone className="w-6 h-6" />CALL<br />BACK
+        </button>
+        <button onClick={acceptIncomingCall}
+          className="flex-1 py-5 rounded-2xl bg-green-500 text-white font-bold text-sm flex flex-col items-center gap-1 active:scale-95 transition-transform">
+          <Mic className="w-6 h-6" />ANSWER
         </button>
       </div>
     </div>
