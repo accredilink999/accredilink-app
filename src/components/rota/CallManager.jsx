@@ -1459,16 +1459,17 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                               onClick={() => {
                                 setExpandedCallId(null);
                                 const incomplete = getIncompleteTasks(call);
-                                if (incomplete.length > 0) {
-                                  setTaskWarningCall(call);
-                                } else if (shift?.paired_shift_id) {
-                                  setLogCompletorCall(call);
-                                } else {
-                                  ShiftCallApi.update(call.id, { clock_out_time: new Date().toISOString() })
-                                    .then(() => queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] }))
-                                    .catch(e => console.warn('Clock out failed:', e));
-                                  setCareLogCall(call);
-                                }
+                                const capturedCall = call;
+                                // Delay opening dialogs/forms to let touch events settle (Radix ghost-click fix)
+                                setTimeout(() => {
+                                  if (incomplete.length > 0) {
+                                    setTaskWarningCall(capturedCall);
+                                  } else if (shift?.paired_shift_id) {
+                                    setLogCompletorCall(capturedCall);
+                                  } else {
+                                    setCareLogCall(capturedCall);
+                                  }
+                                }, 80);
                               }}
                               className="w-full py-3.5 px-4 bg-blue-50 border border-blue-200 text-blue-700 font-semibold rounded-xl flex items-center gap-3 active:scale-[0.99] touch-manipulation transition-all"
                             >
@@ -1791,10 +1792,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
               onClick={() => {
                 const call = logCompletorCall;
                 setLogCompletorCall(null);
-                ShiftCallApi.update(call.id, { clock_out_time: new Date().toISOString() })
-                  .then(() => queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] }))
-                  .catch(e => console.warn('Clock out failed:', e));
-                setCareLogCall(call);
+                setTimeout(() => setCareLogCall(call), 80);
               }}
               className="bg-blue-600 hover:bg-blue-700 h-12"
             >
@@ -1917,14 +1915,13 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
               onClick={() => {
                 const call = taskWarningCall;
                 setTaskWarningCall(null);
-                if (shift?.paired_shift_id) {
-                  setLogCompletorCall(call);
-                } else {
-                  ShiftCallApi.update(call.id, { clock_out_time: new Date().toISOString() })
-                    .then(() => queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] }))
-                    .catch(e => console.warn('Clock out failed:', e));
-                  setCareLogCall(call);
-                }
+                setTimeout(() => {
+                  if (shift?.paired_shift_id) {
+                    setLogCompletorCall(call);
+                  } else {
+                    setCareLogCall(call);
+                  }
+                }, 80);
               }}
               className="bg-amber-600 hover:bg-amber-700"
             >
