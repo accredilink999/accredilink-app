@@ -155,11 +155,13 @@ export default function TwoWayRadio() {
   const [showAddChannel, setShowAddChannel] = useState(false);
 
   useEffect(() => { outgoingRef.current = outgoingCall; }, [outgoingCall]);
-  useEffect(() => { staffRef.current = staff; }, [staff]);
 
   // ── Queries ───────────────────────────────────────────────────────────────
   const { data: user }         = useQuery({ queryKey: ['currentUser'], queryFn: () => base44.auth.me() });
   const { data: staff = [] }   = useQuery({ queryKey: ['staff'],       queryFn: () => base44.entities.User.list() });
+
+  // Keep staffRef in sync so Realtime callbacks don't capture stale staff list
+  useEffect(() => { staffRef.current = staff; }, [staff]);
   const todayStr               = format(new Date(), 'yyyy-MM-dd');
   const { data: todayShifts = [] } = useQuery({
     queryKey: ['radioShifts', todayStr], queryFn: () => ShiftApi.filter({ date: todayStr }), refetchInterval: 60000,
