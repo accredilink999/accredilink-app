@@ -1250,7 +1250,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
 
                   if (isNotHome) {
                     return (
-                      <div className="w-full py-4 px-5 bg-amber-100 text-amber-800 font-semibold text-base rounded-xl flex items-center gap-3 mt-1">
+                      <div className="w-full py-4 px-5 bg-green-500 text-white font-semibold text-base rounded-xl flex items-center gap-3 mt-1">
                         <Home className="w-5 h-5 flex-shrink-0" />
                         <span>Client Not Home</span>
                       </div>
