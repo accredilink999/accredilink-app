@@ -224,8 +224,6 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
     },
     onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] });
-      // Hide overdue alert immediately when staff checks in to a call
-      window.dispatchEvent(new CustomEvent('suppress-overdue-alert'));
 
       // Auto-check-in the partner's matching call and notify them
       if (shift?.paired_shift_id && data.service_user_id) {
@@ -307,8 +305,6 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
     },
     onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] });
-      // Re-enable overdue alert after completing a call so it can check remaining overdue calls
-      window.dispatchEvent(new CustomEvent('unsuppress-overdue-alert'));
 
       // Notify paired shift partner of check-out (don't sync status — each partner checks out independently)
       if (shift?.paired_shift_id && data.service_user_id) {
@@ -771,18 +767,18 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
   };
 
   // The currently active (in-progress + clocked-in, not yet complete) call — locks other pending calls
-  const activeInProgressCall = (freshCalls || calls || []).find(
+  const activeInProgressCall = (freshCalls || calls).find(
     c => c.status === 'in_progress' && !!c.clock_in_time && !c.clock_out_time
   ) || null;
 
   // If any of MY own calls have log_required set (partner said I'm filling it), block the whole UI
   const pendingLogCalls = isMyShift
-    ? (freshCalls || calls || []).filter(c => c.log_required === true && !c.care_log_id)
+    ? (freshCalls || calls).filter(c => c.log_required === true && !c.care_log_id)
     : [];
 
   return (
     <div className="space-y-4">
-      {isMyShift && pendingLogCalls.length > 0 && !careLogCall && (
+      {isMyShift && pendingLogCalls.length > 0 && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
             <div className="flex items-center gap-3 mb-4">
@@ -1462,9 +1458,18 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                             <button
                               onClick={() => {
                                 setExpandedCallId(null);
-                                ShiftCallApi.update(call.id, { clock_out_time: new Date().toISOString() })
-                                  .catch(e => console.warn('Clock out failed:', e));
-                                setCareLogCall(call);
+                                const incomplete = getIncompleteTasks(call);
+                                const capturedCall = call;
+                                // Delay opening dialogs/forms to let touch events settle (Radix ghost-click fix)
+                                setTimeout(() => {
+                                  if (incomplete.length > 0) {
+                                    setTaskWarningCall(capturedCall);
+                                  } else if (shift?.paired_shift_id) {
+                                    setLogCompletorCall(capturedCall);
+                                  } else {
+                                    setCareLogCall(capturedCall);
+                                  }
+                                }, 80);
                               }}
                               className="w-full py-3.5 px-4 bg-blue-50 border border-blue-200 text-blue-700 font-semibold rounded-xl flex items-center gap-3 active:scale-[0.99] touch-manipulation transition-all"
                             >
@@ -1506,7 +1511,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
           shift={shift}
           serviceUser={{ id: careLogCall.service_user_id, full_name: careLogCall.service_user_name }}
           open={!!careLogCall}
-          onClose={() => { setCareLogCall(null); window.dispatchEvent(new CustomEvent('unsuppress-overdue-alert')); }}
+          onClose={() => setCareLogCall(null)}
           callId={careLogCall.id}
           scheduledTime={careLogCall.scheduled_time}
         />
@@ -1787,11 +1792,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
               onClick={() => {
                 const call = logCompletorCall;
                 setLogCompletorCall(null);
-                window.dispatchEvent(new CustomEvent('suppress-overdue-alert'));
-                ShiftCallApi.update(call.id, { clock_out_time: new Date().toISOString() })
-                  .then(() => queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] }))
-                  .catch(e => console.warn('Clock out failed:', e));
-                setCareLogCall(call);
+                setTimeout(() => setCareLogCall(call), 80);
               }}
               className="bg-blue-600 hover:bg-blue-700 h-12"
             >
@@ -1914,15 +1915,13 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
               onClick={() => {
                 const call = taskWarningCall;
                 setTaskWarningCall(null);
-                window.dispatchEvent(new CustomEvent('suppress-overdue-alert'));
-                if (shift?.paired_shift_id) {
-                  setLogCompletorCall(call);
-                } else {
-                  ShiftCallApi.update(call.id, { clock_out_time: new Date().toISOString() })
-                    .then(() => queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] }))
-                    .catch(e => console.warn('Clock out failed:', e));
-                  setCareLogCall(call);
-                }
+                setTimeout(() => {
+                  if (shift?.paired_shift_id) {
+                    setLogCompletorCall(call);
+                  } else {
+                    setCareLogCall(call);
+                  }
+                }, 80);
               }}
               className="bg-amber-600 hover:bg-amber-700"
             >
