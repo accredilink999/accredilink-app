@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import SpeechButton from '@/components/ui/SpeechButton';
-import { Clock, MapPin, CheckCircle, AlertCircle, Play, Square, Plus, Edit, Trash2, FileText, Car, ListChecks, ClipboardList, User, Users, Home, XCircle, SkipForward, ChevronDown } from 'lucide-react';
+import { Clock, MapPin, CheckCircle, AlertCircle, Play, Square, Plus, Edit, Trash2, FileText, Car, ListChecks, ClipboardList, User, Users, Home, XCircle, SkipForward, ChevronDown, Timer } from 'lucide-react';
 import { format } from 'date-fns';
 import { notifyAdminsOfActivity } from '@/utils/adminNotifications';
 import { toast } from 'sonner';
@@ -57,6 +57,8 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
   const [holdExpiredConfirm, setHoldExpiredConfirm] = useState(null);
   const [expandedCallId, setExpandedCallId] = useState(null);
   const [logCompletorCall, setLogCompletorCall] = useState(null);
+  const [delayCall, setDelayCall] = useState(null);
+  const [delayMinutes, setDelayMinutes] = useState('');
 
   const [freshCalls, setFreshCalls] = useState(calls);
 
@@ -657,6 +659,48 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
       toast.error('Failed to complete call');
     }
   };
+
+  const reportDelayMutation = useMutation({
+    mutationFn: async ({ call, minutes }) => {
+      const delayUntil = new Date(Date.now() + parseInt(minutes) * 60 * 1000).toISOString();
+      await ShiftCallApi.update(call.id, {
+        delay_until: delayUntil,
+        overdue_alert_sent_at: new Date().toISOString(),
+      });
+      notifyAdminsOfActivity({
+        title: `⏱ Delayed check-in: ${call.service_user_name}`,
+        message: `${shift?.staff_name || 'Staff'} is running ${minutes} minutes late to ${call.service_user_name}'s ${call.scheduled_time} call.`,
+        excludeUserId: shift?.staff_id,
+        areaId: shift?.rota_area_id || shift?.area_id,
+      });
+      if (shift?.paired_shift_id) {
+        try {
+          const pairedShift = await base44.entities.Shift.read(shift.paired_shift_id);
+          if (pairedShift?.staff_id && pairedShift.staff_id !== shift?.staff_id) {
+            base44.functions.invoke('createNotification', {
+              recipient_ids: [pairedShift.staff_id],
+              type: 'shift_activity',
+              title: `Partner delayed: ${call.service_user_name}`,
+              message: `${shift?.staff_name || 'Your partner'} is running ${minutes} minutes late to ${call.service_user_name}'s ${call.scheduled_time} call.`,
+              priority: 'high',
+              action_url: '/Rota',
+              send_push: true,
+            }).catch(e => console.warn('Partner delay notification failed:', e));
+          }
+        } catch (e) {
+          console.warn('Could not notify partner of delay:', e);
+        }
+      }
+      return delayUntil;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] });
+      toast.success("Delay reported — you'll be re-alerted when the time expires");
+      setDelayCall(null);
+      setDelayMinutes('');
+    },
+    onError: (err) => toast.error('Failed to report delay: ' + (err.message || 'Unknown error')),
+  });
 
   const handleNotAtHome = async (call) => {
     updateStatusMutation.mutate({ callId: call.id, status: 'not_at_home' });
@@ -1267,15 +1311,29 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                   }
 
                   if (isPending) {
+                    const isOverdue = (() => {
+                      if (!call.scheduled_time || !call.call_date) return false;
+                      if (call.delay_until && new Date(call.delay_until) > new Date()) return false;
+                      const [h, m] = call.scheduled_time.split(':').map(Number);
+                      const sched = new Date(call.call_date);
+                      sched.setHours(h, m, 0, 0);
+                      return Date.now() > sched.getTime() + 15 * 60 * 1000;
+                    })();
                     return (
                       <div className="mt-1">
                         <button
                           onClick={() => setExpandedCallId(isExpanded ? null : call.id)}
-                          className="w-full py-4 px-5 bg-blue-500 hover:bg-blue-600 active:scale-[0.99] text-white font-semibold text-base rounded-xl flex items-center justify-between transition-all touch-manipulation"
+                          className={`w-full py-4 px-5 text-white font-semibold text-base rounded-xl flex items-center justify-between transition-all touch-manipulation ${
+                            isOverdue
+                              ? 'bg-red-500 hover:bg-red-600 animate-pulse'
+                              : 'bg-blue-500 hover:bg-blue-600 active:scale-[0.99]'
+                          }`}
                         >
                           <span className="flex items-center gap-3">
-                            <Clock className="w-5 h-5 flex-shrink-0" />
-                            Pending Check In
+                            {isOverdue
+                              ? <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                              : <Clock className="w-5 h-5 flex-shrink-0" />}
+                            {isOverdue ? '⚠ Overdue — Action Required' : 'Pending Check In'}
                           </span>
                           <ChevronDown className={`w-5 h-5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
                         </button>
@@ -1289,6 +1347,15 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                               <Play className="w-4 h-4 flex-shrink-0" />
                               Check In to Call
                             </button>
+                            {isOverdue && (
+                              <button
+                                onClick={() => { setDelayCall(call); setExpandedCallId(null); }}
+                                className="w-full py-3.5 px-4 bg-amber-50 border border-amber-200 text-amber-700 font-semibold rounded-xl flex items-center gap-3 active:scale-[0.99] touch-manipulation transition-all"
+                              >
+                                <Timer className="w-4 h-4 flex-shrink-0" />
+                                Report a Delay
+                              </button>
+                            )}
                             <button
                               onClick={() => { handleNotAtHome(call); setExpandedCallId(null); }}
                               className="w-full py-3.5 px-4 bg-amber-50 border border-amber-200 text-amber-700 font-semibold rounded-xl flex items-center gap-3 active:scale-[0.99] touch-manipulation transition-all"
@@ -1684,6 +1751,61 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                 My Partner Is Completing It
               </Button>
             )}
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Report Delay dialog */}
+      <AlertDialog open={!!delayCall} onOpenChange={(open) => { if (!open) { setDelayCall(null); setDelayMinutes(''); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-amber-600">
+              <Timer className="w-5 h-5" />
+              Report a Delay
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              How many minutes late are you to <strong>{delayCall?.service_user_name}</strong>'s {delayCall?.scheduled_time} call?
+              Your partner and area managers will be notified, and you'll be re-alerted when this time expires.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-2 space-y-3">
+            <div className="grid grid-cols-4 gap-2">
+              {['10', '15', '20', '30'].map(m => (
+                <button
+                  key={m}
+                  onClick={() => setDelayMinutes(m)}
+                  className={`py-2.5 rounded-lg text-sm font-semibold border-2 transition-colors ${
+                    delayMinutes === m
+                      ? 'bg-amber-500 border-amber-500 text-white'
+                      : 'border-slate-200 text-slate-700 hover:border-amber-300'
+                  }`}
+                >
+                  {m}m
+                </button>
+              ))}
+            </div>
+            <Input
+              type="number"
+              value={delayMinutes}
+              onChange={(e) => setDelayMinutes(e.target.value)}
+              placeholder="Or type custom minutes..."
+              min="1"
+              max="120"
+            />
+          </div>
+          <div className="flex gap-3">
+            <AlertDialogCancel onClick={() => { setDelayCall(null); setDelayMinutes(''); }}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (delayCall && delayMinutes && parseInt(delayMinutes) > 0) {
+                  reportDelayMutation.mutate({ call: delayCall, minutes: delayMinutes });
+                }
+              }}
+              disabled={!delayMinutes || parseInt(delayMinutes) < 1 || reportDelayMutation.isPending}
+              className="bg-amber-600 hover:bg-amber-700 disabled:opacity-50"
+            >
+              {reportDelayMutation.isPending ? 'Reporting...' : 'Report Delay'}
+            </AlertDialogAction>
           </div>
         </AlertDialogContent>
       </AlertDialog>
