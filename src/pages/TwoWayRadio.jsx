@@ -361,7 +361,7 @@ export default function TwoWayRadio() {
     base44.functions.invoke('createNotification', {
       recipient_ids: resolveRecipients([selectedPerson.id]), type: 'radio_call',
       title: `📞 ${callerName} is calling you`, message: 'Tap to answer on Team Radio.',
-      priority: 'high', action_url: `/TwoWayRadio?join=${chName}`, send_push: true,
+      priority: 'high', action_url: `/TwoWayRadio?call=${chName}`, send_push: true,
     }).catch(() => {});
   };
 
@@ -588,7 +588,7 @@ export default function TwoWayRadio() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['radioChannels'] }),
   });
 
-  // Auto-join from notification deep link (?join=channelName)
+  // Auto-join from deep link (?join=channelName) — used by Answer button / admin direct-join
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const target = params.get('join');
@@ -601,10 +601,9 @@ export default function TwoWayRadio() {
       } else if (target.startsWith('ptp_')) {
         setActiveChannel({ name: 'Radio Call', id: '__ptp' });
         stopTone(); setIncomingCall(null);
-        // Accept the pending call and signal the caller
         const { data: pending } = await supabase
           .from('radio_calls')
-          .select('id, caller_id')
+          .select('id')
           .eq('callee_id', user?.id)
           .eq('channel_name', target)
           .eq('status', 'pending')
@@ -620,6 +619,29 @@ export default function TwoWayRadio() {
     doJoin();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search, myUid]);
+
+  // Show answer screen from push notification deep link (?call=channelName)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const target = params.get('call');
+    if (!target || !user?.id) return;
+    // Fetch the pending call to populate the incoming call overlay
+    supabase
+      .from('radio_calls')
+      .select('id, caller_id, channel_name')
+      .eq('callee_id', user.id)
+      .eq('channel_name', target)
+      .eq('status', 'pending')
+      .maybeSingle()
+      .then(({ data: pending }) => {
+        if (!pending) return;
+        const caller = staffRef.current.find(s => s.id === pending.caller_id)
+          || { full_name: 'Team Member', id: pending.caller_id };
+        setIncomingCall({ callId: pending.id, caller, channelName: pending.channel_name });
+        stopTone(); stopToneRef.current = playTone([880, 1100, 880, 1100, 660], true);
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search, user?.id]);
 
   // Keyboard Space = PTT (not in hands-free mode)
   useEffect(() => {

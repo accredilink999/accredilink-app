@@ -63,7 +63,10 @@ import {
                                 HelpCircle,
                                 FileText,
                                 RefreshCw,
-                                PoundSterling
+                                PoundSterling,
+                                Phone,
+                                PhoneOff,
+                                Mic,
                               } from 'lucide-react';
 
 
@@ -394,6 +397,78 @@ export default function Layout({ children, currentPageName }) {
     return () => subscription.unsubscribe();
   }, [user?.id]);
 
+  // ─── Global incoming radio call ───────────────────────────────────
+  const [globalIncomingCall, setGlobalIncomingCall] = useState(null);
+  const globalRingStopRef = useRef(null);
+  const globalStaffRef = useRef([]);
+
+  const { data: radioStaff = [] } = useQuery({
+    queryKey: ['staff'],
+    queryFn: () => base44.entities.User.list(),
+    enabled: !!user?.id,
+    staleTime: 60000,
+  });
+  useEffect(() => { globalStaffRef.current = radioStaff; }, [radioStaff]);
+
+  const stopGlobalRing = useCallback(() => {
+    if (globalRingStopRef.current) { globalRingStopRef.current(); globalRingStopRef.current = null; }
+  }, []);
+
+  const playGlobalRing = useCallback(() => {
+    stopGlobalRing();
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const freqs = [880, 1100, 880, 1100, 660];
+      let i = 0; let stopped = false;
+      const next = () => {
+        if (stopped) return;
+        const osc = ctx.createOscillator(); const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = freqs[i % freqs.length]; i++;
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+        osc.start(); osc.stop(ctx.currentTime + 0.18);
+        osc.onended = next;
+      };
+      next();
+      globalRingStopRef.current = () => { stopped = true; try { ctx.close(); } catch {} };
+    } catch {}
+  }, [stopGlobalRing]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const ch = supabase
+      .channel(`layout-radio-calls-${user.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'radio_calls', filter: `callee_id=eq.${user.id}` }, payload => {
+        const call = payload.new;
+        if (call.status !== 'pending') return;
+        if (Date.now() - new Date(call.created_at).getTime() > 30000) return;
+        const caller = globalStaffRef.current.find(s => s.id === call.caller_id)
+          || { full_name: 'Team Member', id: call.caller_id };
+        setGlobalIncomingCall({ callId: call.id, caller, channelName: call.channel_name });
+        playGlobalRing();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [user?.id, playGlobalRing]);
+
+  const handleGlobalAnswer = async () => {
+    if (!globalIncomingCall) return;
+    stopGlobalRing();
+    const { callId, channelName } = globalIncomingCall;
+    setGlobalIncomingCall(null);
+    await supabase.from('radio_calls').update({ status: 'accepted' }).eq('id', callId);
+    navigate(createPageUrl('TwoWayRadio') + `?join=${channelName}`);
+  };
+
+  const handleGlobalDecline = async (status = 'declined') => {
+    if (!globalIncomingCall) return;
+    stopGlobalRing();
+    const { callId } = globalIncomingCall;
+    setGlobalIncomingCall(null);
+    await supabase.from('radio_calls').update({ status }).eq('id', callId);
+  };
+
   // ─── Pull-to-Refresh ─────────────────────────────────────────────
   const mainRef = useRef(null);
   const [pullDistance, setPullDistance] = useState(0);
@@ -690,6 +765,35 @@ export default function Layout({ children, currentPageName }) {
           onUnlock={() => setIsLocked(false)}
           userName={user?.staff_full_name || user?.full_name}
         />
+      )}
+      {/* Global incoming radio call overlay — shown on any page except TwoWayRadio (which has its own) */}
+      {globalIncomingCall && currentPageName !== 'TwoWayRadio' && (
+        <div className="fixed inset-0 z-[9999] bg-slate-950/97 flex flex-col items-center justify-center gap-8 px-6">
+          <div className="relative">
+            <div className="absolute inset-0 rounded-full bg-green-500/20 animate-ping scale-150" />
+            <div className="w-28 h-28 rounded-full bg-slate-800 border-4 border-green-500 flex items-center justify-center text-4xl font-bold text-white">
+              {(globalIncomingCall.caller?.full_name || '?')[0].toUpperCase()}
+            </div>
+          </div>
+          <div className="text-center">
+            <p className="text-slate-400 text-sm uppercase tracking-widest mb-1">Incoming Radio Call</p>
+            <p className="text-white text-3xl font-bold">{globalIncomingCall.caller?.full_name || 'Team Member'}</p>
+          </div>
+          <div className="flex gap-3 w-full max-w-sm">
+            <button onClick={() => handleGlobalDecline('declined')}
+              className="flex-1 py-5 rounded-2xl bg-red-600 text-white font-bold text-sm flex flex-col items-center gap-1 active:scale-95 transition-transform">
+              <PhoneOff className="w-6 h-6" />DECLINE
+            </button>
+            <button onClick={() => handleGlobalDecline('callback')}
+              className="flex-1 py-5 rounded-2xl bg-amber-500 text-white font-bold text-sm flex flex-col items-center gap-1 active:scale-95 transition-transform">
+              <Phone className="w-6 h-6" />CALL<br />BACK
+            </button>
+            <button onClick={handleGlobalAnswer}
+              className="flex-1 py-5 rounded-2xl bg-green-500 text-white font-bold text-sm flex flex-col items-center gap-1 active:scale-95 transition-transform">
+              <Mic className="w-6 h-6" />ANSWER
+            </button>
+          </div>
+        </div>
       )}
       {/* OverdueCallAlert removed — push notifications via edge function handle late call alerts */}
       {/* Unified Header — all devices */}
