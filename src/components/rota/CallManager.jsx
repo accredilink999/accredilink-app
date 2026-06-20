@@ -225,23 +225,39 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
     onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] });
 
-      // Notify paired shift partner of check-in (don't sync status — each partner checks in independently)
+      // Auto-check-in the partner's matching call and notify them
       if (shift?.paired_shift_id && data.service_user_id) {
         try {
           const pairedShift = await base44.entities.Shift.read(shift.paired_shift_id);
           if (pairedShift?.staff_id && pairedShift.staff_id !== shift.staff_id) {
+            // Find and auto-check-in the partner's matching call if it's still pending
+            const partnerCalls = await ShiftCallApi.filter({ shift_id: pairedShift.id }, 'scheduled_time', 100);
+            const partnerMatch = partnerCalls.find(pc =>
+              pc.scheduled_time === data.scheduled_time &&
+              pc.call_date === data.call_date &&
+              (pc.service_user_id === data.service_user_id || pc.service_user_name === data.service_user_name) &&
+              pc.status === 'pending' && !pc.clock_in_time
+            );
+            if (partnerMatch) {
+              await ShiftCallApi.update(partnerMatch.id, {
+                clock_in_time: new Date().toISOString(),
+                status: 'in_progress',
+              });
+              queryClient.invalidateQueries({ queryKey: ['paired-shift-calls', shift.paired_shift_id] });
+            }
+            // Notify the partner
             base44.functions.invoke('createNotification', {
               recipient_ids: [pairedShift.staff_id],
               type: 'care_log',
-              title: `Partner checked in: ${data.service_user_name || 'Client'}`,
-              message: `${shift?.staff_name || 'Your partner'} has checked in to ${data.service_user_name}'s call.`,
+              title: `Checked in: ${data.service_user_name || 'Client'}`,
+              message: `${shift?.staff_name || 'Your partner'} has checked in to ${data.service_user_name}'s call — your call has also been marked in progress.`,
               priority: 'normal',
               action_url: '/Rota',
               send_push: true,
             }).catch(e => console.warn('Partner checkin notification failed:', e));
           }
         } catch (e) {
-          console.warn('Could not notify partner of check-in:', e);
+          console.warn('Could not auto-check-in partner call:', e);
         }
       }
 
@@ -750,6 +766,11 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
     }
   };
 
+  // The currently active (in-progress + clocked-in, not yet complete) call — locks other pending calls
+  const activeInProgressCall = (freshCalls || calls).find(
+    c => c.status === 'in_progress' && !!c.clock_in_time && !c.clock_out_time
+  ) || null;
+
   // If any of MY own calls have log_required set (partner said I'm filling it), block the whole UI
   const pendingLogCalls = isMyShift
     ? (freshCalls || calls).filter(c => c.log_required === true && !c.care_log_id)
@@ -1257,6 +1278,17 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                   const isNotHome = call.status === 'not_at_home';
                   const isMissed = call.status === 'missed';
                   const isExpanded = expandedCallId === call.id;
+
+                  // Lock pending calls while another call is in progress and awaiting completion
+                  const isLockedByActiveCall = isMyShift && isPending && activeInProgressCall && activeInProgressCall.id !== call.id;
+                  if (isLockedByActiveCall) {
+                    return (
+                      <div className="w-full py-4 px-5 bg-slate-100 text-slate-500 font-semibold text-base rounded-xl flex items-center gap-3 mt-1 border border-slate-200">
+                        <Square className="w-5 h-5 flex-shrink-0 text-slate-400" />
+                        <span className="text-sm">Complete <strong>{activeInProgressCall.service_user_name}</strong>'s call first</span>
+                      </div>
+                    );
+                  }
 
                   if (isOnHold) {
                     return (
