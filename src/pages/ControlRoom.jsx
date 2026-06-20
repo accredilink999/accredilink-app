@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { APIProvider, Map as GoogleMap, Marker, InfoWindow, useMap } from '@vis.gl/react-google-maps';
+﻿import React, { useState, useEffect, useRef } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { base44 } from '@/api/base44Client';
 import { ShiftApi, ShiftCallApi } from '@/api/rotaApi';
 import { supabase } from '@/api/supabaseClient';
@@ -24,16 +26,13 @@ import ShiftStatusOverview from '@/components/admin/ShiftStatusOverview';
 import ShiftReminderSettings from '@/components/admin/ShiftReminderSettings';
 import { Trash2 } from 'lucide-react';
 
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
-
-// ── FlyTo helper (runs inside <Map>) ────────────────────────────────────────
+// Helper: flies the map to a target location when props change
 function FlyToLocation({ lat, lng, zoom, onComplete }) {
   const map = useMap();
   useEffect(() => {
-    if (map && lat && lng) {
-      map.panTo({ lat, lng });
-      if (zoom) map.setZoom(zoom);
-      const timer = setTimeout(() => onComplete?.(), 800);
+    if (lat && lng) {
+      map.flyTo([lat, lng], zoom || 16, { duration: 1 });
+      const timer = setTimeout(() => onComplete?.(), 1200);
       return () => clearTimeout(timer);
     }
   }, [lat, lng, zoom, map, onComplete]);
@@ -50,7 +49,7 @@ export default function ControlRoom() {
   const [expandedId, setExpandedId] = useState(null);
   const [editingAnnouncement, setEditingAnnouncement] = useState(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
-  const [openInfoWindow, setOpenInfoWindow] = useState(null); // track which marker info window is open
+  const mapRef = useRef(null);
 
   const { data: user } = useQuery({
     queryKey: ['currentUser'],
@@ -79,7 +78,7 @@ export default function ControlRoom() {
   const { data: todayShifts = [] } = useQuery({
     queryKey: ['todayShifts', todayStr],
     queryFn: () => ShiftApi.filter({ date: todayStr }),
-    refetchInterval: 10000,
+    refetchInterval: 15000,
   });
 
   // Fetch ALL shift_calls for today's shifts
@@ -143,7 +142,7 @@ export default function ControlRoom() {
       return data || [];
     },
     enabled: staffOnShiftIds.length > 0,
-    refetchInterval: 10000,
+    refetchInterval: 15000,
   });
 
   const { data: lastKnownGPS = [] } = useQuery({
@@ -288,6 +287,7 @@ export default function ControlRoom() {
   }, [todayCalls, clientLocations, todayShifts]);
 
   // Active staff: staff with shifts today who have activity in last hour
+  // Deduplicated by staff_id — multiple shifts for the same person are merged
   const activeStaffList = React.useMemo(() => {
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const byStaff = new Map();
@@ -422,172 +422,146 @@ export default function ControlRoom() {
     ? allMapPoints.reduce((sum, m) => sum + m.lng, 0) / allMapPoints.length
     : -3.40;
 
-  const handleFlyComplete = useCallback(() => setFlyToTarget(null), []);
+  // Lollipop icon with client name label
+  const createClientLollipop = (color, name, isInProgress) => {
+    const pulse = isInProgress ? 'animation:pulse 2s infinite;' : '';
+    const labelText = name.length > 15 ? name.substring(0, 14) + '...' : name;
+    return L.divIcon({
+      className: 'client-lollipop',
+      html: `<div style="position:relative;display:flex;flex-direction:column;align-items:center;">
+        <div style="font-size:9px;font-weight:600;color:#334155;background:white;padding:1px 4px;border-radius:3px;box-shadow:0 1px 2px rgba(0,0,0,0.15);white-space:nowrap;margin-bottom:2px;max-width:100px;overflow:hidden;text-overflow:ellipsis;">${labelText}</div>
+        <div style="width:18px;height:18px;background:${color};border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3);${pulse}"></div>
+        <div style="width:2px;height:16px;background:${color};border-radius:1px;"></div>
+      </div>
+      <style>@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.7;transform:scale(1.15)}}</style>`,
+      iconSize: [80, 50],
+      iconAnchor: [40, 50],
+      popupAnchor: [0, -50],
+    });
+  };
 
-  // ── Render map content (shared between normal + maximized) ─────
-  const renderMapContent = () => (
+  // Staff GPS marker icon (blue = live, grey = last known)
+  const createStaffIcon = (name, isLive) => {
+    const color = isLive ? '#3B82F6' : '#9CA3AF';
+    const pulse = isLive ? 'animation:staffPulse 2s infinite;' : '';
+    const labelText = name.length > 15 ? name.substring(0, 14) + '...' : name;
+    const liveDot = isLive
+      ? '<div style="width:7px;height:7px;background:#22C55E;border-radius:50%;position:absolute;top:-1px;right:-1px;border:1.5px solid white;"></div>'
+      : '';
+    return L.divIcon({
+      className: 'staff-gps-marker',
+      html: `<div style="position:relative;display:flex;flex-direction:column;align-items:center;">
+        <div style="font-size:9px;font-weight:600;color:white;background:${color};padding:1px 5px;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,0.25);white-space:nowrap;margin-bottom:2px;max-width:100px;overflow:hidden;text-overflow:ellipsis;">${labelText}</div>
+        <div style="position:relative;width:22px;height:22px;background:${color};border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;${pulse}">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+          ${liveDot}
+        </div>
+      </div>
+      <style>@keyframes staffPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.8;transform:scale(1.1)}}</style>`,
+      iconSize: [80, 42],
+      iconAnchor: [40, 42],
+      popupAnchor: [0, -42],
+    });
+  };
+
+  const renderStaffMarkers = () => (
     <>
-      {/* Staff markers — blue pin (live) / grey pin (last known) */}
       {staffMarkers.map(s => (
         <Marker
           key={`staff-${s.staffId}`}
-          position={{ lat: s.lat, lng: s.lng }}
-          title={s.staffName}
-          label={{ text: s.staffName.substring(0, 1), color: 'white', fontWeight: 'bold' }}
-          icon={{
-            path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z',
-            fillColor: s.isLive ? '#3B82F6' : '#9CA3AF',
-            fillOpacity: 1,
-            strokeColor: 'white',
-            strokeWeight: 2,
-            scale: 1.5,
-            anchor: { x: 12, y: 24 },
-            labelOrigin: { x: 12, y: 10 },
-          }}
-          onClick={() => setOpenInfoWindow(openInfoWindow === `staff-${s.staffId}` ? null : `staff-${s.staffId}`)}
-        />
-      ))}
-      {staffMarkers.map(s => openInfoWindow === `staff-${s.staffId}` && (
-        <InfoWindow
-          key={`staff-info-${s.staffId}`}
-          position={{ lat: s.lat, lng: s.lng }}
-          onCloseClick={() => setOpenInfoWindow(null)}
+          position={[s.lat, s.lng]}
+          icon={createStaffIcon(s.staffName, s.isLive)}
         >
-          <div className="text-sm p-1 w-48">
-            <p className="font-bold text-slate-900">{s.staffName}</p>
-            <div className="flex items-center gap-1.5 mt-1">
-              <div className={`w-2 h-2 rounded-full ${s.isLive ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-              <span className="text-xs text-slate-500">
-                {s.isLive ? 'Live GPS' : 'Last known location'}
-              </span>
+          <Popup>
+            <div className="text-sm p-2 w-48">
+              <p className="font-bold text-slate-900">{s.staffName}</p>
+              <div className="flex items-center gap-1.5 mt-1">
+                <div className={`w-2 h-2 rounded-full ${s.isLive ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                <span className="text-xs text-slate-500">
+                  {s.isLive ? 'Live GPS' : 'Last known location'}
+                </span>
+              </div>
+              {s.timestamp && (
+                <p className="text-xs text-slate-400 mt-1">
+                  Updated: {format(new Date(s.timestamp), 'HH:mm')}
+                </p>
+              )}
+              {s.accuracy && (
+                <p className="text-xs text-slate-400">Accuracy: ±{Math.round(s.accuracy)}m</p>
+              )}
             </div>
-            {s.timestamp && (
-              <p className="text-xs text-slate-400 mt-1">
-                Updated: {format(new Date(s.timestamp), 'HH:mm')}
-              </p>
-            )}
-            {s.accuracy && (
-              <p className="text-xs text-slate-400">Accuracy: ±{Math.round(s.accuracy)}m</p>
-            )}
-          </div>
-        </InfoWindow>
+          </Popup>
+        </Marker>
       ))}
-
-      {/* Client markers — colored pin by status */}
-      {clientMarkers.map(client => (
-        <Marker
-          key={`client-${client.id}`}
-          position={{ lat: client.lat, lng: client.lng }}
-          title={client.name}
-          label={{ text: client.name.substring(0, 1), color: 'white', fontWeight: 'bold' }}
-          icon={{
-            path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z',
-            fillColor: client.statusColor,
-            fillOpacity: 1,
-            strokeColor: 'white',
-            strokeWeight: 2,
-            scale: 1.5,
-            anchor: { x: 12, y: 24 },
-            labelOrigin: { x: 12, y: 10 },
-          }}
-          onClick={() => setOpenInfoWindow(openInfoWindow === `client-${client.id}` ? null : `client-${client.id}`)}
-        />
-      ))}
-      {clientMarkers.map(client => openInfoWindow === `client-${client.id}` && (
-        <InfoWindow
-          key={`client-info-${client.id}`}
-          position={{ lat: client.lat, lng: client.lng }}
-          onCloseClick={() => setOpenInfoWindow(null)}
-        >
-          <div className="text-sm p-1 w-56 space-y-2">
-            <p className="font-bold text-slate-900">{client.name}</p>
-            {client.address && (
-              <p className="text-xs text-slate-500">{client.address}</p>
-            )}
-            <div className="space-y-1.5 border-t border-slate-100 pt-2">
-              {client.calls.map((call, idx) => {
-                const statusBg = call.status === 'in_progress' ? 'bg-amber-100 text-amber-700'
-                  : call.status === 'completed' ? 'bg-green-100 text-green-700'
-                  : call.status === 'not_at_home' ? 'bg-amber-100 text-amber-700'
-                  : call.status === 'missed' ? 'bg-red-100 text-red-700'
-                  : 'bg-slate-100 text-slate-600';
-                const statusText = call.status === 'in_progress' ? 'In Progress'
-                  : call.status === 'completed' ? 'Completed'
-                  : call.status === 'not_at_home' ? 'Not at Home'
-                  : call.status === 'missed' ? 'Missed'
-                  : 'Pending';
-
-                return (
-                  <div key={idx} className="text-xs space-y-0.5">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-slate-700">{call.scheduled_time || '—'}</span>
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${statusBg}`}>{statusText}</span>
-                    </div>
-                    <p className="text-slate-500">{call.staff_name}</p>
-                    {call.clock_in_time && (
-                      <p className="text-slate-400">In: {format(new Date(call.clock_in_time), 'HH:mm')}</p>
-                    )}
-                    {call.clock_out_time && (
-                      <p className="text-slate-400">Out: {format(new Date(call.clock_out_time), 'HH:mm')}</p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </InfoWindow>
-      ))}
-
-      {flyToTarget && <FlyToLocation lat={flyToTarget.lat} lng={flyToTarget.lng} zoom={16} onComplete={handleFlyComplete} />}
     </>
   );
 
-  // ── No API key fallback ────────────────────────────────────────
-  if (!GOOGLE_MAPS_API_KEY) {
-    const mapFallback = (
-      <div className="flex items-center justify-center h-full bg-slate-100 rounded-lg">
-        <div className="text-center p-6">
-          <MapPin className="w-10 h-10 text-slate-400 mx-auto mb-3" />
-          <p className="text-slate-600 font-medium">Google Maps API key not configured</p>
-          <p className="text-xs text-slate-400 mt-1">Set VITE_GOOGLE_MAPS_API_KEY in your .env file</p>
-        </div>
-      </div>
-    );
+  // Render client markers for map
+  const renderClientMarkers = () => (
+    <>
+      {clientMarkers.map(client => (
+        <Marker
+          key={client.id}
+          position={[client.lat, client.lng]}
+          icon={createClientLollipop(client.statusColor, client.name, client.markerStatus === 'in_progress')}
+        >
+          <Popup>
+            <div className="text-sm p-2 w-56 space-y-2">
+              <p className="font-bold text-slate-900">{client.name}</p>
+              {client.address && (
+                <p className="text-xs text-slate-500">{client.address}</p>
+              )}
+              <div className="space-y-1.5 border-t border-slate-100 pt-2">
+                {client.calls.map((call, idx) => {
+                  const statusBg = call.status === 'in_progress' ? 'bg-amber-100 text-amber-700'
+                    : call.status === 'completed' ? 'bg-green-100 text-green-700'
+                    : call.status === 'not_at_home' ? 'bg-amber-100 text-amber-700'
+                    : call.status === 'missed' ? 'bg-red-100 text-red-700'
+                    : 'bg-slate-100 text-slate-600';
+                  const statusText = call.status === 'in_progress' ? 'In Progress'
+                    : call.status === 'completed' ? 'Completed'
+                    : call.status === 'not_at_home' ? 'Not at Home'
+                    : call.status === 'missed' ? 'Missed'
+                    : 'Pending';
 
-    if (mapMaximized) {
-      return (
-        <div className="fixed inset-0 z-50 bg-white flex flex-col">
-          <div className="flex items-center justify-between p-4 border-b border-slate-200">
-            <h1 className="text-xl font-bold text-slate-900">Control Room — Live Map</h1>
-            <Button variant="outline" onClick={() => setMapMaximized(false)}>Minimize</Button>
-          </div>
-          <div className="flex-1">{mapFallback}</div>
-        </div>
-      );
-    }
-    // fall through to normal render with mapFallback in the card
-  }
+                  return (
+                    <div key={idx} className="text-xs space-y-0.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-slate-700">{call.scheduled_time || '—'}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${statusBg}`}>{statusText}</span>
+                      </div>
+                      <p className="text-slate-500">{call.staff_name}</p>
+                      {call.clock_in_time && (
+                        <p className="text-slate-400">In: {format(new Date(call.clock_in_time), 'HH:mm')}</p>
+                      )}
+                      {call.clock_out_time && (
+                        <p className="text-slate-400">Out: {format(new Date(call.clock_out_time), 'HH:mm')}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </Popup>
+        </Marker>
+      ))}
+    </>
+  );
 
   if (mapMaximized) {
     return (
       <div className="fixed inset-0 z-50 bg-white flex flex-col">
-                <div className="flex items-center justify-between p-4 border-b border-slate-200">
+        <div className="flex items-center justify-between p-4 border-b border-slate-200">
           <h1 className="text-xl font-bold text-slate-900">Control Room — Live Map</h1>
           <Button variant="outline" onClick={() => setMapMaximized(false)}>Minimize</Button>
         </div>
         <div className="flex-1 overflow-hidden">
-          <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
-            <GoogleMap
-              defaultCenter={{ lat: centerLat, lng: centerLng }}
-              defaultZoom={13}
-
-              gestureHandling="greedy"
-              disableDefaultUI={false}
-              style={{ width: '100%', height: '100%' }}
-            >
-              {renderMapContent()}
-            </GoogleMap>
-          </APIProvider>
+          <MapContainer center={[centerLat, centerLng]} zoom={13} style={{ height: '100%', width: '100%' }} ref={mapRef}>
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap contributors' />
+            {renderClientMarkers()}
+            {renderStaffMarkers()}
+            {flyToTarget && <FlyToLocation lat={flyToTarget.lat} lng={flyToTarget.lng} zoom={16} onComplete={() => setFlyToTarget(null)} />}
+          </MapContainer>
         </div>
       </div>
     );
@@ -595,7 +569,7 @@ export default function ControlRoom() {
 
   return (
     <div className="space-y-6">
-            <PageHeader
+      <PageHeader
         title="Control Room"
         subtitle="Live client map & staff tracking"
         icon={Navigation}
@@ -654,8 +628,7 @@ export default function ControlRoom() {
         {user?.role === 'super_admin' && (
           <button onClick={() => setActiveTab('radio-settings')} className={`flex items-center justify-center sm:justify-start gap-1 flex-1 text-xs sm:text-sm py-2 sm:py-3 rounded-lg font-medium transition-all shadow-md hover:shadow-lg ${activeTab === 'radio-settings' ? 'bg-gradient-to-r from-teal-500 to-teal-600 text-white' : 'bg-gradient-to-r from-teal-400 to-teal-500 text-white hover:from-teal-500 hover:to-teal-600'}`}>
             <Radio className="w-4 h-4 flex-shrink-0" />
-            <span className="hidden sm:inline">Radio</span>
-            <span className="sm:hidden">Radio</span>
+            <span>Radio</span>
           </button>
         )}
       </div>
@@ -664,36 +637,20 @@ export default function ControlRoom() {
       <div className="max-w-4xl space-y-4">
         {/* Map */}
         <Card className="p-0 bg-white border-0 shadow-sm overflow-hidden relative group h-[350px] z-0">
-          {GOOGLE_MAPS_API_KEY ? (
-            <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
-              <GoogleMap
-                defaultCenter={{ lat: centerLat, lng: centerLng }}
-                defaultZoom={13}
-
-                gestureHandling="greedy"
-                disableDefaultUI={false}
-                style={{ width: '100%', height: '100%' }}
-              >
-                {renderMapContent()}
-              </GoogleMap>
-            </APIProvider>
-          ) : (
-            <div className="flex items-center justify-center h-full bg-slate-100">
-              <div className="text-center p-6">
-                <MapPin className="w-10 h-10 text-slate-400 mx-auto mb-3" />
-                <p className="text-slate-600 font-medium">Google Maps API key not configured</p>
-                <p className="text-xs text-slate-400 mt-1">Set VITE_GOOGLE_MAPS_API_KEY in your .env file</p>
-              </div>
-            </div>
-          )}
-          {clientMarkers.length === 0 && staffMarkers.length === 0 && GOOGLE_MAPS_API_KEY && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white/80 pointer-events-none">
+          <MapContainer center={[centerLat, centerLng]} zoom={13} style={{ height: '100%', width: '100%' }} ref={mapRef}>
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap contributors' />
+            {renderClientMarkers()}
+            {renderStaffMarkers()}
+            {flyToTarget && <FlyToLocation lat={flyToTarget.lat} lng={flyToTarget.lng} zoom={16} onComplete={() => setFlyToTarget(null)} />}
+          </MapContainer>
+          {clientMarkers.length === 0 && staffMarkers.length === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center bg-white/80">
               <p className="text-slate-500 text-xs">No markers to show — client and staff markers will appear when shifts are active</p>
             </div>
           )}
           <button
             onClick={() => setMapMaximized(true)}
-            className="absolute top-2 right-2 bg-white p-2 rounded-lg shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-10"
+            className="absolute top-2 right-2 bg-white p-2 rounded-lg shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
             title="Maximize map"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -947,7 +904,7 @@ export default function ControlRoom() {
       )}
 
       {activeTab === 'radio-settings' && user?.role === 'super_admin' && (
-        <RadioSettingsPanel queryClient={queryClient} />
+        <RadioSettingsPanel queryClient={queryClient} user={user} />
       )}
 
       {/* Edit Announcement Dialog */}
@@ -1019,9 +976,8 @@ export default function ControlRoom() {
 
 function ToggleRow({ label, description, checked, onChange, disabled, color = 'teal' }) {
   const colors = {
-    teal:   { on: 'bg-teal-500',   off: 'bg-slate-300' },
-    amber:  { on: 'bg-amber-500',  off: 'bg-slate-300' },
-    red:    { on: 'bg-red-500',    off: 'bg-slate-300' },
+    teal:  { on: 'bg-teal-500',  off: 'bg-slate-300' },
+    amber: { on: 'bg-amber-500', off: 'bg-slate-300' },
   };
   const c = colors[color] || colors.teal;
   return (
@@ -1041,13 +997,11 @@ function ToggleRow({ label, description, checked, onChange, disabled, color = 't
   );
 }
 
-function RadioSettingsPanel({ queryClient }) {
+function RadioSettingsPanel({ queryClient, user }) {
   const [saving, setSaving] = useState(false);
   const [creatingTest, setCreatingTest] = useState(false);
-  const [testUser, setTestUser] = useState(null); // { email, password, name }
+  const [testUser, setTestUser] = useState(null);
   const [copied, setCopied] = useState(false);
-
-  const { data: currentUser } = useQuery({ queryKey: ['currentUser'], queryFn: () => base44.auth.me() });
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ['radioSettings'],
@@ -1073,23 +1027,16 @@ function RadioSettingsPanel({ queryClient }) {
     setCreatingTest(true);
     setTestUser(null);
     const password = 'RadioTest' + Math.floor(1000 + Math.random() * 9000) + '!';
-    const email    = 'teststaff.radio@carecallai.co.uk';
+    const email = 'teststaff.radio@carecallai.co.uk';
     try {
       const result = await base44.functions.invoke('createStaffUser', {
-        email,
-        password,
-        full_name: 'Test Staff (Radio)',
-        job_title: 'care_worker',
-        role: 'user',
+        email, password, full_name: 'Test Staff (Radio)', job_title: 'care_worker', role: 'user',
       });
       if (result?.error) throw new Error(result.error);
       setTestUser({ name: 'Test Staff (Radio)', email, password });
     } catch (e) {
-      // User might already exist — still show credentials they can use
       if (e.message?.includes('already') || e.message?.includes('exists')) {
-        setTestUser({ name: 'Test Staff (Radio)', email, password: 'Already exists — check existing password or delete and recreate' });
-      } else {
-        import('sonner').then(({ toast }) => toast.error('Could not create test user: ' + e.message));
+        setTestUser({ name: 'Test Staff (Radio)', email, password: 'Already exists — delete and recreate to reset password' });
       }
     }
     setCreatingTest(false);
@@ -1104,7 +1051,6 @@ function RadioSettingsPanel({ queryClient }) {
 
   return (
     <Card className="p-6 max-w-lg space-y-4">
-      {/* Header */}
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
           <Radio className="w-5 h-5 text-teal-600" />
@@ -1115,7 +1061,6 @@ function RadioSettingsPanel({ queryClient }) {
         </div>
       </div>
 
-      {/* Enable radio toggle */}
       <ToggleRow
         label="Enable Radio"
         description="Shows the radio icon in the bottom nav for all staff"
@@ -1125,10 +1070,9 @@ function RadioSettingsPanel({ queryClient }) {
         color="teal"
       />
 
-      {/* Test mode toggle */}
       <ToggleRow
         label="🧪 Test Mode"
-        description="When ON — all radio alerts (All Call, P2P, SOS) only notify you (super admin). Safe to test without disturbing staff."
+        description="When ON — all radio alerts only notify you (super admin). Safe to test without disturbing staff."
         checked={!!settings?.test_mode}
         onChange={() => upsert({ test_mode: !settings?.test_mode })}
         disabled={saving || isLoading}
@@ -1144,48 +1088,29 @@ function RadioSettingsPanel({ queryClient }) {
         </div>
       )}
 
-      {/* Create test user */}
       <div className="border border-slate-200 rounded-xl p-4 space-y-3">
         <div>
-          <p className="font-medium text-slate-900 text-sm">Test Staff Account</p>
-          <p className="text-xs text-slate-500 mt-0.5">Creates a second login so you can test radio on a different device without involving real staff.</p>
+          <p className="font-medium text-slate-900 text-sm">Create Test Staff Account</p>
+          <p className="text-xs text-slate-500 mt-0.5">Creates a staff login you can use on a second device to test radio features.</p>
         </div>
-
-        {testUser ? (
-          <div className="bg-slate-900 rounded-lg p-3 space-y-1 font-mono text-xs">
-            <p className="text-green-400">✓ Account ready</p>
-            <p className="text-slate-300">Name: <span className="text-white">{testUser.name}</span></p>
-            <p className="text-slate-300">Email: <span className="text-white">{testUser.email}</span></p>
-            <p className="text-slate-300">Password: <span className="text-white">{testUser.password}</span></p>
-            <p className="text-slate-400 text-[10px] mt-1">Login at app.carecallai.co.uk on another device</p>
-            <button
-              onClick={copyCredentials}
-              className="mt-2 px-3 py-1 bg-teal-600 text-white rounded text-xs font-sans font-semibold"
-            >
-              {copied ? '✓ Copied!' : 'Copy credentials'}
-            </button>
+        <Button
+          onClick={createTestUser}
+          disabled={creatingTest}
+          className="w-full bg-slate-800 hover:bg-slate-900 text-white"
+        >
+          {creatingTest ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creating…</> : 'Create Test Staff Account'}
+        </Button>
+        {testUser && (
+          <div className="bg-slate-900 rounded-lg p-3 space-y-1">
+            <p className="text-xs text-slate-400">Login credentials:</p>
+            <p className="text-sm text-white font-mono">{testUser.email}</p>
+            <p className="text-sm text-green-400 font-mono">{testUser.password}</p>
+            <Button size="sm" variant="outline" onClick={copyCredentials} className="mt-2 w-full text-xs border-slate-600 text-slate-300 hover:bg-slate-700">
+              {copied ? <><Check className="w-3 h-3 mr-1" />Copied!</> : 'Copy credentials'}
+            </Button>
           </div>
-        ) : (
-          <Button
-            onClick={createTestUser}
-            disabled={creatingTest}
-            className="w-full bg-slate-800 hover:bg-slate-700 text-white text-sm"
-          >
-            {creatingTest ? (
-              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creating…</>
-            ) : (
-              'Create Test Staff Account'
-            )}
-          </Button>
         )}
       </div>
-
-      <p className="text-xs text-slate-400">
-        Radio: <strong className={settings?.is_enabled ? 'text-teal-600' : 'text-slate-500'}>
-          {isLoading ? 'Loading…' : settings?.is_enabled ? 'ENABLED' : 'DISABLED'}
-        </strong>
-        {settings?.test_mode && <span className="text-amber-600 ml-2">· TEST MODE ON</span>}
-      </p>
     </Card>
   );
 }
