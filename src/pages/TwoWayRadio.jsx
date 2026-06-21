@@ -1177,6 +1177,9 @@ export default function TwoWayRadio() {
   // ════════════════════════════════════════════════════════════════════════════
   // MAIN VIEW
   // ════════════════════════════════════════════════════════════════════════════
+  const unreadMissed = missedCalls.filter(c => !dismissedMissedIds.has(c.id));
+  const anyoneSpeaking = speakingNames.length > 0;
+
   return (
     <>
       {EmergencyCountdownOverlay}
@@ -1186,79 +1189,108 @@ export default function TwoWayRadio() {
       {IncomingEmergencyOverlay}
       {TextAlertModal}
 
-      <div className={`min-h-screen bg-slate-900 pb-56 ${emergencyActive ? 'pt-10' : ''}`}>
-        {/* Test mode banner */}
-        {testMode && (
-          <div className="bg-amber-500 px-4 py-2 flex items-center gap-2">
-            <span className="text-white text-xs font-bold">🧪 TEST MODE — alerts only go to you</span>
-          </div>
+      {/* ── Always-visible PTT side bar ── */}
+      <button
+        disabled={!selectedPerson}
+        onPointerDown={e => { e.preventDefault(); if (selectedPerson) initiateP2PCall(); }}
+        style={{ position: 'fixed', top: 0, bottom: 0, [pttHandedness]: 0, width: 68, zIndex: 40 }}
+        className={`flex flex-col items-center justify-center gap-3 select-none touch-none transition-colors ${
+          !selectedPerson
+            ? 'bg-slate-800 text-slate-600'
+            : 'bg-teal-700 hover:bg-teal-600 text-white'
+        } ${pttHandedness === 'right' ? 'rounded-l-2xl' : 'rounded-r-2xl'}`}
+      >
+        <Radio className="w-7 h-7 relative z-10" />
+        <span className="text-xs font-black tracking-widest relative z-10" style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
+          {selectedPerson ? 'CALL' : 'PTT'}
+        </span>
+        {selectedPerson && (
+          <span className="text-[9px] font-bold text-teal-200 text-center px-1 relative z-10 leading-tight"
+            style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
+            {selectedPerson.full_name.split(' ')[0]}
+          </span>
         )}
+      </button>
 
-        {/* MISSED CALL ALERT BANNER — shown at top when unread missed calls exist */}
-        {(() => {
-          const unread = missedCalls.filter(c => !dismissedMissedIds.has(c.id));
-          if (!unread.length) return null;
-          const first = unread[0];
-          const personId = first.status === 'callback' ? first.caller_id : first.callee_id;
-          const person = staff.find(s => s.id === personId);
-          return (
-            <div className="bg-amber-600 px-4 py-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                  <PhoneOff className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white font-bold text-sm">Missed call{unread.length > 1 ? ` (${unread.length})` : ''}</p>
-                  <p className="text-amber-100 text-xs truncate">
-                    {person?.full_name || 'Team member'} · {formatCallTime(first.created_at)}
-                  </p>
-                </div>
-                <button onClick={() => callBackFromMissed(first)}
-                  className="bg-white text-amber-700 font-bold text-xs px-4 py-2 rounded-full active:scale-95 transition-all shrink-0">
-                  Call Back
-                </button>
-                <button onClick={() => setDismissedMissedIds(prev => new Set([...prev, first.id]))}
-                  className="text-white/70 hover:text-white p-1 shrink-0">
-                  <X className="w-4 h-4" />
-                </button>
+      <div className={`min-h-screen bg-slate-950 pb-56 ${emergencyActive ? 'pt-10' : ''} ${pttHandedness === 'right' ? 'pr-[72px]' : 'pl-[72px]'}`}>
+
+        {/* ── RADIO DEVICE HEADER ── */}
+        <div className="bg-slate-900 border-b border-slate-700/50">
+          {/* Speaker grille stripe */}
+          <div className="h-2 bg-slate-950 flex gap-[3px] px-3 pt-1">
+            {Array.from({ length: 32 }).map((_, i) => (
+              <div key={i} className="flex-1 h-full bg-slate-700 rounded-full opacity-60" />
+            ))}
+          </div>
+
+          {/* Test mode banner */}
+          {testMode && (
+            <div className="bg-amber-500 px-4 py-1 flex items-center gap-2">
+              <span className="text-white text-xs font-bold">TEST MODE — alerts only go to you</span>
+            </div>
+          )}
+
+          {/* Main radio header row */}
+          <div className="px-4 pt-3 pb-2 flex items-center gap-3">
+            {/* Brand + signal */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <Radio className="w-4 h-4 text-teal-400 shrink-0" />
+                <span className="text-teal-400 font-black text-xs tracking-[0.2em] uppercase">Care Call Radio</span>
+              </div>
+              {/* LED signal bars */}
+              <div className="flex items-end gap-0.5 mt-1.5">
+                {[3, 5, 7, 9, 11].map((h, i) => (
+                  <div key={i} className={`w-1.5 rounded-sm ${i < 4 ? 'bg-teal-400' : 'bg-slate-700'}`} style={{ height: h }} />
+                ))}
+                <span className="text-slate-500 text-[10px] ml-1.5 font-mono">LIVE</span>
               </div>
             </div>
-          );
-        })()}
 
-        {/* Header */}
-        <div className="bg-slate-800 px-4 pt-4 pb-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-teal-500 flex items-center justify-center shrink-0">
-            <Radio className="w-5 h-5 text-white" />
-          </div>
-          <div className="flex-1">
-            <h1 className="text-white font-bold text-lg leading-tight">Team Radio</h1>
-            <p className="text-slate-400 text-xs">Select a channel or person below</p>
-          </div>
-          <div className="relative">
-            <button onClick={() => setShowSettings(v => !v)}
-              className="text-slate-400 hover:text-white p-2 rounded-full hover:bg-slate-700 transition-colors">
-              <Settings className="w-5 h-5" />
-            </button>
-            {showSettings && (
-              <div className="absolute right-0 top-10 z-50 bg-slate-700 rounded-xl shadow-xl border border-slate-600 w-56 p-3">
-                <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">PTT Button Side</p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => { setPttHandedness('left'); localStorage.setItem('pttHandedness', 'left'); setShowSettings(false); }}
-                    className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${pttHandedness === 'left' ? 'bg-teal-600 text-white' : 'bg-slate-600 text-slate-300 hover:bg-slate-500'}`}
-                  >← Left</button>
-                  <button
-                    onClick={() => { setPttHandedness('right'); localStorage.setItem('pttHandedness', 'right'); setShowSettings(false); }}
-                    className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${pttHandedness === 'right' ? 'bg-teal-600 text-white' : 'bg-slate-600 text-slate-300 hover:bg-slate-500'}`}
-                  >Right →</button>
+            {/* ON AIR indicator */}
+            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded ${anyoneSpeaking ? 'bg-red-700' : 'bg-slate-800'}`}>
+              <div className={`w-2 h-2 rounded-full ${anyoneSpeaking ? 'bg-red-300 animate-pulse' : 'bg-slate-600'}`} />
+              <span className={`text-[10px] font-black tracking-widest ${anyoneSpeaking ? 'text-red-200' : 'text-slate-600'}`}>ON AIR</span>
+            </div>
+
+            {/* Settings gear */}
+            <div className="relative">
+              <button onClick={() => setShowSettings(v => !v)}
+                className="text-slate-500 hover:text-slate-300 p-1.5 rounded-lg hover:bg-slate-800 transition-colors">
+                <Settings className="w-4 h-4" />
+              </button>
+              {showSettings && (
+                <div className="absolute right-0 top-9 z-50 bg-slate-800 rounded-xl shadow-xl border border-slate-700 w-52 p-3">
+                  <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">PTT Button Side</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => { setPttHandedness('left'); localStorage.setItem('pttHandedness', 'left'); setShowSettings(false); }}
+                      className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${pttHandedness === 'left' ? 'bg-teal-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>
+                      ← Left</button>
+                    <button onClick={() => { setPttHandedness('right'); localStorage.setItem('pttHandedness', 'right'); setShowSettings(false); }}
+                      className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${pttHandedness === 'right' ? 'bg-teal-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>
+                      Right →</button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+          </div>
+
+          {/* Speaking ticker */}
+          <div className="px-4 pb-2 h-7 flex items-center">
+            {anyoneSpeaking
+              ? <div className="flex items-center gap-2"><Volume2 className="w-3.5 h-3.5 text-teal-400 animate-pulse shrink-0" /><span className="text-teal-300 text-xs font-semibold truncate">{speakingNames.join(', ')} speaking…</span></div>
+              : <span className="text-slate-600 text-xs font-mono">Channel clear ·· ·</span>}
+          </div>
+
+          {/* Speaker grille stripe bottom */}
+          <div className="h-2 bg-slate-950 flex gap-[3px] px-3 pb-1">
+            {Array.from({ length: 32 }).map((_, i) => (
+              <div key={i} className="flex-1 h-full bg-slate-700 rounded-full opacity-60" />
+            ))}
           </div>
         </div>
 
-        {/* MY STATUS BAR */}
+        {/* ── MY STATUS ── */}
         {(() => {
           const myStatus = getStaffStatus(user?.id);
           const cfg = statusCfg[myStatus] || statusCfg.available;
@@ -1270,33 +1302,24 @@ export default function TwoWayRadio() {
           ];
           return (
             <div className="px-4 pt-3 pb-1 relative">
-              <button
-                onClick={() => !isAutoStatus && setShowStatusMenu(v => !v)}
-                className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 transition-colors ${
-                  isAutoStatus ? 'bg-slate-800 cursor-default' : 'bg-slate-800 hover:bg-slate-700 active:scale-[0.98]'
-                }`}
-              >
-                <span className={`w-3 h-3 rounded-full shrink-0 ${cfg.dot}`} />
-                <span className="flex-1 text-left text-white font-semibold text-sm">
-                  My Status: <span className={cfg.text}>{cfg.label}</span>
+              <button onClick={() => !isAutoStatus && setShowStatusMenu(v => !v)}
+                className={`w-full flex items-center gap-3 rounded-xl px-4 py-2.5 transition-colors border ${
+                  isAutoStatus ? 'bg-slate-900 border-slate-800 cursor-default' : 'bg-slate-900 border-slate-700 hover:bg-slate-800 active:scale-[0.99]'
+                }`}>
+                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${cfg.dot}`} />
+                <span className="flex-1 text-left text-slate-300 text-xs">
+                  My Status: <span className={`font-semibold ${cfg.text}`}>{cfg.label}</span>
                 </span>
-                {isAutoStatus
-                  ? <span className="text-slate-500 text-xs">Auto</span>
-                  : <span className="text-slate-400 text-xs">Tap to change</span>}
+                {isAutoStatus ? <span className="text-slate-600 text-xs">Auto</span> : <span className="text-slate-500 text-xs">▾</span>}
               </button>
               {showStatusMenu && !isAutoStatus && (
-                <div className="absolute left-4 right-4 top-full mt-1 z-50 bg-slate-700 rounded-xl shadow-xl border border-slate-600 overflow-hidden">
+                <div className="absolute left-4 right-4 top-full mt-1 z-50 bg-slate-800 rounded-xl shadow-xl border border-slate-700 overflow-hidden">
                   {manualOptions.map(opt => (
-                    <button
-                      key={opt.key}
-                      onClick={() => { setMyRadioStatus(opt.key); setShowStatusMenu(false); }}
-                      className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-slate-600 ${
-                        myStatus === opt.key ? 'bg-slate-600/70' : ''
-                      }`}
-                    >
-                      <span className={`w-3 h-3 rounded-full shrink-0 ${opt.dot}`} />
-                      <span className="text-white text-sm font-medium">{opt.label}</span>
-                      {myStatus === opt.key && <span className="ml-auto text-teal-400 text-xs font-bold">Current</span>}
+                    <button key={opt.key} onClick={() => { setMyRadioStatus(opt.key); setShowStatusMenu(false); }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-700 ${myStatus === opt.key ? 'bg-slate-700/70' : ''}`}>
+                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${opt.dot}`} />
+                      <span className="text-white text-sm">{opt.label}</span>
+                      {myStatus === opt.key && <span className="ml-auto text-teal-400 text-xs font-bold">✓</span>}
                     </button>
                   ))}
                 </div>
@@ -1305,16 +1328,55 @@ export default function TwoWayRadio() {
           );
         })()}
 
-        {/* CHANNELS */}
+        {/* ── MISSED CALLS — always visible when any exist ── */}
+        {unreadMissed.length > 0 && (
+          <div className="px-4 pt-3 pb-1">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-amber-400 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <PhoneOff className="w-3.5 h-3.5" /> Missed Calls ({unreadMissed.length})
+              </span>
+              <button onClick={() => setDismissedMissedIds(prev => new Set([...prev, ...missedCalls.map(c => c.id)]))}
+                className="text-slate-500 hover:text-slate-300 text-xs">Clear all</button>
+            </div>
+            <div className="space-y-1.5 max-h-52 overflow-y-auto">
+              {unreadMissed.map(call => {
+                const personId = (call.status === 'callback' || call.status === 'cancelled') ? call.caller_id : call.callee_id;
+                const person = staff.find(s => s.id === personId);
+                return (
+                  <div key={call.id} className="flex items-center gap-3 bg-amber-900/20 border border-amber-800/40 rounded-xl px-3 py-2.5">
+                    <div className="w-8 h-8 rounded-full bg-amber-600/30 flex items-center justify-center shrink-0">
+                      <PhoneOff className="w-4 h-4 text-amber-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-semibold text-sm truncate">{person?.full_name || 'Team Member'}</p>
+                      <p className="text-amber-400 text-xs">
+                        {call.status === 'callback' ? 'Call back requested' : call.status === 'cancelled' ? 'Missed call' : 'Declined your call'}
+                        {' · '}{formatCallTime(call.created_at)}
+                      </p>
+                    </div>
+                    <button onClick={() => callBackFromMissed(call)}
+                      className="bg-green-600 hover:bg-green-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg active:scale-95 transition-all shrink-0">
+                      Call Back
+                    </button>
+                    <button onClick={() => setDismissedMissedIds(prev => new Set([...prev, call.id]))}
+                      className="text-slate-600 hover:text-slate-300 p-1 shrink-0"><X className="w-3.5 h-3.5" /></button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── CHANNELS ── */}
         <div className="px-4 pt-4 pb-2">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Channels</span>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-slate-500 text-xs font-semibold uppercase tracking-wider">Channels</span>
             {isSuperAdmin && <button onClick={() => setShowAddChannel(v => !v)} className="text-teal-400 hover:text-teal-300"><Plus className="w-4 h-4" /></button>}
           </div>
           {showAddChannel && (
             <div className="flex gap-2 mb-3">
               <Input value={newChannelName} onChange={e => setNewChannelName(e.target.value)} placeholder="Channel name…"
-                className="h-9 text-sm bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
+                className="h-9 text-sm bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
                 onKeyDown={e => { if (e.key === 'Enter' && newChannelName.trim()) addChannelMutation.mutate(newChannelName.trim()); }} />
               <Button size="sm" className="bg-teal-600 hover:bg-teal-700 h-9 shrink-0" disabled={!newChannelName.trim() || addChannelMutation.isPending}
                 onClick={() => addChannelMutation.mutate(newChannelName.trim())}>Add</Button>
@@ -1324,27 +1386,30 @@ export default function TwoWayRadio() {
             {channels.map(ch => (
               <div key={ch.id} className="flex items-center gap-2">
                 <button onClick={async () => { await joinChannel(ch.name); setActiveChannel(ch); setSelectedPerson(null); setView('ptt'); }}
-                  className="flex-1 flex items-center gap-3 bg-slate-800 hover:bg-slate-700 rounded-xl px-4 py-3 transition-colors text-left">
-                  <div className="w-10 h-10 rounded-full bg-teal-600/20 flex items-center justify-center shrink-0"><Radio className="w-5 h-5 text-teal-400" /></div>
-                  <div className="flex-1 min-w-0"><p className="text-white font-semibold text-sm truncate">{ch.name}</p><p className="text-slate-400 text-xs">Tap to join</p></div>
-                  <ChevronLeft className="w-4 h-4 text-slate-600 rotate-180 shrink-0" />
+                  className="flex-1 flex items-center gap-3 bg-slate-900 border border-slate-800 hover:border-teal-700 hover:bg-slate-800 rounded-xl px-4 py-3 transition-colors text-left">
+                  <div className="w-9 h-9 rounded-lg bg-teal-900/40 border border-teal-800/50 flex items-center justify-center shrink-0"><Radio className="w-4 h-4 text-teal-400" /></div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-semibold text-sm truncate">{ch.name}</p>
+                    <p className="text-slate-500 text-xs">Tap to join channel</p>
+                  </div>
+                  <ChevronLeft className="w-4 h-4 text-slate-700 rotate-180 shrink-0" />
                 </button>
-                {isSuperAdmin && <button onClick={() => deleteChannelMutation.mutate(ch.id)} className="text-slate-600 hover:text-red-400 p-2 transition-colors"><Trash2 className="w-4 h-4" /></button>}
+                {isSuperAdmin && <button onClick={() => deleteChannelMutation.mutate(ch.id)} className="text-slate-700 hover:text-red-400 p-2 transition-colors"><Trash2 className="w-4 h-4" /></button>}
               </div>
             ))}
             {channels.length === 0 && !showAddChannel && (
-              <p className="text-slate-500 text-xs text-center py-2 italic">{isSuperAdmin ? 'Tap + to create a channel' : 'No channels yet'}</p>
+              <p className="text-slate-600 text-xs text-center py-2 italic">{isSuperAdmin ? 'Tap + to create a channel' : 'No channels yet'}</p>
             )}
           </div>
         </div>
 
-        {/* PEOPLE — Admins group + area groups, all staff always shown */}
-        <div className="px-4 pt-4 pb-2">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+        {/* ── PEOPLE ── */}
+        <div className="px-4 pt-3 pb-2">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-slate-500 text-xs font-semibold uppercase tracking-wider">
               People{selectedPerson && <span className="text-teal-400 normal-case font-normal"> — {selectedPerson.full_name} selected</span>}
             </span>
-            {selectedPerson && <button onClick={() => setSelectedPerson(null)} className="text-slate-500 hover:text-slate-300 text-xs">Clear</button>}
+            {selectedPerson && <button onClick={() => setSelectedPerson(null)} className="text-slate-600 hover:text-slate-300 text-xs">Clear</button>}
           </div>
 
           {(() => {
@@ -1356,26 +1421,26 @@ export default function TwoWayRadio() {
               const isSelected = selectedPerson?.id === s.id;
               return (
                 <button key={s.id} onClick={() => setSelectedPerson(isSelected ? null : s)}
-                  className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all text-left ${
-                    isSelected ? 'bg-teal-900/50 ring-2 ring-teal-500'
-                    : isSpeaking ? 'bg-slate-700 ring-1 ring-teal-600'
-                    : 'bg-slate-800/80 hover:bg-slate-700'
+                  className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all text-left border ${
+                    isSelected ? 'bg-teal-900/40 border-teal-700/60 ring-1 ring-teal-600'
+                    : isSpeaking ? 'bg-slate-800 border-teal-800/40'
+                    : 'bg-slate-900 border-slate-800 hover:border-slate-700 hover:bg-slate-800'
                   }`}
                 >
                   <div className="relative shrink-0">
-                    <div className="w-9 h-9 rounded-full bg-slate-600 flex items-center justify-center text-white font-bold text-sm">
+                    <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-white font-bold text-sm">
                       {(s.full_name || s.email || '?')[0].toUpperCase()}
                     </div>
-                    <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-slate-900 ${cfg.dot}`} />
+                    <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-slate-950 ${cfg.dot}`} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-white font-semibold text-sm truncate">{s.full_name || s.email}</p>
+                    <p className="text-white text-sm truncate">{s.full_name || s.email}</p>
                     <p className={`text-xs ${isSpeaking ? 'text-teal-400 animate-pulse' : cfg.text}`}>
                       {isSpeaking ? '🎙 Speaking' : cfg.label}
-                      {teamLabel && <span className="text-slate-500"> · {teamLabel}</span>}
+                      {teamLabel && <span className="text-slate-600"> · {teamLabel}</span>}
                     </p>
                   </div>
-                  {isSelected && <span className="text-teal-400 text-xs font-bold shrink-0">SELECTED</span>}
+                  {isSelected && <span className="text-teal-400 text-[10px] font-black tracking-wider shrink-0">SELECTED</span>}
                 </button>
               );
             };
@@ -1387,11 +1452,10 @@ export default function TwoWayRadio() {
 
             return (
               <div className="space-y-4">
-                {/* Admins & Managers */}
                 {adminStaff.length > 0 && (
                   <div>
-                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-2 px-1">Admins &amp; Managers</p>
-                    <div className="space-y-0.5">
+                    <p className="text-slate-600 text-[10px] font-bold uppercase tracking-wider mb-1.5 px-1">Admins &amp; Managers</p>
+                    <div className="space-y-1">
                       {sortByStatus(adminStaff).map(s => {
                         const teamLabel = areaById[String(s.area_id || s.rota_area_id)]?.name;
                         return <StaffCard key={s.id} s={s} teamLabel={teamLabel} />;
@@ -1399,10 +1463,8 @@ export default function TwoWayRadio() {
                     </div>
                   </div>
                 )}
-
-                {/* One section per area — all staff always visible */}
                 {visibleAreaIds.length === 0 && adminStaff.length === 0 && (
-                  <p className="text-slate-500 text-sm text-center py-4">No staff found</p>
+                  <p className="text-slate-600 text-sm text-center py-4">No staff found</p>
                 )}
                 {visibleAreaIds.map(aId => {
                   const areaStaff = groupedByArea[aId] || [];
@@ -1411,10 +1473,10 @@ export default function TwoWayRadio() {
                   const isMyArea = aId === String(myAreaId);
                   return (
                     <div key={aId}>
-                      <p className={`text-xs font-semibold uppercase tracking-wider mb-2 px-1 ${isMyArea ? 'text-teal-400' : 'text-slate-500'}`}>
-                        {areaName}{isMyArea && <span className="normal-case font-normal text-teal-500 ml-1">— My Team</span>}
+                      <p className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 px-1 ${isMyArea ? 'text-teal-500' : 'text-slate-600'}`}>
+                        {areaName}{isMyArea && <span className="normal-case font-normal ml-1">— My Team</span>}
                       </p>
-                      <div className="space-y-0.5">
+                      <div className="space-y-1">
                         {sortByStatus(areaStaff).map(s => <StaffCard key={s.id} s={s} teamLabel={null} />)}
                       </div>
                     </div>
@@ -1424,63 +1486,17 @@ export default function TwoWayRadio() {
             );
           })()}
         </div>
-
-        {/* CALL LOG */}
-        {missedCalls.length > 0 && (
-          <div className="px-4 pt-4 pb-2">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Call Log</span>
-              <button
-                onClick={() => setDismissedMissedIds(prev => new Set([...prev, ...missedCalls.map(c => c.id)]))}
-                className="text-slate-500 hover:text-slate-300 text-xs"
-              >
-                Dismiss all
-              </button>
-            </div>
-            <div className="space-y-2 max-h-72 overflow-y-auto pr-0.5">
-              {missedCalls.filter(c => !dismissedMissedIds.has(c.id)).map(call => {
-                const personId = (call.status === 'callback' || call.status === 'cancelled') ? call.caller_id : call.callee_id;
-                const person = staff.find(s => s.id === personId);
-                return (
-                  <div key={call.id} className="flex items-center gap-3 bg-slate-800 rounded-xl px-4 py-3">
-                    <div className="w-10 h-10 rounded-full bg-amber-600/20 flex items-center justify-center shrink-0">
-                      <PhoneOff className="w-5 h-5 text-amber-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white font-semibold text-sm truncate">{person?.full_name || 'Team Member'}</p>
-                      <p className="text-amber-400 text-xs">{call.status === 'callback' ? 'Call back requested' : call.status === 'cancelled' ? 'Missed call' : 'Declined your call'}</p>
-                      <p className="text-slate-500 text-xs">{formatCallTime(call.created_at)}</p>
-                    </div>
-                    <button onClick={() => callBackFromMissed(call)}
-                      className="bg-green-600 hover:bg-green-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg active:scale-95 transition-all shrink-0">
-                      Call Back
-                    </button>
-                    <button onClick={() => setDismissedMissedIds(prev => new Set([...prev, call.id]))}
-                      className="text-slate-500 hover:text-slate-300 p-1 shrink-0">
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                );
-              })}
-              {missedCalls.every(c => dismissedMissedIds.has(c.id)) && (
-                <p className="text-slate-500 text-xs text-center py-2">No new missed calls</p>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* FIXED BOTTOM BAR */}
-      <div className="fixed bottom-16 left-0 right-0 px-4 pt-3 pb-2 bg-slate-900/95 backdrop-blur border-t border-slate-800 z-10 space-y-3">
-        {/* Call button — only shown when a person is selected */}
+      <div className={`fixed bottom-16 left-0 right-0 px-4 pt-3 pb-2 bg-slate-950/95 backdrop-blur border-t border-slate-800 z-10 space-y-2 ${pttHandedness === 'right' ? 'pr-[84px]' : 'pl-[84px]'}`}>
         {selectedPerson && (
           <button onClick={() => initiateP2PCall()} disabled={joining}
-            className="w-full flex items-center justify-center gap-3 py-5 rounded-2xl bg-green-600 hover:bg-green-700 active:scale-95 transition-all text-white shadow-lg disabled:opacity-50 max-w-lg mx-auto">
-            <Radio className="w-7 h-7" />
-            <span className="text-base font-bold">P2P — {selectedPerson.full_name}</span>
+            className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-green-700 hover:bg-green-600 active:scale-95 transition-all text-white shadow-lg disabled:opacity-50">
+            <Phone className="w-5 h-5" />
+            <span className="text-sm font-bold">Call {selectedPerson.full_name}</span>
           </button>
         )}
-        {/* Emergency */}
         <EmergencyButton onClick={startEmergencyCountdown} disabled={emergencyActive || emergencyCountdown !== null} />
       </div>
     </>
