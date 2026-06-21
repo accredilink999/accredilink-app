@@ -105,11 +105,12 @@ export default function TwoWayRadio() {
   const location    = useLocation();
 
   // Agora refs
-  const clientRef   = useRef(null);
-  const micTrackRef = useRef(null);
-  const joinedChRef = useRef(null);
-  const stopToneRef = useRef(null);
-  const outgoingRef = useRef(null);
+  const clientRef       = useRef(null);
+  const micTrackRef     = useRef(null);
+  const joinedChRef     = useRef(null);
+  const stopToneRef     = useRef(null);
+  const outgoingRef     = useRef(null);
+  const activeCallIdRef = useRef(null); // tracks active P2P call so either party can end it
 
   // Realtime channel refs (needed so we can .send() on them later)
   const rtAllCallRef   = useRef(null);
@@ -295,9 +296,20 @@ export default function TwoWayRadio() {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'radio_calls' }, payload => {
         const call = payload.new;
         const cur = outgoingRef.current;
+
+        // Either party ended the call — hang up and return to main
+        if (call.status === 'ended' && call.id === activeCallIdRef.current) {
+          activeCallIdRef.current = null;
+          stopTone();
+          leaveChannel().then(() => { setActiveChannel(null); setView('main'); });
+          return;
+        }
+
+        // Caller-side: response from callee
         if (!cur || call.id !== cur.callId) return;
         stopTone();
         if (call.status === 'accepted') {
+          activeCallIdRef.current = call.id;
           setOutgoingCall(null); setCallDeclined(false);
           joinChannel(call.channel_name).then(() => { setActiveChannel({ name: `📞 ${cur.callee?.full_name}`, id: '__ptp' }); setView('ptt'); });
         } else if (call.status === 'callback') {
@@ -389,9 +401,18 @@ export default function TwoWayRadio() {
     stopTone();
     const { caller, channelName, callId } = incomingCall;
     setIncomingCall(null);
+    activeCallIdRef.current = callId;
     await supabase.from('radio_calls').update({ status: 'accepted' }).eq('id', callId);
     await joinChannel(channelName);
     setActiveChannel({ name: `📞 ${caller?.full_name || 'Call'}`, id: '__ptp' }); setView('ptt');
+  };
+
+  const endP2PCall = async () => {
+    const callId = activeCallIdRef.current;
+    activeCallIdRef.current = null; // clear before DB update so we don't self-trigger
+    if (callId) await supabase.from('radio_calls').update({ status: 'ended' }).eq('id', callId);
+    await leaveChannel();
+    setActiveChannel(null); setView('main');
   };
 
   const declineIncomingCall = async (status = 'callback') => {
@@ -648,6 +669,7 @@ export default function TwoWayRadio() {
       .maybeSingle()
       .then(({ data: pending }) => {
         if (!pending) return;
+        activeCallIdRef.current = pending.id;
         const caller = staffRef.current.find(s => s.id === pending.caller_id)
           || { full_name: 'Team Member', id: pending.caller_id };
         setIncomingCall({ callId: pending.id, caller, channelName: pending.channel_name });
@@ -906,6 +928,14 @@ export default function TwoWayRadio() {
                   <span className="text-base font-bold tracking-wide">{joining ? 'JOINING…' : isTalking ? 'TRANSMITTING' : 'HOLD TO TALK'}</span>
                 </button>
               </div>
+              {/* End P2P Call — prominent red button, only for P2P calls */}
+              {activeChannel?.id === '__ptp' && (
+                <button onClick={endP2PCall}
+                  className="w-full max-w-xs py-5 rounded-2xl bg-red-600 hover:bg-red-700 active:scale-95 transition-all text-white shadow-xl flex items-center justify-center gap-3">
+                  <PhoneOff className="w-7 h-7" />
+                  <span className="text-lg font-black tracking-wide">END CALL</span>
+                </button>
+              )}
               {micPermission === 'denied' && <p className="text-red-400 text-xs text-center max-w-xs">Microphone blocked. Allow mic in browser settings and refresh.</p>}
               <p className="text-slate-500 text-xs">Hold to speak · Release to listen · Space on desktop</p>
               {remoteUsers.length > 0 && (
