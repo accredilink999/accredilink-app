@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import {
   Radio, Mic, Users, Plus, Trash2, PhoneOff,
   Volume2, Loader2, Signal, ChevronLeft, Phone, Bell,
-  AlertTriangle, MapPin, MicOff, X, ChevronDown, MessageSquare
+  AlertTriangle, MapPin, MicOff, X, ChevronDown, MessageSquare, Settings
 } from 'lucide-react';
 
 const AGORA_APP_ID   = 'ff9f260da10245a5ab4855ea3ec59500';
@@ -188,6 +188,8 @@ export default function TwoWayRadio() {
     setPttHandedness(next);
     localStorage.setItem('pttHandedness', next);
   };
+
+  const [showSettings, setShowSettings] = useState(false);
 
   // Area grouping
   const [expandedAreas, setExpandedAreas] = useState(new Set());
@@ -1080,15 +1082,6 @@ export default function TwoWayRadio() {
             : <span className="text-slate-500 text-sm">Channel clear</span>}
         </div>
 
-        {/* PTT side-switch hint — obvious tap target */}
-        {!isHandsFree && (
-          <button onClick={toggleHandedness}
-            className="mx-auto flex items-center gap-2 bg-slate-700 hover:bg-slate-600 active:scale-95 transition-all rounded-full px-5 py-2 mb-1">
-            <span className="text-slate-300 text-sm font-semibold">
-              {pttHandedness === 'right' ? '← Move PTT to left hand' : 'Move PTT to right hand →'}
-            </span>
-          </button>
-        )}
 
         {/* Status / content area */}
         <div className="flex-1 flex flex-col items-center justify-center gap-5 px-4">
@@ -1223,9 +1216,30 @@ export default function TwoWayRadio() {
           <div className="w-9 h-9 rounded-full bg-teal-500 flex items-center justify-center shrink-0">
             <Radio className="w-5 h-5 text-white" />
           </div>
-          <div>
+          <div className="flex-1">
             <h1 className="text-white font-bold text-lg leading-tight">Team Radio</h1>
             <p className="text-slate-400 text-xs">Select a channel or person below</p>
+          </div>
+          <div className="relative">
+            <button onClick={() => setShowSettings(v => !v)}
+              className="text-slate-400 hover:text-white p-2 rounded-full hover:bg-slate-700 transition-colors">
+              <Settings className="w-5 h-5" />
+            </button>
+            {showSettings && (
+              <div className="absolute right-0 top-10 z-50 bg-slate-700 rounded-xl shadow-xl border border-slate-600 w-56 p-3">
+                <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">PTT Button Side</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { setPttHandedness('left'); localStorage.setItem('pttHandedness', 'left'); setShowSettings(false); }}
+                    className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${pttHandedness === 'left' ? 'bg-teal-600 text-white' : 'bg-slate-600 text-slate-300 hover:bg-slate-500'}`}
+                  >← Left</button>
+                  <button
+                    onClick={() => { setPttHandedness('right'); localStorage.setItem('pttHandedness', 'right'); setShowSettings(false); }}
+                    className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${pttHandedness === 'right' ? 'bg-teal-600 text-white' : 'bg-slate-600 text-slate-300 hover:bg-slate-500'}`}
+                  >Right →</button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
