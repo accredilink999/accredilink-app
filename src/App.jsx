@@ -268,7 +268,6 @@ const AppShell = () => {
     <>
       <AutoPushRegistration />
       <AppUpdateChecker />
-      <HelpNudge />
       <Layout currentPageName={currentPageName} />
       {/* PIN setup prompt — shown once after first login if no PIN set */}
       {showPinSetup && user?.id && (
@@ -293,7 +292,6 @@ function App() {
           <Router>
             <NavigationTracker />
             <AppShell />
-            <HelpButton />
           </Router>
           <Toaster />
           <SonnerToaster position="top-center" richColors closeButton style={{ zIndex: 99999 }} toastOptions={{ style: { pointerEvents: 'auto' } }} />

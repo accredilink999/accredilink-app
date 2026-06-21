@@ -200,8 +200,7 @@ export default function TwoWayRadio() {
   const [showOffShiftByArea, setShowOffShiftByArea] = useState({});
   const [expandedChannelId, setExpandedChannelId] = useState(null);
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
-  const [groupPttArmed, setGroupPttArmed] = useState(false);
-  const groupPttArmTimerRef = useRef(null);
+  const [groupBroadcastActive, setGroupBroadcastActive] = useState(false);
 
   // 30s call timeout → text alert modal
   const [textAlertModal, setTextAlertModal] = useState(null);
@@ -1239,16 +1238,13 @@ export default function TwoWayRadio() {
   const anyoneSpeaking = speakingNames.length > 0;
   const isInChannel = isJoined && activeChannel;
 
-  // PTT bar: group when in channel with no person selected, P2P when person selected, disabled otherwise
-  const pttMode = selectedPerson ? 'p2p' : isInChannel ? 'group' : 'disabled';
+  // PTT bar: group only when in channel AND broadcast activated in channel card; P2P when person selected
+  const pttMode = selectedPerson ? 'p2p' : (isInChannel && groupBroadcastActive) ? 'group' : 'disabled';
 
-  // Disarm group PTT when leaving group mode (must be after pttMode is declared)
+  // Reset broadcast when leaving channel
   useEffect(() => {
-    if (pttMode !== 'group') {
-      setGroupPttArmed(false);
-      if (groupPttArmTimerRef.current) { clearTimeout(groupPttArmTimerRef.current); groupPttArmTimerRef.current = null; }
-    }
-  }, [pttMode]);
+    if (!isInChannel) setGroupBroadcastActive(false);
+  }, [isInChannel]);
 
   // Reusable staff pill inside a channel card
   const StaffPill = ({ s }) => {
@@ -1348,25 +1344,15 @@ export default function TwoWayRadio() {
         disabled={pttMode === 'disabled'}
         onPointerDown={e => {
           e.preventDefault();
-          if (pttMode === 'p2p') {
-            initiateP2PCall();
-          } else if (pttMode === 'group') {
-            if (!groupPttArmed) {
-              setGroupPttArmed(true);
-              if (groupPttArmTimerRef.current) clearTimeout(groupPttArmTimerRef.current);
-              groupPttArmTimerRef.current = setTimeout(() => { setGroupPttArmed(false); groupPttArmTimerRef.current = null; }, 15000);
-            } else {
-              startTalking();
-            }
-          }
+          if (pttMode === 'p2p') initiateP2PCall();
+          else if (pttMode === 'group') startTalking();
         }}
         style={{ position: 'fixed', top: '50%', transform: 'translateY(-50%)', [pttHandedness]: 0, width: 60, height: 380, zIndex: 40 }}
         className={`flex flex-col items-center justify-center gap-2 select-none touch-none transition-colors ${
-          pttMode === 'disabled' ? 'bg-slate-800/80 text-slate-700'
+          pttMode === 'disabled' ? 'bg-slate-800/60 text-slate-700'
           : pttMode === 'p2p' ? 'bg-green-700 text-white'
           : isTalking ? 'bg-red-600 text-white shadow-2xl shadow-red-900/80'
-          : groupPttArmed ? 'bg-amber-600 text-white'
-          : 'bg-slate-700 text-slate-400'
+          : 'bg-teal-700 text-white'
         } ${pttHandedness === 'right' ? 'rounded-l-2xl' : 'rounded-r-2xl'}`}
       >
         {isTalking && (
@@ -1377,18 +1363,8 @@ export default function TwoWayRadio() {
         )}
         {pttMode === 'p2p' ? <Phone className="w-6 h-6 relative z-10" /> : <Radio className="w-6 h-6 relative z-10" />}
         <span className="text-[10px] font-black tracking-widest relative z-10" style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
-          {pttMode === 'disabled' ? 'PTT'
-            : pttMode === 'p2p' ? 'P2P'
-            : isTalking ? 'LIVE TX'
-            : groupPttArmed ? 'ARMED'
-            : 'TAP'}
+          {pttMode === 'p2p' ? 'P2P' : isTalking ? 'LIVE TX' : 'PTT'}
         </span>
-        {pttMode === 'group' && !groupPttArmed && (
-          <span className="text-[8px] font-bold text-slate-500 relative z-10 leading-tight text-center"
-            style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
-            TO ARM
-          </span>
-        )}
         {pttMode === 'p2p' && selectedPerson && (
           <span className="text-[9px] font-bold text-green-200 relative z-10 leading-tight"
             style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
@@ -1397,7 +1373,14 @@ export default function TwoWayRadio() {
         )}
       </button>
 
-      <div className={`min-h-screen bg-slate-950 pb-56 ${pttHandedness === 'right' ? 'pr-[72px]' : 'pl-[72px]'}`}>
+      <div className="min-h-screen pb-28" style={{
+        backgroundColor: '#040c14',
+        backgroundImage: `
+          repeating-conic-gradient(rgba(253,224,71,0.06) 0% 25%, rgba(34,197,94,0.06) 0% 50%) 0 0 / 52px 52px,
+          radial-gradient(ellipse at 20% 10%, rgba(253,224,71,0.10) 0%, transparent 45%),
+          radial-gradient(ellipse at 80% 90%, rgba(34,197,94,0.08) 0%, transparent 45%)
+        `
+      }}>
 
         {/* ── APP HOME BAR — full-width back button replacing the hidden header ── */}
         <button
@@ -1603,9 +1586,20 @@ export default function TwoWayRadio() {
                         <Users className="w-4 h-4" />
                       </button>
                     )}
+                    {/* Broadcast toggle — shown when this channel is active */}
+                    {isActive && (
+                      <button onClick={e => { e.stopPropagation(); setGroupBroadcastActive(v => !v); }}
+                        className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-colors shrink-0 ${
+                          groupBroadcastActive
+                            ? 'bg-teal-600 border-teal-500 text-white'
+                            : 'border-slate-600 text-slate-400 hover:border-teal-700 hover:text-teal-400'
+                        }`}>
+                        {groupBroadcastActive ? '📡 On Air' : 'Broadcast'}
+                      </button>
+                    )}
                     {/* Join / Leave — admin only */}
                     {isSuperAdmin && (isActive ? (
-                      <button onClick={e => { e.stopPropagation(); leaveChannel().then(() => { setActiveChannel(null); setSelectedPerson(null); }); }}
+                      <button onClick={e => { e.stopPropagation(); leaveChannel().then(() => { setActiveChannel(null); setSelectedPerson(null); setGroupBroadcastActive(false); }); }}
                         className="text-red-400 text-xs font-bold px-3 py-1.5 rounded-full border border-red-800 hover:bg-red-900/30 transition-colors shrink-0">
                         Leave
                       </button>
@@ -1689,7 +1683,7 @@ export default function TwoWayRadio() {
 
       {/* ── DESELECT PILL — only when a person is selected ── */}
       {selectedPerson && (
-        <div className={`fixed bottom-28 left-0 right-0 px-4 z-20 ${pttHandedness === 'right' ? 'pr-[64px]' : 'pl-[64px]'}`}
+        <div className="fixed bottom-28 left-0 right-0 px-4 z-20"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
           <button onClick={() => setSelectedPerson(null)}
             className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-slate-800/95 backdrop-blur border border-slate-700 text-slate-300 text-xs">
@@ -1703,7 +1697,7 @@ export default function TwoWayRadio() {
         <button
           onClick={startEmergencyCountdown}
           disabled={emergencyCountdown !== null}
-          style={{ position: 'fixed', bottom: 'calc(20px + env(safe-area-inset-bottom))', left: '50%', transform: 'translateX(-50%)', zIndex: 30 }}
+          style={{ position: 'fixed', bottom: 'calc(20px + env(safe-area-inset-bottom))', left: 20, zIndex: 30 }}
           className={`w-16 h-16 rounded-full flex flex-col items-center justify-center gap-0.5 shadow-2xl active:scale-95 transition-all touch-manipulation ${
             emergencyCountdown !== null ? 'bg-slate-700 text-slate-500' : 'bg-red-600 text-white shadow-red-900/60'
           }`}
