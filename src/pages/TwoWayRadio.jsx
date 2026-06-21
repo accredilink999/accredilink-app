@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AgoraRTC from 'agora-rtc-sdk-ng';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
 import { supabase } from '@/api/supabaseClient';
 import { base44 } from '@/api/base44Client';
 import { ShiftApi } from '@/api/rotaApi';
@@ -12,7 +13,7 @@ import { toast } from 'sonner';
 import {
   Radio, Mic, Users, Plus, Trash2, PhoneOff,
   Volume2, Loader2, Signal, ChevronLeft, Phone, Bell,
-  AlertTriangle, MapPin, MicOff, X, ChevronDown, MessageSquare, Settings, UserPlus
+  AlertTriangle, MapPin, MicOff, X, ChevronDown, MessageSquare, Settings, UserPlus, Home
 } from 'lucide-react';
 
 const AGORA_APP_ID   = 'ff9f260da10245a5ab4855ea3ec59500';
@@ -126,6 +127,7 @@ function speakText(text) {
 export default function TwoWayRadio() {
   const queryClient = useQueryClient();
   const location    = useLocation();
+  const navigate    = useNavigate();
 
   // Agora refs
   const clientRef       = useRef(null);
@@ -198,6 +200,8 @@ export default function TwoWayRadio() {
   const [showOffShiftByArea, setShowOffShiftByArea] = useState({});
   const [expandedChannelId, setExpandedChannelId] = useState(null);
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+  const [groupPttArmed, setGroupPttArmed] = useState(false);
+  const groupPttArmTimerRef = useRef(null);
 
   // 30s call timeout → text alert modal
   const [textAlertModal, setTextAlertModal] = useState(null);
@@ -875,6 +879,14 @@ export default function TwoWayRadio() {
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
   }, []);
 
+  // Disarm group PTT when leaving group mode
+  useEffect(() => {
+    if (pttMode !== 'group') {
+      setGroupPttArmed(false);
+      if (groupPttArmTimerRef.current) { clearTimeout(groupPttArmTimerRef.current); groupPttArmTimerRef.current = null; }
+    }
+  }, [pttMode]);
+
   // Global pointer release — stops PTT no matter where the finger lifts
   useEffect(() => {
     const up = () => { if (shouldTalkRef.current) stopTalking(); };
@@ -1336,15 +1348,26 @@ export default function TwoWayRadio() {
         disabled={pttMode === 'disabled'}
         onPointerDown={e => {
           e.preventDefault();
-          if (pttMode === 'p2p') initiateP2PCall();
-          else if (pttMode === 'group') startTalking();
+          if (pttMode === 'p2p') {
+            initiateP2PCall();
+          } else if (pttMode === 'group') {
+            if (!groupPttArmed) {
+              // First tap: arm the button — auto-disarms after 15s
+              setGroupPttArmed(true);
+              if (groupPttArmTimerRef.current) clearTimeout(groupPttArmTimerRef.current);
+              groupPttArmTimerRef.current = setTimeout(() => { setGroupPttArmed(false); groupPttArmTimerRef.current = null; }, 15000);
+            } else {
+              startTalking();
+            }
+          }
         }}
         style={{ position: 'fixed', top: 0, bottom: 0, [pttHandedness]: 0, width: 68, zIndex: 40 }}
         className={`flex flex-col items-center justify-center gap-2 select-none touch-none transition-colors ${
           pttMode === 'disabled' ? 'bg-slate-800/80 text-slate-700'
           : pttMode === 'p2p' ? 'bg-green-700 text-white'
           : isTalking ? 'bg-red-600 text-white shadow-2xl shadow-red-900/80'
-          : 'bg-teal-700 text-white'
+          : groupPttArmed ? 'bg-amber-600 text-white'
+          : 'bg-slate-700 text-slate-400'
         } ${pttHandedness === 'right' ? 'rounded-l-2xl' : 'rounded-r-2xl'}`}
       >
         {isTalking && (
@@ -1355,8 +1378,18 @@ export default function TwoWayRadio() {
         )}
         {pttMode === 'p2p' ? <Phone className="w-6 h-6 relative z-10" /> : <Radio className="w-6 h-6 relative z-10" />}
         <span className="text-[10px] font-black tracking-widest relative z-10" style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
-          {pttMode === 'disabled' ? 'PTT' : pttMode === 'p2p' ? 'P2P' : isTalking ? 'LIVE TX' : 'GROUP'}
+          {pttMode === 'disabled' ? 'PTT'
+            : pttMode === 'p2p' ? 'P2P'
+            : isTalking ? 'LIVE TX'
+            : groupPttArmed ? 'ARMED'
+            : 'TAP'}
         </span>
+        {pttMode === 'group' && !groupPttArmed && (
+          <span className="text-[8px] font-bold text-slate-500 relative z-10 leading-tight text-center"
+            style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
+            TO ARM
+          </span>
+        )}
         {pttMode === 'p2p' && selectedPerson && (
           <span className="text-[9px] font-bold text-green-200 relative z-10 leading-tight"
             style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
@@ -1365,7 +1398,17 @@ export default function TwoWayRadio() {
         )}
       </button>
 
-      <div className={`min-h-screen bg-slate-950 pb-56 ${emergencyActive ? 'pt-10' : ''} ${pttHandedness === 'right' ? 'pr-[72px]' : 'pl-[72px]'}`}>
+      <div className={`min-h-screen bg-slate-950 pb-56 ${pttHandedness === 'right' ? 'pr-[72px]' : 'pl-[72px]'}`}>
+
+        {/* ── APP HOME BAR — full-width back button replacing the hidden header ── */}
+        <button
+          onClick={() => navigate(createPageUrl('Dashboard'))}
+          className="w-full flex items-center gap-3 px-5 bg-teal-600 text-white font-semibold text-base flex-shrink-0 active:bg-teal-700 touch-manipulation"
+          style={{ paddingTop: `calc(0.875rem + env(safe-area-inset-top))`, paddingBottom: '0.875rem' }}
+        >
+          <Home className="w-5 h-5 shrink-0" />
+          <span>App Home</span>
+        </button>
 
         {/* ── RADIO DEVICE HEADER ── */}
         <div className="bg-slate-900 border-b border-slate-700/50">

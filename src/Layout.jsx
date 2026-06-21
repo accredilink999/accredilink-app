@@ -899,8 +899,8 @@ export default function Layout({ children, currentPageName }) {
         </div>
       )}
       {/* OverdueCallAlert removed — push notifications via edge function handle late call alerts */}
-      {/* Unified Header — all devices */}
-      <div className="z-50 bg-white border-b border-slate-200 shadow-sm flex-shrink-0" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      {/* Unified Header — hidden on Radio page (Radio has its own top bar) */}
+      {currentPageName !== 'TwoWayRadio' && <div className="z-50 bg-white border-b border-slate-200 shadow-sm flex-shrink-0" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="grid grid-cols-[auto_1fr_auto] items-center px-3 py-2 gap-1">
           {/* Left: Profile + Back */}
           <div className="flex items-center gap-1" style={{ position: 'relative', zIndex: 99999 }}>
@@ -1032,7 +1032,7 @@ export default function Layout({ children, currentPageName }) {
             </button>
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* PWA Install Prompt */}
       <PWAInstallPrompt />
@@ -1094,7 +1094,7 @@ export default function Layout({ children, currentPageName }) {
                    <main
                      ref={mainRef}
                      className="flex-1 overflow-y-auto overflow-x-hidden lg:pb-0"
-                     style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', paddingBottom: 'calc(5rem + env(safe-area-inset-bottom))' }}
+                     style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', paddingBottom: currentPageName === 'TwoWayRadio' ? 'env(safe-area-inset-bottom)' : 'calc(5rem + env(safe-area-inset-bottom))' }}
                      onTouchStart={handleTouchStart}
                      onTouchMove={handleTouchMove}
                      onTouchEnd={handleTouchEnd}
@@ -1146,7 +1146,7 @@ export default function Layout({ children, currentPageName }) {
                                        </div>
                                      )}
                                      {/* Keep-alive: all visited pages stay mounted, hidden with display:none */}
-                                     <div className={currentPageName === 'Chat' ? 'p-0 md:p-3 lg:p-4' : 'p-2 md:p-3 lg:p-4'}>
+                                     <div className={currentPageName === 'Chat' || currentPageName === 'TwoWayRadio' ? 'p-0' : 'p-2 md:p-3 lg:p-4'}>
                                          {Object.entries(PAGES).map(([pageName, PageComponent]) => {
                                            const isActive = pageName === currentPageName;
                                            if (!isActive && !visitedPagesRef.current.has(pageName)) return null;
