@@ -1384,7 +1384,7 @@ export default function TwoWayRadio() {
       <div className="fixed bottom-16 left-0 right-0 px-4 pt-3 pb-2 bg-slate-900/95 backdrop-blur border-t border-slate-800 z-10 space-y-3">
         {/* Call button — only shown when a person is selected */}
         {selectedPerson && (
-          <button onClick={initiateP2PCall} disabled={joining}
+          <button onClick={() => initiateP2PCall()} disabled={joining}
             className="w-full flex items-center justify-center gap-3 py-5 rounded-2xl bg-green-600 hover:bg-green-700 active:scale-95 transition-all text-white shadow-lg disabled:opacity-50 max-w-lg mx-auto">
             <Radio className="w-7 h-7" />
             <span className="text-base font-bold">P2P — {selectedPerson.full_name}</span>
