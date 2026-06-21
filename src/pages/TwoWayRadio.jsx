@@ -656,6 +656,17 @@ export default function TwoWayRadio() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search, user?.id]);
 
+  // Global pointer release — stops PTT no matter where the finger lifts
+  useEffect(() => {
+    const up = () => { if (shouldTalkRef.current) stopTalking(); };
+    window.addEventListener('pointerup', up, { passive: true });
+    window.addEventListener('pointercancel', up, { passive: true });
+    return () => {
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+    };
+  }, [isTalking, isHandsFree]);
+
   // Keyboard Space = PTT (not in hands-free mode)
   useEffect(() => {
     const down = e => { if (e.code === 'Space' && isJoined && !isTalking && !isHandsFree) { e.preventDefault(); startTalking(); } };
@@ -884,9 +895,7 @@ export default function TwoWayRadio() {
                 )}
                 <button
                   disabled={!isJoined || joining}
-                  onPointerDown={e => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); startTalking(); }}
-                  onPointerUp={e => { e.preventDefault(); stopTalking(); }}
-                  onPointerCancel={stopTalking}
+                  onPointerDown={e => { e.preventDefault(); startTalking(); }}
                   className={`relative w-48 h-48 rounded-full flex flex-col items-center justify-center gap-3 font-bold transition-all select-none touch-none shadow-2xl ${
                     !isJoined ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
                     : isTalking ? 'bg-red-600 text-white scale-95'
