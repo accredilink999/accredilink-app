@@ -436,7 +436,6 @@ export default function TwoWayRadio() {
       recipient_ids: resolveRecipients([target.id]), type: 'radio_call',
       title: `📞 ${callerName} is calling you`, message: 'Tap to answer on Team Radio.',
       priority: 'high', action_url: `/TwoWayRadio?call=${chName}`, send_push: true,
-      metadata: { call_id: callRecord.id, channel_name: chName },
     }).catch(() => {});
   };
 

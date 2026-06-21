@@ -362,11 +362,11 @@ export default function Layout({ children, currentPageName }) {
     };
   }, [user?.id, globalTrackingEnabled]);
 
-  // ─── Inactivity Lock Screen (8 hours, resets when app comes back to foreground) ──
+  // ─── Inactivity Lock Screen (2 hours) ─────────────────────────────
   const [isLocked, setIsLocked] = useState(false);
   const [sickDialogOpen, setSickDialogOpen] = useState(false);
   const inactivityTimerRef = React.useRef(null);
-  const INACTIVITY_MS = 8 * 60 * 60 * 1000; // 8 hours — covers a full shift
+  const INACTIVITY_MS = 2 * 60 * 60 * 1000; // 2 hours
 
   useEffect(() => {
     if (!user?.id) return;
@@ -376,25 +376,12 @@ export default function Layout({ children, currentPageName }) {
       inactivityTimerRef.current = setTimeout(() => setIsLocked(true), INACTIVITY_MS);
     };
 
-    // Reset timer whenever user returns to the app (from another app or lock screen)
-    const handleVisibility = () => {
-      if (!document.hidden) {
-        resetTimer();
-        // Refresh Supabase auth token so session stays alive
-        supabase.auth.getSession().then(({ data: { session } }) => {
-          if (session) supabase.auth.refreshSession().catch(() => {});
-        });
-      }
-    };
-
     const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
     events.forEach(e => window.addEventListener(e, resetTimer, { passive: true }));
-    document.addEventListener('visibilitychange', handleVisibility);
-    resetTimer();
+    resetTimer(); // start the timer
 
     return () => {
       events.forEach(e => window.removeEventListener(e, resetTimer));
-      document.removeEventListener('visibilitychange', handleVisibility);
       if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
     };
   }, [user?.id]);
