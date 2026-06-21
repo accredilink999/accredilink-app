@@ -1020,25 +1020,14 @@ export default function TwoWayRadio() {
 
       {/* FIXED BOTTOM BAR */}
       <div className="fixed bottom-16 left-0 right-0 px-4 pt-3 pb-2 bg-slate-900/95 backdrop-blur border-t border-slate-800 z-10 space-y-3">
-        {/* 3 main buttons */}
-        <div className="grid grid-cols-3 gap-3 max-w-lg mx-auto">
-          <button onClick={handleAllCall} disabled={joining}
-            className="flex flex-col items-center justify-center gap-2 py-4 rounded-2xl bg-red-600 hover:bg-red-700 active:scale-95 transition-all text-white shadow-lg disabled:opacity-50">
-            <Users className="w-7 h-7" />
-            <span className="text-xs font-bold leading-tight text-center">ALL<br />CALL</span>
-          </button>
-          <button onClick={initiateP2PCall} disabled={!selectedPerson || joining}
-            className={`flex flex-col items-center justify-center gap-2 py-4 rounded-2xl active:scale-95 transition-all text-white shadow-lg ${selectedPerson ? 'bg-green-600 hover:bg-green-700' : 'bg-slate-700 text-slate-500 cursor-not-allowed'}`}>
+        {/* Call button — only shown when a person is selected */}
+        {selectedPerson && (
+          <button onClick={initiateP2PCall} disabled={joining}
+            className="w-full flex items-center justify-center gap-3 py-5 rounded-2xl bg-green-600 hover:bg-green-700 active:scale-95 transition-all text-white shadow-lg disabled:opacity-50 max-w-lg mx-auto">
             <Phone className="w-7 h-7" />
-            <span className="text-xs font-bold leading-tight text-center">POINT 2<br />POINT</span>
+            <span className="text-base font-bold">Call {selectedPerson.full_name}</span>
           </button>
-          <button onClick={handleSendAlert} disabled={joining}
-            className="flex flex-col items-center justify-center gap-2 py-4 rounded-2xl bg-amber-500 hover:bg-amber-600 active:scale-95 transition-all text-white shadow-lg disabled:opacity-50">
-            <Bell className="w-7 h-7" />
-            <span className="text-xs font-bold leading-tight text-center">{selectedPerson ? 'ALERT\nPERSON' : 'ALERT\nALL'}</span>
-          </button>
-        </div>
-        {selectedPerson && <p className="text-center text-teal-400 text-xs font-medium">{selectedPerson.full_name} selected — tap Point 2 Point to call</p>}
+        )}
         {/* Emergency */}
         <EmergencyButton onClick={startEmergencyCountdown} disabled={emergencyActive || emergencyCountdown !== null} />
       </div>
