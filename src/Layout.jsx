@@ -446,6 +446,36 @@ export default function Layout({ children, currentPageName }) {
     ? missedRadioCalls.filter(c => !dismissedBannerIds.has(c.id))
     : [];
 
+  // Auto-redirect to Radio on app open / return from background if missed calls exist
+  const autoRedirectedRef = useRef(false);
+  const missedCallsForRedirectRef = useRef(missedRadioCalls);
+  const currentPageRef = useRef(currentPageName);
+  missedCallsForRedirectRef.current = missedRadioCalls;
+  currentPageRef.current = currentPageName;
+
+  useEffect(() => {
+    if (autoRedirectedRef.current) return;
+    if (!user?.id || !missedRadioCalls.length || currentPageName === 'TwoWayRadio') return;
+    autoRedirectedRef.current = true;
+    navigate(createPageUrl('TwoWayRadio'));
+  }, [user?.id, missedRadioCalls.length, currentPageName, navigate]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (!document.hidden) {
+        autoRedirectedRef.current = false;
+        setTimeout(() => {
+          if (autoRedirectedRef.current) return;
+          if (!missedCallsForRedirectRef.current.length || currentPageRef.current === 'TwoWayRadio') return;
+          autoRedirectedRef.current = true;
+          navigate(createPageUrl('TwoWayRadio'));
+        }, 2000);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [navigate]);
+
   const stopGlobalRing = useCallback(() => {
     if (globalRingStopRef.current) { globalRingStopRef.current(); globalRingStopRef.current = null; }
   }, []);
