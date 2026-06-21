@@ -255,7 +255,19 @@ export default function TwoWayRadio() {
     enabled: !!user?.id,
     refetchInterval: 60000,
   });
-  const [dismissedMissedIds, setDismissedMissedIds] = useState(new Set());
+  const [dismissedMissedIds, setDismissedMissedIds] = useState(() => {
+    try {
+      const raw = localStorage.getItem('dismissedMissedCalls');
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch { return new Set(); }
+  });
+  const dismissMissedCalls = (...ids) => {
+    setDismissedMissedIds(prev => {
+      const next = new Set([...prev, ...ids]);
+      try { localStorage.setItem('dismissedMissedCalls', JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  };
 
   const isSuperAdmin  = user?.role === 'super_admin' || user?.role === 'admin';
   const myUid         = user?.id ? toUid(user.id) : null;
@@ -337,8 +349,8 @@ export default function TwoWayRadio() {
   }, [todayShifts, staff]);
 
   const setMyRadioStatus = async (newStatus) => {
-    await supabase.from('users').update({ radio_status: newStatus }).eq('id', user.id);
-    queryClient.invalidateQueries({ queryKey: ['staff'] });
+    await base44.entities.User.update(user.id, { radio_status: newStatus });
+    queryClient.refetchQueries({ queryKey: ['staff'] });
   };
 
   const statusCfg = {
@@ -519,7 +531,7 @@ export default function TwoWayRadio() {
     const personId = (call.status === 'callback' || call.status === 'cancelled') ? call.caller_id : call.callee_id;
     const person = staffRef.current.find(s => s.id === personId);
     if (!person) { toast.error('Could not find that person'); return; }
-    setDismissedMissedIds(prev => new Set([...prev, call.id]));
+    dismissMissedCalls(call.id);
     setSelectedPerson(person);
     initiateP2PCall(person);
   };
@@ -1335,7 +1347,7 @@ export default function TwoWayRadio() {
               <span className="text-amber-400 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
                 <PhoneOff className="w-3.5 h-3.5" /> Missed Calls ({unreadMissed.length})
               </span>
-              <button onClick={() => setDismissedMissedIds(prev => new Set([...prev, ...missedCalls.map(c => c.id)]))}
+              <button onClick={() => dismissMissedCalls(...missedCalls.map(c => c.id))}
                 className="text-slate-500 hover:text-slate-300 text-xs">Clear all</button>
             </div>
             <div className="space-y-1.5 max-h-52 overflow-y-auto">
@@ -1358,7 +1370,7 @@ export default function TwoWayRadio() {
                       className="bg-green-600 hover:bg-green-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg active:scale-95 transition-all shrink-0">
                       Call Back
                     </button>
-                    <button onClick={() => setDismissedMissedIds(prev => new Set([...prev, call.id]))}
+                    <button onClick={() => dismissMissedCalls(call.id)}
                       className="text-slate-600 hover:text-slate-300 p-1 shrink-0"><X className="w-3.5 h-3.5" /></button>
                   </div>
                 );
