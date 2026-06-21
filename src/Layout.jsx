@@ -460,17 +460,17 @@ export default function Layout({ children, currentPageName }) {
 
   // Auto-redirect to Radio on app open / return from background if missed calls exist
   const autoRedirectedRef = useRef(false);
-  const missedCallsForRedirectRef = useRef(missedRadioCalls);
+  const visibleMissedForRedirectRef = useRef(visibleMissedCalls);
   const currentPageRef = useRef(currentPageName);
-  missedCallsForRedirectRef.current = missedRadioCalls;
+  visibleMissedForRedirectRef.current = visibleMissedCalls;
   currentPageRef.current = currentPageName;
 
   useEffect(() => {
     if (autoRedirectedRef.current) return;
-    if (!user?.id || !missedRadioCalls.length || currentPageName === 'TwoWayRadio') return;
+    if (!user?.id || !visibleMissedCalls.length || currentPageName === 'TwoWayRadio') return;
     autoRedirectedRef.current = true;
     navigate(createPageUrl('TwoWayRadio'));
-  }, [user?.id, missedRadioCalls.length, currentPageName, navigate]);
+  }, [user?.id, visibleMissedCalls.length, currentPageName, navigate]);
 
   useEffect(() => {
     const onVisible = () => {
@@ -478,7 +478,7 @@ export default function Layout({ children, currentPageName }) {
         autoRedirectedRef.current = false;
         setTimeout(() => {
           if (autoRedirectedRef.current) return;
-          if (!missedCallsForRedirectRef.current.length || currentPageRef.current === 'TwoWayRadio') return;
+          if (!visibleMissedForRedirectRef.current.length || currentPageRef.current === 'TwoWayRadio') return;
           autoRedirectedRef.current = true;
           navigate(createPageUrl('TwoWayRadio'));
         }, 2000);

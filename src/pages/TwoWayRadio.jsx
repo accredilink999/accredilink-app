@@ -197,6 +197,7 @@ export default function TwoWayRadio() {
   const [expandedAreas, setExpandedAreas] = useState(new Set());
   const [showOffShiftByArea, setShowOffShiftByArea] = useState({});
   const [expandedChannelId, setExpandedChannelId] = useState(null);
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
 
   // 30s call timeout → text alert modal
   const [textAlertModal, setTextAlertModal] = useState(null);
@@ -325,19 +326,16 @@ export default function TwoWayRadio() {
 
   const getStaffStatus = useCallback((staffId) => {
     const shifts = todayShifts.filter(s => s.staff_id === staffId && s.status !== 'cancelled');
-    // Active clock-in always takes priority (with_client / on_break are auto-detected)
-    if (shifts.length) {
-      const active = shifts.find(s => s.clock_in_time && !s.clock_out_time);
-      if (active) return active.on_break ? 'on_break' : 'with_client';
-    }
-    // Respect manual radio_status from DB when not actively clocked in
+    // Actively clocked in → shift status takes priority (auto, cannot be overridden)
+    const active = shifts.find(s => s.clock_in_time && !s.clock_out_time);
+    if (active) return active.on_break ? 'on_break' : 'with_client';
+    // Not clocked in → manual radio_status always wins
     const manualStatus = staff.find(s => s.id === staffId)?.radio_status;
-    if (manualStatus === 'dnd') return 'dnd';
-    if (manualStatus === 'on_break' && shifts.length) return 'on_break';
-    // Shift-based fallback
+    if (manualStatus && ['available', 'on_break', 'dnd'].includes(manualStatus)) return manualStatus;
+    // Fallback: derive from shift state
     if (!shifts.length) return 'off_shift';
     const allDone = shifts.every(s => s.clock_out_time);
-    return allDone ? 'off_shift' : manualStatus === 'available' ? 'available' : 'available';
+    return allDone ? 'off_shift' : 'available';
   }, [todayShifts, staff]);
 
   const setMyRadioStatus = async (newStatus) => {
@@ -850,6 +848,15 @@ export default function TwoWayRadio() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search, user?.id]);
 
+  // Track online/offline for signal indicator
+  useEffect(() => {
+    const on = () => setIsOnline(true);
+    const off = () => setIsOnline(false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
+
   // Global pointer release — stops PTT no matter where the finger lifts
   useEffect(() => {
     const up = () => { if (shouldTalkRef.current) stopTalking(); };
@@ -1357,6 +1364,8 @@ export default function TwoWayRadio() {
               <div className="flex items-end gap-0.5 mt-1.5">
                 {[3, 5, 7, 9, 11].map((h, i) => <div key={i} className={`w-1.5 rounded-sm ${i < 4 ? 'bg-teal-400' : 'bg-slate-700'}`} style={{ height: h }} />)}
                 <span className="text-slate-500 text-[10px] ml-1.5 font-mono">LIVE</span>
+                <span className={`w-2 h-2 rounded-full ml-2 mb-0.5 ${isOnline ? 'bg-green-400 animate-pulse' : 'bg-red-500 animate-pulse'}`} title={isOnline ? 'Online' : 'Offline'} />
+                <span className={`text-[10px] ml-0.5 font-mono ${isOnline ? 'text-green-500' : 'text-red-500'}`}>{isOnline ? 'WiFi' : 'OFFLINE'}</span>
               </div>
             </div>
             <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded ${anyoneSpeaking ? 'bg-red-700' : 'bg-slate-800'}`}>
@@ -1390,11 +1399,33 @@ export default function TwoWayRadio() {
           </div>
         </div>
 
+        {/* ── ACTIVE CHANNEL WINDOW ── */}
+        {(() => {
+          const myRecord = staff.find(s => s.id === user?.id);
+          const myChannel = myRecord?.radio_channel_id ? channels.find(c => c.id === myRecord.radio_channel_id) : null;
+          const displayCh = activeChannel && activeChannel.id !== '__ptp' && activeChannel.id !== '__sos' ? activeChannel : myChannel;
+          return (
+            <div className={`mx-4 mt-4 rounded-2xl border-2 px-5 py-3 flex items-center gap-3 ${
+              isJoined && activeChannel ? 'bg-green-900/30 border-green-600' : 'bg-slate-900 border-slate-700'
+            }`}>
+              <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isJoined && activeChannel ? 'bg-green-400 animate-pulse' : 'bg-slate-600'}`} />
+              <div className="flex-1 min-w-0">
+                <p className="text-slate-500 text-[10px] uppercase tracking-widest font-medium">Active Channel</p>
+                <p className={`text-sm font-bold truncate ${isJoined && activeChannel ? 'text-green-300' : 'text-slate-500'}`}>
+                  {displayCh ? displayCh.name : 'No channel joined'}
+                </p>
+              </div>
+              <Radio className={`w-4 h-4 shrink-0 ${isJoined && activeChannel ? 'text-green-400' : 'text-slate-700'}`} />
+            </div>
+          );
+        })()}
+
         {/* ── MY STATUS ── */}
         {(() => {
           const myStatus = getStaffStatus(user?.id);
           const cfg = statusCfg[myStatus] || statusCfg.available;
-          const isAutoStatus = myStatus === 'with_client' || myStatus === 'on_break';
+          const activeShift = todayShifts.find(s => s.staff_id === user?.id && s.clock_in_time && !s.clock_out_time && s.status !== 'cancelled');
+          const isAutoStatus = !!activeShift;
           const manualOptions = [
             { key: 'available', label: 'Available',      dot: 'bg-green-500' },
             { key: 'on_break',  label: 'On Break',       dot: 'bg-amber-400' },
@@ -1490,15 +1521,15 @@ export default function TwoWayRadio() {
               const isActive = isJoined && activeChannel?.id === ch.id;
               const isExpanded = expandedChannelId === ch.id;
               return (
-                <div key={ch.id} className={`rounded-2xl border overflow-hidden transition-colors ${
-                  isActive ? 'border-teal-600 bg-slate-900' : 'border-slate-800 bg-slate-900'
+                <div key={ch.id} className={`rounded-2xl border-2 overflow-hidden transition-colors ${
+                  isActive ? 'border-green-500 bg-green-950/40' : 'border-green-800/60 bg-slate-900'
                 }`}>
                   {/* Channel header row — tap to expand member list */}
                   <button
                     onClick={() => setExpandedChannelId(isExpanded ? null : ch.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${isActive ? 'bg-teal-900/30' : 'hover:bg-slate-800/60'}`}>
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isActive ? 'bg-teal-600' : 'bg-slate-800'}`}>
-                      <Radio className={`w-4 h-4 ${isActive ? 'text-white' : 'text-teal-400'}`} />
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${isActive ? 'bg-green-900/30' : 'hover:bg-green-950/30'}`}>
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isActive ? 'bg-green-600' : 'bg-green-900/50'}`}>
+                      <Radio className={`w-4 h-4 ${isActive ? 'text-white' : 'text-green-400'}`} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-white font-semibold text-sm truncate">{ch.name}</p>
@@ -1534,10 +1565,37 @@ export default function TwoWayRadio() {
 
                   {/* Members — only shown when expanded */}
                   {isExpanded && (
-                    <div className="border-t border-slate-800">
+                    <div className="border-t border-green-900/40">
                       {members.length > 0 ? (
-                        <div className="px-3 py-3 flex flex-wrap gap-1.5">
-                          {members.map(s => <StaffPill key={s.id} s={s} />)}
+                        <div className="p-2 space-y-1">
+                          {members.map(s => {
+                            const st = getStaffStatus(s.id);
+                            const sCfg = statusCfg[st] || statusCfg.off_shift;
+                            const uid = toUid(s.id);
+                            const isSpeaking = speakingUids.has(uid);
+                            const isSelected = selectedPerson?.id === s.id;
+                            return (
+                              <button key={s.id} onClick={() => setSelectedPerson(isSelected ? null : s)}
+                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all border text-left ${
+                                  isSelected ? 'bg-teal-900/50 border-teal-600'
+                                  : isSpeaking ? 'bg-slate-700 border-teal-600/50 animate-pulse'
+                                  : 'bg-slate-800/60 border-slate-700/50 hover:border-green-700/50'
+                                }`}>
+                                <div className="relative shrink-0">
+                                  <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-white font-bold text-sm">
+                                    {(s.full_name || '?')[0].toUpperCase()}
+                                  </div>
+                                  <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-slate-900 ${sCfg.dot}`} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-white text-sm font-semibold truncate">{s.full_name || s.email}</p>
+                                  <p className={`text-xs ${sCfg.text}`}>{sCfg.label}</p>
+                                </div>
+                                {isSpeaking && <Mic className="w-3.5 h-3.5 text-teal-400 shrink-0 animate-pulse" />}
+                                {isSelected && <span className="text-teal-400 text-xs font-bold shrink-0">P2P ▶</span>}
+                              </button>
+                            );
+                          })}
                         </div>
                       ) : (
                         <p className="text-slate-700 text-xs text-center py-3 italic">
