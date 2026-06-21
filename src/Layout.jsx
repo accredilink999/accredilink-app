@@ -362,11 +362,14 @@ export default function Layout({ children, currentPageName }) {
     };
   }, [user?.id, globalTrackingEnabled]);
 
-  // ─── Inactivity Lock Screen (2 hours) ─────────────────────────────
+  // ─── Inactivity Lock Screen ────────────────────────────────────────
+  // Staff log in once per day — lock only after 24h of total inactivity.
+  // Returning to the app from background resets the timer so a normal
+  // shift never triggers the lock screen.
   const [isLocked, setIsLocked] = useState(false);
   const [sickDialogOpen, setSickDialogOpen] = useState(false);
   const inactivityTimerRef = React.useRef(null);
-  const INACTIVITY_MS = 2 * 60 * 60 * 1000; // 2 hours
+  const INACTIVITY_MS = 24 * 60 * 60 * 1000; // 24 hours
 
   useEffect(() => {
     if (!user?.id) return;
@@ -376,12 +379,17 @@ export default function Layout({ children, currentPageName }) {
       inactivityTimerRef.current = setTimeout(() => setIsLocked(true), INACTIVITY_MS);
     };
 
+    // Reset when staff return to the app after using something else
+    const handleVisibility = () => { if (!document.hidden) resetTimer(); };
+
     const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
     events.forEach(e => window.addEventListener(e, resetTimer, { passive: true }));
-    resetTimer(); // start the timer
+    document.addEventListener('visibilitychange', handleVisibility);
+    resetTimer();
 
     return () => {
       events.forEach(e => window.removeEventListener(e, resetTimer));
+      document.removeEventListener('visibilitychange', handleVisibility);
       if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
     };
   }, [user?.id]);
