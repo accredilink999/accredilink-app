@@ -1168,6 +1168,39 @@ export default function TwoWayRadio() {
             <span className="text-white text-xs font-bold">🧪 TEST MODE — alerts only go to you</span>
           </div>
         )}
+
+        {/* MISSED CALL ALERT BANNER — shown at top when unread missed calls exist */}
+        {(() => {
+          const unread = missedCalls.filter(c => !dismissedMissedIds.has(c.id));
+          if (!unread.length) return null;
+          const first = unread[0];
+          const personId = first.status === 'callback' ? first.caller_id : first.callee_id;
+          const person = staff.find(s => s.id === personId);
+          return (
+            <div className="bg-amber-600 px-4 py-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                  <PhoneOff className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white font-bold text-sm">Missed call{unread.length > 1 ? ` (${unread.length})` : ''}</p>
+                  <p className="text-amber-100 text-xs truncate">
+                    {person?.full_name || 'Team member'} · {formatCallTime(first.created_at)}
+                  </p>
+                </div>
+                <button onClick={() => callBackFromMissed(first)}
+                  className="bg-white text-amber-700 font-bold text-xs px-4 py-2 rounded-full active:scale-95 transition-all shrink-0">
+                  Call Back
+                </button>
+                <button onClick={() => setDismissedMissedIds(prev => new Set([...prev, first.id]))}
+                  className="text-white/70 hover:text-white p-1 shrink-0">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Header */}
         <div className="bg-slate-800 px-4 pt-4 pb-3 flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-teal-500 flex items-center justify-center shrink-0">
