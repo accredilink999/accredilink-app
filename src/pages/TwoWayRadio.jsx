@@ -91,6 +91,29 @@ function playAlarm() {
   return () => { active = false; ctx.close().catch(() => {}); };
 }
 
+// UK TETRA/Airwave-style PTT tones
+// talk-up: two ascending beeps (grant tone)
+// talk-down: two descending beeps (clear tone)
+function playPTTTone(type) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const freqs = type === 'up' ? [880, 1320] : [1320, 880];
+    const now = ctx.currentTime;
+    freqs.forEach((freq, i) => {
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq; osc.type = 'sine';
+      const t = now + i * 0.085;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.45, t + 0.008);
+      gain.gain.setValueAtTime(0.45, t + 0.065);
+      gain.gain.linearRampToValueAtTime(0, t + 0.080);
+      osc.start(t); osc.stop(t + 0.085);
+    });
+    setTimeout(() => ctx.close().catch(() => {}), 300);
+  } catch {}
+}
+
 function speakText(text) {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
@@ -257,6 +280,7 @@ export default function TwoWayRadio() {
         try { await clientRef.current.unpublish(track); track.stop(); track.close(); micTrackRef.current = null; } catch {}
         return;
       }
+      playPTTTone('up');
       setIsTalking(true);
     } catch (e) {
       shouldTalkRef.current = false;
@@ -268,6 +292,7 @@ export default function TwoWayRadio() {
   const stopTalking = async () => {
     shouldTalkRef.current = false;
     if (isHandsFree) return; // don't stop if in hands-free emergency mode
+    if (isTalking) playPTTTone('down');
     try {
       if (micTrackRef.current) { await clientRef.current.unpublish(micTrackRef.current); micTrackRef.current.stop(); micTrackRef.current.close(); micTrackRef.current = null; }
     } catch {}
