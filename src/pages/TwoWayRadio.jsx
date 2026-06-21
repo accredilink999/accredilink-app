@@ -221,7 +221,7 @@ export default function TwoWayRadio() {
   });
   const { data: areas = [] } = useQuery({
     queryKey: ['rotaAreas'],
-    queryFn: async () => { const { data } = await supabase.from('rota_areas').select('id, name').order('name'); return data || []; },
+    queryFn: () => base44.entities.RotaArea.list(),
     staleTime: 300000,
   });
 
