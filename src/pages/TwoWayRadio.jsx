@@ -1360,7 +1360,7 @@ export default function TwoWayRadio() {
             }
           }
         }}
-        style={{ position: 'fixed', top: '50%', transform: 'translateY(-50%)', [pttHandedness]: 0, width: 52, height: 130, zIndex: 40 }}
+        style={{ position: 'fixed', top: '50%', transform: 'translateY(-50%)', [pttHandedness]: 0, width: 60, height: 380, zIndex: 40 }}
         className={`flex flex-col items-center justify-center gap-2 select-none touch-none transition-colors ${
           pttMode === 'disabled' ? 'bg-slate-800/80 text-slate-700'
           : pttMode === 'p2p' ? 'bg-green-700 text-white'
