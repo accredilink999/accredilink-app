@@ -1048,13 +1048,6 @@ export default function TwoWayRadio() {
             <p className="text-white font-bold truncate">{activeChannel?.name || 'Radio'}</p>
             <p className="text-xs text-green-400 flex items-center gap-1"><Signal className="w-3 h-3" />Live{isHandsFree && <span className="text-red-400 ml-1">· Hands-free</span>}</p>
           </div>
-          {!isHandsFree && (
-            <button onClick={toggleHandedness}
-              title={`Switch to ${pttHandedness === 'right' ? 'left' : 'right'}-handed mode`}
-              className="text-slate-400 hover:text-slate-200 text-xs px-2 py-1 rounded border border-slate-700 shrink-0 transition-colors">
-              {pttHandedness === 'right' ? '◀ Left' : 'Right ▶'}
-            </button>
-          )}
           {!emergencyActive && (
             <button onClick={() => leaveChannel().then(() => { setActiveChannel(null); setView('main'); })}
               className="text-red-400 text-xs font-semibold px-3 py-1.5 rounded-full border border-red-800 hover:bg-red-900/30 transition-colors shrink-0">
@@ -1069,6 +1062,16 @@ export default function TwoWayRadio() {
             ? <div className="flex items-center gap-2 bg-teal-900/50 rounded-full px-4 py-1.5 animate-pulse"><Volume2 className="w-4 h-4 text-teal-400" /><span className="text-teal-300 text-sm font-semibold">{speakingNames.join(', ')} speaking…</span></div>
             : <span className="text-slate-500 text-sm">Channel clear</span>}
         </div>
+
+        {/* PTT side-switch hint — obvious tap target */}
+        {!isHandsFree && (
+          <button onClick={toggleHandedness}
+            className="mx-auto flex items-center gap-2 bg-slate-700 hover:bg-slate-600 active:scale-95 transition-all rounded-full px-5 py-2 mb-1">
+            <span className="text-slate-300 text-sm font-semibold">
+              {pttHandedness === 'right' ? '← Move PTT to left hand' : 'Move PTT to right hand →'}
+            </span>
+          </button>
+        )}
 
         {/* Status / content area */}
         <div className="flex-1 flex flex-col items-center justify-center gap-5 px-4">
