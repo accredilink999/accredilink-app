@@ -338,6 +338,24 @@ export default function TwoWayRadio() {
     return allDone ? 'off_shift' : 'available';
   }, [todayShifts, staff]);
 
+  // Returns both shift-state and radio-availability for display
+  const getCombinedStatus = useCallback((staffId) => {
+    const radioStatus = getStaffStatus(staffId);
+    const shifts = todayShifts.filter(s => s.staff_id === staffId && s.status !== 'cancelled');
+    const allDone = shifts.length > 0 && shifts.every(s => s.clock_out_time);
+    const isOnShift = shifts.length > 0 && !allDone;
+    const dots  = { with_client: 'bg-red-500', on_break: 'bg-amber-400', available: 'bg-green-500', off_shift: 'bg-blue-500', dnd: 'bg-slate-500' };
+    const texts = { with_client: 'text-red-400', on_break: 'text-amber-400', available: 'text-green-400', off_shift: 'text-blue-400', dnd: 'text-slate-400' };
+    const radioLabels = { with_client: 'With Client', on_break: 'On Break', available: 'Available', dnd: 'Do Not Disturb' };
+    return {
+      isOnShift,
+      shiftLabel: isOnShift ? 'On Shift' : 'Off Shift',
+      radioLabel: radioLabels[radioStatus] || null,
+      dot: dots[radioStatus] || 'bg-blue-500',
+      text: texts[radioStatus] || 'text-blue-400',
+    };
+  }, [getStaffStatus, todayShifts]);
+
   const setMyRadioStatus = async (newStatus) => {
     await base44.entities.User.update(user.id, { radio_status: newStatus });
     queryClient.refetchQueries({ queryKey: ['staff'] });
@@ -1270,8 +1288,7 @@ export default function TwoWayRadio() {
               const inThisChannel = s.radio_channel_id === ch.id;
               const inOtherChannel = !inThisChannel && s.radio_channel_id;
               const otherCh = inOtherChannel ? channels.find(c => c.id === s.radio_channel_id) : null;
-              const status = getStaffStatus(s.id);
-              const cfg = statusCfg[status] || statusCfg.off_shift;
+              const cs = getCombinedStatus(s.id);
               return (
                 <button key={s.id} onClick={() => assignToChannel(s.id, inThisChannel ? null : ch.id)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-left border ${
@@ -1281,11 +1298,12 @@ export default function TwoWayRadio() {
                     <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-white font-bold text-sm">
                       {(s.full_name || '?')[0].toUpperCase()}
                     </div>
-                    <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-slate-900 ${cfg.dot}`} />
+                    <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-slate-900 ${cs.dot}`} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-sm font-semibold truncate">{s.full_name || s.email}</p>
-                    <p className="text-xs text-slate-500">
+                    <p className={`text-xs ${cs.text}`}>{cs.shiftLabel}{cs.radioLabel ? ` · ${cs.radioLabel}` : ''}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">
                       {inThisChannel ? <span className="text-teal-400">In this channel</span>
                         : otherCh ? <span className="text-amber-400">In {otherCh.name} — tap to move here</span>
                         : 'Unassigned'}
@@ -1423,7 +1441,7 @@ export default function TwoWayRadio() {
         {/* ── MY STATUS ── */}
         {(() => {
           const myStatus = getStaffStatus(user?.id);
-          const cfg = statusCfg[myStatus] || statusCfg.available;
+          const cs = getCombinedStatus(user?.id);
           const activeShift = todayShifts.find(s => s.staff_id === user?.id && s.clock_in_time && !s.clock_out_time && s.status !== 'cancelled');
           const isAutoStatus = !!activeShift;
           const manualOptions = [
@@ -1444,14 +1462,15 @@ export default function TwoWayRadio() {
                 className={`w-full flex items-center gap-4 rounded-2xl px-5 py-4 transition-all border-2 ${
                   statusBg[myStatus] || statusBg.off_shift
                 } ${isAutoStatus ? 'cursor-default' : 'active:scale-[0.98]'}`}>
-                <span className={`w-4 h-4 rounded-full shrink-0 shadow-lg ${cfg.dot}`} style={{ boxShadow: `0 0 8px currentColor` }} />
+                <span className={`w-4 h-4 rounded-full shrink-0 shadow-lg ${cs.dot}`} style={{ boxShadow: `0 0 8px currentColor` }} />
                 <div className="flex-1 text-left">
-                  <p className="text-slate-400 text-xs font-medium uppercase tracking-widest leading-none mb-0.5">My Status</p>
-                  <p className={`text-lg font-bold leading-tight ${cfg.text}`}>{cfg.label}</p>
+                  <p className="text-slate-400 text-[10px] font-medium uppercase tracking-widest leading-none mb-1">My Status</p>
+                  <p className={`text-base font-bold leading-tight ${cs.text}`}>{cs.shiftLabel}</p>
+                  {cs.radioLabel && <p className={`text-sm font-semibold leading-tight ${cs.text} opacity-80`}>{cs.radioLabel}</p>}
                 </div>
                 {isAutoStatus
                   ? <span className="text-slate-500 text-xs bg-slate-800 px-2 py-1 rounded-lg">Auto</span>
-                  : <span className={`text-xl ${cfg.text}`}>▾</span>}
+                  : <span className={`text-xl ${cs.text}`}>▾</span>}
               </button>
               {showStatusMenu && !isAutoStatus && (
                 <div className="absolute left-4 right-4 top-full mt-1 z-50 bg-slate-800 rounded-2xl shadow-2xl border border-slate-700 overflow-hidden">
@@ -1569,8 +1588,7 @@ export default function TwoWayRadio() {
                       {members.length > 0 ? (
                         <div className="p-2 space-y-1">
                           {members.map(s => {
-                            const st = getStaffStatus(s.id);
-                            const sCfg = statusCfg[st] || statusCfg.off_shift;
+                            const cs = getCombinedStatus(s.id);
                             const uid = toUid(s.id);
                             const isSpeaking = speakingUids.has(uid);
                             const isSelected = selectedPerson?.id === s.id;
@@ -1585,11 +1603,11 @@ export default function TwoWayRadio() {
                                   <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-white font-bold text-sm">
                                     {(s.full_name || '?')[0].toUpperCase()}
                                   </div>
-                                  <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-slate-900 ${sCfg.dot}`} />
+                                  <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-slate-900 ${cs.dot}`} />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <p className="text-white text-sm font-semibold truncate">{s.full_name || s.email}</p>
-                                  <p className={`text-xs ${sCfg.text}`}>{sCfg.label}</p>
+                                  <p className={`text-xs ${cs.text}`}>{cs.shiftLabel}{cs.radioLabel ? ` · ${cs.radioLabel}` : ''}</p>
                                 </div>
                                 {isSpeaking && <Mic className="w-3.5 h-3.5 text-teal-400 shrink-0 animate-pulse" />}
                                 {isSelected && <span className="text-teal-400 text-xs font-bold shrink-0">P2P ▶</span>}
