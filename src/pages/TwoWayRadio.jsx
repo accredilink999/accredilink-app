@@ -196,6 +196,7 @@ export default function TwoWayRadio() {
   // Area grouping (kept for admin team labels)
   const [expandedAreas, setExpandedAreas] = useState(new Set());
   const [showOffShiftByArea, setShowOffShiftByArea] = useState({});
+  const [expandedChannelId, setExpandedChannelId] = useState(null);
 
   // 30s call timeout → text alert modal
   const [textAlertModal, setTextAlertModal] = useState(null);
@@ -814,6 +815,17 @@ export default function TwoWayRadio() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search, myUid]);
 
+  // Auto-join assigned channel for non-admin users on load
+  useEffect(() => {
+    if (!user?.id || !myUid || !clientRef.current || isSuperAdmin) return;
+    const myRecord = staff.find(s => s.id === user.id);
+    if (!myRecord?.radio_channel_id) return;
+    const ch = channels.find(c => c.id === myRecord.radio_channel_id);
+    if (!ch || joinedChRef.current === ch.name) return;
+    joinChannel(ch.name).then(() => { setActiveChannel(ch); setExpandedChannelId(ch.id); });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, myUid, staff.length, channels.length, isSuperAdmin]);
+
   // Show answer screen from push notification deep link (?call=channelName)
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -1388,24 +1400,36 @@ export default function TwoWayRadio() {
             { key: 'on_break',  label: 'On Break',       dot: 'bg-amber-400' },
             { key: 'dnd',       label: 'Do Not Disturb', dot: 'bg-slate-500' },
           ];
+          const statusBg = {
+            with_client: 'bg-red-900/50 border-red-700',
+            on_break:    'bg-amber-900/50 border-amber-600',
+            available:   'bg-green-900/50 border-green-600',
+            off_shift:   'bg-blue-900/40 border-blue-700',
+            dnd:         'bg-slate-800 border-slate-600',
+          };
           return (
-            <div className="px-4 pt-3 pb-1 relative">
+            <div className="px-4 pt-4 pb-1 relative">
               <button onClick={() => !isAutoStatus && setShowStatusMenu(v => !v)}
-                className={`w-full flex items-center gap-3 rounded-xl px-4 py-2.5 transition-colors border ${
-                  isAutoStatus ? 'bg-slate-900 border-slate-800 cursor-default' : 'bg-slate-900 border-slate-700 hover:bg-slate-800'
-                }`}>
-                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${cfg.dot}`} />
-                <span className="flex-1 text-left text-slate-300 text-xs">My Status: <span className={`font-semibold ${cfg.text}`}>{cfg.label}</span></span>
-                {isAutoStatus ? <span className="text-slate-600 text-xs">Auto</span> : <span className="text-slate-500 text-xs">▾</span>}
+                className={`w-full flex items-center gap-4 rounded-2xl px-5 py-4 transition-all border-2 ${
+                  statusBg[myStatus] || statusBg.off_shift
+                } ${isAutoStatus ? 'cursor-default' : 'active:scale-[0.98]'}`}>
+                <span className={`w-4 h-4 rounded-full shrink-0 shadow-lg ${cfg.dot}`} style={{ boxShadow: `0 0 8px currentColor` }} />
+                <div className="flex-1 text-left">
+                  <p className="text-slate-400 text-xs font-medium uppercase tracking-widest leading-none mb-0.5">My Status</p>
+                  <p className={`text-lg font-bold leading-tight ${cfg.text}`}>{cfg.label}</p>
+                </div>
+                {isAutoStatus
+                  ? <span className="text-slate-500 text-xs bg-slate-800 px-2 py-1 rounded-lg">Auto</span>
+                  : <span className={`text-xl ${cfg.text}`}>▾</span>}
               </button>
               {showStatusMenu && !isAutoStatus && (
-                <div className="absolute left-4 right-4 top-full mt-1 z-50 bg-slate-800 rounded-xl shadow-xl border border-slate-700 overflow-hidden">
+                <div className="absolute left-4 right-4 top-full mt-1 z-50 bg-slate-800 rounded-2xl shadow-2xl border border-slate-700 overflow-hidden">
                   {manualOptions.map(opt => (
                     <button key={opt.key} onClick={() => { setMyRadioStatus(opt.key); setShowStatusMenu(false); }}
-                      className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-700 ${myStatus === opt.key ? 'bg-slate-700/70' : ''}`}>
-                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${opt.dot}`} />
-                      <span className="text-white text-sm">{opt.label}</span>
-                      {myStatus === opt.key && <span className="ml-auto text-teal-400 text-xs font-bold">✓</span>}
+                      className={`w-full flex items-center gap-3 px-5 py-3.5 text-left transition-colors hover:bg-slate-700 ${myStatus === opt.key ? 'bg-slate-700/70' : ''}`}>
+                      <span className={`w-3 h-3 rounded-full shrink-0 ${opt.dot}`} />
+                      <span className="text-white text-sm font-medium">{opt.label}</span>
+                      {myStatus === opt.key && <span className="ml-auto text-teal-400 text-sm font-bold">✓</span>}
                     </button>
                   ))}
                 </div>
@@ -1464,56 +1488,63 @@ export default function TwoWayRadio() {
             {channels.map(ch => {
               const members = channelMembersById[ch.id] || [];
               const isActive = isJoined && activeChannel?.id === ch.id;
+              const isExpanded = expandedChannelId === ch.id;
               return (
                 <div key={ch.id} className={`rounded-2xl border overflow-hidden transition-colors ${
                   isActive ? 'border-teal-600 bg-slate-900' : 'border-slate-800 bg-slate-900'
                 }`}>
-                  {/* Channel header row */}
-                  <div className={`flex items-center gap-3 px-4 py-3 ${isActive ? 'bg-teal-900/30' : ''}`}>
+                  {/* Channel header row — tap to expand member list */}
+                  <button
+                    onClick={() => setExpandedChannelId(isExpanded ? null : ch.id)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${isActive ? 'bg-teal-900/30' : 'hover:bg-slate-800/60'}`}>
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isActive ? 'bg-teal-600' : 'bg-slate-800'}`}>
                       <Radio className={`w-4 h-4 ${isActive ? 'text-white' : 'text-teal-400'}`} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-white font-semibold text-sm truncate">{ch.name}</p>
-                      <p className="text-slate-500 text-xs">{members.length} member{members.length !== 1 ? 's' : ''}</p>
+                      <p className="text-slate-500 text-xs">{members.length} member{members.length !== 1 ? 's' : ''}{isActive ? ' · Active' : ''}</p>
                     </div>
-                    {/* Admin manage button */}
+                    {/* Admin controls */}
                     {isSuperAdmin && (
-                      <button onClick={() => setManagingChannelId(ch.id)}
+                      <button onClick={e => { e.stopPropagation(); setManagingChannelId(ch.id); }}
                         className="text-slate-600 hover:text-teal-400 p-1.5 transition-colors shrink-0">
                         <Users className="w-4 h-4" />
                       </button>
                     )}
-                    {/* Join / Leave */}
-                    {isActive ? (
-                      <button onClick={() => leaveChannel().then(() => { setActiveChannel(null); setSelectedPerson(null); })}
+                    {/* Join / Leave — admin only */}
+                    {isSuperAdmin && (isActive ? (
+                      <button onClick={e => { e.stopPropagation(); leaveChannel().then(() => { setActiveChannel(null); setSelectedPerson(null); }); }}
                         className="text-red-400 text-xs font-bold px-3 py-1.5 rounded-full border border-red-800 hover:bg-red-900/30 transition-colors shrink-0">
                         Leave
                       </button>
                     ) : (
-                      <button onClick={async () => { await joinChannel(ch.name); setActiveChannel(ch); setSelectedPerson(null); }}
+                      <button onClick={e => { e.stopPropagation(); joinChannel(ch.name).then(() => { setActiveChannel(ch); setSelectedPerson(null); }); }}
                         disabled={joining}
                         className="text-teal-400 text-xs font-bold px-3 py-1.5 rounded-full border border-teal-800 hover:bg-teal-900/30 transition-colors shrink-0 disabled:opacity-40">
                         {joining ? '…' : 'Join'}
                       </button>
-                    )}
+                    ))}
                     {isSuperAdmin && (
-                      <button onClick={() => deleteChannelMutation.mutate(ch.id)} className="text-slate-700 hover:text-red-400 p-1 transition-colors shrink-0">
+                      <button onClick={e => { e.stopPropagation(); deleteChannelMutation.mutate(ch.id); }} className="text-slate-700 hover:text-red-400 p-1 transition-colors shrink-0">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     )}
-                  </div>
+                    <ChevronDown className={`w-4 h-4 text-slate-600 shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                  </button>
 
-                  {/* Members grid */}
-                  {members.length > 0 && (
-                    <div className="px-3 pb-3 flex flex-wrap gap-1.5">
-                      {members.map(s => <StaffPill key={s.id} s={s} />)}
+                  {/* Members — only shown when expanded */}
+                  {isExpanded && (
+                    <div className="border-t border-slate-800">
+                      {members.length > 0 ? (
+                        <div className="px-3 py-3 flex flex-wrap gap-1.5">
+                          {members.map(s => <StaffPill key={s.id} s={s} />)}
+                        </div>
+                      ) : (
+                        <p className="text-slate-700 text-xs text-center py-3 italic">
+                          {isSuperAdmin ? 'Tap the people icon to assign members' : 'No members assigned yet'}
+                        </p>
+                      )}
                     </div>
-                  )}
-                  {members.length === 0 && (
-                    <p className="text-slate-700 text-xs text-center pb-3 italic">
-                      {isSuperAdmin ? 'Tap the people icon to assign members' : 'No members yet'}
-                    </p>
                   )}
                 </div>
               );
