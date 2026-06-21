@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import {
   Radio, Mic, Users, Plus, Trash2, PhoneOff,
   Volume2, Loader2, Signal, ChevronLeft, Phone, Bell,
-  AlertTriangle, MapPin, MicOff, X, ChevronDown, MessageSquare, Settings
+  AlertTriangle, MapPin, MicOff, X, ChevronDown, MessageSquare, Settings, UserPlus
 } from 'lucide-react';
 
 const AGORA_APP_ID   = 'ff9f260da10245a5ab4855ea3ec59500';
@@ -191,8 +191,9 @@ export default function TwoWayRadio() {
 
   const [showSettings, setShowSettings] = useState(false);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
+  const [managingChannelId, setManagingChannelId] = useState(null);
 
-  // Area grouping
+  // Area grouping (kept for admin team labels)
   const [expandedAreas, setExpandedAreas] = useState(new Set());
   const [showOffShiftByArea, setShowOffShiftByArea] = useState({});
 
@@ -275,22 +276,19 @@ export default function TwoWayRadio() {
   const staffByUid    = Object.fromEntries(staff.map(s => [toUid(s.id), s]));
   const speakingNames = [...speakingUids].filter(u => u !== myUid).map(u => staffByUid[u]?.full_name || `User ${u}`);
 
-  // Area grouping derived values
-  const myAreaId = user?.area_id || user?.rota_area_id || null;
+  // Channel member grouping
+  const channelMembersById = {};
+  channels.forEach(ch => { channelMembersById[ch.id] = []; });
+  staff.forEach(s => {
+    if (s.radio_channel_id && channelMembersById[s.radio_channel_id]) {
+      channelMembersById[s.radio_channel_id].push(s);
+    }
+  });
+  const assignedIds = new Set(staff.filter(s => s.radio_channel_id).map(s => s.id));
+  const unassignedStaff = staff.filter(s => !assignedIds.has(s.id) && s.id !== user?.id);
+
+  // Area labels (for admin assignment modals)
   const areaById = Object.fromEntries(areas.map(a => [String(a.id), a]));
-  const groupedByArea = {};
-  otherStaff.filter(s => s.role !== 'admin' && s.role !== 'super_admin').forEach(s => {
-    const aId = String(s.area_id || s.rota_area_id || 'none');
-    if (!groupedByArea[aId]) groupedByArea[aId] = [];
-    groupedByArea[aId].push(s);
-  });
-  const sortedAreaIds = Object.keys(groupedByArea).sort((a, b) => {
-    if (a === String(myAreaId)) return -1;
-    if (b === String(myAreaId)) return 1;
-    return (areaById[a]?.name || '').localeCompare(areaById[b]?.name || '');
-  });
-  // All staff see all areas; admins shown in their own top section
-  const visibleAreaIds = sortedAreaIds;
   const adminStaff = otherStaff.filter(s => s.role === 'admin' || s.role === 'super_admin');
 
   const formatCallTime = (dateStr) => {
@@ -462,6 +460,15 @@ export default function TwoWayRadio() {
           leaveChannel().then(() => { setActiveChannel(null); setView('main'); });
           return;
         }
+
+        // Caller cancelled before callee answered — stop ringing on callee side
+        setIncomingCall(prev => {
+          if (prev && prev.callId === call.id && (call.status === 'cancelled' || call.status === 'declined')) {
+            stopTone();
+            return null;
+          }
+          return prev;
+        });
 
         // Caller-side: response from callee
         if (!cur || call.id !== cur.callId) return;
@@ -778,6 +785,11 @@ export default function TwoWayRadio() {
     mutationFn: async (id) => { const { error } = await supabase.from('radio_channels').delete().eq('id', id); if (error) throw error; },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['radioChannels'] }),
   });
+
+  const assignToChannel = async (userId, channelId) => {
+    await base44.entities.User.update(userId, { radio_channel_id: channelId });
+    queryClient.refetchQueries({ queryKey: ['staff'] });
+  };
 
   // Auto-join from deep link (?join=channelName) — used by Answer button / admin direct-join
   useEffect(() => {
@@ -1191,6 +1203,93 @@ export default function TwoWayRadio() {
   // ════════════════════════════════════════════════════════════════════════════
   const unreadMissed = missedCalls.filter(c => !dismissedMissedIds.has(c.id));
   const anyoneSpeaking = speakingNames.length > 0;
+  const isInChannel = isJoined && activeChannel;
+
+  // PTT bar: group when in channel with no person selected, P2P when person selected, disabled otherwise
+  const pttMode = selectedPerson ? 'p2p' : isInChannel ? 'group' : 'disabled';
+
+  // Reusable staff pill inside a channel card
+  const StaffPill = ({ s }) => {
+    const status = getStaffStatus(s.id);
+    const cfg = statusCfg[status] || statusCfg.off_shift;
+    const uid = toUid(s.id);
+    const isSpeaking = speakingUids.has(uid);
+    const isSelected = selectedPerson?.id === s.id;
+    return (
+      <button
+        onClick={() => setSelectedPerson(isSelected ? null : s)}
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all border text-left ${
+          isSelected ? 'bg-teal-900/60 border-teal-600 ring-1 ring-teal-500'
+          : isSpeaking ? 'bg-slate-700 border-teal-700/50 animate-pulse'
+          : 'bg-slate-800 border-slate-700 hover:border-slate-500'
+        }`}
+      >
+        <div className="relative shrink-0">
+          <div className="w-6 h-6 rounded-full bg-slate-600 flex items-center justify-center text-white font-bold text-[10px]">
+            {(s.full_name || '?')[0].toUpperCase()}
+          </div>
+          <span className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-slate-800 ${cfg.dot}`} />
+        </div>
+        <span className={`text-xs truncate max-w-[72px] ${isSelected ? 'text-teal-200 font-semibold' : 'text-slate-200'}`}>
+          {(s.full_name || s.email || '?').split(' ')[0]}
+        </span>
+        {isSpeaking && <Mic className="w-2.5 h-2.5 text-teal-400 shrink-0" />}
+      </button>
+    );
+  };
+
+  // Manage-members modal
+  const ManageModal = managingChannelId && (() => {
+    const ch = channels.find(c => c.id === managingChannelId);
+    if (!ch) return null;
+    const allStaff = staff.filter(s => s.id !== user?.id);
+    return (
+      <div className="fixed inset-0 z-[200] bg-black/70 flex flex-col justify-end" onClick={() => setManagingChannelId(null)}>
+        <div className="bg-slate-900 rounded-t-2xl border-t border-slate-700 max-h-[75vh] flex flex-col" onClick={e => e.stopPropagation()}>
+          <div className="px-5 pt-4 pb-3 border-b border-slate-800 flex items-center justify-between shrink-0">
+            <div>
+              <p className="text-white font-bold text-base">{ch.name}</p>
+              <p className="text-slate-400 text-xs">Tap to assign or remove from this channel</p>
+            </div>
+            <button onClick={() => setManagingChannelId(null)} className="text-slate-500 hover:text-white p-1"><X className="w-5 h-5" /></button>
+          </div>
+          <div className="overflow-y-auto flex-1 p-3 space-y-1">
+            {allStaff.map(s => {
+              const inThisChannel = s.radio_channel_id === ch.id;
+              const inOtherChannel = !inThisChannel && s.radio_channel_id;
+              const otherCh = inOtherChannel ? channels.find(c => c.id === s.radio_channel_id) : null;
+              const status = getStaffStatus(s.id);
+              const cfg = statusCfg[status] || statusCfg.off_shift;
+              return (
+                <button key={s.id} onClick={() => assignToChannel(s.id, inThisChannel ? null : ch.id)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-left border ${
+                    inThisChannel ? 'bg-teal-900/40 border-teal-700/50' : 'bg-slate-800 border-slate-700 hover:border-slate-500'
+                  }`}>
+                  <div className="relative shrink-0">
+                    <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-white font-bold text-sm">
+                      {(s.full_name || '?')[0].toUpperCase()}
+                    </div>
+                    <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-slate-900 ${cfg.dot}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-sm font-semibold truncate">{s.full_name || s.email}</p>
+                    <p className="text-xs text-slate-500">
+                      {inThisChannel ? <span className="text-teal-400">In this channel</span>
+                        : otherCh ? <span className="text-amber-400">In {otherCh.name} — tap to move here</span>
+                        : 'Unassigned'}
+                    </p>
+                  </div>
+                  {inThisChannel
+                    ? <span className="text-teal-400 text-xs font-bold shrink-0">✓ Remove</span>
+                    : <span className="text-slate-500 text-xs shrink-0">Add →</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  })();
 
   return (
     <>
@@ -1200,24 +1299,36 @@ export default function TwoWayRadio() {
       {OutgoingCallOverlay}
       {IncomingEmergencyOverlay}
       {TextAlertModal}
+      {ManageModal}
 
-      {/* ── Always-visible PTT side bar ── */}
+      {/* ── PTT SIDE BAR — always visible, mode changes ── */}
       <button
-        disabled={!selectedPerson}
-        onPointerDown={e => { e.preventDefault(); if (selectedPerson) initiateP2PCall(); }}
+        disabled={pttMode === 'disabled'}
+        onPointerDown={e => {
+          e.preventDefault();
+          if (pttMode === 'p2p') initiateP2PCall();
+          else if (pttMode === 'group') startTalking();
+        }}
         style={{ position: 'fixed', top: 0, bottom: 0, [pttHandedness]: 0, width: 68, zIndex: 40 }}
-        className={`flex flex-col items-center justify-center gap-3 select-none touch-none transition-colors ${
-          !selectedPerson
-            ? 'bg-slate-800 text-slate-600'
-            : 'bg-teal-700 hover:bg-teal-600 text-white'
+        className={`flex flex-col items-center justify-center gap-2 select-none touch-none transition-colors ${
+          pttMode === 'disabled' ? 'bg-slate-800/80 text-slate-700'
+          : pttMode === 'p2p' ? 'bg-green-700 text-white'
+          : isTalking ? 'bg-red-600 text-white shadow-2xl shadow-red-900/80'
+          : 'bg-teal-700 text-white'
         } ${pttHandedness === 'right' ? 'rounded-l-2xl' : 'rounded-r-2xl'}`}
       >
-        <Radio className="w-7 h-7 relative z-10" />
-        <span className="text-xs font-black tracking-widest relative z-10" style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
-          {selectedPerson ? 'CALL' : 'PTT'}
+        {isTalking && (
+          <>
+            <div className="absolute inset-0 bg-red-500/20 animate-ping rounded-inherit" />
+            <div className="absolute inset-0 bg-red-500/10 animate-ping scale-110 rounded-inherit" style={{ animationDelay: '0.25s' }} />
+          </>
+        )}
+        {pttMode === 'p2p' ? <Phone className="w-6 h-6 relative z-10" /> : <Radio className="w-6 h-6 relative z-10" />}
+        <span className="text-[10px] font-black tracking-widest relative z-10" style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
+          {pttMode === 'disabled' ? 'PTT' : pttMode === 'p2p' ? 'P2P' : isTalking ? 'LIVE TX' : 'GROUP'}
         </span>
-        {selectedPerson && (
-          <span className="text-[9px] font-bold text-teal-200 text-center px-1 relative z-10 leading-tight"
+        {pttMode === 'p2p' && selectedPerson && (
+          <span className="text-[9px] font-bold text-green-200 relative z-10 leading-tight"
             style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
             {selectedPerson.full_name.split(' ')[0]}
           </span>
@@ -1228,47 +1339,27 @@ export default function TwoWayRadio() {
 
         {/* ── RADIO DEVICE HEADER ── */}
         <div className="bg-slate-900 border-b border-slate-700/50">
-          {/* Speaker grille stripe */}
           <div className="h-2 bg-slate-950 flex gap-[3px] px-3 pt-1">
-            {Array.from({ length: 32 }).map((_, i) => (
-              <div key={i} className="flex-1 h-full bg-slate-700 rounded-full opacity-60" />
-            ))}
+            {Array.from({ length: 32 }).map((_, i) => <div key={i} className="flex-1 h-full bg-slate-700 rounded-full opacity-60" />)}
           </div>
-
-          {/* Test mode banner */}
-          {testMode && (
-            <div className="bg-amber-500 px-4 py-1 flex items-center gap-2">
-              <span className="text-white text-xs font-bold">TEST MODE — alerts only go to you</span>
-            </div>
-          )}
-
-          {/* Main radio header row */}
+          {testMode && <div className="bg-amber-500 px-4 py-1"><span className="text-white text-xs font-bold">TEST MODE — alerts only go to you</span></div>}
           <div className="px-4 pt-3 pb-2 flex items-center gap-3">
-            {/* Brand + signal */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <Radio className="w-4 h-4 text-teal-400 shrink-0" />
                 <span className="text-teal-400 font-black text-xs tracking-[0.2em] uppercase">Care Call Radio</span>
               </div>
-              {/* LED signal bars */}
               <div className="flex items-end gap-0.5 mt-1.5">
-                {[3, 5, 7, 9, 11].map((h, i) => (
-                  <div key={i} className={`w-1.5 rounded-sm ${i < 4 ? 'bg-teal-400' : 'bg-slate-700'}`} style={{ height: h }} />
-                ))}
+                {[3, 5, 7, 9, 11].map((h, i) => <div key={i} className={`w-1.5 rounded-sm ${i < 4 ? 'bg-teal-400' : 'bg-slate-700'}`} style={{ height: h }} />)}
                 <span className="text-slate-500 text-[10px] ml-1.5 font-mono">LIVE</span>
               </div>
             </div>
-
-            {/* ON AIR indicator */}
             <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded ${anyoneSpeaking ? 'bg-red-700' : 'bg-slate-800'}`}>
               <div className={`w-2 h-2 rounded-full ${anyoneSpeaking ? 'bg-red-300 animate-pulse' : 'bg-slate-600'}`} />
               <span className={`text-[10px] font-black tracking-widest ${anyoneSpeaking ? 'text-red-200' : 'text-slate-600'}`}>ON AIR</span>
             </div>
-
-            {/* Settings gear */}
             <div className="relative">
-              <button onClick={() => setShowSettings(v => !v)}
-                className="text-slate-500 hover:text-slate-300 p-1.5 rounded-lg hover:bg-slate-800 transition-colors">
+              <button onClick={() => setShowSettings(v => !v)} className="text-slate-500 hover:text-slate-300 p-1.5 rounded-lg hover:bg-slate-800 transition-colors">
                 <Settings className="w-4 h-4" />
               </button>
               {showSettings && (
@@ -1276,29 +1367,21 @@ export default function TwoWayRadio() {
                   <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">PTT Button Side</p>
                   <div className="flex gap-2">
                     <button onClick={() => { setPttHandedness('left'); localStorage.setItem('pttHandedness', 'left'); setShowSettings(false); }}
-                      className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${pttHandedness === 'left' ? 'bg-teal-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>
-                      ← Left</button>
+                      className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${pttHandedness === 'left' ? 'bg-teal-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>← Left</button>
                     <button onClick={() => { setPttHandedness('right'); localStorage.setItem('pttHandedness', 'right'); setShowSettings(false); }}
-                      className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${pttHandedness === 'right' ? 'bg-teal-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>
-                      Right →</button>
+                      className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${pttHandedness === 'right' ? 'bg-teal-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>Right →</button>
                   </div>
                 </div>
               )}
             </div>
           </div>
-
-          {/* Speaking ticker */}
           <div className="px-4 pb-2 h-7 flex items-center">
             {anyoneSpeaking
               ? <div className="flex items-center gap-2"><Volume2 className="w-3.5 h-3.5 text-teal-400 animate-pulse shrink-0" /><span className="text-teal-300 text-xs font-semibold truncate">{speakingNames.join(', ')} speaking…</span></div>
               : <span className="text-slate-600 text-xs font-mono">Channel clear ·· ·</span>}
           </div>
-
-          {/* Speaker grille stripe bottom */}
           <div className="h-2 bg-slate-950 flex gap-[3px] px-3 pb-1">
-            {Array.from({ length: 32 }).map((_, i) => (
-              <div key={i} className="flex-1 h-full bg-slate-700 rounded-full opacity-60" />
-            ))}
+            {Array.from({ length: 32 }).map((_, i) => <div key={i} className="flex-1 h-full bg-slate-700 rounded-full opacity-60" />)}
           </div>
         </div>
 
@@ -1316,12 +1399,10 @@ export default function TwoWayRadio() {
             <div className="px-4 pt-3 pb-1 relative">
               <button onClick={() => !isAutoStatus && setShowStatusMenu(v => !v)}
                 className={`w-full flex items-center gap-3 rounded-xl px-4 py-2.5 transition-colors border ${
-                  isAutoStatus ? 'bg-slate-900 border-slate-800 cursor-default' : 'bg-slate-900 border-slate-700 hover:bg-slate-800 active:scale-[0.99]'
+                  isAutoStatus ? 'bg-slate-900 border-slate-800 cursor-default' : 'bg-slate-900 border-slate-700 hover:bg-slate-800'
                 }`}>
                 <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${cfg.dot}`} />
-                <span className="flex-1 text-left text-slate-300 text-xs">
-                  My Status: <span className={`font-semibold ${cfg.text}`}>{cfg.label}</span>
-                </span>
+                <span className="flex-1 text-left text-slate-300 text-xs">My Status: <span className={`font-semibold ${cfg.text}`}>{cfg.label}</span></span>
                 {isAutoStatus ? <span className="text-slate-600 text-xs">Auto</span> : <span className="text-slate-500 text-xs">▾</span>}
               </button>
               {showStatusMenu && !isAutoStatus && (
@@ -1340,15 +1421,14 @@ export default function TwoWayRadio() {
           );
         })()}
 
-        {/* ── MISSED CALLS — always visible when any exist ── */}
+        {/* ── MISSED CALLS ── */}
         {unreadMissed.length > 0 && (
           <div className="px-4 pt-3 pb-1">
             <div className="flex items-center justify-between mb-2">
               <span className="text-amber-400 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
                 <PhoneOff className="w-3.5 h-3.5" /> Missed Calls ({unreadMissed.length})
               </span>
-              <button onClick={() => dismissMissedCalls(...missedCalls.map(c => c.id))}
-                className="text-slate-500 hover:text-slate-300 text-xs">Clear all</button>
+              <button onClick={() => dismissMissedCalls(...missedCalls.map(c => c.id))} className="text-slate-500 hover:text-slate-300 text-xs">Clear all</button>
             </div>
             <div className="space-y-1.5 max-h-52 overflow-y-auto">
               {unreadMissed.map(call => {
@@ -1356,22 +1436,13 @@ export default function TwoWayRadio() {
                 const person = staff.find(s => s.id === personId);
                 return (
                   <div key={call.id} className="flex items-center gap-3 bg-amber-900/20 border border-amber-800/40 rounded-xl px-3 py-2.5">
-                    <div className="w-8 h-8 rounded-full bg-amber-600/30 flex items-center justify-center shrink-0">
-                      <PhoneOff className="w-4 h-4 text-amber-400" />
-                    </div>
+                    <div className="w-8 h-8 rounded-full bg-amber-600/30 flex items-center justify-center shrink-0"><PhoneOff className="w-4 h-4 text-amber-400" /></div>
                     <div className="flex-1 min-w-0">
                       <p className="text-white font-semibold text-sm truncate">{person?.full_name || 'Team Member'}</p>
-                      <p className="text-amber-400 text-xs">
-                        {call.status === 'callback' ? 'Call back requested' : call.status === 'cancelled' ? 'Missed call' : 'Declined your call'}
-                        {' · '}{formatCallTime(call.created_at)}
-                      </p>
+                      <p className="text-amber-400 text-xs">{call.status === 'callback' ? 'Call back requested' : call.status === 'cancelled' ? 'Missed call' : 'Declined your call'} · {formatCallTime(call.created_at)}</p>
                     </div>
-                    <button onClick={() => callBackFromMissed(call)}
-                      className="bg-green-600 hover:bg-green-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg active:scale-95 transition-all shrink-0">
-                      Call Back
-                    </button>
-                    <button onClick={() => dismissMissedCalls(call.id)}
-                      className="text-slate-600 hover:text-slate-300 p-1 shrink-0"><X className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => callBackFromMissed(call)} className="bg-green-600 hover:bg-green-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg active:scale-95 transition-all shrink-0">Call Back</button>
+                    <button onClick={() => dismissMissedCalls(call.id)} className="text-slate-600 hover:text-slate-300 p-1 shrink-0"><X className="w-3.5 h-3.5" /></button>
                   </div>
                 );
               })}
@@ -1379,11 +1450,13 @@ export default function TwoWayRadio() {
           </div>
         )}
 
-        {/* ── CHANNELS ── */}
+        {/* ── CHANNELS WITH MEMBERS ── */}
         <div className="px-4 pt-4 pb-2">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-3">
             <span className="text-slate-500 text-xs font-semibold uppercase tracking-wider">Channels</span>
-            {isSuperAdmin && <button onClick={() => setShowAddChannel(v => !v)} className="text-teal-400 hover:text-teal-300"><Plus className="w-4 h-4" /></button>}
+            {isSuperAdmin && (
+              <button onClick={() => setShowAddChannel(v => !v)} className="text-teal-400 hover:text-teal-300"><Plus className="w-4 h-4" /></button>
+            )}
           </div>
           {showAddChannel && (
             <div className="flex gap-2 mb-3">
@@ -1394,119 +1467,90 @@ export default function TwoWayRadio() {
                 onClick={() => addChannelMutation.mutate(newChannelName.trim())}>Add</Button>
             </div>
           )}
-          <div className="space-y-2">
-            {channels.map(ch => (
-              <div key={ch.id} className="flex items-center gap-2">
-                <button onClick={async () => { await joinChannel(ch.name); setActiveChannel(ch); setSelectedPerson(null); setView('ptt'); }}
-                  className="flex-1 flex items-center gap-3 bg-slate-900 border border-slate-800 hover:border-teal-700 hover:bg-slate-800 rounded-xl px-4 py-3 transition-colors text-left">
-                  <div className="w-9 h-9 rounded-lg bg-teal-900/40 border border-teal-800/50 flex items-center justify-center shrink-0"><Radio className="w-4 h-4 text-teal-400" /></div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white font-semibold text-sm truncate">{ch.name}</p>
-                    <p className="text-slate-500 text-xs">Tap to join channel</p>
+          <div className="space-y-3">
+            {channels.map(ch => {
+              const members = channelMembersById[ch.id] || [];
+              const isActive = isJoined && activeChannel?.id === ch.id;
+              return (
+                <div key={ch.id} className={`rounded-2xl border overflow-hidden transition-colors ${
+                  isActive ? 'border-teal-600 bg-slate-900' : 'border-slate-800 bg-slate-900'
+                }`}>
+                  {/* Channel header row */}
+                  <div className={`flex items-center gap-3 px-4 py-3 ${isActive ? 'bg-teal-900/30' : ''}`}>
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isActive ? 'bg-teal-600' : 'bg-slate-800'}`}>
+                      <Radio className={`w-4 h-4 ${isActive ? 'text-white' : 'text-teal-400'}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-semibold text-sm truncate">{ch.name}</p>
+                      <p className="text-slate-500 text-xs">{members.length} member{members.length !== 1 ? 's' : ''}</p>
+                    </div>
+                    {/* Admin manage button */}
+                    {isSuperAdmin && (
+                      <button onClick={() => setManagingChannelId(ch.id)}
+                        className="text-slate-600 hover:text-teal-400 p-1.5 transition-colors shrink-0">
+                        <Users className="w-4 h-4" />
+                      </button>
+                    )}
+                    {/* Join / Leave */}
+                    {isActive ? (
+                      <button onClick={() => leaveChannel().then(() => { setActiveChannel(null); setSelectedPerson(null); })}
+                        className="text-red-400 text-xs font-bold px-3 py-1.5 rounded-full border border-red-800 hover:bg-red-900/30 transition-colors shrink-0">
+                        Leave
+                      </button>
+                    ) : (
+                      <button onClick={async () => { await joinChannel(ch.name); setActiveChannel(ch); setSelectedPerson(null); }}
+                        disabled={joining}
+                        className="text-teal-400 text-xs font-bold px-3 py-1.5 rounded-full border border-teal-800 hover:bg-teal-900/30 transition-colors shrink-0 disabled:opacity-40">
+                        {joining ? '…' : 'Join'}
+                      </button>
+                    )}
+                    {isSuperAdmin && (
+                      <button onClick={() => deleteChannelMutation.mutate(ch.id)} className="text-slate-700 hover:text-red-400 p-1 transition-colors shrink-0">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
-                  <ChevronLeft className="w-4 h-4 text-slate-700 rotate-180 shrink-0" />
-                </button>
-                {isSuperAdmin && <button onClick={() => deleteChannelMutation.mutate(ch.id)} className="text-slate-700 hover:text-red-400 p-2 transition-colors"><Trash2 className="w-4 h-4" /></button>}
-              </div>
-            ))}
+
+                  {/* Members grid */}
+                  {members.length > 0 && (
+                    <div className="px-3 pb-3 flex flex-wrap gap-1.5">
+                      {members.map(s => <StaffPill key={s.id} s={s} />)}
+                    </div>
+                  )}
+                  {members.length === 0 && (
+                    <p className="text-slate-700 text-xs text-center pb-3 italic">
+                      {isSuperAdmin ? 'Tap the people icon to assign members' : 'No members yet'}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
             {channels.length === 0 && !showAddChannel && (
-              <p className="text-slate-600 text-xs text-center py-2 italic">{isSuperAdmin ? 'Tap + to create a channel' : 'No channels yet'}</p>
+              <p className="text-slate-600 text-xs text-center py-4 italic">{isSuperAdmin ? 'Tap + to create a channel' : 'No channels yet'}</p>
             )}
           </div>
         </div>
 
-        {/* ── PEOPLE ── */}
-        <div className="px-4 pt-3 pb-2">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-slate-500 text-xs font-semibold uppercase tracking-wider">
-              People{selectedPerson && <span className="text-teal-400 normal-case font-normal"> — {selectedPerson.full_name} selected</span>}
-            </span>
-            {selectedPerson && <button onClick={() => setSelectedPerson(null)} className="text-slate-600 hover:text-slate-300 text-xs">Clear</button>}
+        {/* ── UNASSIGNED PEOPLE (shrinks as admin assigns everyone) ── */}
+        {unassignedStaff.length > 0 && (
+          <div className="px-4 pt-2 pb-4">
+            <p className="text-slate-600 text-[10px] font-bold uppercase tracking-wider mb-2">
+              Unassigned ({unassignedStaff.length})
+              {isSuperAdmin && <span className="normal-case font-normal ml-1 text-slate-700">— assign via channel people icon</span>}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {unassignedStaff.map(s => <StaffPill key={s.id} s={s} />)}
+            </div>
           </div>
-
-          {(() => {
-            const StaffCard = ({ s, teamLabel }) => {
-              const status = getStaffStatus(s.id);
-              const cfg = statusCfg[status] || statusCfg.off_shift;
-              const uid = toUid(s.id);
-              const isSpeaking = speakingUids.has(uid);
-              const isSelected = selectedPerson?.id === s.id;
-              return (
-                <button key={s.id} onClick={() => setSelectedPerson(isSelected ? null : s)}
-                  className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all text-left border ${
-                    isSelected ? 'bg-teal-900/40 border-teal-700/60 ring-1 ring-teal-600'
-                    : isSpeaking ? 'bg-slate-800 border-teal-800/40'
-                    : 'bg-slate-900 border-slate-800 hover:border-slate-700 hover:bg-slate-800'
-                  }`}
-                >
-                  <div className="relative shrink-0">
-                    <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-white font-bold text-sm">
-                      {(s.full_name || s.email || '?')[0].toUpperCase()}
-                    </div>
-                    <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-slate-950 ${cfg.dot}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white text-sm truncate">{s.full_name || s.email}</p>
-                    <p className={`text-xs ${isSpeaking ? 'text-teal-400 animate-pulse' : cfg.text}`}>
-                      {isSpeaking ? '🎙 Speaking' : cfg.label}
-                      {teamLabel && <span className="text-slate-600"> · {teamLabel}</span>}
-                    </p>
-                  </div>
-                  {isSelected && <span className="text-teal-400 text-[10px] font-black tracking-wider shrink-0">SELECTED</span>}
-                </button>
-              );
-            };
-
-            const sortByStatus = arr => [...arr].sort((a, b) => {
-              const order = { with_client: 0, on_break: 1, available: 2, dnd: 3, off_shift: 4 };
-              return (order[getStaffStatus(a.id)] ?? 4) - (order[getStaffStatus(b.id)] ?? 4);
-            });
-
-            return (
-              <div className="space-y-4">
-                {adminStaff.length > 0 && (
-                  <div>
-                    <p className="text-slate-600 text-[10px] font-bold uppercase tracking-wider mb-1.5 px-1">Admins &amp; Managers</p>
-                    <div className="space-y-1">
-                      {sortByStatus(adminStaff).map(s => {
-                        const teamLabel = areaById[String(s.area_id || s.rota_area_id)]?.name;
-                        return <StaffCard key={s.id} s={s} teamLabel={teamLabel} />;
-                      })}
-                    </div>
-                  </div>
-                )}
-                {visibleAreaIds.length === 0 && adminStaff.length === 0 && (
-                  <p className="text-slate-600 text-sm text-center py-4">No staff found</p>
-                )}
-                {visibleAreaIds.map(aId => {
-                  const areaStaff = groupedByArea[aId] || [];
-                  if (!areaStaff.length) return null;
-                  const areaName = areaById[aId]?.name || (aId === 'none' ? 'Unassigned' : 'Team');
-                  const isMyArea = aId === String(myAreaId);
-                  return (
-                    <div key={aId}>
-                      <p className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 px-1 ${isMyArea ? 'text-teal-500' : 'text-slate-600'}`}>
-                        {areaName}{isMyArea && <span className="normal-case font-normal ml-1">— My Team</span>}
-                      </p>
-                      <div className="space-y-1">
-                        {sortByStatus(areaStaff).map(s => <StaffCard key={s.id} s={s} teamLabel={null} />)}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
-        </div>
+        )}
       </div>
 
       {/* FIXED BOTTOM BAR */}
       <div className={`fixed bottom-16 left-0 right-0 px-4 pt-3 pb-2 bg-slate-950/95 backdrop-blur border-t border-slate-800 z-10 space-y-2 ${pttHandedness === 'right' ? 'pr-[84px]' : 'pl-[84px]'}`}>
         {selectedPerson && (
-          <button onClick={() => initiateP2PCall()} disabled={joining}
-            className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-green-700 hover:bg-green-600 active:scale-95 transition-all text-white shadow-lg disabled:opacity-50">
-            <Phone className="w-5 h-5" />
-            <span className="text-sm font-bold">Call {selectedPerson.full_name}</span>
+          <button onClick={() => { setSelectedPerson(null); }}
+            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 text-xs">
+            <X className="w-3.5 h-3.5" /> Deselect {selectedPerson.full_name} — press PTT bar to call
           </button>
         )}
         <EmergencyButton onClick={startEmergencyCountdown} disabled={emergencyActive || emergencyCountdown !== null} />
