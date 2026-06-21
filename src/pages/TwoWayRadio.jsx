@@ -534,6 +534,17 @@ export default function TwoWayRadio() {
     if (callId) await supabase.from('radio_calls').update({ status }).eq('id', callId);
   };
 
+  // "Call Back" on incoming call: mark as callback AND immediately dial the caller back
+  const callBackImmediately = async () => {
+    stopTone();
+    if (!incomingCall) return;
+    const caller = incomingCall.caller;
+    const { callId } = incomingCall;
+    setIncomingCall(null);
+    if (callId) await supabase.from('radio_calls').update({ status: 'callback' }).eq('id', callId);
+    if (caller) await initiateP2PCall(caller);
+  };
+
   const handleSendAlert = async () => {
     const callerName = user?.full_name || user?.email || 'A team member';
     const targets = selectedPerson ? [selectedPerson.id] : otherStaff.map(s => s.id);
@@ -878,7 +889,7 @@ export default function TwoWayRadio() {
           className="flex-1 py-5 rounded-2xl bg-red-600 text-white font-bold text-sm flex flex-col items-center gap-1 active:scale-95 transition-transform">
           <PhoneOff className="w-6 h-6" />DECLINE
         </button>
-        <button onClick={() => declineIncomingCall('callback')}
+        <button onClick={callBackImmediately}
           className="flex-1 py-5 rounded-2xl bg-amber-500 text-white font-bold text-sm flex flex-col items-center gap-1 active:scale-95 transition-transform">
           <Phone className="w-6 h-6" />CALL<br />BACK
         </button>
