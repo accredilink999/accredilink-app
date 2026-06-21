@@ -135,8 +135,7 @@ export default function TwoWayRadio() {
   const outgoingRef     = useRef(null);
   const activeCallIdRef = useRef(null); // tracks active P2P call so either party can end it
 
-  // Realtime channel refs (needed so we can .send() on them later)
-  const rtAllCallRef   = useRef(null);
+  // Realtime channel ref for emergency broadcast
   const rtEmergencyRef = useRef(null);
 
   // PTT intent ref — tracks whether the user is still holding the button,
@@ -445,17 +444,6 @@ export default function TwoWayRadio() {
       })
       .subscribe();
 
-    // All Call in-app broadcast
-    const allCallCh = supabase.channel(`radio-allcall-${orgId}`);
-    allCallCh.on('broadcast', { event: 'all_call' }, ({ payload }) => {
-      if (payload.callerId === user.id) return;
-      toast(`📻 ${payload.callerName || 'Someone'} started All Staff Radio`, {
-        duration: 30000,
-        action: { label: 'Join now', onClick: () => joinChannel('allstaff-broadcast').then(() => { setActiveChannel({ name: 'All Staff', id: '__allcall' }); setView('ptt'); }) },
-      });
-    }).subscribe();
-    rtAllCallRef.current = allCallCh;
-
     // Emergency in-app broadcast
     const emergencyCh = supabase.channel(`radio-emergency-${orgId}`);
     emergencyCh.on('broadcast', { event: 'sos' }, ({ payload }) => {
@@ -476,25 +464,10 @@ export default function TwoWayRadio() {
     .subscribe();
     rtEmergencyRef.current = emergencyCh;
 
-    return () => { supabase.removeChannel(callSub); supabase.removeChannel(allCallCh); supabase.removeChannel(emergencyCh); };
+    return () => { supabase.removeChannel(callSub); supabase.removeChannel(emergencyCh); };
   }, [user?.id]);
 
   // ── Radio action handlers ─────────────────────────────────────────────────
-  const handleAllCall = async () => {
-    await joinChannel('allstaff-broadcast');
-    setActiveChannel({ name: 'All Staff', id: '__allcall' });
-    setSelectedPerson(null); setView('ptt');
-    const callerName = user?.full_name || user?.email || 'A team member';
-    rtAllCallRef.current?.send({ type: 'broadcast', event: 'all_call', payload: { callerName, callerId: user.id } }).catch(() => {});
-    const recipientIds = otherStaff.map(s => s.id);
-    if (recipientIds.length > 0) {
-      base44.functions.invoke('createNotification', {
-        recipient_ids: resolveRecipients(recipientIds), type: 'radio_call', title: '📻 All Staff Radio',
-        message: `${callerName} is on the All Staff channel. Tap to join.`,
-        priority: 'high', action_url: '/TwoWayRadio?join=allstaff-broadcast', send_push: true,
-      }).catch(() => {});
-    }
-  };
 
   const initiateP2PCall = async (overridePerson = null) => {
     const target = overridePerson || selectedPerson;
@@ -766,9 +739,7 @@ export default function TwoWayRadio() {
     if (joinedChRef.current === target) return;
     const doJoin = async () => {
       await joinChannel(target);
-      if (target === 'allstaff-broadcast') {
-        setActiveChannel({ name: 'All Staff', id: '__allcall' });
-      } else if (target.startsWith('ptp_')) {
+      if (target.startsWith('ptp_')) {
         setActiveChannel({ name: 'Radio Call', id: '__ptp' });
         stopTone(); setIncomingCall(null);
         const { data: pending } = await supabase
@@ -1219,12 +1190,6 @@ export default function TwoWayRadio() {
             </div>
           )}
           <div className="space-y-2">
-            <button onClick={handleAllCall}
-              className="w-full flex items-center gap-3 bg-slate-800 hover:bg-slate-700 rounded-xl px-4 py-3 transition-colors text-left">
-              <div className="w-10 h-10 rounded-full bg-red-600/20 flex items-center justify-center shrink-0"><Users className="w-5 h-5 text-red-400" /></div>
-              <div className="flex-1 min-w-0"><p className="text-white font-semibold text-sm">All Staff</p><p className="text-slate-400 text-xs">Broadcast to everyone</p></div>
-              <ChevronLeft className="w-4 h-4 text-slate-600 rotate-180 shrink-0" />
-            </button>
             {channels.map(ch => (
               <div key={ch.id} className="flex items-center gap-2">
                 <button onClick={async () => { await joinChannel(ch.name); setActiveChannel(ch); setSelectedPerson(null); setView('ptt'); }}
