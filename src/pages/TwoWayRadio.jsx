@@ -258,7 +258,7 @@ export default function TwoWayRadio() {
   const myAreaId = user?.area_id || user?.rota_area_id || null;
   const areaById = Object.fromEntries(areas.map(a => [String(a.id), a]));
   const groupedByArea = {};
-  otherStaff.forEach(s => {
+  otherStaff.filter(s => s.role !== 'admin' && s.role !== 'super_admin').forEach(s => {
     const aId = String(s.area_id || s.rota_area_id || 'none');
     if (!groupedByArea[aId]) groupedByArea[aId] = [];
     groupedByArea[aId].push(s);
@@ -268,9 +268,9 @@ export default function TwoWayRadio() {
     if (b === String(myAreaId)) return 1;
     return (areaById[a]?.name || '').localeCompare(areaById[b]?.name || '');
   });
-  const visibleAreaIds = isSuperAdmin
-    ? sortedAreaIds
-    : sortedAreaIds.filter(id => id === String(myAreaId));
+  // All staff see all areas; admins shown in their own top section
+  const visibleAreaIds = sortedAreaIds;
+  const adminStaff = otherStaff.filter(s => s.role === 'admin' || s.role === 'super_admin');
 
   const formatCallTime = (dateStr) => {
     const d = new Date(dateStr);
@@ -283,9 +283,11 @@ export default function TwoWayRadio() {
   const testMode = !!radioSettings?.test_mode;
   const resolveRecipients = (ids) => testMode ? (user?.id ? [user.id] : []) : ids;
 
-  // Auto-expand the logged-in user's own area when user data loads
+  // Auto-expand the logged-in user's own area + admins group on load
   useEffect(() => {
-    if (myAreaId) setExpandedAreas(new Set([String(myAreaId)]));
+    const ids = ['__admins'];
+    if (myAreaId) ids.push(String(myAreaId));
+    setExpandedAreas(new Set(ids));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myAreaId]);
 
@@ -1207,7 +1209,7 @@ export default function TwoWayRadio() {
           </div>
         </div>
 
-        {/* PEOPLE — grouped by area */}
+        {/* PEOPLE — Admins group + area groups, all staff visible */}
         <div className="px-4 pt-4 pb-2">
           <div className="flex items-center justify-between mb-3">
             <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
@@ -1215,88 +1217,122 @@ export default function TwoWayRadio() {
             </span>
             {selectedPerson && <button onClick={() => setSelectedPerson(null)} className="text-slate-500 hover:text-slate-300 text-xs">Clear</button>}
           </div>
-          <div className="space-y-2">
-            {visibleAreaIds.length === 0 && <p className="text-slate-500 text-sm text-center py-4">No staff found</p>}
-            {visibleAreaIds.map(aId => {
-              const areaStaff = groupedByArea[aId] || [];
-              const areaName = areaById[aId]?.name || (aId === 'none' ? 'My Team' : 'Team');
-              const isExpanded = expandedAreas.has(aId);
-              const isMyArea = aId === String(myAreaId);
-              const onShiftStaff = areaStaff.filter(s => getStaffStatus(s.id) !== 'off_shift');
-              const offShiftStaff = areaStaff.filter(s => getStaffStatus(s.id) === 'off_shift');
-              const showOff = !!showOffShiftByArea[aId];
-              const displayedStaff = isExpanded ? (showOff ? areaStaff : onShiftStaff) : [];
+
+          {/* Reusable staff card */}
+          {(() => {
+            const StaffCard = ({ s, teamLabel }) => {
+              const status = getStaffStatus(s.id);
+              const cfg = statusCfg[status] || statusCfg.off_shift;
+              const uid = toUid(s.id);
+              const isSpeaking = speakingUids.has(uid);
+              const isSelected = selectedPerson?.id === s.id;
               return (
-                <div key={aId} className="rounded-xl overflow-hidden border border-slate-700/50">
-                  <button
-                    onClick={() => setExpandedAreas(prev => {
-                      const next = new Set(prev);
-                      if (next.has(aId)) next.delete(aId); else next.add(aId);
-                      return next;
-                    })}
-                    className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors ${
-                      isMyArea ? 'bg-teal-900/40 hover:bg-teal-900/60' : 'bg-slate-800 hover:bg-slate-700'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className={`font-semibold text-sm truncate ${isMyArea ? 'text-teal-300' : 'text-slate-300'}`}>{areaName}</span>
-                      {isMyArea && <span className="text-teal-500 text-xs shrink-0">My Team</span>}
-                      <span className="text-slate-500 text-xs shrink-0 ml-1">
-                        <span className="text-green-400">{onShiftStaff.length} on</span>
-                        {offShiftStaff.length > 0 && <span className="text-blue-400"> · {offShiftStaff.length} off</span>}
-                      </span>
+                <button key={s.id} onClick={() => setSelectedPerson(isSelected ? null : s)}
+                  className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all text-left ${
+                    isSelected ? 'bg-teal-900/50 ring-2 ring-teal-500'
+                    : isSpeaking ? 'bg-slate-700 ring-1 ring-teal-600'
+                    : 'bg-slate-800/80 hover:bg-slate-700'
+                  }`}
+                >
+                  <div className="relative shrink-0">
+                    <div className="w-9 h-9 rounded-full bg-slate-600 flex items-center justify-center text-white font-bold text-sm">
+                      {(s.full_name || s.email || '?')[0].toUpperCase()}
                     </div>
-                    <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform shrink-0 ml-2 ${isExpanded ? 'rotate-180' : ''}`} />
-                  </button>
-                  {isExpanded && (
-                    <div className="bg-slate-800/50 space-y-0.5 px-2 pt-1 pb-2">
-                      {displayedStaff.length === 0 && onShiftStaff.length === 0 && (
-                        <p className="text-slate-500 text-xs text-center py-3">No on-shift staff</p>
-                      )}
-                      {displayedStaff.map(s => {
-                        const status = getStaffStatus(s.id);
-                        const cfg = statusCfg[status] || statusCfg.off_shift;
-                        const uid = toUid(s.id);
-                        const isSpeaking = speakingUids.has(uid);
-                        const isSelected = selectedPerson?.id === s.id;
-                        return (
-                          <button key={s.id} onClick={() => setSelectedPerson(isSelected ? null : s)}
-                            className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all text-left ${
-                              isSelected ? 'bg-teal-900/50 ring-2 ring-teal-500'
-                              : isSpeaking ? 'bg-slate-700 ring-1 ring-teal-600'
-                              : 'bg-slate-800/80 hover:bg-slate-700'
-                            }`}
-                          >
-                            <div className="relative shrink-0">
-                              <div className="w-9 h-9 rounded-full bg-slate-600 flex items-center justify-center text-white font-bold text-sm">
-                                {(s.full_name || s.email || '?')[0].toUpperCase()}
-                              </div>
-                              <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-slate-900 ${cfg.dot}`} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-white font-semibold text-sm truncate">{s.full_name || s.email}</p>
-                              <p className={`text-xs ${isSpeaking ? 'text-teal-400 animate-pulse' : cfg.text}`}>
-                                {isSpeaking ? '🎙 Speaking' : cfg.label}
-                              </p>
-                            </div>
-                            {isSelected && <span className="text-teal-400 text-xs font-bold shrink-0">SELECTED</span>}
-                          </button>
-                        );
-                      })}
-                      {offShiftStaff.length > 0 && (
-                        <button
-                          onClick={() => setShowOffShiftByArea(prev => ({ ...prev, [aId]: !showOff }))}
-                          className="w-full text-center text-xs text-blue-400 hover:text-blue-300 py-2 transition-colors"
-                        >
-                          {showOff ? 'Hide off-shift staff' : `+ ${offShiftStaff.length} off-shift`}
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
+                    <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-slate-900 ${cfg.dot}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-semibold text-sm truncate">{s.full_name || s.email}</p>
+                    <p className={`text-xs ${isSpeaking ? 'text-teal-400 animate-pulse' : cfg.text}`}>
+                      {isSpeaking ? '🎙 Speaking' : cfg.label}
+                      {teamLabel && <span className="text-slate-500"> · {teamLabel}</span>}
+                    </p>
+                  </div>
+                  {isSelected && <span className="text-teal-400 text-xs font-bold shrink-0">SELECTED</span>}
+                </button>
               );
-            })}
-          </div>
+            };
+
+            const SectionHeader = ({ aId, label, isMyArea, onShiftCount, offShiftCount }) => {
+              const isExpanded = expandedAreas.has(aId);
+              return (
+                <button
+                  onClick={() => setExpandedAreas(prev => {
+                    const next = new Set(prev); if (next.has(aId)) next.delete(aId); else next.add(aId); return next;
+                  })}
+                  className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors ${
+                    isMyArea ? 'bg-teal-900/40 hover:bg-teal-900/60' : 'bg-slate-800 hover:bg-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`font-semibold text-sm truncate ${isMyArea ? 'text-teal-300' : 'text-slate-300'}`}>{label}</span>
+                    {isMyArea && <span className="text-teal-500 text-xs shrink-0">My Team</span>}
+                    {onShiftCount !== undefined && (
+                      <span className="text-slate-500 text-xs shrink-0 ml-1">
+                        <span className="text-green-400">{onShiftCount} on</span>
+                        {offShiftCount > 0 && <span className="text-blue-400"> · {offShiftCount} off</span>}
+                      </span>
+                    )}
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform shrink-0 ml-2 ${isExpanded ? 'rotate-180' : ''}`} />
+                </button>
+              );
+            };
+
+            return (
+              <div className="space-y-2">
+                {/* Admins group */}
+                {adminStaff.length > 0 && (
+                  <div className="rounded-xl overflow-hidden border border-purple-800/40">
+                    <SectionHeader aId="__admins" label="Admins & Managers" isMyArea={false} />
+                    {expandedAreas.has('__admins') && (
+                      <div className="bg-slate-800/50 space-y-0.5 px-2 pt-1 pb-2">
+                        {adminStaff.map(s => {
+                          const teamLabel = areaById[String(s.area_id || s.rota_area_id)]?.name;
+                          return <StaffCard key={s.id} s={s} teamLabel={teamLabel} />;
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Area groups */}
+                {visibleAreaIds.length === 0 && adminStaff.length === 0 && (
+                  <p className="text-slate-500 text-sm text-center py-4">No staff found</p>
+                )}
+                {visibleAreaIds.map(aId => {
+                  const areaStaff = groupedByArea[aId] || [];
+                  const areaName = areaById[aId]?.name || (aId === 'none' ? 'Unassigned' : 'Team');
+                  const isMyArea = aId === String(myAreaId);
+                  const onShiftStaff = areaStaff.filter(s => getStaffStatus(s.id) !== 'off_shift');
+                  const offShiftStaff = areaStaff.filter(s => getStaffStatus(s.id) === 'off_shift');
+                  const showOff = !!showOffShiftByArea[aId];
+                  const isExpanded = expandedAreas.has(aId);
+                  const displayedStaff = isExpanded ? (showOff ? areaStaff : onShiftStaff) : [];
+                  return (
+                    <div key={aId} className="rounded-xl overflow-hidden border border-slate-700/50">
+                      <SectionHeader aId={aId} label={areaName} isMyArea={isMyArea} onShiftCount={onShiftStaff.length} offShiftCount={offShiftStaff.length} />
+                      {isExpanded && (
+                        <div className="bg-slate-800/50 space-y-0.5 px-2 pt-1 pb-2">
+                          {displayedStaff.length === 0 && onShiftStaff.length === 0 && (
+                            <p className="text-slate-500 text-xs text-center py-3">No on-shift staff</p>
+                          )}
+                          {displayedStaff.map(s => <StaffCard key={s.id} s={s} teamLabel={null} />)}
+                          {offShiftStaff.length > 0 && (
+                            <button
+                              onClick={() => setShowOffShiftByArea(prev => ({ ...prev, [aId]: !showOff }))}
+                              className="w-full text-center text-xs text-blue-400 hover:text-blue-300 py-2 transition-colors"
+                            >
+                              {showOff ? 'Hide off-shift staff' : `+ ${offShiftStaff.length} off-shift`}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
 
         {/* CALL LOG */}
