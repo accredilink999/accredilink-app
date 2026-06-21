@@ -115,6 +115,10 @@ export default function TwoWayRadio() {
   const rtAllCallRef   = useRef(null);
   const rtEmergencyRef = useRef(null);
 
+  // PTT intent ref — tracks whether the user is still holding the button,
+  // so we can cancel if they release before the async mic track is ready
+  const shouldTalkRef = useRef(false);
+
   // Emergency refs
   const countdownTimerRef  = useRef(null);
   const countdownAudioRef  = useRef(null);
@@ -241,19 +245,28 @@ export default function TwoWayRadio() {
 
   const startTalking = async () => {
     if (!isJoined || isTalking) return;
+    shouldTalkRef.current = true;
     try {
       const track = await AgoraRTC.createMicrophoneAudioTrack();
       micTrackRef.current = track;
       await clientRef.current.publish(track);
-      setIsTalking(true); setMicPermission('granted');
+      setMicPermission('granted');
+      // If user released before the track was ready, stop immediately
+      if (!shouldTalkRef.current) {
+        try { await clientRef.current.unpublish(track); track.stop(); track.close(); micTrackRef.current = null; } catch {}
+        return;
+      }
+      setIsTalking(true);
     } catch (e) {
+      shouldTalkRef.current = false;
       if (e.name === 'NotAllowedError') { setMicPermission('denied'); toast.error('Microphone access denied'); }
       else toast.error('Mic error: ' + e.message);
     }
   };
 
   const stopTalking = async () => {
-    if (!isTalking || isHandsFree) return; // don't stop if in hands-free emergency mode
+    shouldTalkRef.current = false;
+    if (isHandsFree) return; // don't stop if in hands-free emergency mode
     try {
       if (micTrackRef.current) { await clientRef.current.unpublish(micTrackRef.current); micTrackRef.current.stop(); micTrackRef.current.close(); micTrackRef.current = null; }
     } catch {}
@@ -871,8 +884,9 @@ export default function TwoWayRadio() {
                 )}
                 <button
                   disabled={!isJoined || joining}
-                  onMouseDown={startTalking} onMouseUp={stopTalking} onMouseLeave={stopTalking}
-                  onTouchStart={e => { e.preventDefault(); startTalking(); }} onTouchEnd={e => { e.preventDefault(); stopTalking(); }} onTouchCancel={e => { e.preventDefault(); stopTalking(); }}
+                  onPointerDown={e => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); startTalking(); }}
+                  onPointerUp={e => { e.preventDefault(); stopTalking(); }}
+                  onPointerCancel={stopTalking}
                   className={`relative w-48 h-48 rounded-full flex flex-col items-center justify-center gap-3 font-bold transition-all select-none touch-none shadow-2xl ${
                     !isJoined ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
                     : isTalking ? 'bg-red-600 text-white scale-95'
