@@ -441,7 +441,19 @@ export default function Layout({ children, currentPageName }) {
     enabled: !!user?.id,
     refetchInterval: 60000,
   });
-  const [dismissedBannerIds, setDismissedBannerIds] = useState(new Set());
+  const [dismissedBannerIds, setDismissedBannerIds] = useState(() => {
+    try {
+      const raw = localStorage.getItem('dismissedMissedCalls');
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch { return new Set(); }
+  });
+  const dismissBannerCalls = (...ids) => {
+    setDismissedBannerIds(prev => {
+      const next = new Set([...prev, ...ids]);
+      try { localStorage.setItem('dismissedMissedCalls', JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  };
   const visibleMissedCalls = currentPageName !== 'TwoWayRadio'
     ? missedRadioCalls.filter(c => !dismissedBannerIds.has(c.id))
     : [];
@@ -1126,7 +1138,7 @@ export default function Layout({ children, currentPageName }) {
                                            Open Radio
                                          </button>
                                          <button
-                                           onClick={() => setDismissedBannerIds(prev => new Set([...prev, ...visibleMissedCalls.map(c => c.id)]))}
+                                           onClick={() => dismissBannerCalls(...visibleMissedCalls.map(c => c.id))}
                                            className="text-amber-200 hover:text-white shrink-0 p-1 touch-manipulation"
                                          >
                                            <X className="w-5 h-5" />

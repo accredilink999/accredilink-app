@@ -1235,7 +1235,7 @@ export default function TwoWayRadio() {
   const ManageModal = managingChannelId && (() => {
     const ch = channels.find(c => c.id === managingChannelId);
     if (!ch) return null;
-    const allStaff = staff.filter(s => s.id !== user?.id);
+    const allStaff = staff.slice();
     return (
       <div className="fixed inset-0 z-[200] bg-black/70 flex flex-col justify-end" onClick={() => setManagingChannelId(null)}>
         <div className="bg-slate-900 rounded-t-2xl border-t border-slate-700 max-h-[75vh] flex flex-col" onClick={e => e.stopPropagation()}>
