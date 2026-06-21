@@ -879,14 +879,6 @@ export default function TwoWayRadio() {
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
   }, []);
 
-  // Disarm group PTT when leaving group mode
-  useEffect(() => {
-    if (pttMode !== 'group') {
-      setGroupPttArmed(false);
-      if (groupPttArmTimerRef.current) { clearTimeout(groupPttArmTimerRef.current); groupPttArmTimerRef.current = null; }
-    }
-  }, [pttMode]);
-
   // Global pointer release — stops PTT no matter where the finger lifts
   useEffect(() => {
     const up = () => { if (shouldTalkRef.current) stopTalking(); };
@@ -1249,6 +1241,14 @@ export default function TwoWayRadio() {
 
   // PTT bar: group when in channel with no person selected, P2P when person selected, disabled otherwise
   const pttMode = selectedPerson ? 'p2p' : isInChannel ? 'group' : 'disabled';
+
+  // Disarm group PTT when leaving group mode (must be after pttMode is declared)
+  useEffect(() => {
+    if (pttMode !== 'group') {
+      setGroupPttArmed(false);
+      if (groupPttArmTimerRef.current) { clearTimeout(groupPttArmTimerRef.current); groupPttArmTimerRef.current = null; }
+    }
+  }, [pttMode]);
 
   // Reusable staff pill inside a channel card
   const StaffPill = ({ s }) => {
