@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
@@ -16,7 +17,7 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import CallManager from '@/components/rota/CallManager';
 import ShiftSittingLogs from '@/components/rota/ShiftSittingLogs';
 import ShiftSwapRequest from '@/components/rota/ShiftSwapRequest';
-import { Clock, MapPin, Calendar, User, Trash2, Play, Square, RefreshCw, Edit2, Save, X, Car, FileText, CheckCircle, AlertCircle, Home } from 'lucide-react';
+import { Clock, MapPin, Calendar, User, Trash2, Play, Square, RefreshCw, Edit2, Save, X, Car, FileText, CheckCircle, AlertCircle, Home, Radio } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from 'date-fns';
 import { notifyAdminsOfActivity } from '@/utils/adminNotifications';
@@ -41,6 +42,7 @@ function timeToMinutes(t) {
 }
 
 export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId, isEditMode = false }) {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isSitIn = SIT_IN_NAMES.has(shift?.shift_name);
   const [activeTab, setActiveTab] = useState(isSitIn ? 'sitting-logs' : 'calls');
@@ -895,6 +897,15 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
                   >
                     <Square className="w-4 h-4 mr-2" />
                     Clock Off Shift
+                  </Button>
+                )}
+                {currentShift.clock_in_time && !currentShift.clock_out_time && (
+                  <Button
+                    onClick={() => { onClose(); navigate('/TwoWayRadio'); }}
+                    className="bg-teal-600 hover:bg-teal-700 min-h-[44px] px-4 touch-manipulation"
+                  >
+                    <Radio className="w-4 h-4 mr-2" />
+                    Team Radio
                   </Button>
                 )}
                 {currentShift.status === 'scheduled' && (
