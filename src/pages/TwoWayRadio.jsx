@@ -1256,7 +1256,7 @@ export default function TwoWayRadio() {
           </div>
         </div>
 
-        {/* PEOPLE — Admins group + area groups, all staff visible */}
+        {/* PEOPLE — Admins group + area groups, all staff always shown */}
         <div className="px-4 pt-4 pb-2">
           <div className="flex items-center justify-between mb-3">
             <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
@@ -1265,7 +1265,6 @@ export default function TwoWayRadio() {
             {selectedPerson && <button onClick={() => setSelectedPerson(null)} className="text-slate-500 hover:text-slate-300 text-xs">Clear</button>}
           </div>
 
-          {/* Reusable staff card */}
           {(() => {
             const StaffCard = ({ s, teamLabel }) => {
               const status = getStaffStatus(s.id);
@@ -1299,81 +1298,43 @@ export default function TwoWayRadio() {
               );
             };
 
-            const SectionHeader = ({ aId, label, isMyArea, onShiftCount, offShiftCount }) => {
-              const isExpanded = expandedAreas.has(aId);
-              return (
-                <button
-                  onClick={() => setExpandedAreas(prev => {
-                    const next = new Set(prev); if (next.has(aId)) next.delete(aId); else next.add(aId); return next;
-                  })}
-                  className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors ${
-                    isMyArea ? 'bg-teal-900/40 hover:bg-teal-900/60' : 'bg-slate-800 hover:bg-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className={`font-semibold text-sm truncate ${isMyArea ? 'text-teal-300' : 'text-slate-300'}`}>{label}</span>
-                    {isMyArea && <span className="text-teal-500 text-xs shrink-0">My Team</span>}
-                    {onShiftCount !== undefined && (
-                      <span className="text-slate-500 text-xs shrink-0 ml-1">
-                        <span className="text-green-400">{onShiftCount} on</span>
-                        {offShiftCount > 0 && <span className="text-blue-400"> · {offShiftCount} off</span>}
-                      </span>
-                    )}
-                  </div>
-                  <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform shrink-0 ml-2 ${isExpanded ? 'rotate-180' : ''}`} />
-                </button>
-              );
-            };
+            const sortByStatus = arr => [...arr].sort((a, b) => {
+              const order = { with_client: 0, on_break: 1, available: 2, off_shift: 3 };
+              return (order[getStaffStatus(a.id)] ?? 3) - (order[getStaffStatus(b.id)] ?? 3);
+            });
 
             return (
-              <div className="space-y-2">
-                {/* Admins group */}
+              <div className="space-y-4">
+                {/* Admins & Managers */}
                 {adminStaff.length > 0 && (
-                  <div className="rounded-xl overflow-hidden border border-purple-800/40">
-                    <SectionHeader aId="__admins" label="Admins & Managers" isMyArea={false} />
-                    {expandedAreas.has('__admins') && (
-                      <div className="bg-slate-800/50 space-y-0.5 px-2 pt-1 pb-2">
-                        {adminStaff.map(s => {
-                          const teamLabel = areaById[String(s.area_id || s.rota_area_id)]?.name;
-                          return <StaffCard key={s.id} s={s} teamLabel={teamLabel} />;
-                        })}
-                      </div>
-                    )}
+                  <div>
+                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-2 px-1">Admins &amp; Managers</p>
+                    <div className="space-y-0.5">
+                      {sortByStatus(adminStaff).map(s => {
+                        const teamLabel = areaById[String(s.area_id || s.rota_area_id)]?.name;
+                        return <StaffCard key={s.id} s={s} teamLabel={teamLabel} />;
+                      })}
+                    </div>
                   </div>
                 )}
 
-                {/* Area groups */}
+                {/* One section per area — all staff always visible */}
                 {visibleAreaIds.length === 0 && adminStaff.length === 0 && (
                   <p className="text-slate-500 text-sm text-center py-4">No staff found</p>
                 )}
                 {visibleAreaIds.map(aId => {
                   const areaStaff = groupedByArea[aId] || [];
+                  if (!areaStaff.length) return null;
                   const areaName = areaById[aId]?.name || (aId === 'none' ? 'Unassigned' : 'Team');
                   const isMyArea = aId === String(myAreaId);
-                  const onShiftStaff = areaStaff.filter(s => getStaffStatus(s.id) !== 'off_shift');
-                  const offShiftStaff = areaStaff.filter(s => getStaffStatus(s.id) === 'off_shift');
-                  const showOff = !!showOffShiftByArea[aId];
-                  const isExpanded = expandedAreas.has(aId);
-                  const displayedStaff = isExpanded ? (showOff ? areaStaff : onShiftStaff) : [];
                   return (
-                    <div key={aId} className="rounded-xl overflow-hidden border border-slate-700/50">
-                      <SectionHeader aId={aId} label={areaName} isMyArea={isMyArea} onShiftCount={onShiftStaff.length} offShiftCount={offShiftStaff.length} />
-                      {isExpanded && (
-                        <div className="bg-slate-800/50 space-y-0.5 px-2 pt-1 pb-2">
-                          {displayedStaff.length === 0 && onShiftStaff.length === 0 && (
-                            <p className="text-slate-500 text-xs text-center py-3">No on-shift staff</p>
-                          )}
-                          {displayedStaff.map(s => <StaffCard key={s.id} s={s} teamLabel={null} />)}
-                          {offShiftStaff.length > 0 && (
-                            <button
-                              onClick={() => setShowOffShiftByArea(prev => ({ ...prev, [aId]: !showOff }))}
-                              className="w-full text-center text-xs text-blue-400 hover:text-blue-300 py-2 transition-colors"
-                            >
-                              {showOff ? 'Hide off-shift staff' : `+ ${offShiftStaff.length} off-shift`}
-                            </button>
-                          )}
-                        </div>
-                      )}
+                    <div key={aId}>
+                      <p className={`text-xs font-semibold uppercase tracking-wider mb-2 px-1 ${isMyArea ? 'text-teal-400' : 'text-slate-500'}`}>
+                        {areaName}{isMyArea && <span className="normal-case font-normal text-teal-500 ml-1">— My Team</span>}
+                      </p>
+                      <div className="space-y-0.5">
+                        {sortByStatus(areaStaff).map(s => <StaffCard key={s.id} s={s} teamLabel={null} />)}
+                      </div>
                     </div>
                   );
                 })}
