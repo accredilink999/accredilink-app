@@ -225,21 +225,27 @@ export default function TwoWayRadio() {
     staleTime: 300000,
   });
 
-  // Missed / callback calls in the last 4 hours
+  // Missed / callback / cancelled calls in the last 24 hours
   const { data: missedCalls = [] } = useQuery({
     queryKey: ['missedRadioCalls', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
       const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const [{ data: cbCalls }, { data: dcCalls }] = await Promise.all([
+      const [{ data: cbCalls }, { data: dcCalls }, { data: cancelledCalls }] = await Promise.all([
+        // I was called and said "call back"
         supabase.from('radio_calls').select('id, caller_id, callee_id, status, created_at')
           .eq('callee_id', user.id).eq('status', 'callback').gt('created_at', since)
           .order('created_at', { ascending: false }),
+        // I called someone and they declined
         supabase.from('radio_calls').select('id, caller_id, callee_id, status, created_at')
           .eq('caller_id', user.id).eq('status', 'declined').gt('created_at', since)
           .order('created_at', { ascending: false }),
+        // Someone called me but I didn't answer (30s timeout → cancelled)
+        supabase.from('radio_calls').select('id, caller_id, callee_id, status, created_at')
+          .eq('callee_id', user.id).eq('status', 'cancelled').gt('created_at', since)
+          .order('created_at', { ascending: false }),
       ]);
-      return [...(cbCalls || []), ...(dcCalls || [])]
+      return [...(cbCalls || []), ...(dcCalls || []), ...(cancelledCalls || [])]
         .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
         .slice(0, 20);
     },
@@ -493,7 +499,7 @@ export default function TwoWayRadio() {
   };
 
   const callBackFromMissed = (call) => {
-    const personId = call.status === 'callback' ? call.caller_id : call.callee_id;
+    const personId = (call.status === 'callback' || call.status === 'cancelled') ? call.caller_id : call.callee_id;
     const person = staffRef.current.find(s => s.id === personId);
     if (!person) { toast.error('Could not find that person'); return; }
     setDismissedMissedIds(prev => new Set([...prev, call.id]));
@@ -1357,7 +1363,7 @@ export default function TwoWayRadio() {
             </div>
             <div className="space-y-2 max-h-72 overflow-y-auto pr-0.5">
               {missedCalls.filter(c => !dismissedMissedIds.has(c.id)).map(call => {
-                const personId = call.status === 'callback' ? call.caller_id : call.callee_id;
+                const personId = (call.status === 'callback' || call.status === 'cancelled') ? call.caller_id : call.callee_id;
                 const person = staff.find(s => s.id === personId);
                 return (
                   <div key={call.id} className="flex items-center gap-3 bg-slate-800 rounded-xl px-4 py-3">
@@ -1366,7 +1372,7 @@ export default function TwoWayRadio() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-white font-semibold text-sm truncate">{person?.full_name || 'Team Member'}</p>
-                      <p className="text-amber-400 text-xs">{call.status === 'callback' ? 'Call back requested' : 'Declined your call'}</p>
+                      <p className="text-amber-400 text-xs">{call.status === 'callback' ? 'Call back requested' : call.status === 'cancelled' ? 'Missed call' : 'Declined your call'}</p>
                       <p className="text-slate-500 text-xs">{formatCallTime(call.created_at)}</p>
                     </div>
                     <button onClick={() => callBackFromMissed(call)}

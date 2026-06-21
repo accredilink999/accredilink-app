@@ -523,8 +523,8 @@ export default function Layout({ children, currentPageName }) {
           setGlobalIncomingCall(null);
           stopGlobalRing();
         }
-        // Refresh missed calls list when I say "callback" or call gets declined
-        if (['callback', 'declined'].includes(status)) {
+        // Refresh missed calls when I said callback, call was declined, or caller gave up (cancelled = missed call for me)
+        if (['callback', 'declined', 'cancelled'].includes(status)) {
           queryClient.invalidateQueries({ queryKey: ['missedRadioCalls', user.id] });
         }
       })
