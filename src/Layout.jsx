@@ -401,6 +401,8 @@ export default function Layout({ children, currentPageName }) {
   const [globalIncomingCall, setGlobalIncomingCall] = useState(null);
   const globalRingStopRef = useRef(null);
   const globalStaffRef = useRef([]);
+  const currentPageNameRef = useRef(currentPageName);
+  useEffect(() => { currentPageNameRef.current = currentPageName; }, [currentPageName]);
 
   const { data: radioStaff = [] } = useQuery({
     queryKey: ['staff'],
@@ -443,6 +445,8 @@ export default function Layout({ children, currentPageName }) {
         const call = payload.new;
         if (call.status !== 'pending') return;
         if (Date.now() - new Date(call.created_at).getTime() > 30000) return;
+        // TwoWayRadio page has its own overlay + ring — don't double up
+        if (currentPageNameRef.current === 'TwoWayRadio') return;
         const caller = globalStaffRef.current.find(s => s.id === call.caller_id)
           || { full_name: 'Team Member', id: call.caller_id };
         setGlobalIncomingCall({ callId: call.id, caller, channelName: call.channel_name });
