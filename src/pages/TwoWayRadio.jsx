@@ -1343,7 +1343,7 @@ export default function TwoWayRadio() {
       {TextAlertModal}
       {ManageModal}
 
-      {/* ── PTT SIDE BAR — always visible, mode changes ── */}
+      {/* ── PTT SIDE BAR — centred on edge, smaller pill ── */}
       <button
         disabled={pttMode === 'disabled'}
         onPointerDown={e => {
@@ -1352,7 +1352,6 @@ export default function TwoWayRadio() {
             initiateP2PCall();
           } else if (pttMode === 'group') {
             if (!groupPttArmed) {
-              // First tap: arm the button — auto-disarms after 15s
               setGroupPttArmed(true);
               if (groupPttArmTimerRef.current) clearTimeout(groupPttArmTimerRef.current);
               groupPttArmTimerRef.current = setTimeout(() => { setGroupPttArmed(false); groupPttArmTimerRef.current = null; }, 15000);
@@ -1361,7 +1360,7 @@ export default function TwoWayRadio() {
             }
           }
         }}
-        style={{ position: 'fixed', top: 0, bottom: 0, [pttHandedness]: 0, width: 68, zIndex: 40 }}
+        style={{ position: 'fixed', top: '50%', transform: 'translateY(-50%)', [pttHandedness]: 0, width: 52, height: 130, zIndex: 40 }}
         className={`flex flex-col items-center justify-center gap-2 select-none touch-none transition-colors ${
           pttMode === 'disabled' ? 'bg-slate-800/80 text-slate-700'
           : pttMode === 'p2p' ? 'bg-green-700 text-white'
@@ -1688,16 +1687,31 @@ export default function TwoWayRadio() {
         )}
       </div>
 
-      {/* FIXED BOTTOM BAR */}
-      <div className={`fixed bottom-16 left-0 right-0 px-4 pt-3 pb-2 bg-slate-950/95 backdrop-blur border-t border-slate-800 z-10 space-y-2 ${pttHandedness === 'right' ? 'pr-[84px]' : 'pl-[84px]'}`}>
-        {selectedPerson && (
-          <button onClick={() => { setSelectedPerson(null); }}
-            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 text-xs">
-            <X className="w-3.5 h-3.5" /> Deselect {selectedPerson.full_name} — press PTT bar to call
+      {/* ── DESELECT PILL — only when a person is selected ── */}
+      {selectedPerson && (
+        <div className={`fixed bottom-28 left-0 right-0 px-4 z-20 ${pttHandedness === 'right' ? 'pr-[64px]' : 'pl-[64px]'}`}
+          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+          <button onClick={() => setSelectedPerson(null)}
+            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-slate-800/95 backdrop-blur border border-slate-700 text-slate-300 text-xs">
+            <X className="w-3.5 h-3.5" /> Deselect {selectedPerson.full_name} — press PTT to call
           </button>
-        )}
-        <EmergencyButton onClick={startEmergencyCountdown} disabled={emergencyActive || emergencyCountdown !== null} />
-      </div>
+        </div>
+      )}
+
+      {/* ── SOS BUTTON — fixed round, bottom centre ── */}
+      {!emergencyActive && (
+        <button
+          onClick={startEmergencyCountdown}
+          disabled={emergencyCountdown !== null}
+          style={{ position: 'fixed', bottom: 'calc(20px + env(safe-area-inset-bottom))', left: '50%', transform: 'translateX(-50%)', zIndex: 30 }}
+          className={`w-16 h-16 rounded-full flex flex-col items-center justify-center gap-0.5 shadow-2xl active:scale-95 transition-all touch-manipulation ${
+            emergencyCountdown !== null ? 'bg-slate-700 text-slate-500' : 'bg-red-600 text-white shadow-red-900/60'
+          }`}
+        >
+          <AlertTriangle className="w-6 h-6" />
+          <span className="text-[9px] font-black tracking-widest">SOS</span>
+        </button>
+      )}
     </>
   );
 }
