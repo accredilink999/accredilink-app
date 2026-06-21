@@ -201,29 +201,6 @@ export default function TwoWayRadio() {
 
   useEffect(() => { outgoingRef.current = outgoingCall; }, [outgoingCall]);
 
-  // Auto-expand the logged-in user's own area on load
-  useEffect(() => {
-    if (myAreaId) setExpandedAreas(new Set([String(myAreaId)]));
-  }, [myAreaId]);
-
-  // 30-second outgoing call timeout → offer text alert
-  useEffect(() => {
-    if (outgoingCall?.callId) {
-      callTimeoutRef.current = setTimeout(async () => {
-        const cur = outgoingRef.current;
-        if (!cur?.callId) return;
-        const calleeInfo = cur.callee;
-        stopTone();
-        await supabase.from('radio_calls').update({ status: 'cancelled' }).eq('id', cur.callId);
-        setOutgoingCall(null); setCallDeclined(false);
-        setTextAlertModal({ callee: calleeInfo });
-      }, 30000);
-    } else {
-      if (callTimeoutRef.current) { clearTimeout(callTimeoutRef.current); callTimeoutRef.current = null; }
-    }
-    return () => { if (callTimeoutRef.current) { clearTimeout(callTimeoutRef.current); callTimeoutRef.current = null; } };
-  }, [outgoingCall?.callId]);
-
   // ── Queries ───────────────────────────────────────────────────────────────
   const { data: user }         = useQuery({ queryKey: ['currentUser'], queryFn: () => base44.auth.me() });
   const { data: staff = [] }   = useQuery({ queryKey: ['staff'],       queryFn: () => base44.entities.User.list() });
@@ -306,6 +283,31 @@ export default function TwoWayRadio() {
   // When test mode is ON, only send notifications to the current super admin
   const testMode = !!radioSettings?.test_mode;
   const resolveRecipients = (ids) => testMode ? (user?.id ? [user.id] : []) : ids;
+
+  // Auto-expand the logged-in user's own area when user data loads
+  useEffect(() => {
+    if (myAreaId) setExpandedAreas(new Set([String(myAreaId)]));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myAreaId]);
+
+  // 30-second outgoing call timeout → offer text alert
+  useEffect(() => {
+    if (outgoingCall?.callId) {
+      callTimeoutRef.current = setTimeout(async () => {
+        const cur = outgoingRef.current;
+        if (!cur?.callId) return;
+        const calleeInfo = cur.callee;
+        if (stopToneRef.current) { stopToneRef.current(); stopToneRef.current = null; }
+        await supabase.from('radio_calls').update({ status: 'cancelled' }).eq('id', cur.callId);
+        setOutgoingCall(null); setCallDeclined(false);
+        setTextAlertModal({ callee: calleeInfo });
+      }, 30000);
+    } else {
+      if (callTimeoutRef.current) { clearTimeout(callTimeoutRef.current); callTimeoutRef.current = null; }
+    }
+    return () => { if (callTimeoutRef.current) { clearTimeout(callTimeoutRef.current); callTimeoutRef.current = null; } };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outgoingCall?.callId]);
 
   const getStaffStatus = useCallback((staffId) => {
     const shifts = todayShifts.filter(s => s.staff_id === staffId && s.status !== 'cancelled');
