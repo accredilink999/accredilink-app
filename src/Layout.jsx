@@ -412,6 +412,32 @@ export default function Layout({ children, currentPageName }) {
   });
   useEffect(() => { globalStaffRef.current = radioStaff; }, [radioStaff]);
 
+  // Missed / callback calls — shared cache key with TwoWayRadio
+  const { data: missedRadioCalls = [] } = useQuery({
+    queryKey: ['missedRadioCalls', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const since = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+      const [{ data: cbCalls }, { data: dcCalls }] = await Promise.all([
+        supabase.from('radio_calls').select('id, caller_id, callee_id, status, created_at')
+          .eq('callee_id', user.id).eq('status', 'callback').gt('created_at', since)
+          .order('created_at', { ascending: false }),
+        supabase.from('radio_calls').select('id, caller_id, callee_id, status, created_at')
+          .eq('caller_id', user.id).eq('status', 'declined').gt('created_at', since)
+          .order('created_at', { ascending: false }),
+      ]);
+      return [...(cbCalls || []), ...(dcCalls || [])]
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        .slice(0, 10);
+    },
+    enabled: !!user?.id,
+    refetchInterval: 60000,
+  });
+  const [dismissedBannerIds, setDismissedBannerIds] = useState(new Set());
+  const visibleMissedCalls = currentPageName !== 'TwoWayRadio'
+    ? missedRadioCalls.filter(c => !dismissedBannerIds.has(c.id))
+    : [];
+
   const stopGlobalRing = useCallback(() => {
     if (globalRingStopRef.current) { globalRingStopRef.current(); globalRingStopRef.current = null; }
   }, []);
@@ -452,9 +478,32 @@ export default function Layout({ children, currentPageName }) {
         setGlobalIncomingCall({ callId: call.id, caller, channelName: call.channel_name });
         playGlobalRing();
       })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'radio_calls', filter: `callee_id=eq.${user.id}` }, payload => {
+        const { status } = payload.new;
+        // Clear the global incoming overlay if call resolved
+        if (['accepted', 'ended', 'cancelled', 'declined'].includes(status)) {
+          setGlobalIncomingCall(null);
+          stopGlobalRing();
+        }
+        // Refresh missed calls list when I say "callback" or call gets declined
+        if (['callback', 'declined'].includes(status)) {
+          queryClient.invalidateQueries({ queryKey: ['missedRadioCalls', user.id] });
+        }
+      })
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [user?.id, playGlobalRing]);
+
+    // Watch for others declining MY outgoing calls
+    const ch2 = supabase
+      .channel(`layout-radio-caller-${user.id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'radio_calls', filter: `caller_id=eq.${user.id}` }, payload => {
+        if (['declined', 'callback'].includes(payload.new.status)) {
+          queryClient.invalidateQueries({ queryKey: ['missedRadioCalls', user.id] });
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(ch); supabase.removeChannel(ch2); };
+  }, [user?.id, playGlobalRing, stopGlobalRing, queryClient]);
 
   const handleGlobalAnswer = async () => {
     if (!globalIncomingCall) return;
@@ -1014,6 +1063,38 @@ export default function Layout({ children, currentPageName }) {
                                      {/* App Update Banner */}
                                      <AppUpdateBanner />
                                      <GpsWarningBanner />
+                                     {/* Missed radio calls banner — sticky at top of scroll area, persists until dismissed */}
+                                     {visibleMissedCalls.length > 0 && (
+                                       <div className="sticky top-0 z-40 bg-amber-600 px-4 py-3 flex items-center gap-3">
+                                         <PhoneOff className="w-5 h-5 text-white shrink-0" />
+                                         <div className="flex-1 min-w-0">
+                                           {visibleMissedCalls.length === 1 ? (
+                                             <p className="text-white text-sm font-semibold truncate">
+                                               {(() => {
+                                                 const call = visibleMissedCalls[0];
+                                                 const personId = call.status === 'callback' ? call.caller_id : call.callee_id;
+                                                 const name = globalStaffRef.current.find(s => s.id === personId)?.full_name || 'Team Member';
+                                                 return call.status === 'callback' ? `Call back: ${name}` : `${name} missed your call`;
+                                               })()}
+                                             </p>
+                                           ) : (
+                                             <p className="text-white text-sm font-semibold">{visibleMissedCalls.length} missed radio calls</p>
+                                           )}
+                                         </div>
+                                         <button
+                                           onClick={() => navigate(createPageUrl('TwoWayRadio'))}
+                                           className="bg-white text-amber-700 text-xs font-bold px-3 py-1.5 rounded-lg shrink-0 active:scale-95 transition-transform touch-manipulation"
+                                         >
+                                           Open Radio
+                                         </button>
+                                         <button
+                                           onClick={() => setDismissedBannerIds(prev => new Set([...prev, ...visibleMissedCalls.map(c => c.id)]))}
+                                           className="text-amber-200 hover:text-white shrink-0 p-1 touch-manipulation"
+                                         >
+                                           <X className="w-5 h-5" />
+                                         </button>
+                                       </div>
+                                     )}
                                      {/* Keep-alive: all visited pages stay mounted, hidden with display:none */}
                                      <div className={currentPageName === 'Chat' ? 'p-0 md:p-3 lg:p-4' : 'p-2 md:p-3 lg:p-4'}>
                                          {Object.entries(PAGES).map(([pageName, PageComponent]) => {

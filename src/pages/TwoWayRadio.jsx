@@ -5,14 +5,14 @@ import { useLocation } from 'react-router-dom';
 import { supabase } from '@/api/supabaseClient';
 import { base44 } from '@/api/base44Client';
 import { ShiftApi } from '@/api/rotaApi';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import {
   Radio, Mic, Users, Plus, Trash2, PhoneOff,
   Volume2, Loader2, Signal, ChevronLeft, Phone, Bell,
-  AlertTriangle, MapPin, MicOff
+  AlertTriangle, MapPin, MicOff, X
 } from 'lucide-react';
 
 const AGORA_APP_ID   = 'ff9f260da10245a5ab4855ea3ec59500';
@@ -203,6 +203,29 @@ export default function TwoWayRadio() {
     queryFn: async () => { const { data } = await supabase.from('radio_settings').select('*').limit(1).single(); return data; },
     staleTime: 0, refetchInterval: 30000,
   });
+
+  // Missed / callback calls in the last 4 hours
+  const { data: missedCalls = [] } = useQuery({
+    queryKey: ['missedRadioCalls', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const since = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+      const [{ data: cbCalls }, { data: dcCalls }] = await Promise.all([
+        supabase.from('radio_calls').select('id, caller_id, callee_id, status, created_at')
+          .eq('callee_id', user.id).eq('status', 'callback').gt('created_at', since)
+          .order('created_at', { ascending: false }),
+        supabase.from('radio_calls').select('id, caller_id, callee_id, status, created_at')
+          .eq('caller_id', user.id).eq('status', 'declined').gt('created_at', since)
+          .order('created_at', { ascending: false }),
+      ]);
+      return [...(cbCalls || []), ...(dcCalls || [])]
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        .slice(0, 10);
+    },
+    enabled: !!user?.id,
+    refetchInterval: 60000,
+  });
+  const [dismissedMissedIds, setDismissedMissedIds] = useState(new Set());
 
   const isSuperAdmin  = user?.role === 'super_admin' || user?.role === 'admin';
   const myUid         = user?.id ? toUid(user.id) : null;
@@ -395,24 +418,34 @@ export default function TwoWayRadio() {
     }
   };
 
-  const initiateP2PCall = async () => {
-    if (!selectedPerson || !user?.id) return;
-    const ids = [user.id, selectedPerson.id].sort();
+  const initiateP2PCall = async (overridePerson = null) => {
+    const target = overridePerson || selectedPerson;
+    if (!target || !user?.id) return;
+    const ids = [user.id, target.id].sort();
     const chName = `ptp_${ids[0].slice(0, 8)}_${ids[1].slice(0, 8)}`;
     const { data: callRecord, error } = await supabase.from('radio_calls').insert({
-      caller_id: user.id, callee_id: selectedPerson.id,
+      caller_id: user.id, callee_id: target.id,
       channel_name: chName, status: 'pending', organization_id: getOrgId(),
     }).select().single();
     if (error) { toast.error('Failed to initiate call'); return; }
-    setOutgoingCall({ callId: callRecord.id, callee: selectedPerson, channelName: chName });
+    setOutgoingCall({ callId: callRecord.id, callee: target, channelName: chName });
     setCallDeclined(false);
     stopTone(); stopToneRef.current = playTone([400, 600, 800, 600, 400], true);
     const callerName = user?.full_name || user?.email || 'A team member';
     base44.functions.invoke('createNotification', {
-      recipient_ids: resolveRecipients([selectedPerson.id]), type: 'radio_call',
+      recipient_ids: resolveRecipients([target.id]), type: 'radio_call',
       title: `📞 ${callerName} is calling you`, message: 'Tap to answer on Team Radio.',
       priority: 'high', action_url: `/TwoWayRadio?call=${chName}`, send_push: true,
     }).catch(() => {});
+  };
+
+  const callBackFromMissed = (call) => {
+    const personId = call.status === 'callback' ? call.caller_id : call.callee_id;
+    const person = staffRef.current.find(s => s.id === personId);
+    if (!person) { toast.error('Could not find that person'); return; }
+    setDismissedMissedIds(prev => new Set([...prev, call.id]));
+    setSelectedPerson(person);
+    initiateP2PCall(person);
   };
 
   const cancelOutgoingCall = async () => {
@@ -1094,6 +1127,41 @@ export default function TwoWayRadio() {
             {otherStaff.length === 0 && <p className="text-slate-500 text-sm text-center py-4">No other staff found</p>}
           </div>
         </div>
+
+        {/* MISSED CALLS */}
+        {missedCalls.filter(c => !dismissedMissedIds.has(c.id)).length > 0 && (
+          <div className="px-4 pt-4 pb-2">
+            <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Missed Calls</span>
+            <div className="space-y-2 mt-3">
+              {missedCalls.filter(c => !dismissedMissedIds.has(c.id)).map(call => {
+                const personId = call.status === 'callback' ? call.caller_id : call.callee_id;
+                const person = staff.find(s => s.id === personId);
+                return (
+                  <div key={call.id} className="flex items-center gap-3 bg-slate-800 rounded-xl px-4 py-3">
+                    <div className="w-10 h-10 rounded-full bg-amber-600/20 flex items-center justify-center shrink-0">
+                      <PhoneOff className="w-5 h-5 text-amber-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-semibold text-sm truncate">{person?.full_name || 'Team Member'}</p>
+                      <p className="text-amber-400 text-xs">
+                        {call.status === 'callback' ? 'Call back requested' : 'Declined your call'}
+                        {' · '}{formatDistanceToNow(new Date(call.created_at), { addSuffix: true })}
+                      </p>
+                    </div>
+                    <button onClick={() => callBackFromMissed(call)}
+                      className="bg-green-600 hover:bg-green-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg active:scale-95 transition-all shrink-0">
+                      Call Back
+                    </button>
+                    <button onClick={() => setDismissedMissedIds(prev => new Set([...prev, call.id]))}
+                      className="text-slate-500 hover:text-slate-300 p-1 shrink-0">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* FIXED BOTTOM BAR */}
