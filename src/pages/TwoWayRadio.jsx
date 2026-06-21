@@ -302,13 +302,6 @@ export default function TwoWayRadio() {
   const testMode = !!radioSettings?.test_mode;
   const resolveRecipients = (ids) => testMode ? (user?.id ? [user.id] : []) : ids;
 
-  // Auto-expand the logged-in user's own area + admins group on load
-  useEffect(() => {
-    const ids = ['__admins'];
-    if (myAreaId) ids.push(String(myAreaId));
-    setExpandedAreas(new Set(ids));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [myAreaId]);
 
   // 30-second outgoing call timeout → offer text alert
   useEffect(() => {
