@@ -190,6 +190,7 @@ export default function TwoWayRadio() {
   };
 
   const [showSettings, setShowSettings] = useState(false);
+  const [showStatusMenu, setShowStatusMenu] = useState(false);
 
   // Area grouping
   const [expandedAreas, setExpandedAreas] = useState(new Set());
@@ -320,18 +321,32 @@ export default function TwoWayRadio() {
 
   const getStaffStatus = useCallback((staffId) => {
     const shifts = todayShifts.filter(s => s.staff_id === staffId && s.status !== 'cancelled');
+    // Active clock-in always takes priority (with_client / on_break are auto-detected)
+    if (shifts.length) {
+      const active = shifts.find(s => s.clock_in_time && !s.clock_out_time);
+      if (active) return active.on_break ? 'on_break' : 'with_client';
+    }
+    // Respect manual radio_status from DB when not actively clocked in
+    const manualStatus = staff.find(s => s.id === staffId)?.radio_status;
+    if (manualStatus === 'dnd') return 'dnd';
+    if (manualStatus === 'on_break' && shifts.length) return 'on_break';
+    // Shift-based fallback
     if (!shifts.length) return 'off_shift';
-    const active = shifts.find(s => s.clock_in_time && !s.clock_out_time);
-    if (active) return active.on_break ? 'on_break' : 'with_client';
     const allDone = shifts.every(s => s.clock_out_time);
-    return allDone ? 'off_shift' : 'available';
-  }, [todayShifts]);
+    return allDone ? 'off_shift' : manualStatus === 'available' ? 'available' : 'available';
+  }, [todayShifts, staff]);
+
+  const setMyRadioStatus = async (newStatus) => {
+    await supabase.from('users').update({ radio_status: newStatus }).eq('id', user.id);
+    queryClient.invalidateQueries({ queryKey: ['staff'] });
+  };
 
   const statusCfg = {
-    with_client: { label: 'With Client', dot: 'bg-red-500',   text: 'text-red-400'   },
-    on_break:    { label: 'On Break',    dot: 'bg-amber-400', text: 'text-amber-400' },
-    available:   { label: 'Available',  dot: 'bg-green-500', text: 'text-green-400' },
-    off_shift:   { label: 'Off Shift',  dot: 'bg-blue-500',  text: 'text-blue-400'  },
+    with_client: { label: 'With Client',    dot: 'bg-red-500',    text: 'text-red-400'    },
+    on_break:    { label: 'On Break',       dot: 'bg-amber-400',  text: 'text-amber-400'  },
+    available:   { label: 'Available',     dot: 'bg-green-500',  text: 'text-green-400'  },
+    off_shift:   { label: 'Off Shift',     dot: 'bg-blue-500',   text: 'text-blue-400'   },
+    dnd:         { label: 'Do Not Disturb', dot: 'bg-slate-500',  text: 'text-slate-400'  },
   };
 
   // ── Agora setup ───────────────────────────────────────────────────────────
@@ -1243,6 +1258,53 @@ export default function TwoWayRadio() {
           </div>
         </div>
 
+        {/* MY STATUS BAR */}
+        {(() => {
+          const myStatus = getStaffStatus(user?.id);
+          const cfg = statusCfg[myStatus] || statusCfg.available;
+          const isAutoStatus = myStatus === 'with_client' || myStatus === 'on_break';
+          const manualOptions = [
+            { key: 'available', label: 'Available',      dot: 'bg-green-500' },
+            { key: 'on_break',  label: 'On Break',       dot: 'bg-amber-400' },
+            { key: 'dnd',       label: 'Do Not Disturb', dot: 'bg-slate-500' },
+          ];
+          return (
+            <div className="px-4 pt-3 pb-1 relative">
+              <button
+                onClick={() => !isAutoStatus && setShowStatusMenu(v => !v)}
+                className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 transition-colors ${
+                  isAutoStatus ? 'bg-slate-800 cursor-default' : 'bg-slate-800 hover:bg-slate-700 active:scale-[0.98]'
+                }`}
+              >
+                <span className={`w-3 h-3 rounded-full shrink-0 ${cfg.dot}`} />
+                <span className="flex-1 text-left text-white font-semibold text-sm">
+                  My Status: <span className={cfg.text}>{cfg.label}</span>
+                </span>
+                {isAutoStatus
+                  ? <span className="text-slate-500 text-xs">Auto</span>
+                  : <span className="text-slate-400 text-xs">Tap to change</span>}
+              </button>
+              {showStatusMenu && !isAutoStatus && (
+                <div className="absolute left-4 right-4 top-full mt-1 z-50 bg-slate-700 rounded-xl shadow-xl border border-slate-600 overflow-hidden">
+                  {manualOptions.map(opt => (
+                    <button
+                      key={opt.key}
+                      onClick={() => { setMyRadioStatus(opt.key); setShowStatusMenu(false); }}
+                      className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-slate-600 ${
+                        myStatus === opt.key ? 'bg-slate-600/70' : ''
+                      }`}
+                    >
+                      <span className={`w-3 h-3 rounded-full shrink-0 ${opt.dot}`} />
+                      <span className="text-white text-sm font-medium">{opt.label}</span>
+                      {myStatus === opt.key && <span className="ml-auto text-teal-400 text-xs font-bold">Current</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* CHANNELS */}
         <div className="px-4 pt-4 pb-2">
           <div className="flex items-center justify-between mb-3">
@@ -1319,8 +1381,8 @@ export default function TwoWayRadio() {
             };
 
             const sortByStatus = arr => [...arr].sort((a, b) => {
-              const order = { with_client: 0, on_break: 1, available: 2, off_shift: 3 };
-              return (order[getStaffStatus(a.id)] ?? 3) - (order[getStaffStatus(b.id)] ?? 3);
+              const order = { with_client: 0, on_break: 1, available: 2, dnd: 3, off_shift: 4 };
+              return (order[getStaffStatus(a.id)] ?? 4) - (order[getStaffStatus(b.id)] ?? 4);
             });
 
             return (
