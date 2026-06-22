@@ -1,22 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, Suspense, Component } from 'react';
-
-class PageErrorBoundary extends Component {
-  constructor(props) { super(props); this.state = { error: null }; }
-  static getDerivedStateFromError(error) { return { error }; }
-  componentDidCatch(error, info) { console.error('[PageErrorBoundary]', error, info); }
-  render() {
-    if (this.state.error) {
-      return (
-        <div className="p-8 text-red-600 bg-red-50 rounded-xl m-4">
-          <p className="font-bold mb-2">Page Error — {this.props.pageName}</p>
-          <pre className="text-xs whitespace-pre-wrap break-all">{String(this.state.error)}</pre>
-          <button className="mt-4 text-sm underline" onClick={() => this.setState({ error: null })}>Retry</button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
+import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from './utils';
 import { base44 } from '@/api/base44Client';
@@ -1178,11 +1160,9 @@ export default function Layout({ children, currentPageName }) {
                                            if (isActive) visitedPagesRef.current.add(pageName);
                                            return (
                                              <div key={pageName} style={{ display: isActive ? 'block' : 'none' }}>
-                                               <PageErrorBoundary pageName={pageName}>
                                                <Suspense fallback={<div className="flex items-center justify-center h-96"><div className="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin"></div></div>}>
                                                  <PageComponent />
                                                </Suspense>
-                                               </PageErrorBoundary>
                                              </div>
                                            );
                                          })}
