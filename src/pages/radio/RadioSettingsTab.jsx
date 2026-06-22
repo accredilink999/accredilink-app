@@ -94,6 +94,12 @@ export default function RadioSettingsTab({
 
   const handleSoundUpload = (key, file) => saveSound(key, file);
 
+  const clearAllSounds = () => {
+    setCustomSounds({});
+    try { localStorage.removeItem('radio_custom_sounds'); } catch {}
+    toast.success('All sounds reset to defaults');
+  };
+
   const removeSound = (key) => {
     const next = { ...customSounds };
     delete next[key];
@@ -199,6 +205,22 @@ export default function RadioSettingsTab({
             );
           })}
         </div>
+
+        {/* Reset all to built-in defaults */}
+        {Object.keys(customSounds).length > 0 && (
+          <div className="border-t border-slate-800 px-4 py-3 flex items-center justify-between">
+            <div>
+              <p className="text-slate-400 text-xs font-semibold">Reset to Default Sounds</p>
+              <p className="text-slate-600 text-[10px] mt-0.5">Remove all custom audio files and use built-in tones</p>
+            </div>
+            <button
+              onClick={clearAllSounds}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-red-800/60 text-red-400 text-xs font-semibold hover:border-red-600 transition-colors touch-manipulation shrink-0">
+              <Trash2 className="w-3.5 h-3.5" />
+              Reset
+            </button>
+          </div>
+        )}
       </Section>
 
       {/* Hardware PTT key binding */}
