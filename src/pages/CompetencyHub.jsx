@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { base44 } from '@/api/base44Client';
-import { getCurrentOrgId } from '@/api/rotaApi';
+import { getCurrentOrgId } from '@/lib/orgContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
