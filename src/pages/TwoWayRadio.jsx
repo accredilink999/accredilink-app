@@ -15,6 +15,8 @@ import {
   Volume2, Loader2, Signal, ChevronLeft, Phone, Bell,
   AlertTriangle, MapPin, MicOff, X, ChevronDown, MessageSquare, Settings, UserPlus, Home
 } from 'lucide-react';
+import RadioShiftTab from './radio/RadioShiftTab';
+import RadioSettingsTab from './radio/RadioSettingsTab';
 
 const AGORA_APP_ID   = 'ff9f260da10245a5ab4855ea3ec59500';
 const AGORA_APP_CERT = 'e8dd782a9eac4d3385162b3a1f81d6c4';
@@ -66,7 +68,41 @@ function getAudioCtx() {
   } catch { return null; }
 }
 
+function playCustomSound(key) {
+  try {
+    const stored = localStorage.getItem('radio_custom_sounds');
+    if (!stored) return false;
+    const snd = JSON.parse(stored)[key];
+    if (!snd?.url) return false;
+    const audio = new Audio(snd.url);
+    audio.volume = 1.0;
+    audio.play().catch(() => {});
+    return true;
+  } catch { return false; }
+}
+
 function playTone(freqs, loop = false) {
+  if (localStorage.getItem('radio_silent_mode') === 'true') return () => {};
+  // Custom incoming ring sound (loops until stop() is called)
+  if (loop) {
+    try {
+      const stored = localStorage.getItem('radio_custom_sounds');
+      if (stored) {
+        const snd = JSON.parse(stored).incoming;
+        if (snd?.url) {
+          let active = true;
+          const step = () => {
+            if (!active) return;
+            const a = new Audio(snd.url); a.volume = 1.0;
+            a.play().catch(() => {});
+            a.addEventListener('ended', () => { if (active) setTimeout(step, 300); });
+          };
+          step();
+          return () => { active = false; };
+        }
+      }
+    } catch {}
+  }
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
   let timer = null;
   const burst = () => freqs.forEach((freq, i) => {
@@ -107,6 +143,8 @@ function playAlarm() {
 // UK TETRA/Airwave-style PTT tones — loud, sharp, two-tone
 // talk-up (grant): low→high beep-bop  talk-down (clear): high→low bop-beep
 function playPTTTone(type) {
+  if (localStorage.getItem('radio_silent_mode') === 'true') return;
+  if (playCustomSound(type === 'up' ? 'ptt_up' : 'ptt_down')) return;
   try {
     const ctx = getAudioCtx(); if (!ctx) return;
     const freqs = type === 'up' ? [880, 1400] : [1400, 880];
@@ -127,6 +165,8 @@ function playPTTTone(type) {
 
 // Call-end tone — three descending tones (bip-bop-boop)
 function playCallEndTone() {
+  if (localStorage.getItem('radio_silent_mode') === 'true') return;
+  if (playCustomSound('call_end')) return;
   try {
     const ctx = getAudioCtx(); if (!ctx) return;
     const now = ctx.currentTime;
@@ -231,6 +271,13 @@ export default function TwoWayRadio() {
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
   const [groupBroadcastActive, setGroupBroadcastActive] = useState(false);
 
+  // Tab navigation and per-device settings (all localStorage-backed for PWA/native)
+  const [radioTab, setRadioTab]         = useState('radio'); // 'radio' | 'shift' | 'settings'
+  const [silentMode, setSilentMode]     = useState(() => localStorage.getItem('radio_silent_mode') === 'true');
+  const [showAllAreas, setShowAllAreas] = useState(() => localStorage.getItem('radio_show_all_areas') !== 'false');
+  const [areaToggles, setAreaToggles]   = useState(() => { try { return JSON.parse(localStorage.getItem('radio_area_toggles') || '{}'); } catch { return {}; } });
+  const [customSounds, setCustomSounds] = useState(() => { try { return JSON.parse(localStorage.getItem('radio_custom_sounds') || '{}'); } catch { return {}; } });
+
   // 30s call timeout → text alert modal
   const [textAlertModal, setTextAlertModal] = useState(null);
   const [textAlertMsg, setTextAlertMsg] = useState('');
@@ -261,6 +308,22 @@ export default function TwoWayRadio() {
     queryKey: ['rotaAreas'],
     queryFn: () => base44.entities.RotaArea.list(),
     staleTime: 300000,
+  });
+
+  // Admin-only: today's shift calls for the Shift tab
+  const { data: todayShiftCalls = [] } = useQuery({
+    queryKey: ['radioShiftCalls', todayStr],
+    queryFn: async () => {
+      const { data } = await withOrgFilter(
+        supabase.from('shift_calls')
+          .select('id, shift_id, service_user_name, status, scheduled_time, log_required, care_log_id, shifts(id, staff_id, staff_name, rota_area_id)')
+          .eq('call_date', todayStr)
+          .order('scheduled_time')
+      );
+      return data || [];
+    },
+    enabled: !!user?.id && (user?.role === 'super_admin' || user?.role === 'admin'),
+    refetchInterval: 60000,
   });
 
   // Missed / callback / cancelled calls in the last 24 hours
@@ -1372,7 +1435,7 @@ export default function TwoWayRadio() {
       {ManageModal}
 
       {/* ── PTT SIDE BAR — centred on edge, smaller pill ── */}
-      <button
+      {radioTab === 'radio' && <button
         disabled={pttMode === 'disabled'}
         onPointerDown={e => {
           e.preventDefault();
@@ -1403,7 +1466,7 @@ export default function TwoWayRadio() {
             {selectedPerson.full_name.split(' ')[0]}
           </span>
         )}
-      </button>
+      </button>}
 
       <div className="min-h-screen pb-28" style={{
         backgroundColor: '#040c14',
@@ -1423,6 +1486,20 @@ export default function TwoWayRadio() {
           <Home className="w-5 h-5 shrink-0" />
           <span>App Home</span>
         </button>
+
+        {/* ── TAB BAR ── */}
+        <div className="flex bg-slate-950/90 border-b border-slate-800 backdrop-blur">
+          {(['radio', ...(isSuperAdmin ? ['shift'] : []), 'settings']).map(key => (
+            <button key={key} onClick={() => setRadioTab(key)}
+              className={`flex-1 py-2.5 text-xs font-black uppercase tracking-wider transition-colors touch-manipulation ${
+                radioTab === key ? 'text-teal-400 border-b-2 border-teal-400' : 'text-slate-600 hover:text-slate-400'
+              }`}>
+              {key === 'radio' ? 'Radio' : key === 'shift' ? 'Current Shift' : 'Settings'}
+            </button>
+          ))}
+        </div>
+
+        {radioTab === 'radio' && (<>
 
         {/* ── RADIO DEVICE HEADER ── */}
         <div className="bg-slate-900 border-b border-slate-700/50">
@@ -1711,10 +1788,38 @@ export default function TwoWayRadio() {
             </div>
           </div>
         )}
+        </>)}
+
+        {radioTab === 'shift' && (isSuperAdmin
+          ? <RadioShiftTab
+              todayShiftCalls={todayShiftCalls}
+              todayShifts={todayShifts}
+              rotaAreas={areas}
+              staff={staff}
+              navigate={navigate}
+              createPageUrl={createPageUrl}
+            />
+          : <p className="text-slate-600 text-xs text-center mt-16 px-8">Shift overview is available to admins only.</p>
+        )}
+
+        {radioTab === 'settings' && (
+          <RadioSettingsTab
+            channels={channels}
+            silentMode={silentMode}
+            setSilentMode={setSilentMode}
+            showAllAreas={showAllAreas}
+            setShowAllAreas={setShowAllAreas}
+            areaToggles={areaToggles}
+            setAreaToggles={setAreaToggles}
+            customSounds={customSounds}
+            setCustomSounds={setCustomSounds}
+          />
+        )}
+
       </div>
 
       {/* ── DESELECT PILL — only when a person is selected ── */}
-      {selectedPerson && (
+      {radioTab === 'radio' && selectedPerson && (
         <div className="fixed bottom-28 left-0 right-0 px-4 z-20"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
           <button onClick={() => setSelectedPerson(null)}
@@ -1724,8 +1829,8 @@ export default function TwoWayRadio() {
         </div>
       )}
 
-      {/* ── SOS BUTTON — fixed round, bottom centre ── */}
-      {!emergencyActive && (
+      {/* ── SOS BUTTON — fixed round, bottom left ── */}
+      {radioTab === 'radio' && !emergencyActive && (
         <button
           onClick={startEmergencyCountdown}
           disabled={emergencyCountdown !== null}

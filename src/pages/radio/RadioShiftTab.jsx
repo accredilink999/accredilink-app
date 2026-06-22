@@ -1,0 +1,202 @@
+import React, { useState, useMemo } from 'react';
+import { AlertTriangle, ChevronDown, CheckCircle, Clock, XCircle, FileText, User } from 'lucide-react';
+import { format, isPast, parseISO } from 'date-fns';
+
+const CALL_STATUS = {
+  completed:   { dot: 'bg-green-500',  text: 'text-green-400',  label: 'Complete',     border: 'border-l-green-600' },
+  in_progress: { dot: 'bg-amber-400',  text: 'text-amber-400',  label: 'In Progress',  border: 'border-l-amber-500' },
+  started:     { dot: 'bg-amber-400',  text: 'text-amber-400',  label: 'Started',      border: 'border-l-amber-500' },
+  pending:     { dot: 'bg-red-500',    text: 'text-red-400',    label: 'Not Started',  border: 'border-l-red-700' },
+  missed:      { dot: 'bg-red-600',    text: 'text-red-400',    label: 'Missed',       border: 'border-l-red-600' },
+  not_at_home: { dot: 'bg-orange-500', text: 'text-orange-400', label: 'Not at Home',  border: 'border-l-orange-600' },
+  log_missing: { dot: 'bg-amber-400',  text: 'text-amber-400',  label: 'Log Missing',  border: 'border-l-amber-500' },
+};
+
+function effectiveStatus(call) {
+  if (call.status === 'completed' && call.log_required && !call.care_log_id) return 'log_missing';
+  return call.status;
+}
+
+export default function RadioShiftTab({ todayShiftCalls, todayShifts, rotaAreas, staff = [], navigate, createPageUrl }) {
+  const [expandedAreas, setExpandedAreas] = useState(() => new Set(['all']));
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+
+  const getStaffName = (call) =>
+    call.shifts?.staff_name ||
+    staff.find(s => s.id === call.shifts?.staff_id)?.full_name ||
+    '—';
+
+  const toggle = (id) => setExpandedAreas(prev => {
+    const n = new Set(prev);
+    n.has(id) ? n.delete(id) : n.add(id);
+    return n;
+  });
+
+  // ── Alerts ──────────────────────────────────────────────────────────────────
+  const missedCalls = todayShiftCalls.filter(c => c.status === 'missed');
+
+  const missingLogs = todayShiftCalls.filter(c =>
+    c.status === 'completed' && c.log_required && !c.care_log_id
+  );
+
+  const notClockedIn = todayShifts.filter(s => {
+    if (['completed', 'cancelled'].includes(s.status) || s.clock_in_time) return false;
+    try {
+      const start = parseISO(`${s.date || todayStr}T${s.start_time || '00:00'}`);
+      return isPast(start);
+    } catch { return false; }
+  });
+
+  const totalAlerts = missedCalls.length + missingLogs.length + notClockedIn.length;
+
+  // ── Group calls by area ───────────────────────────────────────────────────
+  const areaGroups = useMemo(() => {
+    const map = {};
+    todayShiftCalls.forEach(call => {
+      const areaId = call.shifts?.rota_area_id || 'unassigned';
+      if (!map[areaId]) map[areaId] = { areaId, calls: [] };
+      map[areaId].calls.push(call);
+    });
+    return Object.values(map).map(g => {
+      const area = rotaAreas.find(a => a.id === g.areaId);
+      return {
+        ...g,
+        areaName: area?.name || (g.areaId === 'unassigned' ? 'Unassigned' : 'Area'),
+      };
+    }).sort((a, b) => a.areaName.localeCompare(b.areaName));
+  }, [todayShiftCalls, rotaAreas]);
+
+  const groupSummary = (calls) => {
+    const total = calls.length;
+    const done  = calls.filter(c => effectiveStatus(c) === 'completed').length;
+    const issues = calls.filter(c => ['missed', 'log_missing'].includes(effectiveStatus(c))).length;
+    const active = calls.filter(c => ['in_progress', 'started'].includes(effectiveStatus(c))).length;
+    return { total, done, issues, active };
+  };
+
+  return (
+    <div className="pb-32">
+      {/* ── Alerts ── */}
+      <div className="mx-4 mt-4">
+        {totalAlerts > 0 ? (
+          <div className="rounded-2xl border border-red-800/60 bg-red-950/30 overflow-hidden">
+            <div className="px-4 py-2.5 bg-red-900/40 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+              <span className="text-red-300 text-xs font-black uppercase tracking-widest flex-1">
+                {totalAlerts} Alert{totalAlerts !== 1 ? 's' : ''} Requiring Attention
+              </span>
+            </div>
+            <div className="divide-y divide-red-900/30">
+              {missedCalls.map(c => (
+                <button key={c.id} onClick={() => navigate(createPageUrl('Rota'))}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left active:bg-red-900/30 touch-manipulation">
+                  <XCircle className="w-4 h-4 text-red-400 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-xs font-semibold truncate">Missed call — {c.service_user_name}</p>
+                    <p className="text-red-400/70 text-[10px]">
+                      {getStaffName(c)} · {c.scheduled_time?.slice(0, 5) || '—'}
+                    </p>
+                  </div>
+                  <span className="text-red-600 text-xs shrink-0">›</span>
+                </button>
+              ))}
+              {missingLogs.map(c => (
+                <button key={c.id} onClick={() => navigate(createPageUrl('Rota'))}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left active:bg-red-900/30 touch-manipulation">
+                  <FileText className="w-4 h-4 text-amber-400 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-xs font-semibold truncate">Log missing — {c.service_user_name}</p>
+                    <p className="text-amber-400/70 text-[10px]">
+                      {getStaffName(c)} · call complete, no log submitted
+                    </p>
+                  </div>
+                  <span className="text-amber-600 text-xs shrink-0">›</span>
+                </button>
+              ))}
+              {notClockedIn.map(s => (
+                <button key={s.id} onClick={() => navigate(createPageUrl('Rota'))}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left active:bg-red-900/30 touch-manipulation">
+                  <Clock className="w-4 h-4 text-orange-400 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-xs font-semibold truncate">Not clocked in — {s.staff_name || s.staff_id?.slice(0, 8)}</p>
+                    <p className="text-orange-400/70 text-[10px]">
+                      Shift started {s.start_time?.slice(0, 5) || '—'}, no clock-in recorded
+                    </p>
+                  </div>
+                  <span className="text-orange-600 text-xs shrink-0">›</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-green-800/40 bg-green-950/20 px-4 py-3 flex items-center gap-3">
+            <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
+            <p className="text-green-400 text-xs font-semibold">All clear — no outstanding alerts for today</p>
+          </div>
+        )}
+      </div>
+
+      {/* ── Calls by area ── */}
+      <div className="mx-4 mt-4 mb-2">
+        <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Today's Calls by Area</p>
+      </div>
+
+      {areaGroups.length === 0 && (
+        <p className="text-slate-600 text-xs text-center mt-6 px-4">No calls scheduled for today</p>
+      )}
+
+      {areaGroups.map(group => {
+        const isExp = expandedAreas.has(group.areaId);
+        const { total, done, issues, active } = groupSummary(group.calls);
+        const allDone   = done === total && total > 0;
+        const hasIssues = issues > 0;
+        const headerDot = allDone ? 'bg-green-500' : hasIssues ? 'bg-red-500' : active > 0 ? 'bg-amber-400' : 'bg-slate-600';
+
+        return (
+          <div key={group.areaId} className="mx-4 mb-3 rounded-2xl border border-slate-700/60 bg-slate-900/80 overflow-hidden">
+            <button onClick={() => toggle(group.areaId)}
+              className="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-slate-800/60 touch-manipulation">
+              <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${headerDot}`} />
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-sm font-bold truncate">{group.areaName}</p>
+                <p className="text-slate-500 text-xs">
+                  {done}/{total} complete
+                  {issues > 0 ? ` · ${issues} issue${issues !== 1 ? 's' : ''}` : ''}
+                  {active > 0 ? ` · ${active} active` : ''}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {hasIssues && <span className="w-4 h-4 rounded-full bg-red-600 text-white text-[9px] font-black flex items-center justify-center">{issues}</span>}
+                <ChevronDown className={`w-4 h-4 text-slate-600 transition-transform ${isExp ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+
+            {isExp && (
+              <div className="border-t border-slate-800">
+                {group.calls.map(call => {
+                  const es   = effectiveStatus(call);
+                  const cfg  = CALL_STATUS[es] || CALL_STATUS.pending;
+                  return (
+                    <div key={call.id}
+                      className={`flex items-center gap-3 px-4 py-2.5 border-b border-slate-800/60 border-l-2 ${cfg.border}`}>
+                      <div className={`w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-xs font-semibold truncate">{call.service_user_name || 'Unknown'}</p>
+                        <p className="text-slate-500 text-[10px]">
+                          {getStaffName(call)} · {call.scheduled_time?.slice(0, 5) || '—'}
+                          {call.log_required && !call.care_log_id && call.status === 'completed'
+                            ? ' · ⚠ log missing' : ''}
+                        </p>
+                      </div>
+                      <span className={`text-[10px] font-semibold shrink-0 ${cfg.text}`}>{cfg.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
