@@ -294,8 +294,31 @@ export default function TwoWayRadio() {
   const [incomingCall, setIncomingCall] = useState(null);
   const [outgoingCall, setOutgoingCall] = useState(null);
   const [callDeclined, setCallDeclined] = useState(false);
-  const [callbackRequests, setCallbackRequests]     = useState([]);
-  const [dismissedCbReqIds, setDismissedCbReqIds]  = useState(new Set());
+
+  // Callback requests — queried from DB so they survive page loads
+  const { data: callbackRequestRecords = [] } = useQuery({
+    queryKey: ['callbackRequests', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const since = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+      const { data } = await supabase
+        .from('radio_calls')
+        .select('id, caller_id, status, created_at')
+        .eq('callee_id', user.id)
+        .eq('status', 'callback_request')
+        .gt('created_at', since)
+        .order('created_at', { ascending: false });
+      return data || [];
+    },
+    enabled: !!user?.id,
+    refetchInterval: 60000,
+  });
+  const [dismissedCbReqIds, setDismissedCbReqIds] = useState(() => {
+    try {
+      const raw = localStorage.getItem('dismissedCallbackRequests');
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch { return new Set(); }
+  });
 
   // Emergency
   const [emergencyCountdown, setEmergencyCountdown] = useState(null); // null | 10…0
@@ -646,8 +669,7 @@ export default function TwoWayRadio() {
           setIncomingCall({ callId: call.id, caller, channelName: call.channel_name });
           stopTone(); stopToneRef.current = playTone([880, 1100, 880, 1100, 660], true);
         } else if (call.status === 'callback_request') {
-          const requester = staffRef.current.find(s => s.id === call.caller_id);
-          setCallbackRequests(prev => [{ callId: call.id, requester }, ...prev]);
+          queryClient.invalidateQueries({ queryKey: ['callbackRequests', user.id] });
           playCallbackRequestTone();
         }
       })
@@ -753,14 +775,19 @@ export default function TwoWayRadio() {
     toast.success(`Call-back request sent to ${person.full_name}`);
   };
 
-  const dismissCallbackRequest = (callId) => {
-    setDismissedCbReqIds(prev => new Set([...prev, callId]));
+  const dismissCallbackRequest = (...ids) => {
+    setDismissedCbReqIds(prev => {
+      const next = new Set([...prev, ...ids]);
+      try { localStorage.setItem('dismissedCallbackRequests', JSON.stringify([...next])); } catch {}
+      return next;
+    });
   };
 
   const callBackFromRequest = (req) => {
     dismissCallbackRequest(req.callId);
-    setSelectedPerson(req.requester);
-    initiateP2PCall(req.requester);
+    const person = staffRef.current.find(s => s.id === req.callerId) || req.requester;
+    setSelectedPerson(person);
+    initiateP2PCall(person);
   };
 
   const callBackFromMissed = (call) => {
@@ -1553,7 +1580,9 @@ export default function TwoWayRadio() {
   // MAIN VIEW
   // ════════════════════════════════════════════════════════════════════════════
   const unreadMissed = missedCalls.filter(c => !dismissedMissedIds.has(c.id));
-  const unreadCbRequests = callbackRequests.filter(r => !dismissedCbReqIds.has(r.callId));
+  const unreadCbRequests = callbackRequestRecords
+    .filter(r => !dismissedCbReqIds.has(r.id))
+    .map(r => ({ callId: r.id, callerId: r.caller_id, requester: staff.find(s => s.id === r.caller_id) || { id: r.caller_id, full_name: 'Team Member' } }));
   const anyoneSpeaking = speakingNames.length > 0;
 
   // Reusable staff pill inside a channel card

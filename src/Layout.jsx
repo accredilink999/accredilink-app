@@ -433,17 +433,35 @@ export default function Layout({ children, currentPageName }) {
     queryFn: async () => {
       if (!user?.id) return [];
       const since = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
-      const [{ data: cbCalls }, { data: dcCalls }] = await Promise.all([
+      const [{ data: cbCalls }, { data: dcCalls }, { data: cancelledCalls }] = await Promise.all([
         supabase.from('radio_calls').select('id, caller_id, callee_id, status, created_at')
           .eq('callee_id', user.id).eq('status', 'callback').gt('created_at', since)
           .order('created_at', { ascending: false }),
         supabase.from('radio_calls').select('id, caller_id, callee_id, status, created_at')
           .eq('caller_id', user.id).eq('status', 'declined').gt('created_at', since)
           .order('created_at', { ascending: false }),
+        supabase.from('radio_calls').select('id, caller_id, callee_id, status, created_at')
+          .eq('callee_id', user.id).eq('status', 'cancelled').gt('created_at', since)
+          .order('created_at', { ascending: false }),
       ]);
-      return [...(cbCalls || []), ...(dcCalls || [])]
+      return [...(cbCalls || []), ...(dcCalls || []), ...(cancelledCalls || [])]
         .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
         .slice(0, 10);
+    },
+    enabled: !!user?.id,
+    refetchInterval: 60000,
+  });
+  // Callback requests directed at this user (shared cache key with TwoWayRadio)
+  const { data: callbackRequestCalls = [] } = useQuery({
+    queryKey: ['callbackRequests', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const since = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+      const { data } = await supabase
+        .from('radio_calls').select('id, caller_id, callee_id, status, created_at')
+        .eq('callee_id', user.id).eq('status', 'callback_request').gt('created_at', since)
+        .order('created_at', { ascending: false });
+      return data || [];
     },
     enabled: !!user?.id,
     refetchInterval: 60000,
@@ -454,6 +472,12 @@ export default function Layout({ children, currentPageName }) {
       return raw ? new Set(JSON.parse(raw)) : new Set();
     } catch { return new Set(); }
   });
+  const [dismissedCbBannerIds, setDismissedCbBannerIds] = useState(() => {
+    try {
+      const raw = localStorage.getItem('dismissedCallbackRequests');
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch { return new Set(); }
+  });
   const dismissBannerCalls = (...ids) => {
     setDismissedBannerIds(prev => {
       const next = new Set([...prev, ...ids]);
@@ -461,23 +485,34 @@ export default function Layout({ children, currentPageName }) {
       return next;
     });
   };
+  const dismissCbBannerCalls = (...ids) => {
+    setDismissedCbBannerIds(prev => {
+      const next = new Set([...prev, ...ids]);
+      try { localStorage.setItem('dismissedCallbackRequests', JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  };
   const visibleMissedCalls = currentPageName !== 'TwoWayRadio'
     ? missedRadioCalls.filter(c => !dismissedBannerIds.has(c.id))
     : [];
+  const visibleCbRequests = currentPageName !== 'TwoWayRadio'
+    ? callbackRequestCalls.filter(c => !dismissedCbBannerIds.has(c.id))
+    : [];
+  const anyRadioAlerts = visibleMissedCalls.length > 0 || visibleCbRequests.length > 0;
 
-  // Auto-redirect to Radio on app open / return from background if missed calls exist
+  // Auto-redirect to Radio on app open / return from background if missed calls or callback requests exist
   const autoRedirectedRef = useRef(false);
-  const visibleMissedForRedirectRef = useRef(visibleMissedCalls);
+  const anyRadioAlertsRef = useRef(anyRadioAlerts);
   const currentPageRef = useRef(currentPageName);
-  visibleMissedForRedirectRef.current = visibleMissedCalls;
+  anyRadioAlertsRef.current = anyRadioAlerts;
   currentPageRef.current = currentPageName;
 
   useEffect(() => {
     if (autoRedirectedRef.current) return;
-    if (!user?.id || !visibleMissedCalls.length || currentPageName === 'TwoWayRadio') return;
+    if (!user?.id || !anyRadioAlerts || currentPageName === 'TwoWayRadio') return;
     autoRedirectedRef.current = true;
     navigate(createPageUrl('TwoWayRadio'));
-  }, [user?.id, visibleMissedCalls.length, currentPageName, navigate]);
+  }, [user?.id, anyRadioAlerts, currentPageName, navigate]);
 
   useEffect(() => {
     const onVisible = () => {
@@ -485,7 +520,7 @@ export default function Layout({ children, currentPageName }) {
         autoRedirectedRef.current = false;
         setTimeout(() => {
           if (autoRedirectedRef.current) return;
-          if (!visibleMissedForRedirectRef.current.length || currentPageRef.current === 'TwoWayRadio') return;
+          if (!anyRadioAlertsRef.current || currentPageRef.current === 'TwoWayRadio') return;
           autoRedirectedRef.current = true;
           navigate(createPageUrl('TwoWayRadio'));
         }, 2000);
@@ -1120,7 +1155,7 @@ export default function Layout({ children, currentPageName }) {
                                      {/* App Update Banner */}
                                      <AppUpdateBanner />
                                      <GpsWarningBanner />
-                                     {/* Missed radio calls banner — sticky at top of scroll area, persists until dismissed */}
+                                     {/* Missed radio calls banner */}
                                      {visibleMissedCalls.length > 0 && (
                                        <div
                                          className="sticky top-0 z-40 bg-amber-600 px-4 py-3 flex items-center gap-3 cursor-pointer touch-manipulation"
@@ -1150,6 +1185,36 @@ export default function Layout({ children, currentPageName }) {
                                          <button
                                            onClick={e => { e.stopPropagation(); dismissBannerCalls(...visibleMissedCalls.map(c => c.id)); }}
                                            className="text-amber-200 hover:text-white shrink-0 p-1 touch-manipulation"
+                                         >
+                                           <X className="w-5 h-5" />
+                                         </button>
+                                       </div>
+                                     )}
+                                     {/* Call-back request banner */}
+                                     {visibleCbRequests.length > 0 && (
+                                       <div
+                                         className="sticky top-0 z-40 bg-teal-700 px-4 py-3 flex items-center gap-3 cursor-pointer touch-manipulation"
+                                         onClick={() => navigate(createPageUrl('TwoWayRadio'))}
+                                       >
+                                         <Phone className="w-5 h-5 text-white shrink-0" />
+                                         <div className="flex-1 min-w-0">
+                                           {visibleCbRequests.length === 1 ? (
+                                             <>
+                                               <p className="text-white text-sm font-bold truncate">
+                                                 {globalStaffRef.current.find(s => s.id === visibleCbRequests[0].caller_id)?.full_name || 'Team Member'} wants a call back
+                                               </p>
+                                               <p className="text-teal-200 text-xs">Tap to open Radio</p>
+                                             </>
+                                           ) : (
+                                             <>
+                                               <p className="text-white text-sm font-bold">{visibleCbRequests.length} call-back requests</p>
+                                               <p className="text-teal-200 text-xs">Tap to open Radio</p>
+                                             </>
+                                           )}
+                                         </div>
+                                         <button
+                                           onClick={e => { e.stopPropagation(); dismissCbBannerCalls(...visibleCbRequests.map(c => c.id)); }}
+                                           className="text-teal-200 hover:text-white shrink-0 p-1 touch-manipulation"
                                          >
                                            <X className="w-5 h-5" />
                                          </button>
