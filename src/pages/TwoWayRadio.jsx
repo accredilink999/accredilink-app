@@ -54,6 +54,18 @@ const getOrgId = () => localStorage.getItem('organizationId') || sessionStorage.
 const withOrgFilter = q => { const id = getOrgId(); return id ? q.eq('organization_id', id) : q; };
 
 // ── Audio helpers ─────────────────────────────────────────────────────────────
+// Shared AudioContext — created once, avoids 100-200ms cold-start latency on every tone
+let _sharedCtx = null;
+function getAudioCtx() {
+  try {
+    if (!_sharedCtx || _sharedCtx.state === 'closed') {
+      _sharedCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (_sharedCtx.state === 'suspended') _sharedCtx.resume().catch(() => {});
+    return _sharedCtx;
+  } catch { return null; }
+}
+
 function playTone(freqs, loop = false) {
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
   let timer = null;
@@ -62,7 +74,7 @@ function playTone(freqs, loop = false) {
     osc.connect(gain); gain.connect(ctx.destination);
     osc.frequency.value = freq; osc.type = 'sine';
     const t = ctx.currentTime + i * 0.11;
-    gain.gain.setValueAtTime(0.35, t);
+    gain.gain.setValueAtTime(0.85, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.10);
     osc.start(t); osc.stop(t + 0.10);
   });
@@ -82,7 +94,7 @@ function playAlarm() {
       osc.connect(gain); gain.connect(ctx.destination);
       osc.frequency.value = freq; osc.type = 'square';
       const t = ctx.currentTime + i * 0.12;
-      gain.gain.setValueAtTime(0.4, t);
+      gain.gain.setValueAtTime(0.85, t);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
       osc.start(t); osc.stop(t + 0.11);
     });
@@ -92,26 +104,43 @@ function playAlarm() {
   return () => { active = false; ctx.close().catch(() => {}); };
 }
 
-// UK TETRA/Airwave-style PTT tones
-// talk-up: two ascending beeps (grant tone)
-// talk-down: two descending beeps (clear tone)
+// UK TETRA/Airwave-style PTT tones — loud, sharp, two-tone
+// talk-up (grant): low→high beep-bop  talk-down (clear): high→low bop-beep
 function playPTTTone(type) {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const freqs = type === 'up' ? [880, 1320] : [1320, 880];
+    const ctx = getAudioCtx(); if (!ctx) return;
+    const freqs = type === 'up' ? [880, 1400] : [1400, 880];
     const now = ctx.currentTime;
     freqs.forEach((freq, i) => {
       const osc = ctx.createOscillator(), gain = ctx.createGain();
       osc.connect(gain); gain.connect(ctx.destination);
       osc.frequency.value = freq; osc.type = 'sine';
-      const t = now + i * 0.085;
+      const t = now + i * 0.075;
       gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.45, t + 0.008);
-      gain.gain.setValueAtTime(0.45, t + 0.065);
-      gain.gain.linearRampToValueAtTime(0, t + 0.080);
-      osc.start(t); osc.stop(t + 0.085);
+      gain.gain.linearRampToValueAtTime(0.92, t + 0.003); // sharp attack
+      gain.gain.setValueAtTime(0.92, t + 0.058);
+      gain.gain.linearRampToValueAtTime(0, t + 0.072);
+      osc.start(t); osc.stop(t + 0.075);
     });
-    setTimeout(() => ctx.close().catch(() => {}), 300);
+  } catch {}
+}
+
+// Call-end tone — three descending tones (bip-bop-boop)
+function playCallEndTone() {
+  try {
+    const ctx = getAudioCtx(); if (!ctx) return;
+    const now = ctx.currentTime;
+    [1200, 900, 600].forEach((freq, i) => {
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq; osc.type = 'sine';
+      const t = now + i * 0.095;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.85, t + 0.003);
+      gain.gain.setValueAtTime(0.85, t + 0.065);
+      gain.gain.linearRampToValueAtTime(0, t + 0.088);
+      osc.start(t); osc.stop(t + 0.095);
+    });
   } catch {}
 }
 
@@ -424,7 +453,6 @@ export default function TwoWayRadio() {
         try { await clientRef.current.unpublish(track); track.stop(); track.close(); micTrackRef.current = null; } catch {}
         return;
       }
-      playPTTTone('up');
       setIsTalking(true);
     } catch (e) {
       shouldTalkRef.current = false;
@@ -574,6 +602,7 @@ export default function TwoWayRadio() {
   };
 
   const endP2PCall = async () => {
+    playCallEndTone();
     const callId = activeCallIdRef.current;
     activeCallIdRef.current = null; // clear before DB update so we don't self-trigger
     if (callId) await supabase.from('radio_calls').update({ status: 'ended' }).eq('id', callId);
@@ -891,7 +920,7 @@ export default function TwoWayRadio() {
 
   // Keyboard Space = PTT (not in hands-free mode)
   useEffect(() => {
-    const down = e => { if (e.code === 'Space' && isJoined && !isTalking && !isHandsFree) { e.preventDefault(); startTalking(); } };
+    const down = e => { if (e.code === 'Space' && isJoined && !isTalking && !isHandsFree) { e.preventDefault(); playPTTTone('up'); startTalking(); } };
     const up   = e => { if (e.code === 'Space' && !isHandsFree) stopTalking(); };
     window.addEventListener('keydown', down); window.addEventListener('keyup', up);
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
@@ -901,6 +930,9 @@ export default function TwoWayRadio() {
   useEffect(() => {
     if (!isJoined || !activeChannel) setGroupBroadcastActive(false);
   }, [isJoined, activeChannel]);
+
+  // Pre-warm AudioContext on mount so first PTT tone fires instantly
+  useEffect(() => { getAudioCtx(); }, []);
 
   // ── Error state ───────────────────────────────────────────────────────────
   if (channelsError) return (
@@ -1111,7 +1143,7 @@ export default function TwoWayRadio() {
       {!isHandsFree && (
         <button
           disabled={!isJoined || joining}
-          onPointerDown={e => { e.preventDefault(); startTalking(); }}
+          onPointerDown={e => { e.preventDefault(); playPTTTone('up'); startTalking(); }}
           style={{ position: 'fixed', top: 0, bottom: 0, [pttHandedness]: 0, width: 68, zIndex: 40 }}
           className={`flex flex-col items-center justify-center gap-3 select-none touch-none transition-colors ${
             !isJoined || joining ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
@@ -1345,7 +1377,7 @@ export default function TwoWayRadio() {
         onPointerDown={e => {
           e.preventDefault();
           if (pttMode === 'p2p') initiateP2PCall();
-          else if (pttMode === 'group') startTalking();
+          else if (pttMode === 'group') { playPTTTone('up'); startTalking(); }
         }}
         style={{ position: 'fixed', top: '50%', transform: 'translateY(-50%)', [pttHandedness]: 0, width: 60, height: 380, zIndex: 40 }}
         className={`flex flex-col items-center justify-center gap-2 select-none touch-none transition-colors ${
