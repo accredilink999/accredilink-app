@@ -6,11 +6,19 @@ import { RADIO_THEMES } from './radioThemes';
 // Sound slots wired to the module-level audio functions in TwoWayRadio.jsx
 // Keys must match what playCustomSound(key) looks up in localStorage
 const SOUND_SLOTS = [
-  { key: 'ptt_up',   label: 'PTT Press',         desc: 'Beep-bop when you start transmitting' },
-  { key: 'ptt_down', label: 'PTT Release',        desc: 'Bop-beep when you stop transmitting' },
-  { key: 'incoming', label: 'Incoming Ring',      desc: 'Loops while an incoming call is ringing' },
-  { key: 'call_end', label: 'Call End',           desc: 'Plays when a P2P call is ended' },
+  { key: 'ptt_up',         label: 'PTT Press',      desc: 'Beep-bop when you start transmitting' },
+  { key: 'ptt_down',       label: 'PTT Release',    desc: 'Bop-beep when you stop transmitting' },
+  { key: 'incoming',       label: 'Incoming Ring',  desc: 'Loops while an incoming call is ringing' },
+  { key: 'call_connected', label: 'Call Connected', desc: 'Double-beep when a P2P call connects' },
+  { key: 'call_end',       label: 'Call End',       desc: 'Plays when a P2P call is ended' },
 ];
+
+const TETRA_SOUNDS = {
+  ptt_up:         { name: 'Beep Bop.aac',  url: '/radio-tones/Beep Bop.aac' },
+  ptt_down:       { name: 'Bop Beep.aac',  url: '/radio-tones/Bop Beep.aac' },
+  incoming:       { name: 'Alert tone.aac', url: '/radio-tones/Alert tone.aac' },
+  call_connected: { name: 'Beep Bop.aac',  url: '/radio-tones/Beep Bop.aac' },
+};
 
 // Built-in tone packs — files served from /radio-tones/
 const TONE_PRESETS = [
@@ -24,11 +32,7 @@ const TONE_PRESETS = [
     id: 'tetra',
     label: 'TETRA / Airwave',
     desc: 'Authentic TETRA radio tones',
-    sounds: {
-      ptt_up:   { name: 'Beep Bop.aac',          url: '/radio-tones/Beep Bop.aac' },
-      ptt_down: { name: 'Bop Beep.aac',           url: '/radio-tones/Bop Beep.aac' },
-      incoming: { name: 'Alert tone.aac',          url: '/radio-tones/Alert tone.aac' },
-    },
+    sounds: TETRA_SOUNDS,
   },
 ];
 
@@ -115,13 +119,8 @@ export default function RadioSettingsTab({
   const handleSoundUpload = (key, file) => saveSound(key, file);
 
   const clearAllSounds = () => {
-    const tetra = {
-      ptt_up:   { name: 'Beep Bop.aac',   url: '/radio-tones/Beep Bop.aac' },
-      ptt_down: { name: 'Bop Beep.aac',    url: '/radio-tones/Bop Beep.aac' },
-      incoming: { name: 'Alert tone.aac',  url: '/radio-tones/Alert tone.aac' },
-    };
-    setCustomSounds(tetra);
-    try { localStorage.setItem('radio_custom_sounds', JSON.stringify(tetra)); } catch {}
+    setCustomSounds(TETRA_SOUNDS);
+    try { localStorage.setItem('radio_custom_sounds', JSON.stringify(TETRA_SOUNDS)); } catch {}
     toast.success('Reset to TETRA tones');
   };
 
@@ -134,9 +133,9 @@ export default function RadioSettingsTab({
 
   const applyPreset = (preset) => {
     if (!preset.sounds) {
-      // Built-in — clear ptt_up, ptt_down, incoming but preserve call_end if set
+      // Built-in — clear TETRA slots but preserve any user-uploaded sounds
       const next = { ...customSounds };
-      delete next.ptt_up; delete next.ptt_down; delete next.incoming;
+      delete next.ptt_up; delete next.ptt_down; delete next.incoming; delete next.call_connected;
       setCustomSounds(next);
       try { localStorage.setItem('radio_custom_sounds', JSON.stringify(next)); } catch {}
     } else {
@@ -151,11 +150,12 @@ export default function RadioSettingsTab({
   };
 
   const activePreset = (() => {
-    const up   = customSounds.ptt_up?.url;
-    const down = customSounds.ptt_down?.url;
-    const inc  = customSounds.incoming?.url;
-    if (up?.includes('Beep Bop') && down?.includes('Bop Beep') && inc?.includes('Alert tone')) return 'tetra';
-    if (!up && !down && !inc) return 'builtin';
+    const up  = customSounds.ptt_up?.url;
+    const dn  = customSounds.ptt_down?.url;
+    const inc = customSounds.incoming?.url;
+    const cc  = customSounds.call_connected?.url;
+    if (up?.includes('Beep Bop') && dn?.includes('Bop Beep') && inc?.includes('Alert tone') && cc?.includes('Beep Bop')) return 'tetra';
+    if (!up && !dn && !inc && !cc) return 'builtin';
     return 'custom';
   })();
 

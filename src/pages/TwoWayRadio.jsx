@@ -69,15 +69,25 @@ function getAudioCtx() {
   } catch { return null; }
 }
 
+// Preload bundled tones so they play instantly on PTT press (no network fetch delay)
+const _preloaded = {};
+['/radio-tones/Beep Bop.aac', '/radio-tones/Bop Beep.aac', '/radio-tones/Alert tone.aac'].forEach(url => {
+  try { const a = new Audio(url); a.preload = 'auto'; _preloaded[url] = a; } catch {}
+});
+
 function playCustomSound(key) {
   try {
     const stored = localStorage.getItem('radio_custom_sounds');
     if (!stored) return false;
     const snd = JSON.parse(stored)[key];
     if (!snd?.url) return false;
-    const audio = new Audio(snd.url);
-    audio.volume = 1.0;
-    audio.play().catch(() => {});
+    const pre = _preloaded[snd.url];
+    if (pre) {
+      pre.currentTime = 0; pre.volume = 1.0;
+      pre.play().catch(() => {});
+    } else {
+      const a = new Audio(snd.url); a.volume = 1.0; a.play().catch(() => {});
+    }
     return true;
   } catch { return false; }
 }
@@ -185,6 +195,27 @@ function playCallEndTone() {
   } catch {}
 }
 
+// Call-connected tone — double ascending beep when a P2P call connects
+function playCallConnectedTone() {
+  if (localStorage.getItem('radio_silent_mode') === 'true') return;
+  if (playCustomSound('call_connected')) return;
+  try {
+    const ctx = getAudioCtx(); if (!ctx) return;
+    const now = ctx.currentTime;
+    [880, 1400].forEach((freq, i) => {
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq; osc.type = 'sine';
+      const t = now + i * 0.075;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.8, t + 0.003);
+      gain.gain.setValueAtTime(0.8, t + 0.058);
+      gain.gain.linearRampToValueAtTime(0, t + 0.072);
+      osc.start(t); osc.stop(t + 0.075);
+    });
+  } catch {}
+}
+
 function speakText(text) {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
@@ -281,15 +312,23 @@ export default function TwoWayRadio() {
   const [customSounds, setCustomSounds] = useState(() => {
     try {
       const stored = localStorage.getItem('radio_custom_sounds');
-      if (stored !== null) return JSON.parse(stored);
-      // First launch — default to TETRA preset
-      const tetra = {
-        ptt_up:   { name: 'Beep Bop.aac',   url: '/radio-tones/Beep Bop.aac' },
-        ptt_down: { name: 'Bop Beep.aac',    url: '/radio-tones/Bop Beep.aac' },
-        incoming: { name: 'Alert tone.aac',  url: '/radio-tones/Alert tone.aac' },
-      };
-      localStorage.setItem('radio_custom_sounds', JSON.stringify(tetra));
-      return tetra;
+      const sounds = stored ? JSON.parse(stored) : {};
+      // One-time migration: seed TETRA defaults for any unset slots
+      if (localStorage.getItem('radio_sounds_migrated') !== 'v1') {
+        const tetra = {
+          ptt_up:         { name: 'Beep Bop.aac',  url: '/radio-tones/Beep Bop.aac' },
+          ptt_down:       { name: 'Bop Beep.aac',   url: '/radio-tones/Bop Beep.aac' },
+          incoming:       { name: 'Alert tone.aac', url: '/radio-tones/Alert tone.aac' },
+          call_connected: { name: 'Beep Bop.aac',  url: '/radio-tones/Beep Bop.aac' },
+        };
+        let changed = false;
+        for (const [k, v] of Object.entries(tetra)) {
+          if (!sounds[k]) { sounds[k] = v; changed = true; }
+        }
+        if (changed) localStorage.setItem('radio_custom_sounds', JSON.stringify(sounds));
+        localStorage.setItem('radio_sounds_migrated', 'v1');
+      }
+      return sounds;
     } catch { return {}; }
   });
 
@@ -609,7 +648,7 @@ export default function TwoWayRadio() {
         if (call.status === 'accepted') {
           activeCallIdRef.current = call.id;
           setOutgoingCall(null); setCallDeclined(false);
-          joinChannel(call.channel_name).then(() => { setActiveChannel({ name: `📞 ${cur.callee?.full_name}`, id: '__ptp' }); setView('ptt'); });
+          joinChannel(call.channel_name).then(() => { playCallConnectedTone(); setActiveChannel({ name: `📞 ${cur.callee?.full_name}`, id: '__ptp' }); setView('ptt'); });
         } else if (call.status === 'callback') {
           setCallDeclined(true);
           setTimeout(() => { setOutgoingCall(null); setCallDeclined(false); }, 4000);
@@ -690,6 +729,7 @@ export default function TwoWayRadio() {
     activeCallIdRef.current = callId;
     await supabase.from('radio_calls').update({ status: 'accepted' }).eq('id', callId);
     await joinChannel(channelName);
+    playCallConnectedTone();
     setActiveChannel({ name: `📞 ${caller?.full_name || 'Call'}`, id: '__ptp' }); setView('ptt');
   };
 
