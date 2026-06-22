@@ -1030,7 +1030,7 @@ export default function TwoWayRadio() {
 
   // ── Hardware PTT key listener (Inrico T320 side key / any mapped keycode) ─
   // Uses refs so the handler doesn't need to be re-registered on every render
-  const pttModeRef   = useRef(pttMode);
+  const pttModeRef   = useRef('disabled');
   const isTalkingRef = useRef(isTalking);
   useEffect(() => { pttModeRef.current   = pttMode;   }, [pttMode]);
   useEffect(() => { isTalkingRef.current = isTalking; }, [isTalking]);
