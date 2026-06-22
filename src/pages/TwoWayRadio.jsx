@@ -385,6 +385,10 @@ export default function TwoWayRadio() {
   const staffByUid    = Object.fromEntries(staff.map(s => [toUid(s.id), s]));
   const speakingNames = [...speakingUids].filter(u => u !== myUid).map(u => staffByUid[u]?.full_name || `User ${u}`);
 
+  // Declared early so hooks below can reference them without TDZ errors
+  const isInChannel = isJoined && activeChannel;
+  const pttMode     = selectedPerson ? 'p2p' : (isInChannel && groupBroadcastActive) ? 'group' : 'disabled';
+
   // Channel member grouping
   const channelMembersById = {};
   channels.forEach(ch => { channelMembersById[ch.id] = []; });
@@ -1030,7 +1034,7 @@ export default function TwoWayRadio() {
 
   // ── Hardware PTT key listener (Inrico T320 side key / any mapped keycode) ─
   // Uses refs so the handler doesn't need to be re-registered on every render
-  const pttModeRef   = useRef('disabled');
+  const pttModeRef   = useRef(pttMode);
   const isTalkingRef = useRef(isTalking);
   useEffect(() => { pttModeRef.current   = pttMode;   }, [pttMode]);
   useEffect(() => { isTalkingRef.current = isTalking; }, [isTalking]);
@@ -1429,10 +1433,6 @@ export default function TwoWayRadio() {
   // ════════════════════════════════════════════════════════════════════════════
   const unreadMissed = missedCalls.filter(c => !dismissedMissedIds.has(c.id));
   const anyoneSpeaking = speakingNames.length > 0;
-  const isInChannel = isJoined && activeChannel;
-
-  // PTT bar: group only when in channel AND broadcast activated in channel card; P2P when person selected
-  const pttMode = selectedPerson ? 'p2p' : (isInChannel && groupBroadcastActive) ? 'group' : 'disabled';
 
   // Reusable staff pill inside a channel card
   const StaffPill = ({ s }) => {
