@@ -17,7 +17,7 @@ function effectiveStatus(call) {
   return call.status;
 }
 
-export default function RadioShiftTab({ todayShiftCalls, todayShifts, rotaAreas, staff = [], navigate, createPageUrl }) {
+export default function RadioShiftTab({ todayShiftCalls, todayShifts, rotaAreas, staff = [], navigate, createPageUrl, isControlDevice = false }) {
   const [expandedAreas, setExpandedAreas] = useState(() => new Set(['all']));
   const todayStr = format(new Date(), 'yyyy-MM-dd');
 
@@ -103,9 +103,10 @@ export default function RadioShiftTab({ todayShiftCalls, todayShifts, rotaAreas,
               {missedCalls.map(c => {
                 const areaName = getAreaName(c.shifts?.rota_area_id);
                 const staffName = getStaffName(c);
+                const Tag = isControlDevice ? 'div' : 'button';
                 return (
-                  <button key={c.id}
-                    onClick={() => navigate(`${createPageUrl('Rota')}?focus=call&id=${c.id}&shiftId=${c.shift_id}`)}
+                  <Tag key={c.id}
+                    {...(!isControlDevice && { onClick: () => navigate(`${createPageUrl('Rota')}?focus=call&id=${c.id}&shiftId=${c.shift_id}`) })}
                     className="w-full flex items-start gap-3 px-4 py-3 text-left active:bg-red-900/30 touch-manipulation">
                     <XCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
@@ -115,16 +116,17 @@ export default function RadioShiftTab({ todayShiftCalls, todayShifts, rotaAreas,
                         {staffName}{areaName ? ` · ${areaName}` : ''} · scheduled {c.scheduled_time?.slice(0, 5) || '—'}
                       </p>
                     </div>
-                    <ArrowRight className="w-3.5 h-3.5 text-red-600 shrink-0 mt-0.5" />
-                  </button>
+                    {!isControlDevice && <ArrowRight className="w-3.5 h-3.5 text-red-600 shrink-0 mt-0.5" />}
+                  </Tag>
                 );
               })}
               {missingLogs.map(c => {
                 const areaName = getAreaName(c.shifts?.rota_area_id);
                 const staffName = getStaffName(c);
+                const Tag = isControlDevice ? 'div' : 'button';
                 return (
-                  <button key={c.id}
-                    onClick={() => navigate(`${createPageUrl('Rota')}?focus=call&id=${c.id}&shiftId=${c.shift_id}`)}
+                  <Tag key={c.id}
+                    {...(!isControlDevice && { onClick: () => navigate(`${createPageUrl('Rota')}?focus=call&id=${c.id}&shiftId=${c.shift_id}`) })}
                     className="w-full flex items-start gap-3 px-4 py-3 text-left active:bg-red-900/30 touch-manipulation">
                     <FileText className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
@@ -134,8 +136,8 @@ export default function RadioShiftTab({ todayShiftCalls, todayShifts, rotaAreas,
                         {staffName}{areaName ? ` · ${areaName}` : ''} · call marked complete, log not submitted
                       </p>
                     </div>
-                    <ArrowRight className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                  </button>
+                    {!isControlDevice && <ArrowRight className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />}
+                  </Tag>
                 );
               })}
               {notClockedIn.map(s => {
@@ -146,9 +148,10 @@ export default function RadioShiftTab({ todayShiftCalls, todayShifts, rotaAreas,
                   const startDt = parseISO(`${s.date || todayStr}T${s.start_time}`);
                   overdueStr = formatDistanceToNow(startDt, { addSuffix: false }) + ' overdue';
                 } catch {}
+                const Tag = isControlDevice ? 'div' : 'button';
                 return (
-                  <button key={s.id}
-                    onClick={() => navigate(`${createPageUrl('Rota')}?focus=shift&id=${s.id}`)}
+                  <Tag key={s.id}
+                    {...(!isControlDevice && { onClick: () => navigate(`${createPageUrl('Rota')}?focus=shift&id=${s.id}`) })}
                     className="w-full flex items-start gap-3 px-4 py-3 text-left active:bg-red-900/30 touch-manipulation">
                     <Clock className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
@@ -158,8 +161,8 @@ export default function RadioShiftTab({ todayShiftCalls, todayShifts, rotaAreas,
                         Started {s.start_time?.slice(0, 5)}{areaName ? ` · ${areaName}` : ''}{overdueStr ? ` · ${overdueStr}` : ''}
                       </p>
                     </div>
-                    <ArrowRight className="w-3.5 h-3.5 text-orange-600 shrink-0 mt-0.5" />
-                  </button>
+                    {!isControlDevice && <ArrowRight className="w-3.5 h-3.5 text-orange-600 shrink-0 mt-0.5" />}
+                  </Tag>
                 );
               })}
             </div>

@@ -1557,15 +1557,28 @@ export default function TwoWayRadio() {
 
       <div className="min-h-screen pb-28" style={theme.bgStyle}>
 
-        {/* ── APP HOME BAR — full-width back button replacing the hidden header ── */}
-        <button
-          onClick={() => navigate(createPageUrl('Dashboard'))}
-          className={`w-full flex items-center gap-3 px-5 font-semibold text-base flex-shrink-0 touch-manipulation ${theme.homeBar}`}
-          style={{ paddingTop: `calc(0.875rem + env(safe-area-inset-top))`, paddingBottom: '0.875rem' }}
-        >
-          <Home className="w-5 h-5 shrink-0" />
-          <span>App Home</span>
-        </button>
+        {/* ── APP HOME BAR — hidden for control devices, they have no access to the rest of the app ── */}
+        {user?.is_control_device ? (
+          <div
+            className={`w-full flex items-center gap-3 px-5 font-semibold text-base flex-shrink-0 ${theme.homeBar}`}
+            style={{ paddingTop: `calc(0.875rem + env(safe-area-inset-top))`, paddingBottom: '0.875rem' }}
+          >
+            <Radio className="w-5 h-5 shrink-0" />
+            <span className="flex-1">Control Radio</span>
+            <span className="text-xs font-normal opacity-60">
+              {activeChannel?.name || 'Radio'}
+            </span>
+          </div>
+        ) : (
+          <button
+            onClick={() => navigate(createPageUrl('Dashboard'))}
+            className={`w-full flex items-center gap-3 px-5 font-semibold text-base flex-shrink-0 touch-manipulation ${theme.homeBar}`}
+            style={{ paddingTop: `calc(0.875rem + env(safe-area-inset-top))`, paddingBottom: '0.875rem' }}
+          >
+            <Home className="w-5 h-5 shrink-0" />
+            <span>App Home</span>
+          </button>
+        )}
 
         {/* ── TAB BAR ── */}
         <div className={`flex border-b backdrop-blur ${theme.tabBar}`}>
@@ -1878,6 +1891,7 @@ export default function TwoWayRadio() {
               staff={staff}
               navigate={navigate}
               createPageUrl={createPageUrl}
+              isControlDevice={!!user?.is_control_device}
             />
           : <p className="text-slate-600 text-xs text-center mt-16 px-8">Shift overview is available to admins only.</p>
         )}
