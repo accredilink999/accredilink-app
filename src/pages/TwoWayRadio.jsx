@@ -376,7 +376,9 @@ export default function TwoWayRadio() {
     });
   };
 
-  const isSuperAdmin  = user?.role === 'super_admin' || user?.role === 'admin';
+  const isControlDevice = isControlDevice;
+  // Control devices get full admin-level radio access regardless of their assigned role
+  const isSuperAdmin  = user?.role === 'super_admin' || user?.role === 'admin' || isControlDevice;
   const myUid         = user?.id ? toUid(user.id) : null;
   const otherStaff    = staff.filter(s => s.id !== user?.id);
   const staffByUid    = Object.fromEntries(staff.map(s => [toUid(s.id), s]));
@@ -935,9 +937,14 @@ export default function TwoWayRadio() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search, myUid]);
 
-  // Auto-join assigned channel for non-admin users on load
+  // Auto-join assigned channel on load.
+  // Regular staff: always auto-join their assigned channel.
+  // Admins: skip (they pick channels manually).
+  // Control devices: always auto-join — they are fixed to one area's channel.
   useEffect(() => {
-    if (!user?.id || !myUid || !clientRef.current || isSuperAdmin) return;
+    if (!user?.id || !myUid || !clientRef.current) return;
+    const isRegularAdmin = (user?.role === 'super_admin' || user?.role === 'admin') && !isControlDevice;
+    if (isRegularAdmin) return;
     const myRecord = staff.find(s => s.id === user.id);
     if (!myRecord?.radio_channel_id) return;
     const ch = channels.find(c => c.id === myRecord.radio_channel_id);
@@ -1558,7 +1565,7 @@ export default function TwoWayRadio() {
       <div className="min-h-screen pb-28" style={theme.bgStyle}>
 
         {/* ── APP HOME BAR — hidden for control devices, they have no access to the rest of the app ── */}
-        {user?.is_control_device ? (
+        {isControlDevice ? (
           <div
             className={`w-full flex items-center gap-3 px-5 font-semibold text-base flex-shrink-0 ${theme.homeBar}`}
             style={{ paddingTop: `calc(0.875rem + env(safe-area-inset-top))`, paddingBottom: '0.875rem' }}
@@ -1891,7 +1898,7 @@ export default function TwoWayRadio() {
               staff={staff}
               navigate={navigate}
               createPageUrl={createPageUrl}
-              isControlDevice={!!user?.is_control_device}
+              isControlDevice={isControlDevice}
             />
           : <p className="text-slate-600 text-xs text-center mt-16 px-8">Shift overview is available to admins only.</p>
         )}
@@ -1918,7 +1925,7 @@ export default function TwoWayRadio() {
             onDetectPTTKey={onDetectPTTKey}
             onSetPTTKey={onSetPTTKey}
             onClearPTTKey={onClearPTTKey}
-            isControlDevice={!!user?.is_control_device}
+            isControlDevice={isControlDevice}
             radioTheme={radioTheme}
             setRadioTheme={setRadioTheme}
           />
