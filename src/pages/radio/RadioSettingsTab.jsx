@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
-import { Upload, Check, Trash2, Volume2, VolumeX, Cpu, Wifi, Monitor, Zap, Radio } from 'lucide-react';
+import { Upload, Check, Trash2, Volume2, VolumeX, Cpu, Wifi, Monitor, Zap, Radio, Palette } from 'lucide-react';
 import { toast } from 'sonner';
+import { RADIO_THEMES } from '../TwoWayRadio';
 
 // Sound slots wired to the module-level audio functions in TwoWayRadio.jsx
 // Keys must match what playCustomSound(key) looks up in localStorage
@@ -50,10 +51,14 @@ export default function RadioSettingsTab({
   pttKeyCode, keepAwake, setKeepAwake, wakeOnIncoming, setWakeOnIncoming,
   bringToFront, setBringToFront, detectingPTTKey, onDetectPTTKey, onSetPTTKey, onClearPTTKey,
   isControlDevice,
+  radioTheme, setRadioTheme,
 }) {
-  const handleSoundUpload = (key, file) => {
+  const saveSound = (key, file) => {
     if (!file) return;
-    if (!file.type.startsWith('audio/')) { toast.error('Please upload an audio file (MP3, WAV, OGG)'); return; }
+    if (!file.type.startsWith('audio/') && !file.name.match(/\.(mp3|wav|ogg|m4a|aac|flac|opus)$/i)) {
+      toast.error('Please select an audio file (MP3, WAV, OGG, M4A…)');
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (e) => {
       const url = e.target.result;
@@ -61,11 +66,33 @@ export default function RadioSettingsTab({
       setCustomSounds(next);
       try { localStorage.setItem('radio_custom_sounds', JSON.stringify(next)); } catch {}
       toast.success(`${file.name} saved`);
-      // Preview the uploaded sound
       try { const a = new Audio(url); a.volume = 0.7; a.play().catch(() => {}); } catch {}
     };
     reader.readAsDataURL(file);
   };
+
+  // File System Access API — lets user browse internal storage directly (Android WebView / Chrome)
+  const browseStorage = async (key) => {
+    if (window.showOpenFilePicker) {
+      try {
+        const [fileHandle] = await window.showOpenFilePicker({
+          types: [{ description: 'Audio files', accept: { 'audio/*': ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac', '.opus'] } }],
+          multiple: false,
+        });
+        const file = await fileHandle.getFile();
+        saveSound(key, file);
+      } catch (e) {
+        if (e.name !== 'AbortError') toast.error('Could not open file picker');
+      }
+    } else {
+      // Fallback: trigger hidden input (standard file dialog)
+      fileInputRefs.current[key]?.click();
+    }
+  };
+
+  const fileInputRefs = useRef({});
+
+  const handleSoundUpload = (key, file) => saveSound(key, file);
 
   const removeSound = (key) => {
     const next = { ...customSounds };
@@ -116,13 +143,13 @@ export default function RadioSettingsTab({
       {/* Sound file uploads */}
       <Section
         title="Custom Sounds"
-        subtitle="Upload MP3 / WAV / OGG files — stored on this device. Native app will use device storage."
+        subtitle="Browse device storage or upload — stored locally. Native app uses device filesystem."
       >
         <div className="-mx-4 divide-y divide-slate-800">
           {SOUND_SLOTS.map(slot => {
             const has = !!customSounds[slot.key];
             return (
-              <div key={slot.key} className="flex items-center gap-3 px-4 py-3">
+              <div key={slot.key} className="flex items-start gap-3 px-4 py-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-white text-sm font-semibold">{slot.label}</p>
                   <p className="text-xs mt-0.5">
@@ -130,31 +157,44 @@ export default function RadioSettingsTab({
                       ? <span className="text-teal-400">{customSounds[slot.key].name}</span>
                       : <span className="text-slate-500">{slot.desc}</span>}
                   </p>
+                  {/* Preview button when sound is set */}
+                  {has && (
+                    <button onClick={() => { try { new Audio(customSounds[slot.key].url).play(); } catch {} }}
+                      className="text-[10px] text-teal-600 hover:text-teal-400 mt-0.5 transition-colors">
+                      ▶ Preview
+                    </button>
+                  )}
                 </div>
 
-                {has && (
-                  <button
-                    onClick={() => removeSound(slot.key)}
-                    className="p-2 text-slate-600 hover:text-red-400 transition-colors shrink-0 touch-manipulation"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
+                <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+                  {has && (
+                    <button onClick={() => removeSound(slot.key)}
+                      className="p-1.5 text-slate-600 hover:text-red-400 transition-colors touch-manipulation">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
 
-                <label className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold cursor-pointer transition-colors shrink-0 touch-manipulation ${
-                  has
-                    ? 'border-teal-700 text-teal-400 hover:border-teal-500'
-                    : 'border-slate-600 text-slate-400 hover:border-slate-400'
-                }`}>
-                  {has ? <Check className="w-3.5 h-3.5" /> : <Upload className="w-3.5 h-3.5" />}
-                  {has ? 'Replace' : 'Upload'}
+                  {/* Browse internal storage (File System Access API) */}
+                  <button
+                    onClick={() => browseStorage(slot.key)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition-colors touch-manipulation ${
+                      has
+                        ? 'border-teal-700 text-teal-400 hover:border-teal-500'
+                        : 'border-slate-600 text-slate-400 hover:border-slate-400'
+                    }`}>
+                    <Upload className="w-3.5 h-3.5" />
+                    {has ? 'Replace' : 'Browse'}
+                  </button>
+
+                  {/* Hidden fallback input for browsers without File System Access */}
                   <input
+                    ref={el => { fileInputRefs.current[slot.key] = el; }}
                     type="file"
-                    accept="audio/*"
+                    accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac,.opus"
                     className="sr-only"
                     onChange={e => handleSoundUpload(slot.key, e.target.files?.[0])}
                   />
-                </label>
+                </div>
               </div>
             );
           })}
@@ -227,6 +267,35 @@ export default function RadioSettingsTab({
           label="Bring to Front on PTT"
           desc="Raise app window when hardware PTT is pressed (native app)"
         />
+      </Section>
+
+      {/* ── Radio Theme ── */}
+      <Section
+        title="Radio Theme"
+        subtitle="Choose the colour scheme for the Radio pages."
+        icon={<Palette className="w-4 h-4 text-slate-400" />}
+      >
+        <div className="grid grid-cols-2 gap-2">
+          {Object.entries(RADIO_THEMES).map(([key, t]) => {
+            const active = radioTheme === key;
+            return (
+              <button key={key}
+                onClick={() => { setRadioTheme(key); localStorage.setItem('radio_theme', key); toast.success(`Theme set to ${t.label}`); }}
+                className={`flex items-center gap-2.5 rounded-xl p-3 border text-left transition-all touch-manipulation ${
+                  active ? 'border-white/40 bg-white/10' : 'border-slate-700/50 bg-slate-800/30 hover:border-slate-600'
+                }`}
+                style={active ? t.bgStyle : undefined}
+              >
+                <span className="text-lg leading-none">{t.emoji}</span>
+                <div className="min-w-0 flex-1">
+                  <p className={`text-xs font-bold truncate ${active ? 'text-white' : 'text-slate-300'}`}>{t.label}</p>
+                  {active && <p className="text-[10px] text-white/60 mt-0.5">Active</p>}
+                </div>
+                {active && <Check className="w-3.5 h-3.5 text-white shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
       </Section>
 
       {/* Device info */}

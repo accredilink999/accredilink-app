@@ -20,6 +20,63 @@ import RadioSettingsTab from './radio/RadioSettingsTab';
 
 const AGORA_APP_ID   = 'ff9f260da10245a5ab4855ea3ec59500';
 const AGORA_APP_CERT = 'e8dd782a9eac4d3385162b3a1f81d6c4';
+
+// ── Radio page themes ─────────────────────────────────────────────────────────
+export const RADIO_THEMES = {
+  blue: {
+    label: 'Blue Pro', emoji: '🔵',
+    bgStyle: { backgroundColor: '#0d47a1', backgroundImage: 'linear-gradient(160deg, #1976d2 0%, #0d47a1 55%, #0a2d6e 100%)' },
+    homeBar:    'bg-[#0a2d6e] text-white active:bg-[#071f4f]',
+    tabBar:     'bg-[#071f4f] border-[#0d3a8a]',
+    tabActive:  'text-blue-200 border-b-2 border-blue-300',
+    tabInactive:'text-[#3b6fbe] hover:text-blue-400',
+    header:     'bg-[#0a2d6e] border-[#0d3a8a]',
+    pttIdle:    'bg-blue-700',
+    accent:     'text-blue-300',
+    dot:        'bg-blue-300',
+  },
+  battenburg: {
+    label: 'Battenburg', emoji: '🟡',
+    bgStyle: {
+      backgroundColor: '#040c14',
+      backgroundImage: `repeating-conic-gradient(rgba(253,224,71,0.06) 0% 25%,rgba(34,197,94,0.06) 0% 50%) 0 0/52px 52px,
+        radial-gradient(ellipse at 20% 10%,rgba(253,224,71,0.10) 0%,transparent 45%),
+        radial-gradient(ellipse at 80% 90%,rgba(34,197,94,0.08) 0%,transparent 45%)`,
+    },
+    homeBar:    'bg-teal-600 text-white active:bg-teal-700',
+    tabBar:     'bg-slate-950/90 border-slate-800',
+    tabActive:  'text-teal-400 border-b-2 border-teal-400',
+    tabInactive:'text-slate-600 hover:text-slate-400',
+    header:     'bg-slate-900 border-slate-700/50',
+    pttIdle:    'bg-teal-700',
+    accent:     'text-teal-400',
+    dot:        'bg-teal-400',
+  },
+  dark: {
+    label: 'Dark Ops', emoji: '⚫',
+    bgStyle: { backgroundColor: '#020408', backgroundImage: 'radial-gradient(ellipse at 50% 0%,rgba(15,23,42,1) 0%,rgba(2,4,8,1) 70%)' },
+    homeBar:    'bg-slate-950 text-white active:bg-black',
+    tabBar:     'bg-black border-slate-900',
+    tabActive:  'text-slate-200 border-b-2 border-slate-400',
+    tabInactive:'text-slate-700 hover:text-slate-500',
+    header:     'bg-slate-950 border-slate-900',
+    pttIdle:    'bg-slate-700',
+    accent:     'text-slate-300',
+    dot:        'bg-slate-400',
+  },
+  red: {
+    label: 'Alert Red', emoji: '🔴',
+    bgStyle: { backgroundColor: '#150000', backgroundImage: 'linear-gradient(160deg,#3b0000 0%,#150000 100%)' },
+    homeBar:    'bg-red-950 text-white active:bg-red-900',
+    tabBar:     'bg-red-950/95 border-red-900',
+    tabActive:  'text-red-300 border-b-2 border-red-400',
+    tabInactive:'text-red-900 hover:text-red-700',
+    header:     'bg-red-950 border-red-900/80',
+    pttIdle:    'bg-red-800',
+    accent:     'text-red-400',
+    dot:        'bg-red-400',
+  },
+};
 const COUNTDOWN_SECS = 10;
 
 AgoraRTC.setLogLevel(4);
@@ -271,7 +328,8 @@ export default function TwoWayRadio() {
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
   const [groupBroadcastActive, setGroupBroadcastActive] = useState(false);
 
-  // Tab navigation and per-device settings (all localStorage-backed for PWA/native)
+  // Tab navigation, theme, and per-device settings (all localStorage-backed for PWA/native)
+  const [radioTheme, setRadioTheme]     = useState(() => localStorage.getItem('radio_theme') || 'blue');
   const [radioTab, setRadioTab]         = useState('radio'); // 'radio' | 'shift' | 'settings'
   const [silentMode, setSilentMode]     = useState(() => localStorage.getItem('radio_silent_mode') === 'true');
   const [showAllAreas, setShowAllAreas] = useState(() => localStorage.getItem('radio_show_all_areas') !== 'false');
@@ -1507,6 +1565,8 @@ export default function TwoWayRadio() {
     );
   })();
 
+  const theme = RADIO_THEMES[radioTheme] || RADIO_THEMES.blue;
+
   return (
     <>
       {EmergencyCountdownOverlay}
@@ -1530,7 +1590,7 @@ export default function TwoWayRadio() {
           pttMode === 'disabled' ? 'bg-slate-800/60 text-slate-700'
           : pttMode === 'p2p' ? 'bg-green-700 text-white'
           : isTalking ? 'bg-red-600 text-white shadow-2xl shadow-red-900/80'
-          : 'bg-teal-700 text-white'
+          : `${theme.pttIdle} text-white`
         } ${pttHandedness === 'right' ? 'rounded-l-2xl' : 'rounded-r-2xl'}`}
       >
         {isTalking && (
@@ -1551,19 +1611,12 @@ export default function TwoWayRadio() {
         )}
       </button>}
 
-      <div className="min-h-screen pb-28" style={{
-        backgroundColor: '#040c14',
-        backgroundImage: `
-          repeating-conic-gradient(rgba(253,224,71,0.06) 0% 25%, rgba(34,197,94,0.06) 0% 50%) 0 0 / 52px 52px,
-          radial-gradient(ellipse at 20% 10%, rgba(253,224,71,0.10) 0%, transparent 45%),
-          radial-gradient(ellipse at 80% 90%, rgba(34,197,94,0.08) 0%, transparent 45%)
-        `
-      }}>
+      <div className="min-h-screen pb-28" style={theme.bgStyle}>
 
         {/* ── APP HOME BAR — full-width back button replacing the hidden header ── */}
         <button
           onClick={() => navigate(createPageUrl('Dashboard'))}
-          className="w-full flex items-center gap-3 px-5 bg-teal-600 text-white font-semibold text-base flex-shrink-0 active:bg-teal-700 touch-manipulation"
+          className={`w-full flex items-center gap-3 px-5 font-semibold text-base flex-shrink-0 touch-manipulation ${theme.homeBar}`}
           style={{ paddingTop: `calc(0.875rem + env(safe-area-inset-top))`, paddingBottom: '0.875rem' }}
         >
           <Home className="w-5 h-5 shrink-0" />
@@ -1571,11 +1624,11 @@ export default function TwoWayRadio() {
         </button>
 
         {/* ── TAB BAR ── */}
-        <div className="flex bg-slate-950/90 border-b border-slate-800 backdrop-blur">
+        <div className={`flex border-b backdrop-blur ${theme.tabBar}`}>
           {(['radio', ...(isSuperAdmin ? ['shift'] : []), 'settings']).map(key => (
             <button key={key} onClick={() => setRadioTab(key)}
               className={`flex-1 py-2.5 text-xs font-black uppercase tracking-wider transition-colors touch-manipulation ${
-                radioTab === key ? 'text-teal-400 border-b-2 border-teal-400' : 'text-slate-600 hover:text-slate-400'
+                radioTab === key ? theme.tabActive : theme.tabInactive
               }`}>
               {key === 'radio' ? 'Radio' : key === 'shift' ? 'Current Shift' : 'Settings'}
             </button>
@@ -1585,19 +1638,19 @@ export default function TwoWayRadio() {
         {radioTab === 'radio' && (<>
 
         {/* ── RADIO DEVICE HEADER ── */}
-        <div className="bg-slate-900 border-b border-slate-700/50">
-          <div className="h-2 bg-slate-950 flex gap-[3px] px-3 pt-1">
-            {Array.from({ length: 32 }).map((_, i) => <div key={i} className="flex-1 h-full bg-slate-700 rounded-full opacity-60" />)}
+        <div className={`border-b ${theme.header}`}>
+          <div className="h-2 bg-black/30 flex gap-[3px] px-3 pt-1">
+            {Array.from({ length: 32 }).map((_, i) => <div key={i} className="flex-1 h-full bg-white/10 rounded-full" />)}
           </div>
           {testMode && <div className="bg-amber-500 px-4 py-1"><span className="text-white text-xs font-bold">TEST MODE — alerts only go to you</span></div>}
           <div className="px-4 pt-3 pb-2 flex items-center gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <Radio className="w-4 h-4 text-teal-400 shrink-0" />
-                <span className="text-teal-400 font-black text-xs tracking-[0.2em] uppercase">Care Call Radio</span>
+                <Radio className={`w-4 h-4 shrink-0 ${theme.accent}`} />
+                <span className={`font-black text-xs tracking-[0.2em] uppercase ${theme.accent}`}>Care Call Radio</span>
               </div>
               <div className="flex items-end gap-0.5 mt-1.5">
-                {[3, 5, 7, 9, 11].map((h, i) => <div key={i} className={`w-1.5 rounded-sm ${i < 4 ? 'bg-teal-400' : 'bg-slate-700'}`} style={{ height: h }} />)}
+                {[3, 5, 7, 9, 11].map((h, i) => <div key={i} className={`w-1.5 rounded-sm ${i < 4 ? theme.dot : 'bg-white/20'}`} style={{ height: h }} />)}
                 <span className="text-slate-500 text-[10px] ml-1.5 font-mono">LIVE</span>
                 <span className={`w-2 h-2 rounded-full ml-2 mb-0.5 ${isOnline ? 'bg-green-400 animate-pulse' : 'bg-red-500 animate-pulse'}`} title={isOnline ? 'Online' : 'Offline'} />
                 <span className={`text-[10px] ml-0.5 font-mono ${isOnline ? 'text-green-500' : 'text-red-500'}`}>{isOnline ? 'WiFi' : 'OFFLINE'}</span>
@@ -1626,11 +1679,11 @@ export default function TwoWayRadio() {
           </div>
           <div className="px-4 pb-2 h-7 flex items-center">
             {anyoneSpeaking
-              ? <div className="flex items-center gap-2"><Volume2 className="w-3.5 h-3.5 text-teal-400 animate-pulse shrink-0" /><span className="text-teal-300 text-xs font-semibold truncate">{speakingNames.join(', ')} speaking…</span></div>
+              ? <div className="flex items-center gap-2"><Volume2 className={`w-3.5 h-3.5 animate-pulse shrink-0 ${theme.accent}`} /><span className={`text-xs font-semibold truncate ${theme.accent}`}>{speakingNames.join(', ')} speaking…</span></div>
               : <span className="text-slate-600 text-xs font-mono">Channel clear ·· ·</span>}
           </div>
-          <div className="h-2 bg-slate-950 flex gap-[3px] px-3 pb-1">
-            {Array.from({ length: 32 }).map((_, i) => <div key={i} className="flex-1 h-full bg-slate-700 rounded-full opacity-60" />)}
+          <div className="h-2 bg-black/30 flex gap-[3px] px-3 pb-1">
+            {Array.from({ length: 32 }).map((_, i) => <div key={i} className="flex-1 h-full bg-white/10 rounded-full" />)}
           </div>
         </div>
 
@@ -1908,6 +1961,8 @@ export default function TwoWayRadio() {
             onSetPTTKey={onSetPTTKey}
             onClearPTTKey={onClearPTTKey}
             isControlDevice={!!user?.is_control_device}
+            radioTheme={radioTheme}
+            setRadioTheme={setRadioTheme}
           />
         )}
 
