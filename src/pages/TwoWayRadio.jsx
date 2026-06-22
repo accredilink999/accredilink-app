@@ -278,7 +278,20 @@ export default function TwoWayRadio() {
   const [silentMode, setSilentMode]     = useState(() => localStorage.getItem('radio_silent_mode') === 'true');
   const [showAllAreas, setShowAllAreas] = useState(() => localStorage.getItem('radio_show_all_areas') !== 'false');
   const [areaToggles, setAreaToggles]   = useState(() => { try { return JSON.parse(localStorage.getItem('radio_area_toggles') || '{}'); } catch { return {}; } });
-  const [customSounds, setCustomSounds] = useState(() => { try { return JSON.parse(localStorage.getItem('radio_custom_sounds') || '{}'); } catch { return {}; } });
+  const [customSounds, setCustomSounds] = useState(() => {
+    try {
+      const stored = localStorage.getItem('radio_custom_sounds');
+      if (stored !== null) return JSON.parse(stored);
+      // First launch — default to TETRA preset
+      const tetra = {
+        ptt_up:   { name: 'Beep Bop.aac',   url: '/radio-tones/Beep Bop.aac' },
+        ptt_down: { name: 'Bop Beep.aac',    url: '/radio-tones/Bop Beep.aac' },
+        incoming: { name: 'Alert tone.aac',  url: '/radio-tones/Alert tone.aac' },
+      };
+      localStorage.setItem('radio_custom_sounds', JSON.stringify(tetra));
+      return tetra;
+    } catch { return {}; }
+  });
 
   // Handset hardware settings
   const [pttKeyCode, setPttKeyCode]           = useState(() => parseInt(localStorage.getItem('radio_ptt_keycode') || '0'));

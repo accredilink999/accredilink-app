@@ -115,9 +115,14 @@ export default function RadioSettingsTab({
   const handleSoundUpload = (key, file) => saveSound(key, file);
 
   const clearAllSounds = () => {
-    setCustomSounds({});
-    try { localStorage.removeItem('radio_custom_sounds'); } catch {}
-    toast.success('All sounds reset to defaults');
+    const tetra = {
+      ptt_up:   { name: 'Beep Bop.aac',   url: '/radio-tones/Beep Bop.aac' },
+      ptt_down: { name: 'Bop Beep.aac',    url: '/radio-tones/Bop Beep.aac' },
+      incoming: { name: 'Alert tone.aac',  url: '/radio-tones/Alert tone.aac' },
+    };
+    setCustomSounds(tetra);
+    try { localStorage.setItem('radio_custom_sounds', JSON.stringify(tetra)); } catch {}
+    toast.success('Reset to TETRA tones');
   };
 
   const removeSound = (key) => {
@@ -284,8 +289,8 @@ export default function RadioSettingsTab({
         {Object.keys(customSounds).length > 0 && (
           <div className="border-t border-slate-800 px-4 py-3 flex items-center justify-between">
             <div>
-              <p className="text-slate-400 text-xs font-semibold">Reset to Default Sounds</p>
-              <p className="text-slate-600 text-[10px] mt-0.5">Remove all custom audio files and use built-in tones</p>
+              <p className="text-slate-400 text-xs font-semibold">Reset to TETRA Tones</p>
+              <p className="text-slate-600 text-[10px] mt-0.5">Restore the built-in TETRA / Airwave sound pack</p>
             </div>
             <button
               onClick={clearAllSounds}
