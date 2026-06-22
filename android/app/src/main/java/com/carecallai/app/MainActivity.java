@@ -2,8 +2,12 @@ package com.carecallai.app;
 
 import android.Manifest;
 import android.app.DownloadManager;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -12,6 +16,7 @@ import android.view.KeyEvent;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
 import android.webkit.GeolocationPermissions;
+import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
@@ -21,6 +26,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
+import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.BridgeActivity;
@@ -34,6 +40,11 @@ public class MainActivity extends BridgeActivity {
     private static final int KEYCODE_INRICO_SIDE  = 293;
     private static final int KEYCODE_MENU_PTT     = 139;
 
+    // LED notification
+    private static final int    LED_NOTIF_ID      = 9001;
+    private static final String CH_ONLINE         = "radio_led_online";
+    private static final String CH_OFFLINE        = "radio_led_offline";
+
     private WebView webView;
     private boolean keepScreenOn = false;
 
@@ -42,8 +53,12 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
 
         requestMicPermission();
+        setupLedChannels();
 
         webView = getBridge().getWebView();
+
+        // Expose LED bridge to JavaScript — called from TwoWayRadio when isOnline changes
+        webView.addJavascriptInterface(new LedBridge(), "AndroidLED");
 
         // Radio flavor: inject localStorage flag so React app boots directly to radio
         // and locks navigation. Standard flavor skips this entirely.
@@ -98,6 +113,60 @@ public class MainActivity extends BridgeActivity {
                 return super.onShowFileChooser(webView, filePathCallback, fileChooserParams);
             }
         });
+    }
+
+    // ── LED status indicator ───────────────────────────────────────────────────
+    // Called from JavaScript: window.AndroidLED.setOnline(true/false)
+    // Posts a persistent notification on the matching LED channel so the T320
+    // hardware LED blinks green (online) or red (offline).
+
+    private void setupLedChannels() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+
+            NotificationChannel online = new NotificationChannel(
+                CH_ONLINE, "Radio Online", NotificationManager.IMPORTANCE_LOW);
+            online.setDescription("LED blinks green — radio connected");
+            online.enableLights(true);
+            online.setLightColor(Color.GREEN);
+            online.setShowBadge(false);
+            nm.createNotificationChannel(online);
+
+            NotificationChannel offline = new NotificationChannel(
+                CH_OFFLINE, "Radio Offline", NotificationManager.IMPORTANCE_LOW);
+            offline.setDescription("LED blinks red — no network connection");
+            offline.enableLights(true);
+            offline.setLightColor(Color.RED);
+            offline.setShowBadge(false);
+            nm.createNotificationChannel(offline);
+        }
+    }
+
+    private void showLedNotification(boolean online) {
+        NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        String channel = online ? CH_ONLINE : CH_OFFLINE;
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, channel)
+            .setSmallIcon(android.R.drawable.stat_sys_phone_call)
+            .setContentTitle(online ? "Radio Connected" : "Radio Offline")
+            .setContentText(online ? "CareCall Radio is online" : "No connection — check network")
+            .setOngoing(true)
+            .setSilent(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW);
+
+        // Pre-Oreo: set LED colour directly on the notification
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            builder.setLights(online ? Color.GREEN : Color.RED, 500, 500);
+        }
+
+        nm.notify(LED_NOTIF_ID, builder.build());
+    }
+
+    private class LedBridge {
+        @JavascriptInterface
+        public void setOnline(boolean online) {
+            runOnUiThread(() -> showLedNotification(online));
+        }
     }
 
     // ── Hardware PTT key forwarding ────────────────────────────────────────────

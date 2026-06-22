@@ -294,25 +294,6 @@ export default function TwoWayRadio() {
   const [incomingCall, setIncomingCall] = useState(null);
   const [outgoingCall, setOutgoingCall] = useState(null);
   const [callDeclined, setCallDeclined] = useState(false);
-
-  // Callback requests — queried from DB so they survive page loads
-  const { data: callbackRequestRecords = [] } = useQuery({
-    queryKey: ['callbackRequests', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return [];
-      const since = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
-      const { data } = await supabase
-        .from('radio_calls')
-        .select('id, caller_id, status, created_at')
-        .eq('callee_id', user.id)
-        .eq('status', 'callback_request')
-        .gt('created_at', since)
-        .order('created_at', { ascending: false });
-      return data || [];
-    },
-    enabled: !!user?.id,
-    refetchInterval: 60000,
-  });
   const [dismissedCbReqIds, setDismissedCbReqIds] = useState(() => {
     try {
       const raw = localStorage.getItem('dismissedCallbackRequests');
@@ -397,6 +378,26 @@ export default function TwoWayRadio() {
   // ── Queries ───────────────────────────────────────────────────────────────
   const { data: user }         = useQuery({ queryKey: ['currentUser'], queryFn: () => base44.auth.me() });
   const { data: staff = [] }   = useQuery({ queryKey: ['staff'],       queryFn: () => base44.entities.User.list() });
+
+  // Callback requests — queried from DB so they survive page loads
+  // (placed here, after `user`, to avoid TDZ — user?.id needed in queryKey + enabled)
+  const { data: callbackRequestRecords = [] } = useQuery({
+    queryKey: ['callbackRequests', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const since = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+      const { data } = await supabase
+        .from('radio_calls')
+        .select('id, caller_id, status, created_at')
+        .eq('callee_id', user.id)
+        .eq('status', 'callback_request')
+        .gt('created_at', since)
+        .order('created_at', { ascending: false });
+      return data || [];
+    },
+    enabled: !!user?.id,
+    refetchInterval: 60000,
+  });
 
   // Keep staffRef in sync so Realtime callbacks don't capture stale staff list
   useEffect(() => { staffRef.current = staff; }, [staff]);
@@ -1138,6 +1139,11 @@ export default function TwoWayRadio() {
     window.addEventListener('offline', off);
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
   }, []);
+
+  // T320 LED — blink green when online, red when offline
+  useEffect(() => {
+    try { if (window.AndroidLED) window.AndroidLED.setOnline(isOnline); } catch {}
+  }, [isOnline]);
 
   // Global pointer release — stops PTT no matter where the finger lifts
   useEffect(() => {
