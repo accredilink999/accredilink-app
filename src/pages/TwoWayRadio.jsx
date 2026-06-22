@@ -216,6 +216,28 @@ function playCallConnectedTone() {
   } catch {}
 }
 
+// Callback-request alert tone — uses callback_request slot (defaults to Bop Beep)
+function playCallbackRequestTone() {
+  if (localStorage.getItem('radio_silent_mode') === 'true') return;
+  if (playCustomSound('callback_request')) return;
+  // Synthesised fallback: descending double-beep (bop-beep feel)
+  try {
+    const ctx = getAudioCtx(); if (!ctx) return;
+    const now = ctx.currentTime;
+    [1400, 880].forEach((freq, i) => {
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq; osc.type = 'sine';
+      const t = now + i * 0.075;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.8, t + 0.003);
+      gain.gain.setValueAtTime(0.8, t + 0.058);
+      gain.gain.linearRampToValueAtTime(0, t + 0.072);
+      osc.start(t); osc.stop(t + 0.075);
+    });
+  } catch {}
+}
+
 function speakText(text) {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
@@ -272,6 +294,8 @@ export default function TwoWayRadio() {
   const [incomingCall, setIncomingCall] = useState(null);
   const [outgoingCall, setOutgoingCall] = useState(null);
   const [callDeclined, setCallDeclined] = useState(false);
+  const [callbackRequests, setCallbackRequests]     = useState([]);
+  const [dismissedCbReqIds, setDismissedCbReqIds]  = useState(new Set());
 
   // Emergency
   const [emergencyCountdown, setEmergencyCountdown] = useState(null); // null | 10…0
@@ -314,19 +338,20 @@ export default function TwoWayRadio() {
       const stored = localStorage.getItem('radio_custom_sounds');
       const sounds = stored ? JSON.parse(stored) : {};
       // One-time migration: seed TETRA defaults for any unset slots
-      if (localStorage.getItem('radio_sounds_migrated') !== 'v1') {
+      if (localStorage.getItem('radio_sounds_migrated') !== 'v2') {
         const tetra = {
-          ptt_up:         { name: 'Beep Bop.aac',  url: '/radio-tones/Beep Bop.aac' },
-          ptt_down:       { name: 'Bop Beep.aac',   url: '/radio-tones/Bop Beep.aac' },
-          incoming:       { name: 'Alert tone.aac', url: '/radio-tones/Alert tone.aac' },
-          call_connected: { name: 'Beep Bop.aac',  url: '/radio-tones/Beep Bop.aac' },
+          ptt_up:            { name: 'Beep Bop.aac',  url: '/radio-tones/Beep Bop.aac' },
+          ptt_down:          { name: 'Bop Beep.aac',  url: '/radio-tones/Bop Beep.aac' },
+          incoming:          { name: 'Alert tone.aac', url: '/radio-tones/Alert tone.aac' },
+          call_connected:    { name: 'Beep Bop.aac',  url: '/radio-tones/Beep Bop.aac' },
+          callback_request:  { name: 'Bop Beep.aac',  url: '/radio-tones/Bop Beep.aac' },
         };
         let changed = false;
         for (const [k, v] of Object.entries(tetra)) {
           if (!sounds[k]) { sounds[k] = v; changed = true; }
         }
         if (changed) localStorage.setItem('radio_custom_sounds', JSON.stringify(sounds));
-        localStorage.setItem('radio_sounds_migrated', 'v1');
+        localStorage.setItem('radio_sounds_migrated', 'v2');
       }
       return sounds;
     } catch { return {}; }
@@ -615,11 +640,16 @@ export default function TwoWayRadio() {
       .channel(`radio-calls-in-${user.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'radio_calls', filter: `callee_id=eq.${user.id}` }, payload => {
         const call = payload.new;
-        if (call.status !== 'pending') return;
         if (Date.now() - new Date(call.created_at).getTime() > 30000) return;
-        const caller = staffRef.current.find(s => s.id === call.caller_id);
-        setIncomingCall({ callId: call.id, caller, channelName: call.channel_name });
-        stopTone(); stopToneRef.current = playTone([880, 1100, 880, 1100, 660], true);
+        if (call.status === 'pending') {
+          const caller = staffRef.current.find(s => s.id === call.caller_id);
+          setIncomingCall({ callId: call.id, caller, channelName: call.channel_name });
+          stopTone(); stopToneRef.current = playTone([880, 1100, 880, 1100, 660], true);
+        } else if (call.status === 'callback_request') {
+          const requester = staffRef.current.find(s => s.id === call.caller_id);
+          setCallbackRequests(prev => [{ callId: call.id, requester }, ...prev]);
+          playCallbackRequestTone();
+        }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'radio_calls' }, payload => {
         const call = payload.new;
@@ -704,6 +734,33 @@ export default function TwoWayRadio() {
       title: `📞 ${callerName} is calling you`, message: 'Tap to answer on Team Radio.',
       priority: 'high', action_url: `/TwoWayRadio?call=${chName}`, send_push: true,
     }).catch(() => {});
+  };
+
+  const sendCallbackRequest = async (person) => {
+    if (!person || !user?.id) return;
+    await supabase.from('radio_calls').insert({
+      caller_id: user.id, callee_id: person.id,
+      channel_name: `cbr_${user.id.slice(0, 8)}`, status: 'callback_request',
+      organization_id: getOrgId(),
+    });
+    const callerName = user?.full_name || 'A team member';
+    base44.functions.invoke('createNotification', {
+      recipient_ids: resolveRecipients([person.id]), type: 'radio_call',
+      title: `📲 ${callerName} wants a call back`,
+      message: 'Tap to call them back on Team Radio.',
+      priority: 'high', action_url: '/TwoWayRadio', send_push: true,
+    }).catch(() => {});
+    toast.success(`Call-back request sent to ${person.full_name}`);
+  };
+
+  const dismissCallbackRequest = (callId) => {
+    setDismissedCbReqIds(prev => new Set([...prev, callId]));
+  };
+
+  const callBackFromRequest = (req) => {
+    dismissCallbackRequest(req.callId);
+    setSelectedPerson(req.requester);
+    initiateP2PCall(req.requester);
   };
 
   const callBackFromMissed = (call) => {
@@ -1496,6 +1553,7 @@ export default function TwoWayRadio() {
   // MAIN VIEW
   // ════════════════════════════════════════════════════════════════════════════
   const unreadMissed = missedCalls.filter(c => !dismissedMissedIds.has(c.id));
+  const unreadCbRequests = callbackRequests.filter(r => !dismissedCbReqIds.has(r.callId));
   const anyoneSpeaking = speakingNames.length > 0;
 
   // Reusable staff pill inside a channel card
@@ -1764,6 +1822,47 @@ export default function TwoWayRadio() {
                     </div>
                   );
                 })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── CALLBACK REQUEST STICKY ALERT ── */}
+        {unreadCbRequests.length > 0 && (
+          <div className="sticky top-0 z-30 bg-teal-700 shadow-lg">
+            <div className="flex items-center gap-3 px-4 py-3">
+              <Phone className="w-4 h-4 text-white shrink-0" />
+              <div className="flex-1 min-w-0">
+                {unreadCbRequests.length === 1 ? (
+                  <p className="text-white text-sm font-bold truncate">
+                    {unreadCbRequests[0].requester?.full_name || 'Team Member'} wants a call back
+                  </p>
+                ) : (
+                  <p className="text-white text-sm font-bold">{unreadCbRequests.length} call-back requests</p>
+                )}
+              </div>
+              {unreadCbRequests.length === 1 && (
+                <button
+                  onClick={() => callBackFromRequest(unreadCbRequests[0])}
+                  className="bg-white text-teal-700 text-xs font-bold px-3 py-1.5 rounded-lg active:scale-95 transition-transform touch-manipulation shrink-0">
+                  Call Back
+                </button>
+              )}
+              <button
+                onClick={() => unreadCbRequests.forEach(r => dismissCallbackRequest(r.callId))}
+                className="text-teal-200 hover:text-white p-1 shrink-0 touch-manipulation">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            {unreadCbRequests.length > 1 && (
+              <div className="px-4 pb-3 space-y-1.5">
+                {unreadCbRequests.map(req => (
+                  <div key={req.callId} className="flex items-center gap-2 bg-teal-800/50 rounded-lg px-3 py-2">
+                    <p className="flex-1 text-white text-xs font-semibold truncate">{req.requester?.full_name || 'Team Member'}</p>
+                    <button onClick={() => callBackFromRequest(req)} className="bg-white text-teal-700 text-[10px] font-bold px-2.5 py-1 rounded-md active:scale-95 transition-transform touch-manipulation shrink-0">Call Back</button>
+                    <button onClick={() => dismissCallbackRequest(req.callId)} className="text-teal-300 hover:text-white p-0.5 shrink-0"><X className="w-3.5 h-3.5" /></button>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -2053,11 +2152,16 @@ export default function TwoWayRadio() {
 
       {/* ── DESELECT PILL — only when a person is selected ── */}
       {radioTab === 'radio' && selectedPerson && (
-        <div className="fixed bottom-28 left-0 right-0 px-4 z-20"
+        <div className="fixed bottom-28 left-0 right-0 px-4 z-20 space-y-1.5"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+          <button
+            onClick={() => sendCallbackRequest(selectedPerson)}
+            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-teal-800/95 backdrop-blur border border-teal-600 text-teal-200 text-xs font-semibold touch-manipulation active:scale-[0.98] transition-transform">
+            <Phone className="w-3.5 h-3.5" /> Call me back — {selectedPerson.full_name}
+          </button>
           <button onClick={() => setSelectedPerson(null)}
-            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-slate-800/95 backdrop-blur border border-slate-700 text-slate-300 text-xs">
-            <X className="w-3.5 h-3.5" /> Deselect {selectedPerson.full_name} — press PTT to call
+            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-slate-800/95 backdrop-blur border border-slate-700 text-slate-300 text-xs touch-manipulation">
+            <X className="w-3.5 h-3.5" /> Deselect — press PTT to call
           </button>
         </div>
       )}

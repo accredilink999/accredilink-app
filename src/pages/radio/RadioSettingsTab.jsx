@@ -6,18 +6,20 @@ import { RADIO_THEMES } from './radioThemes';
 // Sound slots wired to the module-level audio functions in TwoWayRadio.jsx
 // Keys must match what playCustomSound(key) looks up in localStorage
 const SOUND_SLOTS = [
-  { key: 'ptt_up',         label: 'PTT Press',      desc: 'Beep-bop when you start transmitting' },
-  { key: 'ptt_down',       label: 'PTT Release',    desc: 'Bop-beep when you stop transmitting' },
-  { key: 'incoming',       label: 'Incoming Ring',  desc: 'Loops while an incoming call is ringing' },
-  { key: 'call_connected', label: 'Call Connected', desc: 'Double-beep when a P2P call connects' },
-  { key: 'call_end',       label: 'Call End',       desc: 'Plays when a P2P call is ended' },
+  { key: 'ptt_up',           label: 'PTT Press',        desc: 'Beep-bop when you start transmitting' },
+  { key: 'ptt_down',         label: 'PTT Release',      desc: 'Bop-beep when you stop transmitting' },
+  { key: 'incoming',         label: 'Incoming Ring',    desc: 'Loops while an incoming call is ringing' },
+  { key: 'call_connected',   label: 'Call Connected',   desc: 'Double-beep when a P2P call connects' },
+  { key: 'callback_request', label: 'Call Me Back',     desc: 'Alert when someone requests a call back from you' },
+  { key: 'call_end',         label: 'Call End',         desc: 'Plays when a P2P call is ended' },
 ];
 
 const TETRA_SOUNDS = {
-  ptt_up:         { name: 'Beep Bop.aac',  url: '/radio-tones/Beep Bop.aac' },
-  ptt_down:       { name: 'Bop Beep.aac',  url: '/radio-tones/Bop Beep.aac' },
-  incoming:       { name: 'Alert tone.aac', url: '/radio-tones/Alert tone.aac' },
-  call_connected: { name: 'Beep Bop.aac',  url: '/radio-tones/Beep Bop.aac' },
+  ptt_up:           { name: 'Beep Bop.aac',  url: '/radio-tones/Beep Bop.aac' },
+  ptt_down:         { name: 'Bop Beep.aac',  url: '/radio-tones/Bop Beep.aac' },
+  incoming:         { name: 'Alert tone.aac', url: '/radio-tones/Alert tone.aac' },
+  call_connected:   { name: 'Beep Bop.aac',  url: '/radio-tones/Beep Bop.aac' },
+  callback_request: { name: 'Bop Beep.aac',  url: '/radio-tones/Bop Beep.aac' },
 };
 
 // Built-in tone packs — files served from /radio-tones/
@@ -135,7 +137,7 @@ export default function RadioSettingsTab({
     if (!preset.sounds) {
       // Built-in — clear TETRA slots but preserve any user-uploaded sounds
       const next = { ...customSounds };
-      delete next.ptt_up; delete next.ptt_down; delete next.incoming; delete next.call_connected;
+      delete next.ptt_up; delete next.ptt_down; delete next.incoming; delete next.call_connected; delete next.callback_request;
       setCustomSounds(next);
       try { localStorage.setItem('radio_custom_sounds', JSON.stringify(next)); } catch {}
     } else {
@@ -154,8 +156,9 @@ export default function RadioSettingsTab({
     const dn  = customSounds.ptt_down?.url;
     const inc = customSounds.incoming?.url;
     const cc  = customSounds.call_connected?.url;
-    if (up?.includes('Beep Bop') && dn?.includes('Bop Beep') && inc?.includes('Alert tone') && cc?.includes('Beep Bop')) return 'tetra';
-    if (!up && !dn && !inc && !cc) return 'builtin';
+    const cbr = customSounds.callback_request?.url;
+    if (up?.includes('Beep Bop') && dn?.includes('Bop Beep') && inc?.includes('Alert tone') && cc?.includes('Beep Bop') && cbr?.includes('Bop Beep')) return 'tetra';
+    if (!up && !dn && !inc && !cc && !cbr) return 'builtin';
     return 'custom';
   })();
 
