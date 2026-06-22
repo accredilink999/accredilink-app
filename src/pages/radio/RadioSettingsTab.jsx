@@ -12,6 +12,26 @@ const SOUND_SLOTS = [
   { key: 'call_end', label: 'Call End',           desc: 'Plays when a P2P call is ended' },
 ];
 
+// Built-in tone packs — files served from /radio-tones/
+const TONE_PRESETS = [
+  {
+    id: 'builtin',
+    label: 'Built-in Tones',
+    desc: 'Synthesised TETRA-style beeps (default)',
+    sounds: null, // null = clear custom sounds, use synthesised fallback
+  },
+  {
+    id: 'tetra',
+    label: 'TETRA / Airwave',
+    desc: 'Authentic TETRA radio tones',
+    sounds: {
+      ptt_up:   { name: 'Beep Bop.aac',          url: '/radio-tones/Beep Bop.aac' },
+      ptt_down: { name: 'Bop Beep.aac',           url: '/radio-tones/Bop Beep.aac' },
+      incoming: { name: 'Alert tone.aac',          url: '/radio-tones/Alert tone.aac' },
+    },
+  },
+];
+
 function Toggle({ value, onChange, label, desc }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1">
@@ -107,6 +127,33 @@ export default function RadioSettingsTab({
     try { localStorage.setItem('radio_custom_sounds', JSON.stringify(next)); } catch {}
   };
 
+  const applyPreset = (preset) => {
+    if (!preset.sounds) {
+      // Built-in — clear ptt_up, ptt_down, incoming but preserve call_end if set
+      const next = { ...customSounds };
+      delete next.ptt_up; delete next.ptt_down; delete next.incoming;
+      setCustomSounds(next);
+      try { localStorage.setItem('radio_custom_sounds', JSON.stringify(next)); } catch {}
+    } else {
+      const next = { ...customSounds, ...preset.sounds };
+      setCustomSounds(next);
+      try { localStorage.setItem('radio_custom_sounds', JSON.stringify(next)); } catch {}
+    }
+    toast.success(`${preset.label} applied`);
+    // Preview the PTT-up tone
+    const upUrl = preset.sounds?.ptt_up?.url;
+    if (upUrl) { try { new Audio(upUrl).play().catch(() => {}); } catch {} }
+  };
+
+  const activePreset = (() => {
+    const up   = customSounds.ptt_up?.url;
+    const down = customSounds.ptt_down?.url;
+    const inc  = customSounds.incoming?.url;
+    if (up?.includes('Beep Bop') && down?.includes('Bop Beep') && inc?.includes('Alert tone')) return 'tetra';
+    if (!up && !down && !inc) return 'builtin';
+    return 'custom';
+  })();
+
   const toggleArea = (areaId, enabled) => {
     const next = { ...areaToggles, [areaId]: enabled };
     setAreaToggles(next);
@@ -146,10 +193,37 @@ export default function RadioSettingsTab({
         </Section>
       )}
 
+      {/* Preset tone packs */}
+      <Section title="Tone Preset" subtitle="Choose a built-in sound pack or upload your own below">
+        <div className="-mx-4 divide-y divide-slate-800">
+          {TONE_PRESETS.map(preset => {
+            const active = activePreset === preset.id;
+            return (
+              <div key={preset.id} className="flex items-center gap-3 px-4 py-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm font-semibold">{preset.label}</p>
+                  <p className="text-slate-500 text-xs mt-0.5">{preset.desc}</p>
+                </div>
+                <button
+                  onClick={() => applyPreset(preset)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition-colors touch-manipulation shrink-0 ${
+                    active
+                      ? 'border-teal-600 text-teal-400 bg-teal-950/30'
+                      : 'border-slate-600 text-slate-400 hover:border-teal-700 hover:text-teal-400'
+                  }`}>
+                  {active && <Check className="w-3 h-3" />}
+                  {active ? 'Active' : 'Apply'}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </Section>
+
       {/* Sound file uploads */}
       <Section
         title="Custom Sounds"
-        subtitle="Browse device storage or upload — stored locally. Native app uses device filesystem."
+        subtitle="Override individual slots — browse device storage or upload your own file."
       >
         <div className="-mx-4 divide-y divide-slate-800">
           {SOUND_SLOTS.map(slot => {
