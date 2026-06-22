@@ -44,6 +44,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import AppDownloadGuide from '@/components/profile/AppDownloadGuide';
 import StaffMyMatrix from '@/components/profile/StaffMyMatrix';
+import StaffCompetencies from '@/components/profile/StaffCompetencies';
 
 export default function Profile() {
   const queryClient = useQueryClient();
@@ -657,6 +658,10 @@ export default function Profile() {
                 <StaffMyMatrix userId={user?.id} />
               )}
 
+              {activeSection === 'development' && (
+                <StaffCompetencies userId={user?.id} />
+              )}
+
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
@@ -666,6 +671,7 @@ export default function Profile() {
                 { value: 'training', label: 'Training', icon: Award, bg: 'from-purple-400 to-purple-600', desc: 'Certificates & CPD' },
                 { value: 'activity', label: 'Activity', icon: Clock, bg: 'from-amber-400 to-amber-600', desc: 'Recent shift history' },
                 { value: 'matrix', label: 'My Matrix', icon: LayoutGrid, bg: 'from-rose-400 to-rose-600', desc: 'Compliance & training docs' },
+                { value: 'development', label: 'My Development', icon: ClipboardCheck, bg: 'from-violet-400 to-violet-600', desc: 'Competencies & probation' },
               ].map(section => {
                 const Icon = section.icon;
                 return (

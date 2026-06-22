@@ -51,6 +51,7 @@ import PhotoGallery from './pages/PhotoGallery';
 import StaffAwards from './pages/StaffAwards';
 import MyMentoring from './pages/MyMentoring';
 import TwoWayRadio from './pages/TwoWayRadio';
+import CompetencyHub from './pages/CompetencyHub';
 import __Layout from './Layout.jsx';
 
 
@@ -105,6 +106,7 @@ export const PAGES = {
     "PhotoGallery": PhotoGallery,
     "StaffAwards": StaffAwards,
     "TwoWayRadio": TwoWayRadio,
+    "CompetencyHub": CompetencyHub,
 }
 
 export const pagesConfig = {
