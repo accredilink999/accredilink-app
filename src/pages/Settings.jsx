@@ -943,6 +943,139 @@ function AppShareQRCode({ isAdmin }) {
   );
 }
 
+// ── Control Handsets Section ─────────────────────────────────────────────────
+function ControlHandsetsSection() {
+  const { data: staff = [] } = useQuery({
+    queryKey: ['staff'], queryFn: () => base44.entities.User.list(),
+  });
+  const { data: channels = [] } = useQuery({
+    queryKey: ['radioChannels'],
+    queryFn: async () => {
+      const { data } = await supabase.from('radio_channels').select('id, name').order('created_at');
+      return data || [];
+    },
+    staleTime: 60000,
+  });
+  const [search, setSearch] = useState('');
+  const [saving, setSaving] = useState(null);
+  const queryClient = useQueryClient();
+
+  const controlDevices = staff.filter(s => s.is_control_device);
+  const otherStaff = staff.filter(s => !s.is_control_device && (
+    s.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+    s.email?.toLowerCase().includes(search.toLowerCase())
+  ));
+
+  const setControlDevice = async (userId, enabled) => {
+    setSaving(userId);
+    try {
+      await supabase.from('users').update({ is_control_device: enabled }).eq('id', userId);
+      queryClient.invalidateQueries({ queryKey: ['staff'] });
+      toast.success(enabled ? 'Control device enabled' : 'Control device removed');
+    } catch { toast.error('Failed to update'); }
+    setSaving(null);
+  };
+
+  const setChannel = async (userId, channelId) => {
+    await supabase.from('users').update({ radio_channel_id: channelId || null }).eq('id', userId);
+    queryClient.invalidateQueries({ queryKey: ['staff'] });
+  };
+
+  const getChannelName = (id) => channels.find(c => c.id === id)?.name || '—';
+
+  return (
+    <Card className="p-4 bg-slate-900 border-slate-700">
+      <div className="flex items-center gap-2 mb-4">
+        <Smartphone className="w-4 h-4 text-teal-400 shrink-0" />
+        <div>
+          <h3 className="text-white text-sm font-bold">Control Handsets</h3>
+          <p className="text-slate-500 text-xs">Inrico T320 / PoC devices — restricted to Radio mode</p>
+        </div>
+      </div>
+
+      {/* SQL reminder */}
+      <div className="rounded-xl border border-amber-800/40 bg-amber-950/20 px-3 py-2 mb-4">
+        <p className="text-amber-400 text-[10px] font-semibold">Supabase SQL required (run once):</p>
+        <code className="text-amber-300/70 text-[9px] font-mono block mt-0.5 select-all">
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS is_control_device BOOLEAN DEFAULT false;
+        </code>
+      </div>
+
+      {/* Active control devices */}
+      {controlDevices.length > 0 && (
+        <div className="mb-4 space-y-2">
+          <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Active Handsets ({controlDevices.length})</p>
+          {controlDevices.map(s => (
+            <div key={s.id} className="rounded-xl border border-teal-800/50 bg-teal-950/20 p-3">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-teal-700 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                  {s.full_name?.[0] || '?'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm font-semibold truncate">{s.full_name}</p>
+                  <p className="text-slate-500 text-xs truncate">{s.email}</p>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <p className="text-slate-600 text-[10px]">Channel:</p>
+                    <select
+                      value={s.radio_channel_id || ''}
+                      onChange={e => setChannel(s.id, e.target.value)}
+                      className="text-[10px] bg-slate-800 border border-slate-700 rounded px-2 py-0.5 text-slate-300 flex-1 min-w-0"
+                    >
+                      <option value="">— None —</option>
+                      {channels.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setControlDevice(s.id, false)}
+                  disabled={saving === s.id}
+                  className="text-slate-600 hover:text-red-400 transition-colors shrink-0 p-1">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add control device */}
+      <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-2">Add Handset Account</p>
+      <Input
+        placeholder="Search staff by name or email…"
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        className="mb-2 bg-slate-800 border-slate-700 text-white text-xs placeholder:text-slate-600"
+      />
+      {search.length > 1 && (
+        <div className="space-y-1 max-h-48 overflow-y-auto">
+          {otherStaff.slice(0, 8).map(s => (
+            <div key={s.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-slate-800 hover:bg-slate-700/80 transition-colors">
+              <div className="w-7 h-7 rounded-full bg-slate-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                {s.full_name?.[0] || '?'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-xs font-semibold truncate">{s.full_name}</p>
+                <p className="text-slate-500 text-[10px] truncate">{s.email}</p>
+              </div>
+              <button
+                onClick={() => { setControlDevice(s.id, true); setSearch(''); }}
+                disabled={saving === s.id}
+                className="text-xs font-semibold px-3 py-1.5 rounded-full bg-teal-700 text-white hover:bg-teal-600 transition-colors shrink-0 touch-manipulation">
+                {saving === s.id ? '…' : 'Make Handset'}
+              </button>
+            </div>
+          ))}
+          {otherStaff.length === 0 && <p className="text-slate-600 text-xs text-center py-3">No staff found</p>}
+        </div>
+      )}
+
+      <p className="text-slate-700 text-[10px] mt-3">
+        Control handset accounts are limited to Radio, Shift and Settings. Use the native Android app builder to deploy to Inrico T320 devices.
+      </p>
+    </Card>
+  );
+}
+
 export default function Settings() {
   const queryClient = useQueryClient();
   const { data: user } = useQuery({
@@ -1549,10 +1682,13 @@ export default function Settings() {
         </p>
       </Card>
 
+      {/* ── Control Handsets (admin only) ────────────────────────────────── */}
+      {isAdmin && <ControlHandsetsSection />}
+
       {/* Logout */}
-      <Button 
+      <Button
         onClick={handleLogout}
-        variant="outline" 
+        variant="outline"
         className="w-full border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
       >
         <LogOut className="w-4 h-4 mr-2" />

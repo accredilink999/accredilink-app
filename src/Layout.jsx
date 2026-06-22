@@ -108,6 +108,13 @@ export default function Layout({ children, currentPageName }) {
     },
   });
 
+  // Control device — auto-redirect to Radio page and stay there
+  React.useEffect(() => {
+    if (user?.is_control_device && currentPageName !== 'TwoWayRadio') {
+      navigate(createPageUrl('TwoWayRadio'));
+    }
+  }, [user?.is_control_device, currentPageName]);
+
   // If user is deleted, log them out
   React.useEffect(() => {
     if (userError || (user && !user.id)) {
@@ -1163,10 +1170,11 @@ export default function Layout({ children, currentPageName }) {
                       </main>
 
                       {/* Bottom Navigation for Mobile */}
-                      <BottomNavigation 
+                      <BottomNavigation
                         currentPageName={currentPageName}
                         unreadChatCount={unreadConversations.length}
                         unreadAssetsCount={openIncidents.length}
+                        isControlDevice={!!user?.is_control_device}
                       />
 
                       {user?.id && <ActiveShiftAutoOpen userId={user.id} />}

@@ -23,7 +23,7 @@ const baseNavigation = [
 
 const radioNav = { name: 'Radio', icon: Radio, page: 'TwoWayRadio' };
 
-export default function BottomNavigation({ currentPageName, unreadChatCount = 0, unreadAssetsCount = 0 }) {
+export default function BottomNavigation({ currentPageName, unreadChatCount = 0, unreadAssetsCount = 0, isControlDevice = false }) {
   const [hiddenByModal, setHiddenByModal] = useState(false);
 
   useEffect(() => {
@@ -53,7 +53,7 @@ export default function BottomNavigation({ currentPageName, unreadChatCount = 0,
     ? [baseNavigation[0], baseNavigation[1], radioNav, baseNavigation[2], baseNavigation[3]]
     : baseNavigation;
 
-  if (hiddenByModal || currentPageName === 'TwoWayRadio') return null;
+  if (hiddenByModal || currentPageName === 'TwoWayRadio' || isControlDevice) return null;
 
   return createPortal(
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-[9999] shadow-[0_-2px_10px_rgba(0,0,0,0.05)]" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>

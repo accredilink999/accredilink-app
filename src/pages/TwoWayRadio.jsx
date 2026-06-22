@@ -278,6 +278,13 @@ export default function TwoWayRadio() {
   const [areaToggles, setAreaToggles]   = useState(() => { try { return JSON.parse(localStorage.getItem('radio_area_toggles') || '{}'); } catch { return {}; } });
   const [customSounds, setCustomSounds] = useState(() => { try { return JSON.parse(localStorage.getItem('radio_custom_sounds') || '{}'); } catch { return {}; } });
 
+  // Handset hardware settings
+  const [pttKeyCode, setPttKeyCode]           = useState(() => parseInt(localStorage.getItem('radio_ptt_keycode') || '0'));
+  const [keepAwake, setKeepAwake]             = useState(() => localStorage.getItem('radio_keep_awake') === 'true');
+  const [wakeOnIncoming, setWakeOnIncoming]   = useState(() => localStorage.getItem('radio_wake_on_incoming') === 'true');
+  const [bringToFront, setBringToFront]       = useState(() => localStorage.getItem('radio_bring_to_front') === 'true');
+  const [detectingPTTKey, setDetectingPTTKey] = useState(false);
+
   // 30s call timeout → text alert modal
   const [textAlertModal, setTextAlertModal] = useState(null);
   const [textAlertMsg, setTextAlertMsg] = useState('');
@@ -996,6 +1003,82 @@ export default function TwoWayRadio() {
 
   // Pre-warm AudioContext on mount so first PTT tone fires instantly
   useEffect(() => { getAudioCtx(); }, []);
+
+  // ── Wake lock — keep screen on while radio page is open ──────────────────
+  useEffect(() => {
+    if (!keepAwake || !navigator.wakeLock) return;
+    let lock = null;
+    const acquire = () => navigator.wakeLock.request('screen').then(l => { lock = l; }).catch(() => {});
+    acquire();
+    const onVisible = () => { if (document.visibilityState === 'visible') acquire(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      lock?.release().catch(() => {});
+    };
+  }, [keepAwake]);
+
+  // ── Hardware PTT key listener (Inrico T320 side key / any mapped keycode) ─
+  // Uses refs so the handler doesn't need to be re-registered on every render
+  const pttModeRef   = useRef(pttMode);
+  const isTalkingRef = useRef(isTalking);
+  useEffect(() => { pttModeRef.current   = pttMode;   }, [pttMode]);
+  useEffect(() => { isTalkingRef.current = isTalking; }, [isTalking]);
+
+  useEffect(() => {
+    if (!pttKeyCode) return;
+    const handleDown = (e) => {
+      if (e.keyCode !== pttKeyCode || e.repeat) return;
+      e.preventDefault(); e.stopPropagation();
+      if (pttModeRef.current === 'p2p') initiateP2PCall();
+      else if (pttModeRef.current === 'group') { playPTTTone('up'); startTalking(); }
+    };
+    const handleUp = (e) => {
+      if (e.keyCode !== pttKeyCode) return;
+      e.preventDefault(); e.stopPropagation();
+      if (isTalkingRef.current) { playPTTTone('down'); stopTalking(); }
+    };
+    document.addEventListener('keydown', handleDown, true);
+    document.addEventListener('keyup', handleUp, true);
+    return () => {
+      document.removeEventListener('keydown', handleDown, true);
+      document.removeEventListener('keyup', handleUp, true);
+    };
+  }, [pttKeyCode]); // only re-registers when keycode changes
+
+  // ── PTT key detection helper ─────────────────────────────────────────────
+  const onDetectPTTKey = useCallback(() => {
+    setDetectingPTTKey(true);
+    const cancelTimeout = setTimeout(() => {
+      setDetectingPTTKey(false);
+      document.removeEventListener('keydown', handler, true);
+    }, 10000);
+    function handler(e) {
+      const code = e.keyCode;
+      if (code > 0 && code !== 27) {
+        e.preventDefault();
+        clearTimeout(cancelTimeout);
+        setPttKeyCode(code);
+        localStorage.setItem('radio_ptt_keycode', String(code));
+        setDetectingPTTKey(false);
+        document.removeEventListener('keydown', handler, true);
+        toast.success(`PTT key bound — keycode ${code}`);
+      }
+    }
+    document.addEventListener('keydown', handler, true);
+  }, []);
+
+  const onSetPTTKey = useCallback((code) => {
+    setPttKeyCode(code);
+    localStorage.setItem('radio_ptt_keycode', String(code));
+    toast.success(`PTT key set to keycode ${code}`);
+  }, []);
+
+  const onClearPTTKey = useCallback(() => {
+    setPttKeyCode(0);
+    localStorage.removeItem('radio_ptt_keycode');
+    toast('PTT key binding cleared');
+  }, []);
 
   // ── Error state ───────────────────────────────────────────────────────────
   if (channelsError) return (
@@ -1813,6 +1896,18 @@ export default function TwoWayRadio() {
             setAreaToggles={setAreaToggles}
             customSounds={customSounds}
             setCustomSounds={setCustomSounds}
+            pttKeyCode={pttKeyCode}
+            keepAwake={keepAwake}
+            setKeepAwake={setKeepAwake}
+            wakeOnIncoming={wakeOnIncoming}
+            setWakeOnIncoming={setWakeOnIncoming}
+            bringToFront={bringToFront}
+            setBringToFront={setBringToFront}
+            detectingPTTKey={detectingPTTKey}
+            onDetectPTTKey={onDetectPTTKey}
+            onSetPTTKey={onSetPTTKey}
+            onClearPTTKey={onClearPTTKey}
+            isControlDevice={!!user?.is_control_device}
           />
         )}
 
