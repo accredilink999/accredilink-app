@@ -11,7 +11,6 @@ import { LanguageProvider } from '@/lib/LanguageContext';
 import { HelpModeProvider } from '@/lib/HelpModeContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import Login from './pages/Login';
-import TwoWayRadio from './pages/TwoWayRadio';
 import DevicePreview from '@/components/DevicePreview';
 import ErrorCatcher from '@/components/ErrorCatcher';
 import HelpButton from '@/components/HelpButton';
@@ -29,6 +28,7 @@ import { hasPin, isPinSessionUnlocked, wasPinPromptShown } from '@/utils/pinUtil
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
+const TwoWayRadio = Pages.TwoWayRadio;
 
 /**
  * AppShell — no <Routes>, no route matching, no remounting.
