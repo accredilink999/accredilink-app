@@ -376,7 +376,8 @@ export default function TwoWayRadio() {
     });
   };
 
-  const isControlDevice = isControlDevice;
+  const urlPreview = new URLSearchParams(window.location.search).get('preview');
+  const isControlDevice = !!user?.is_control_device || urlPreview === 'control';
   // Control devices get full admin-level radio access regardless of their assigned role
   const isSuperAdmin  = user?.role === 'super_admin' || user?.role === 'admin' || isControlDevice;
   const myUid         = user?.id ? toUid(user.id) : null;
