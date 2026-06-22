@@ -8,6 +8,8 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.view.KeyEvent;
+import android.view.WindowManager;
 import android.webkit.CookieManager;
 import android.webkit.GeolocationPermissions;
 import android.webkit.PermissionRequest;
@@ -27,15 +29,21 @@ public class MainActivity extends BridgeActivity {
 
     private static final int MIC_PERMISSION_REQUEST = 1001;
 
+    // Inrico T320 / PoC handset keycodes for the hardware PTT button
+    private static final int KEYCODE_PTT          = 280;
+    private static final int KEYCODE_INRICO_SIDE  = 293;
+    private static final int KEYCODE_MENU_PTT     = 139;
+
+    private WebView webView;
+    private boolean keepScreenOn = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Request microphone permission at startup so WebView can use getUserMedia
         requestMicPermission();
 
-        // After the bridge is initialized, configure WebView
-        WebView webView = getBridge().getWebView();
+        webView = getBridge().getWebView();
 
         // Download listener — uses Android DownloadManager to download APK files
         webView.setDownloadListener((url, userAgent, contentDisposition, mimetype, contentLength) -> {
@@ -58,25 +66,20 @@ public class MainActivity extends BridgeActivity {
             }
         });
 
-        // Save Capacitor's default WebChromeClient and wrap it
-        // so we add mic + geolocation handling without breaking anything
         final WebChromeClient capacitorClient = getBridge().getWebView().getWebChromeClient();
 
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
-                // Auto-grant all WebView permission requests (mic, camera, etc.)
                 runOnUiThread(() -> request.grant(request.getResources()));
             }
 
             @Override
             public void onGeolocationPermissionsShowPrompt(String origin,
                     GeolocationPermissions.Callback callback) {
-                // Auto-grant geolocation to the app's web content
                 callback.invoke(origin, true, false);
             }
 
-            // Delegate file chooser to Capacitor's handler (for file uploads)
             @Override
             public boolean onShowFileChooser(WebView webView,
                     ValueCallback<Uri[]> filePathCallback,
@@ -88,6 +91,70 @@ public class MainActivity extends BridgeActivity {
             }
         });
     }
+
+    // ── Hardware PTT key forwarding ────────────────────────────────────────────
+    // Inrico T320 PTT key fires KEYCODE_PTT (280) at Android level. Some PoC
+    // firmware consumes it before the WebView sees it. We intercept here and
+    // inject the keydown/keyup event directly into the WebView via JS so our
+    // document.addEventListener('keydown') handler in the app always fires.
+
+    private boolean isPttKey(int keyCode) {
+        return keyCode == KEYCODE_PTT || keyCode == KEYCODE_INRICO_SIDE || keyCode == KEYCODE_MENU_PTT;
+    }
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (isPttKey(keyCode) && webView != null) {
+            webView.evaluateJavascript(
+                "document.dispatchEvent(new KeyboardEvent('keydown',{keyCode:" + keyCode + ",bubbles:true,cancelable:true}));",
+                null
+            );
+            return true; // consumed — don't let system do anything else with PTT
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+
+    @Override
+    public boolean onKeyUp(int keyCode, KeyEvent event) {
+        if (isPttKey(keyCode) && webView != null) {
+            webView.evaluateJavascript(
+                "document.dispatchEvent(new KeyboardEvent('keyup',{keyCode:" + keyCode + ",bubbles:true,cancelable:true}));",
+                null
+            );
+            return true;
+        }
+        return super.onKeyUp(keyCode, event);
+    }
+
+    // ── Keep screen on (called from JS via window.setKeepScreenOn) ─────────────
+    // The Web Wake Lock API works in modern WebView but this is the reliable
+    // Android-level fallback for older firmware on PoC handsets.
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Re-read the localStorage flag each time app comes to foreground
+        if (webView != null) {
+            webView.evaluateJavascript(
+                "(function(){var v=localStorage.getItem('radio_keep_awake');return v;})()",
+                value -> {
+                    boolean on = "'true'".equals(value);
+                    runOnUiThread(() -> applyKeepScreenOn(on));
+                }
+            );
+        }
+    }
+
+    private void applyKeepScreenOn(boolean on) {
+        if (on) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        } else {
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
+        keepScreenOn = on;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
 
     private void requestMicPermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
@@ -103,9 +170,9 @@ public class MainActivity extends BridgeActivity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == MIC_PERMISSION_REQUEST) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                // Microphone permission granted — WebView getUserMedia will now work
+                // Microphone granted — WebView getUserMedia will work
             } else {
-                Toast.makeText(this, "Microphone permission is needed for voice-to-text", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "Microphone permission is needed for radio", Toast.LENGTH_LONG).show();
             }
         }
     }
