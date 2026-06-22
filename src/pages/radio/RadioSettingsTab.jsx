@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { Upload, Check, Trash2, Volume2, VolumeX, Cpu, Wifi, Monitor, Zap, Radio, Palette } from 'lucide-react';
 import { toast } from 'sonner';
-import { RADIO_THEMES } from '../TwoWayRadio';
+import { RADIO_THEMES } from './radioThemes';
 
 // Sound slots wired to the module-level audio functions in TwoWayRadio.jsx
 // Keys must match what playCustomSound(key) looks up in localStorage

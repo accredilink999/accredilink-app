@@ -17,66 +17,10 @@ import {
 } from 'lucide-react';
 import RadioShiftTab from './radio/RadioShiftTab';
 import RadioSettingsTab from './radio/RadioSettingsTab';
+import { RADIO_THEMES } from './radio/radioThemes';
 
 const AGORA_APP_ID   = 'ff9f260da10245a5ab4855ea3ec59500';
 const AGORA_APP_CERT = 'e8dd782a9eac4d3385162b3a1f81d6c4';
-
-// ── Radio page themes ─────────────────────────────────────────────────────────
-export const RADIO_THEMES = {
-  blue: {
-    label: 'Blue Pro', emoji: '🔵',
-    bgStyle: { backgroundColor: '#0d47a1', backgroundImage: 'linear-gradient(160deg, #1976d2 0%, #0d47a1 55%, #0a2d6e 100%)' },
-    homeBar:    'bg-[#0a2d6e] text-white active:bg-[#071f4f]',
-    tabBar:     'bg-[#071f4f] border-[#0d3a8a]',
-    tabActive:  'text-blue-200 border-b-2 border-blue-300',
-    tabInactive:'text-[#3b6fbe] hover:text-blue-400',
-    header:     'bg-[#0a2d6e] border-[#0d3a8a]',
-    pttIdle:    'bg-blue-700',
-    accent:     'text-blue-300',
-    dot:        'bg-blue-300',
-  },
-  battenburg: {
-    label: 'Battenburg', emoji: '🟡',
-    bgStyle: {
-      backgroundColor: '#040c14',
-      backgroundImage: `repeating-conic-gradient(rgba(253,224,71,0.06) 0% 25%,rgba(34,197,94,0.06) 0% 50%) 0 0/52px 52px,
-        radial-gradient(ellipse at 20% 10%,rgba(253,224,71,0.10) 0%,transparent 45%),
-        radial-gradient(ellipse at 80% 90%,rgba(34,197,94,0.08) 0%,transparent 45%)`,
-    },
-    homeBar:    'bg-teal-600 text-white active:bg-teal-700',
-    tabBar:     'bg-slate-950/90 border-slate-800',
-    tabActive:  'text-teal-400 border-b-2 border-teal-400',
-    tabInactive:'text-slate-600 hover:text-slate-400',
-    header:     'bg-slate-900 border-slate-700/50',
-    pttIdle:    'bg-teal-700',
-    accent:     'text-teal-400',
-    dot:        'bg-teal-400',
-  },
-  dark: {
-    label: 'Dark Ops', emoji: '⚫',
-    bgStyle: { backgroundColor: '#020408', backgroundImage: 'radial-gradient(ellipse at 50% 0%,rgba(15,23,42,1) 0%,rgba(2,4,8,1) 70%)' },
-    homeBar:    'bg-slate-950 text-white active:bg-black',
-    tabBar:     'bg-black border-slate-900',
-    tabActive:  'text-slate-200 border-b-2 border-slate-400',
-    tabInactive:'text-slate-700 hover:text-slate-500',
-    header:     'bg-slate-950 border-slate-900',
-    pttIdle:    'bg-slate-700',
-    accent:     'text-slate-300',
-    dot:        'bg-slate-400',
-  },
-  red: {
-    label: 'Alert Red', emoji: '🔴',
-    bgStyle: { backgroundColor: '#150000', backgroundImage: 'linear-gradient(160deg,#3b0000 0%,#150000 100%)' },
-    homeBar:    'bg-red-950 text-white active:bg-red-900',
-    tabBar:     'bg-red-950/95 border-red-900',
-    tabActive:  'text-red-300 border-b-2 border-red-400',
-    tabInactive:'text-red-900 hover:text-red-700',
-    header:     'bg-red-950 border-red-900/80',
-    pttIdle:    'bg-red-800',
-    accent:     'text-red-400',
-    dot:        'bg-red-400',
-  },
-};
 const COUNTDOWN_SECS = 10;
 
 AgoraRTC.setLogLevel(4);
