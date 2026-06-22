@@ -252,6 +252,9 @@ export default function TwoWayRadio() {
   const location    = useLocation();
   const navigate    = useNavigate();
 
+  // On T320 handsets the PTT side bars are unnecessary — hardware button is used
+  const isRadioMode = localStorage.getItem('carecall_radio_mode') === 'true';
+
   // Agora refs
   const clientRef       = useRef(null);
   const micTrackRef     = useRef(null);
@@ -1188,16 +1191,23 @@ export default function TwoWayRadio() {
 
   // ── Hardware PTT key listener (Inrico T320 side key / any mapped keycode) ─
   // Uses refs so the handler doesn't need to be re-registered on every render
-  const pttModeRef   = useRef(pttMode);
-  const isTalkingRef = useRef(isTalking);
-  useEffect(() => { pttModeRef.current   = pttMode;   }, [pttMode]);
-  useEffect(() => { isTalkingRef.current = isTalking; }, [isTalking]);
+  const pttModeRef              = useRef(pttMode);
+  const isTalkingRef            = useRef(isTalking);
+  const incomingCallRef         = useRef(incomingCall);
+  const acceptIncomingCallRef   = useRef(null);
+  useEffect(() => { pttModeRef.current            = pttMode;            }, [pttMode]);
+  useEffect(() => { isTalkingRef.current          = isTalking;          }, [isTalking]);
+  useEffect(() => { incomingCallRef.current       = incomingCall;       }, [incomingCall]);
+  // keep stable pointer to latest acceptIncomingCall so keyboard handler stays fresh
+  acceptIncomingCallRef.current = acceptIncomingCall;
 
   useEffect(() => {
     if (!pttKeyCode) return;
     const handleDown = (e) => {
       if (e.keyCode !== pttKeyCode || e.repeat) return;
       e.preventDefault(); e.stopPropagation();
+      // If there's an incoming call, PTT accepts it instead of transmitting
+      if (incomingCallRef.current) { acceptIncomingCallRef.current?.(); return; }
       if (pttModeRef.current === 'p2p') initiateP2PCall();
       else if (pttModeRef.current === 'group') { playPTTTone('up'); startTalking(); }
     };
@@ -1453,11 +1463,11 @@ export default function TwoWayRadio() {
       {IncomingEmergencyOverlay}
       {TextAlertModal}
 
-      {/* Fixed full-height PTT side bar */}
-      {!isHandsFree && (
+      {/* Fixed full-height PTT side bar — hidden on T320 (hardware PTT) */}
+      {!isHandsFree && !isRadioMode && (
         <button
           disabled={!isJoined || joining}
-          onPointerDown={e => { e.preventDefault(); playPTTTone('up'); startTalking(); }}
+          onPointerDown={e => { e.preventDefault(); if (incomingCall) { acceptIncomingCall(); return; } playPTTTone('up'); startTalking(); }}
           style={{ position: 'fixed', top: 0, bottom: 0, [pttHandedness]: 0, width: 68, zIndex: 40 }}
           className={`flex flex-col items-center justify-center gap-3 select-none touch-none transition-colors ${
             !isJoined || joining ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
@@ -1479,7 +1489,7 @@ export default function TwoWayRadio() {
         </button>
       )}
 
-      <div className={`min-h-screen bg-slate-900 flex flex-col pb-28 ${emergencyActive ? 'pt-10' : ''} ${!isHandsFree ? (pttHandedness === 'right' ? 'pr-[72px]' : 'pl-[72px]') : ''}`}>
+      <div className={`min-h-screen bg-slate-900 flex flex-col pb-28 ${emergencyActive ? 'pt-10' : ''} ${!isHandsFree && !isRadioMode ? (pttHandedness === 'right' ? 'pr-[72px]' : 'pl-[72px]') : ''}`}>
         {/* Header */}
         <div className="bg-slate-800 px-4 pt-4 pb-3 flex items-center gap-3">
           <button onClick={() => { if (!emergencyActive) { leaveChannel().then(() => setActiveChannel(null)); } setView('main'); }}
@@ -1686,11 +1696,12 @@ export default function TwoWayRadio() {
       {TextAlertModal}
       {ManageModal}
 
-      {/* ── PTT SIDE BAR — centred on edge, smaller pill ── */}
-      {radioTab === 'radio' && <button
+      {/* ── PTT SIDE BAR — centred on edge, smaller pill — hidden on T320 (hardware PTT) ── */}
+      {radioTab === 'radio' && !isRadioMode && <button
         disabled={pttMode === 'disabled'}
         onPointerDown={e => {
           e.preventDefault();
+          if (incomingCall) { acceptIncomingCall(); return; }
           if (pttMode === 'p2p') initiateP2PCall();
           else if (pttMode === 'group') { playPTTTone('up'); startTalking(); }
         }}
