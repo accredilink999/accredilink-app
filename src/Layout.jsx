@@ -1122,30 +1122,33 @@ export default function Layout({ children, currentPageName }) {
                                      <GpsWarningBanner />
                                      {/* Missed radio calls banner — sticky at top of scroll area, persists until dismissed */}
                                      {visibleMissedCalls.length > 0 && (
-                                       <div className="sticky top-0 z-40 bg-amber-600 px-4 py-3 flex items-center gap-3">
+                                       <div
+                                         className="sticky top-0 z-40 bg-amber-600 px-4 py-3 flex items-center gap-3 cursor-pointer touch-manipulation"
+                                         onClick={() => navigate(createPageUrl('TwoWayRadio'))}
+                                       >
                                          <PhoneOff className="w-5 h-5 text-white shrink-0" />
                                          <div className="flex-1 min-w-0">
-                                           {visibleMissedCalls.length === 1 ? (
-                                             <p className="text-white text-sm font-semibold truncate">
-                                               {(() => {
-                                                 const call = visibleMissedCalls[0];
-                                                 const personId = call.status === 'callback' ? call.caller_id : call.callee_id;
-                                                 const name = globalStaffRef.current.find(s => s.id === personId)?.full_name || 'Team Member';
-                                                 return call.status === 'callback' ? `Call back: ${name}` : `${name} missed your call`;
-                                               })()}
-                                             </p>
-                                           ) : (
-                                             <p className="text-white text-sm font-semibold">{visibleMissedCalls.length} missed radio calls</p>
+                                           {visibleMissedCalls.length === 1 ? (() => {
+                                             const call = visibleMissedCalls[0];
+                                             const personId = call.status === 'callback' ? call.caller_id : call.callee_id;
+                                             const name = globalStaffRef.current.find(s => s.id === personId)?.full_name || 'Team Member';
+                                             return (
+                                               <>
+                                                 <p className="text-white text-sm font-bold truncate">
+                                                   {call.status === 'callback' ? `Call back: ${name}` : `Missed call from ${name}`}
+                                                 </p>
+                                                 <p className="text-amber-200 text-xs">Tap to open Radio</p>
+                                               </>
+                                             );
+                                           })() : (
+                                             <>
+                                               <p className="text-white text-sm font-bold">{visibleMissedCalls.length} missed radio calls</p>
+                                               <p className="text-amber-200 text-xs">Tap to open Radio</p>
+                                             </>
                                            )}
                                          </div>
                                          <button
-                                           onClick={() => navigate(createPageUrl('TwoWayRadio'))}
-                                           className="bg-white text-amber-700 text-xs font-bold px-3 py-1.5 rounded-lg shrink-0 active:scale-95 transition-transform touch-manipulation"
-                                         >
-                                           Open Radio
-                                         </button>
-                                         <button
-                                           onClick={() => dismissBannerCalls(...visibleMissedCalls.map(c => c.id))}
+                                           onClick={e => { e.stopPropagation(); dismissBannerCalls(...visibleMissedCalls.map(c => c.id)); }}
                                            className="text-amber-200 hover:text-white shrink-0 p-1 touch-manipulation"
                                          >
                                            <X className="w-5 h-5" />

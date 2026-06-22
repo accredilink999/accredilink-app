@@ -717,7 +717,18 @@ export default function TwoWayRadio() {
 
   const cancelOutgoingCall = async () => {
     stopTone();
-    if (outgoingCall?.callId) await supabase.from('radio_calls').update({ status: 'cancelled' }).eq('id', outgoingCall.callId);
+    if (outgoingCall?.callId) {
+      await supabase.from('radio_calls').update({ status: 'cancelled' }).eq('id', outgoingCall.callId);
+      // Push notification to callee so they know about the missed call even if app is closed
+      const callerName = user?.full_name || 'A team member';
+      base44.functions.invoke('createNotification', {
+        recipient_ids: resolveRecipients([outgoingCall.callee.id]),
+        type: 'radio_call',
+        title: `📵 Missed call from ${callerName}`,
+        message: 'You missed a radio call. Tap to call back.',
+        priority: 'high', action_url: '/TwoWayRadio', send_push: true,
+      }).catch(() => {});
+    }
     setOutgoingCall(null); setCallDeclined(false);
   };
 
@@ -1704,6 +1715,59 @@ export default function TwoWayRadio() {
             {Array.from({ length: 32 }).map((_, i) => <div key={i} className="flex-1 h-full bg-white/10 rounded-full" />)}
           </div>
         </div>
+
+        {/* ── MISSED CALL STICKY ALERT ── */}
+        {unreadMissed.length > 0 && (
+          <div className="sticky top-0 z-30 bg-amber-600 shadow-lg">
+            <div className="flex items-center gap-3 px-4 py-3">
+              <PhoneOff className="w-4 h-4 text-white shrink-0" />
+              <div className="flex-1 min-w-0">
+                {unreadMissed.length === 1 ? (() => {
+                  const call = unreadMissed[0];
+                  const personId = call.status === 'callback' ? call.caller_id : call.callee_id;
+                  const name = staff.find(s => s.id === personId)?.full_name || 'Team Member';
+                  return (
+                    <>
+                      <p className="text-white text-sm font-bold truncate">
+                        {call.status === 'callback' ? `Call back: ${name}` : `Missed call from ${name}`}
+                      </p>
+                      <p className="text-amber-200 text-xs">{formatCallTime(call.created_at)}</p>
+                    </>
+                  );
+                })() : (
+                  <p className="text-white text-sm font-bold">{unreadMissed.length} missed calls</p>
+                )}
+              </div>
+              {unreadMissed.length === 1 && (
+                <button
+                  onClick={() => callBackFromMissed(unreadMissed[0])}
+                  className="bg-white text-amber-700 text-xs font-bold px-3 py-1.5 rounded-lg active:scale-95 transition-transform touch-manipulation shrink-0">
+                  Call Back
+                </button>
+              )}
+              <button
+                onClick={() => dismissMissedCalls(...unreadMissed.map(c => c.id))}
+                className="text-amber-200 hover:text-white p-1 shrink-0 touch-manipulation">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            {unreadMissed.length > 1 && (
+              <div className="px-4 pb-3 space-y-1.5">
+                {unreadMissed.map(call => {
+                  const personId = call.status === 'callback' ? call.caller_id : call.callee_id;
+                  const name = staff.find(s => s.id === personId)?.full_name || 'Team Member';
+                  return (
+                    <div key={call.id} className="flex items-center gap-2 bg-amber-700/40 rounded-lg px-3 py-2">
+                      <p className="flex-1 text-white text-xs font-semibold truncate">{name} · {formatCallTime(call.created_at)}</p>
+                      <button onClick={() => callBackFromMissed(call)} className="bg-white text-amber-700 text-[10px] font-bold px-2.5 py-1 rounded-md active:scale-95 transition-transform touch-manipulation shrink-0">Call Back</button>
+                      <button onClick={() => dismissMissedCalls(call.id)} className="text-amber-300 hover:text-white p-0.5 shrink-0"><X className="w-3.5 h-3.5" /></button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── ACTIVE CHANNEL WINDOW ── */}
         {(() => {
