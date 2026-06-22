@@ -45,6 +45,14 @@ public class MainActivity extends BridgeActivity {
 
         webView = getBridge().getWebView();
 
+        // Radio flavor: inject localStorage flag so React app boots directly to radio
+        // and locks navigation. Standard flavor skips this entirely.
+        if (BuildConfig.FLAVOR.equals("radio")) {
+            webView.post(() -> webView.evaluateJavascript(
+                "localStorage.setItem('carecall_radio_mode','true');", null
+            ));
+        }
+
         // Download listener — uses Android DownloadManager to download APK files
         webView.setDownloadListener((url, userAgent, contentDisposition, mimetype, contentLength) -> {
             try {

@@ -11,6 +11,7 @@ import { LanguageProvider } from '@/lib/LanguageContext';
 import { HelpModeProvider } from '@/lib/HelpModeContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import Login from './pages/Login';
+import TwoWayRadio from './pages/TwoWayRadio';
 import DevicePreview from '@/components/DevicePreview';
 import ErrorCatcher from '@/components/ErrorCatcher';
 import HelpButton from '@/components/HelpButton';
@@ -207,6 +208,22 @@ const AppShell = () => {
 
   // First load only — splash covers this
   if (!hasEverAuthedRef.current && isLoading) return null;
+
+  // ── Radio handset mode ───────────────────────────────────────────────────
+  // Set by MainActivity (radio flavor) via localStorage on app start.
+  // Bypasses all app chrome — boots directly to TwoWayRadio.
+  // Push notifications still register so shift alerts reach the handset.
+  const isRadioMode = localStorage.getItem('carecall_radio_mode') === 'true';
+  if (isRadioMode) {
+    if (!isAuthenticated) return <Login />;
+    return (
+      <>
+        <AutoPushRegistration />
+        <TwoWayRadio />
+      </>
+    );
+  }
+  // ────────────────────────────────────────────────────────────────────────
 
   // Login page
   if (location.pathname === '/login') return <Login />;

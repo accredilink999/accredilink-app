@@ -16,6 +16,18 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    flavorDimensions "mode"
+    productFlavors {
+        standard {
+            dimension "mode"
+            applicationId "com.carecallai.app"
+        }
+        radio {
+            dimension "mode"
+            applicationId "com.carecallai.radio"
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
