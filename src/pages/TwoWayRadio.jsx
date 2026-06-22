@@ -897,6 +897,11 @@ export default function TwoWayRadio() {
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
   }, [isJoined, isTalking, isHandsFree]);
 
+  // Reset broadcast active when leaving a channel (must be before early returns)
+  useEffect(() => {
+    if (!isJoined || !activeChannel) setGroupBroadcastActive(false);
+  }, [isJoined, activeChannel]);
+
   // ── Error state ───────────────────────────────────────────────────────────
   if (channelsError) return (
     <div className="p-8 text-center bg-slate-900 min-h-screen flex flex-col items-center justify-center gap-3">
@@ -1240,11 +1245,6 @@ export default function TwoWayRadio() {
 
   // PTT bar: group only when in channel AND broadcast activated in channel card; P2P when person selected
   const pttMode = selectedPerson ? 'p2p' : (isInChannel && groupBroadcastActive) ? 'group' : 'disabled';
-
-  // Reset broadcast when leaving channel
-  useEffect(() => {
-    if (!isInChannel) setGroupBroadcastActive(false);
-  }, [isInChannel]);
 
   // Reusable staff pill inside a channel card
   const StaffPill = ({ s }) => {
