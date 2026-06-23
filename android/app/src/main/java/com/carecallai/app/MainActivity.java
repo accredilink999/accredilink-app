@@ -251,15 +251,16 @@ public class MainActivity extends BridgeActivity {
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (isPttKey(keyCode) && webView != null) {
-            // Acquire wake lock — brings screen on if it was dark, keeps it on
-            // for 10 minutes (cancelled on keyUp or if FLAG_KEEP_SCREEN_ON takes over)
+            if (event.getRepeatCount() > 0) return true; // ignore held-key repeats
             if (pttWakeLock != null && !pttWakeLock.isHeld()) {
                 pttWakeLock.acquire(10 * 60 * 1000L);
             }
-            // Bring activity to front in case it was backgrounded
             moveTaskToFront();
+            // Call window.__pttDown() directly — more reliable than KeyboardEvent
+            // because new KeyboardEvent({keyCode:N}) does not set e.keyCode in all
+            // Chromium WebView versions (it's a legacy read-only property).
             webView.evaluateJavascript(
-                "document.dispatchEvent(new KeyboardEvent('keydown',{keyCode:" + keyCode + ",bubbles:true,cancelable:true}));",
+                "if(typeof window.__pttDown==='function'){window.__pttDown();}",
                 null
             );
             return true;
@@ -270,13 +271,11 @@ public class MainActivity extends BridgeActivity {
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event) {
         if (isPttKey(keyCode) && webView != null) {
-            // Release wake lock — FLAG_KEEP_SCREEN_ON keeps screen on anyway,
-            // but releasing avoids holding it when radio mode isn't active
             if (pttWakeLock != null && pttWakeLock.isHeld()) {
                 pttWakeLock.release();
             }
             webView.evaluateJavascript(
-                "document.dispatchEvent(new KeyboardEvent('keyup',{keyCode:" + keyCode + ",bubbles:true,cancelable:true}));",
+                "if(typeof window.__pttUp==='function'){window.__pttUp();}",
                 null
             );
             return true;

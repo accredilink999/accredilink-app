@@ -1226,27 +1226,45 @@ export default function TwoWayRadio() {
   acceptIncomingCallRef.current = acceptIncomingCall;
 
   useEffect(() => {
-    if (!pttKeyCode) return;
-    const handleDown = (e) => {
-      if (e.keyCode !== pttKeyCode || e.repeat) return;
-      e.preventDefault(); e.stopPropagation();
-      // If there's an incoming call, PTT accepts it instead of transmitting
+    // Core PTT logic — called by both the Android direct bridge AND the keyboard listener.
+    // Refs are updated every render so this always sees current state even though the
+    // effect only runs once (no stale closure problem).
+    const pttDown = () => {
       if (incomingCallRef.current) { acceptIncomingCallRef.current?.(); return; }
       if (pttModeRef.current === 'p2p') initiateP2PCallRef.current?.();
       else if (pttModeRef.current === 'group') { playPTTTone('up'); startTalking(); }
     };
+    const pttUp = () => {
+      if (isTalkingRef.current) { playPTTTone('down'); stopTalking(); }
+    };
+
+    // Android native bridge: MainActivity calls window.__pttDown() / window.__pttUp()
+    // directly instead of dispatching a KeyboardEvent. This avoids the Chromium WebView
+    // bug where new KeyboardEvent({keyCode:280}) does not actually set e.keyCode.
+    window.__pttDown = pttDown;
+    window.__pttUp   = pttUp;
+
+    // Keyboard fallback — for web browser testing with a mapped key
+    if (!pttKeyCode) return;
+    const handleDown = (e) => {
+      if (e.keyCode !== pttKeyCode || e.repeat) return;
+      e.preventDefault(); e.stopPropagation();
+      pttDown();
+    };
     const handleUp = (e) => {
       if (e.keyCode !== pttKeyCode) return;
       e.preventDefault(); e.stopPropagation();
-      if (isTalkingRef.current) { playPTTTone('down'); stopTalking(); }
+      pttUp();
     };
     document.addEventListener('keydown', handleDown, true);
     document.addEventListener('keyup', handleUp, true);
     return () => {
       document.removeEventListener('keydown', handleDown, true);
       document.removeEventListener('keyup', handleUp, true);
+      delete window.__pttDown;
+      delete window.__pttUp;
     };
-  }, [pttKeyCode]); // only re-registers when keycode changes
+  }, []); // runs once — refs keep everything current
 
   // ── PTT key detection helper ─────────────────────────────────────────────
   const onDetectPTTKey = useCallback(() => {
