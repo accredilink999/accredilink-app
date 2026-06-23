@@ -480,7 +480,7 @@ export default function Login() {
             </button>
           </form>
         ) : mode === 'signin' ? (
-          <form onSubmit={handleSignIn}>
+          <form onSubmit={handleSignIn} noValidate>
             <div style={{ marginBottom: 16 }}>
               <label htmlFor="signin-email" style={{ display: 'block', fontSize: 14, fontWeight: 500, color: isDark ? '#cbd5e1' : '#334155', marginBottom: 6 }}>
                 Email
@@ -494,6 +494,9 @@ export default function Login() {
                 placeholder="you@example.com"
                 required
                 autoComplete="email"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 lang="en-GB"
                 style={inputStyle}
               />
@@ -554,7 +557,7 @@ export default function Login() {
             </p>
           </form>
         ) : mode === 'forgot-password' ? (
-          <form onSubmit={handleForgotPassword}>
+          <form onSubmit={handleForgotPassword} noValidate>
             <div style={{ marginBottom: 20 }}>
               <label htmlFor="reset-email" style={{ display: 'block', fontSize: 14, fontWeight: 500, color: isDark ? '#cbd5e1' : '#334155', marginBottom: 6 }}>
                 Email Address
@@ -568,6 +571,9 @@ export default function Login() {
                 placeholder="you@example.com"
                 required
                 autoComplete="email"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 style={inputStyle}
               />
             </div>
@@ -598,7 +604,7 @@ export default function Login() {
             </p>
           </form>
         ) : (
-          <form onSubmit={handleSignUp}>
+          <form onSubmit={handleSignUp} noValidate>
             <div style={{ marginBottom: 16 }}>
               <label htmlFor="signup-name" style={{ display: 'block', fontSize: 14, fontWeight: 500, color: isDark ? '#cbd5e1' : '#334155', marginBottom: 6 }}>
                 Full Name
@@ -629,6 +635,9 @@ export default function Login() {
                 placeholder="you@example.com"
                 required
                 autoComplete="email"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 lang="en-GB"
                 style={inputStyle}
               />
