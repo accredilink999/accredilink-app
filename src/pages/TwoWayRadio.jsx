@@ -508,10 +508,14 @@ export default function TwoWayRadio() {
   const pttMode     = selectedPerson ? 'p2p' : (isInChannel && groupBroadcastActive) ? 'group' : 'disabled';
 
   // Channel member grouping
+  // Admin / control-device users appear in ALL channels so staff can always call them back.
   const channelMembersById = {};
   channels.forEach(ch => { channelMembersById[ch.id] = []; });
   staff.forEach(s => {
-    if (s.radio_channel_id && channelMembersById[s.radio_channel_id]) {
+    const isControlUser = s.role === 'super_admin' || s.role === 'admin' || s.is_control_device;
+    if (isControlUser) {
+      channels.forEach(ch => channelMembersById[ch.id].push(s));
+    } else if (s.radio_channel_id && channelMembersById[s.radio_channel_id]) {
       channelMembersById[s.radio_channel_id].push(s);
     }
   });
