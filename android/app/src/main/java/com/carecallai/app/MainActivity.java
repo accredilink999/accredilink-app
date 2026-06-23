@@ -12,6 +12,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.PowerManager;
 import android.view.KeyEvent;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
@@ -36,17 +37,19 @@ public class MainActivity extends BridgeActivity {
     private static final int MIC_PERMISSION_REQUEST = 1001;
 
     // Inrico T320 / PoC handset keycodes for the hardware PTT button
-    private static final int KEYCODE_PTT          = 280;
-    private static final int KEYCODE_INRICO_SIDE  = 293;
-    private static final int KEYCODE_MENU_PTT     = 139;
+    private static final int KEYCODE_PTT         = 280;
+    private static final int KEYCODE_INRICO_SIDE = 293;
+    private static final int KEYCODE_MENU_PTT    = 139;
 
     // LED notification
-    private static final int    LED_NOTIF_ID      = 9001;
-    private static final String CH_ONLINE         = "radio_led_online";
-    private static final String CH_OFFLINE        = "radio_led_offline";
+    private static final int    LED_NOTIF_ID = 9001;
+    private static final String CH_ONLINE    = "radio_led_online";
+    private static final String CH_OFFLINE   = "radio_led_offline";
 
     private WebView webView;
-    private boolean keepScreenOn = false;
+
+    // Wake lock — acquired on PTT press to bring screen on if it went dark
+    private PowerManager.WakeLock pttWakeLock;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,16 +58,46 @@ public class MainActivity extends BridgeActivity {
         requestMicPermission();
         setupLedChannels();
 
+        // ── Radio flavor: always-on, show-over-lock-screen ────────────────────
+        // The T320 is a dedicated handset — screen must never sleep and calls must
+        // appear even if the device is "locked" or in screensaver mode.
+        if (BuildConfig.FLAVOR.equals("radio")) {
+            getWindow().addFlags(
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON |
+                WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+            );
+            // API 27+ uses dedicated methods; older versions use window flags
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                setShowWhenLocked(true);
+                setTurnScreenOn(true);
+            } else {
+                getWindow().addFlags(
+                    WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED |
+                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                );
+            }
+            // Wake lock: if the screen somehow goes off (manual power button),
+            // pressing PTT wakes it back to full brightness immediately.
+            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            pttWakeLock = pm.newWakeLock(
+                PowerManager.SCREEN_BRIGHT_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                "carecallai:ptt_wake"
+            );
+            pttWakeLock.setReferenceCounted(false);
+        }
+
         webView = getBridge().getWebView();
 
         // Expose LED bridge to JavaScript — called from TwoWayRadio when isOnline changes
         webView.addJavascriptInterface(new LedBridge(), "AndroidLED");
 
-        // Radio flavor: inject localStorage flag so React app boots directly to radio
-        // and locks navigation. Standard flavor skips this entirely.
+        // Radio flavor: inject localStorage flag so React app boots to radio page
         if (BuildConfig.FLAVOR.equals("radio")) {
             webView.post(() -> webView.evaluateJavascript(
-                "localStorage.setItem('carecall_radio_mode','true');", null
+                "localStorage.setItem('carecall_radio_mode','true');" +
+                // Also enable keep-awake via Web Wake Lock as belt-and-braces
+                "localStorage.setItem('radio_keep_awake','true');",
+                null
             ));
         }
 
@@ -115,10 +148,10 @@ public class MainActivity extends BridgeActivity {
         });
     }
 
-    // ── LED status indicator ───────────────────────────────────────────────────
-    // Called from JavaScript: window.AndroidLED.setOnline(true/false)
-    // Posts a persistent notification on the matching LED channel so the T320
-    // hardware LED blinks green (online) or red (offline).
+    // ── LED status indicator ──────────────────────────────────────────────────
+    // Blinks the T320 hardware LED green (online) or red (offline) by posting
+    // a persistent notification on the matching LED notification channel.
+    // Called from TwoWayRadio.jsx via window.AndroidLED.setOnline(bool).
 
     private void setupLedChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -169,24 +202,32 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    // ── Hardware PTT key forwarding ────────────────────────────────────────────
-    // Inrico T320 PTT key fires KEYCODE_PTT (280) at Android level. Some PoC
-    // firmware consumes it before the WebView sees it. We intercept here and
-    // inject the keydown/keyup event directly into the WebView via JS so our
-    // document.addEventListener('keydown') handler in the app always fires.
+    // ── Hardware PTT key forwarding ───────────────────────────────────────────
+    // Inrico T320 PTT fires KEYCODE_PTT (280). We intercept it here, acquire a
+    // wake lock to ensure the screen is bright, then inject a synthetic keydown
+    // event into the WebView so the React app's document.addEventListener fires.
 
     private boolean isPttKey(int keyCode) {
-        return keyCode == KEYCODE_PTT || keyCode == KEYCODE_INRICO_SIDE || keyCode == KEYCODE_MENU_PTT;
+        return keyCode == KEYCODE_PTT
+            || keyCode == KEYCODE_INRICO_SIDE
+            || keyCode == KEYCODE_MENU_PTT;
     }
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (isPttKey(keyCode) && webView != null) {
+            // Acquire wake lock — brings screen on if it was dark, keeps it on
+            // for 10 minutes (cancelled on keyUp or if FLAG_KEEP_SCREEN_ON takes over)
+            if (pttWakeLock != null && !pttWakeLock.isHeld()) {
+                pttWakeLock.acquire(10 * 60 * 1000L);
+            }
+            // Bring activity to front in case it was backgrounded
+            moveTaskToFront();
             webView.evaluateJavascript(
                 "document.dispatchEvent(new KeyboardEvent('keydown',{keyCode:" + keyCode + ",bubbles:true,cancelable:true}));",
                 null
             );
-            return true; // consumed — don't let system do anything else with PTT
+            return true;
         }
         return super.onKeyDown(keyCode, event);
     }
@@ -194,6 +235,11 @@ public class MainActivity extends BridgeActivity {
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event) {
         if (isPttKey(keyCode) && webView != null) {
+            // Release wake lock — FLAG_KEEP_SCREEN_ON keeps screen on anyway,
+            // but releasing avoids holding it when radio mode isn't active
+            if (pttWakeLock != null && pttWakeLock.isHeld()) {
+                pttWakeLock.release();
+            }
             webView.evaluateJavascript(
                 "document.dispatchEvent(new KeyboardEvent('keyup',{keyCode:" + keyCode + ",bubbles:true,cancelable:true}));",
                 null
@@ -203,53 +249,48 @@ public class MainActivity extends BridgeActivity {
         return super.onKeyUp(keyCode, event);
     }
 
-    // ── Keep screen on (called from JS via window.setKeepScreenOn) ─────────────
-    // The Web Wake Lock API works in modern WebView but this is the reliable
-    // Android-level fallback for older firmware on PoC handsets.
+    /** Bring this activity to the foreground if it's been pushed back. */
+    private void moveTaskToFront() {
+        try {
+            android.app.ActivityManager am =
+                (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+            if (am != null) {
+                am.moveTaskToFront(getTaskId(), 0);
+            }
+        } catch (Exception ignored) {}
+    }
 
+    // ── onResume — re-apply keep-screen-on flag ───────────────────────────────
     @Override
     protected void onResume() {
         super.onResume();
-        // Re-read the localStorage flag each time app comes to foreground
-        if (webView != null) {
-            webView.evaluateJavascript(
-                "(function(){var v=localStorage.getItem('radio_keep_awake');return v;})()",
-                value -> {
-                    boolean on = "'true'".equals(value);
-                    runOnUiThread(() -> applyKeepScreenOn(on));
-                }
-            );
-        }
-    }
-
-    private void applyKeepScreenOn(boolean on) {
-        if (on) {
+        // Ensure keep-screen-on is re-applied after activity lifecycle events
+        if (BuildConfig.FLAVOR.equals("radio")) {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        } else {
-            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
-        keepScreenOn = on;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── Microphone permission ─────────────────────────────────────────────────
 
     private void requestMicPermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.RECORD_AUDIO},
-                    MIC_PERMISSION_REQUEST);
+                new String[]{ Manifest.permission.RECORD_AUDIO },
+                MIC_PERMISSION_REQUEST);
         }
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode,
+            @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == MIC_PERMISSION_REQUEST) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 // Microphone granted — WebView getUserMedia will work
             } else {
-                Toast.makeText(this, "Microphone permission is needed for radio", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "Microphone permission is needed for radio",
+                    Toast.LENGTH_LONG).show();
             }
         }
     }
