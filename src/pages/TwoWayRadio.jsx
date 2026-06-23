@@ -1241,7 +1241,13 @@ export default function TwoWayRadio() {
     // Android native bridge: MainActivity calls window.__pttDown() / window.__pttUp()
     // directly instead of dispatching a KeyboardEvent. This avoids the Chromium WebView
     // bug where new KeyboardEvent({keyCode:280}) does not actually set e.keyCode.
-    window.__pttDown = pttDown;
+    window.__pttDown = () => {
+      // DEBUG: visible toast so we can confirm Android is reaching JS
+      const mode = pttModeRef.current;
+      const hasPerson = !!initiateP2PCallRef.current;
+      import('sonner').then(({ toast: t }) => t.info(`PTT▼ mode=${mode} fn=${hasPerson}`, { duration: 3000 })).catch(() => {});
+      pttDown();
+    };
     window.__pttUp   = pttUp;
 
     // Keyboard fallback — for web browser testing with a mapped key
@@ -1834,6 +1840,24 @@ export default function TwoWayRadio() {
             <div className="px-4 py-3 flex items-center gap-2">
               <Radio className={`w-4 h-4 shrink-0 ${theme.accent}`} />
               <span className={`font-black text-sm tracking-widest uppercase ${theme.accent}`}>CareCall Radio</span>
+            </div>
+          ) : radioTab === 'radio' ? (
+            /* PWA / web: compact header with on-screen PTT button for testing */
+            <div className="px-4 py-3 flex items-center gap-3">
+              <Radio className={`w-4 h-4 shrink-0 ${theme.accent}`} />
+              <span className={`font-black text-xs tracking-[0.2em] uppercase flex-1 ${theme.accent}`}>Care Call Radio</span>
+              <button
+                onPointerDown={e => { e.preventDefault(); window.__pttDown?.(); }}
+                onPointerUp={e => { e.preventDefault(); window.__pttUp?.(); }}
+                onPointerLeave={e => { e.preventDefault(); window.__pttUp?.(); }}
+                className={`px-4 py-2 rounded-xl text-xs font-black tracking-widest uppercase select-none touch-none transition-colors ${
+                  pttMode === 'p2p' ? 'bg-teal-600 text-white active:bg-teal-500' :
+                  pttMode === 'group' ? 'bg-green-600 text-white active:bg-green-500' :
+                  'bg-slate-700 text-slate-400 cursor-not-allowed'
+                }`}
+              >
+                {pttMode === 'p2p' ? '📞 PTT' : pttMode === 'group' ? '📡 PTT' : 'PTT'}
+              </button>
             </div>
           ) : (
             <>
