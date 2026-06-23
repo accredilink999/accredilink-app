@@ -222,6 +222,20 @@ public class MainActivity extends BridgeActivity {
         public String getDefaultPttKeyCode() {
             return String.valueOf(KEYCODE_PTT); // "280"
         }
+
+        // Called by React when an incoming P2P call arrives via Supabase Realtime.
+        // Wakes the screen from screensaver/sleep and brings the app to the front
+        // so the user sees the answer controls immediately.
+        @JavascriptInterface
+        public void wakeForCall() {
+            runOnUiThread(() -> {
+                // Acquire wake lock — turns screen on at full brightness
+                if (pttWakeLock != null && !pttWakeLock.isHeld()) {
+                    pttWakeLock.acquire(60 * 1000L); // hold for up to 60s while ringing
+                }
+                moveTaskToFront();
+            });
+        }
     }
 
     // ── Hardware PTT key forwarding ───────────────────────────────────────────

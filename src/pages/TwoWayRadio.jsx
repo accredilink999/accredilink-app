@@ -684,6 +684,8 @@ export default function TwoWayRadio() {
           const caller = staffRef.current.find(s => s.id === call.caller_id);
           setIncomingCall({ callId: call.id, caller, channelName: call.channel_name });
           stopTone(); stopToneRef.current = playTone([880, 1100, 880, 1100, 660], true);
+          // Wake screen and bring app to front on T320 handset
+          window.AndroidApp?.wakeForCall?.();
         } else if (call.status === 'callback_request') {
           queryClient.invalidateQueries({ queryKey: ['callbackRequests', user.id] });
           playCallbackRequestTone();
