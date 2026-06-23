@@ -42,18 +42,15 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-
-      - name: Install SDK components
-        run: |
-          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+        with:
+          packages: 'platforms;android-35 build-tools;35.0.0 platform-tools'
+          accept-android-sdk-licenses: true
 
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
       - name: Build radio debug APK
-        run: cd android && ./gradlew assembleRadioDebug --no-daemon
-        env:
-          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: cd android && ./gradlew assembleRadioDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
