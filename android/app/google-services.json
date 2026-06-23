@@ -1,6 +1,6 @@
 {
   "project_info": {
-    "project_number": "000000000000",
+    "project_number": "123456789012",
     "firebase_url": "https://carecallai-app-default-rtdb.firebaseio.com",
     "project_id": "carecallai-app",
     "storage_bucket": "carecallai-app.appspot.com"
@@ -8,25 +8,41 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
+        "mobilesdk_app_id": "1:123456789012:android:abcdef1234567890",
         "android_client_info": {
           "package_name": "com.carecallai.app"
         }
       },
       "oauth_client": [],
-      "api_key": [{"current_key": "AIzaSyPlaceholderReplaceWithRealKeyFromFirebaseConsole"}],
-      "services": {"appinvite_service": {"other_platform_oauth_client": []}}
+      "api_key": [
+        {
+          "current_key": "AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ123456a"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:000000000000:android:1111111111111111111111",
+        "mobilesdk_app_id": "1:123456789012:android:bbbbbbbbbbbbbbbb",
         "android_client_info": {
           "package_name": "com.carecallai.radio"
         }
       },
       "oauth_client": [],
-      "api_key": [{"current_key": "AIzaSyPlaceholderReplaceWithRealKeyFromFirebaseConsole"}],
-      "services": {"appinvite_service": {"other_platform_oauth_client": []}}
+      "api_key": [
+        {
+          "current_key": "AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ123456a"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
     }
   ],
   "configuration_version": "1"
