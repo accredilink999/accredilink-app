@@ -216,7 +216,13 @@ const AppShell = () => {
   const isRadioMode = localStorage.getItem('carecall_radio_mode') === 'true';
   if (isRadioMode) {
     if (!isAuthenticated) return <Login />;
-    if (orgReady === null) return null; // wait for org context before loading channels
+    if (orgReady === null) return (
+      <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#0f172a', gap: '12px' }}>
+        <div style={{ width: 32, height: 32, border: '3px solid #334155', borderTopColor: '#22c55e', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        <p style={{ color: '#64748b', fontSize: 13, fontFamily: 'system-ui' }}>Connecting…</p>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
     return <TwoWayRadio />;
   }
   // ────────────────────────────────────────────────────────────────────────

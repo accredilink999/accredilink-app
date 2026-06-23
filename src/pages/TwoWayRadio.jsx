@@ -423,6 +423,8 @@ export default function TwoWayRadio() {
   const { data: channels = [], isError: channelsError } = useQuery({
     queryKey: ['radioChannels'],
     queryFn: async () => { const { data, error } = await withOrgFilter(supabase.from('radio_channels').select('*').order('created_at')); if (error) throw error; return data || []; },
+    retry: 3,
+    retryDelay: 2000,
   });
   const { data: radioSettings } = useQuery({
     queryKey: ['radioSettings'],
@@ -1276,9 +1278,16 @@ export default function TwoWayRadio() {
 
   // ── Error state ───────────────────────────────────────────────────────────
   if (channelsError) return (
-    <div className="p-8 text-center bg-slate-900 min-h-screen flex flex-col items-center justify-center gap-3">
-      <Radio className="w-12 h-12 text-slate-600 mx-auto" />
-      <p className="text-slate-400 text-sm">Radio tables not set up. Run the SQL in Supabase first.</p>
+    <div className="h-screen flex flex-col items-center justify-center gap-4 bg-slate-900 p-8 text-center">
+      <Radio className="w-12 h-12 text-slate-600" />
+      <p className="text-slate-300 font-medium">Connection error</p>
+      <p className="text-slate-500 text-sm">Could not load channels. Check your signal and try again.</p>
+      <button
+        onClick={() => queryClient.invalidateQueries({ queryKey: ['radioChannels'] })}
+        className="mt-2 px-6 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-sm font-medium"
+      >
+        Retry
+      </button>
     </div>
   );
 
