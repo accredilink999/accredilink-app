@@ -216,6 +216,7 @@ const AppShell = () => {
   const isRadioMode = localStorage.getItem('carecall_radio_mode') === 'true';
   if (isRadioMode) {
     if (!isAuthenticated) return <Login />;
+    if (orgReady === null) return null; // wait for org context before loading channels
     return <TwoWayRadio />;
   }
   // ────────────────────────────────────────────────────────────────────────
