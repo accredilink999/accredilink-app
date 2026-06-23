@@ -420,7 +420,7 @@ export default function TwoWayRadio() {
   const { data: todayShifts = [] } = useQuery({
     queryKey: ['radioShifts', todayStr], queryFn: () => ShiftApi.filter({ date: todayStr }), refetchInterval: 60000,
   });
-  const { data: channels = [], isError: channelsError } = useQuery({
+  const { data: channels = [], isError: channelsError, error: channelsErrorObj } = useQuery({
     queryKey: ['radioChannels'],
     queryFn: async () => { const { data, error } = await withOrgFilter(supabase.from('radio_channels').select('*').order('created_at')); if (error) throw error; return data || []; },
     retry: 3,
@@ -1280,8 +1280,10 @@ export default function TwoWayRadio() {
   if (channelsError) return (
     <div className="h-screen flex flex-col items-center justify-center gap-4 bg-slate-900 p-8 text-center">
       <Radio className="w-12 h-12 text-slate-600" />
-      <p className="text-slate-300 font-medium">Connection error</p>
-      <p className="text-slate-500 text-sm">Could not load channels. Check your signal and try again.</p>
+      <p className="text-slate-300 font-medium">Could not load channels</p>
+      <p className="text-slate-500 text-xs font-mono break-all">
+        {channelsErrorObj?.message || channelsErrorObj?.code || String(channelsErrorObj) || 'unknown error'}
+      </p>
       <button
         onClick={() => queryClient.invalidateQueries({ queryKey: ['radioChannels'] })}
         className="mt-2 px-6 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-sm font-medium"
