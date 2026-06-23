@@ -1505,7 +1505,7 @@ export default function TwoWayRadio() {
         </button>
       )}
 
-      <div className={`min-h-screen bg-slate-900 flex flex-col pb-28 ${emergencyActive ? 'pt-10' : ''} ${!isHandsFree && !isRadioMode ? (pttHandedness === 'right' ? 'pr-[72px]' : 'pl-[72px]') : ''}`}>
+      <div className={`h-screen overflow-y-auto bg-slate-900 flex flex-col pb-28 ${emergencyActive ? 'pt-10' : ''} ${!isHandsFree && !isRadioMode ? (pttHandedness === 'right' ? 'pr-[72px]' : 'pl-[72px]') : ''}`}>
         {/* Header */}
         <div className="bg-slate-800 px-4 pt-4 pb-3 flex items-center gap-3">
           <button onClick={() => { if (!emergencyActive) { leaveChannel().then(() => setActiveChannel(null)); } setView('main'); }}
@@ -1747,7 +1747,7 @@ export default function TwoWayRadio() {
         )}
       </button>}
 
-      <div className="min-h-screen pb-28" style={theme.bgStyle}>
+      <div className="h-screen overflow-y-auto pb-28" style={theme.bgStyle}>
 
         {/* ── APP HOME BAR — hidden for control devices, they have no access to the rest of the app ── */}
         {isControlDevice ? (
