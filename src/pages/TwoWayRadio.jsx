@@ -2076,14 +2076,14 @@ export default function TwoWayRadio() {
             {channels.map(ch => {
               const members = channelMembersById[ch.id] || [];
               const isActive = isJoined && activeChannel?.id === ch.id;
-              const isExpanded = isRadioMode ? true : expandedChannelId === ch.id;
+              const isExpanded = expandedChannelId === ch.id;
               return (
                 <div key={ch.id} className={`rounded-2xl border-2 overflow-hidden transition-colors ${
                   isActive ? 'border-green-500 bg-green-950/40' : 'border-green-800/60 bg-slate-900'
                 }`}>
-                  {/* Channel header row */}
-                  <div className={`w-full flex items-center gap-3 px-4 py-3 ${isActive ? 'bg-green-900/30' : ''} ${!isRadioMode ? 'cursor-pointer hover:bg-green-950/30' : ''}`}
-                    onClick={!isRadioMode ? () => setExpandedChannelId(isExpanded ? null : ch.id) : undefined}>
+                  {/* Channel header row — tap to expand in both modes */}
+                  <div className={`w-full flex items-center gap-3 px-4 py-3 cursor-pointer ${isActive ? 'bg-green-900/30' : 'hover:bg-green-950/30'}`}
+                    onClick={() => setExpandedChannelId(isExpanded ? null : ch.id)}>
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isActive ? 'bg-green-600' : 'bg-green-900/50'}`}>
                       <Radio className={`w-4 h-4 ${isActive ? 'text-white' : 'text-green-400'}`} />
                     </div>
@@ -2123,7 +2123,7 @@ export default function TwoWayRadio() {
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     )}
-                    {!isRadioMode && <ChevronDown className={`w-4 h-4 text-slate-600 shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />}
+                    <ChevronDown className={`w-4 h-4 text-slate-600 shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                   </div>
 
                   {/* Members — always visible in radio mode, expand/collapse on web */}
