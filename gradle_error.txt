@@ -3,56 +3,60 @@
 > Task :app:preBuild UP-TO-DATE
 > Task :app:preRadioDebugBuild UP-TO-DATE
 > Task :app:mergeRadioDebugNativeDebugMetadata NO-SOURCE
-> Task :app:javaPreCompileRadioDebug
 > Task :capacitor-android:preBuild UP-TO-DATE
 > Task :capacitor-android:preDebugBuild UP-TO-DATE
+> Task :app:javaPreCompileRadioDebug
+> Task :capacitor-android:writeDebugAarMetadata
 > Task :capacitor-app:preBuild UP-TO-DATE
 > Task :capacitor-app:preDebugBuild UP-TO-DATE
-> Task :capacitor-android:writeDebugAarMetadata
 > Task :capacitor-browser:preBuild UP-TO-DATE
 > Task :capacitor-browser:preDebugBuild UP-TO-DATE
 > Task :capacitor-app:writeDebugAarMetadata
 > Task :capacitor-community-speech-recognition:preBuild UP-TO-DATE
-> Task :capacitor-community-speech-recognition:preDebugBuild UP-TO-DATE
 > Task :capacitor-browser:writeDebugAarMetadata
+> Task :capacitor-community-speech-recognition:preDebugBuild UP-TO-DATE
+> Task :capacitor-community-speech-recognition:writeDebugAarMetadata
 > Task :capacitor-cordova-android-plugins:preBuild UP-TO-DATE
 > Task :capacitor-cordova-android-plugins:preDebugBuild UP-TO-DATE
-> Task :capacitor-community-speech-recognition:writeDebugAarMetadata
 > Task :capacitor-haptics:preBuild UP-TO-DATE
 > Task :capacitor-haptics:preDebugBuild UP-TO-DATE
 > Task :capacitor-cordova-android-plugins:writeDebugAarMetadata
+> Task :capacitor-haptics:writeDebugAarMetadata
 > Task :capacitor-keyboard:preBuild UP-TO-DATE
 > Task :capacitor-keyboard:preDebugBuild UP-TO-DATE
-> Task :capacitor-haptics:writeDebugAarMetadata
 > Task :capacitor-native-biometric:preBuild UP-TO-DATE
-> Task :capacitor-native-biometric:preDebugBuild UP-TO-DATE
 > Task :capacitor-keyboard:writeDebugAarMetadata
+> Task :capacitor-native-biometric:preDebugBuild UP-TO-DATE
 > Task :capacitor-push-notifications:preBuild UP-TO-DATE
-> Task :capacitor-push-notifications:preDebugBuild UP-TO-DATE
 > Task :capacitor-native-biometric:writeDebugAarMetadata
+> Task :capacitor-push-notifications:preDebugBuild UP-TO-DATE
 > Task :capacitor-status-bar:preBuild UP-TO-DATE
 > Task :capacitor-status-bar:preDebugBuild UP-TO-DATE
 > Task :capacitor-push-notifications:writeDebugAarMetadata
 > Task :capacitor-status-bar:writeDebugAarMetadata
 > Task :app:generateRadioDebugResValues
-> Task :app:processRadioDebugGoogleServices FAILED
+> Task :app:processRadioDebugGoogleServices
+> Task :capacitor-android:generateDebugResValues
+> Task :capacitor-android:generateDebugResources
 > Task :app:checkRadioDebugAarMetadata
-Execution failed for task ':app:processRadioDebugGoogleServices'.
-> Malformed root json at /home/runner/work/accredilink-app/accredilink-app/android/app/google-services.json
-> Run with --info or --debug option to get more log output.
-> Run with --scan to get full insights.
-> Get more help at https://help.gradle.org.
-org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app:processRadioDebugGoogleServices'.
-Caused by: org.gradle.api.GradleException: Malformed root json at /home/runner/work/accredilink-app/accredilink-app/android/app/google-services.json
+> Task :capacitor-android:packageDebugResources
+> Task :capacitor-app:generateDebugResValues
+> Task :capacitor-app:generateDebugResources
+> Task :capacitor-app:packageDebugResources
+> Task :capacitor-browser:generateDebugResValues
+> Task :capacitor-browser:generateDebugResources
+> Task :capacitor-browser:packageDebugResources
+> Task :capacitor-community-speech-recognition:generateDebugResValues
+> Task :capacitor-community-speech-recognition:generateDebugResources
 ===TAIL===
-	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:331)
-	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:318)
-	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.lambda$execute$0(DefaultTaskExecutionGraph.java:314)
+	at org.gradle.internal.build.DefaultBuildWorkGraphController$DefaultBuildWorkGraph.runWork(DefaultBuildWorkGraphController.java:220)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocks(DefaultWorkerLeaseService.java:263)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:127)
+	at org.gradle.composite.internal.DefaultBuildController.doRun(DefaultBuildController.java:181)
+	at org.gradle.composite.internal.DefaultBuildController.access$000(DefaultBuildController.java:50)
+	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.lambda$run$0(DefaultBuildController.java:198)
 	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:85)
-	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:314)
-	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:303)
-	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:459)
-	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
+	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.run(DefaultBuildController.java:198)
 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
 
@@ -63,5 +67,5 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 
 For more on this, please refer to https://docs.gradle.org/8.11.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD FAILED in 1m 8s
-14 actionable tasks: 14 executed
+BUILD FAILED in 1m 16s
+137 actionable tasks: 137 executed
