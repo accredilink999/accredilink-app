@@ -1747,12 +1747,12 @@ export default function TwoWayRadio() {
           </div>
         ) : (
           <button
-            onClick={() => navigate(createPageUrl('Dashboard'))}
+            onClick={() => isRadioMode ? window.AndroidApp?.minimize() : navigate(createPageUrl('Dashboard'))}
             className={`w-full flex items-center gap-3 px-5 font-semibold text-base flex-shrink-0 touch-manipulation ${theme.homeBar}`}
             style={{ paddingTop: `calc(0.875rem + env(safe-area-inset-top))`, paddingBottom: '0.875rem' }}
           >
             <Home className="w-5 h-5 shrink-0" />
-            <span>App Home</span>
+            <span>{isRadioMode ? 'Minimise' : 'App Home'}</span>
           </button>
         )}
 
@@ -1793,13 +1793,6 @@ export default function TwoWayRadio() {
               <div className={`w-2 h-2 rounded-full ${anyoneSpeaking ? 'bg-red-300 animate-pulse' : 'bg-slate-600'}`} />
               <span className={`text-[10px] font-black tracking-widest ${anyoneSpeaking ? 'text-red-200' : 'text-slate-600'}`}>ON AIR</span>
             </div>
-            {isRadioMode && (
-              <button onClick={() => window.AndroidApp?.minimize()}
-                className="text-slate-500 hover:text-slate-300 p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
-                title="Minimise to home screen">
-                <Home className="w-4 h-4" />
-              </button>
-            )}
             <div className="relative">
               <button onClick={() => setShowSettings(v => !v)} className="text-slate-500 hover:text-slate-300 p-1.5 rounded-lg hover:bg-slate-800 transition-colors">
                 <Settings className="w-4 h-4" />
