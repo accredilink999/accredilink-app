@@ -250,28 +250,44 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (isPttKey(keyCode) && webView != null) {
-            if (event.getRepeatCount() > 0) return true; // ignore held-key repeats
+        if (event.getRepeatCount() > 0) return super.onKeyDown(keyCode, event);
+        if (webView == null) return super.onKeyDown(keyCode, event);
+
+        // During detect mode: forward EVERY key to JS so we can discover the
+        // actual keycode the T320 PTT button sends (may not be 280 or 293).
+        // Exclude common Android system keys that would give a false result.
+        boolean isSystemKey = (keyCode == KeyEvent.KEYCODE_BACK
+                            || keyCode == KeyEvent.KEYCODE_VOLUME_UP
+                            || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
+                            || keyCode == KeyEvent.KEYCODE_POWER
+                            || keyCode == KeyEvent.KEYCODE_HOME);
+        if (!isSystemKey) {
+            webView.evaluateJavascript(
+                "if(typeof window.__pttDetect==='function'){window.__pttDetect(" + keyCode + ");}",
+                null
+            );
+        }
+
+        // Normal PTT operation — only for known PTT keycodes
+        if (isPttKey(keyCode)) {
             if (pttWakeLock != null && !pttWakeLock.isHeld()) {
                 pttWakeLock.acquire(10 * 60 * 1000L);
             }
             moveTaskToFront();
-            // Call window.__pttDown() directly — more reliable than KeyboardEvent
-            // because new KeyboardEvent({keyCode:N}) does not set e.keyCode in all
-            // Chromium WebView versions (it's a legacy read-only property).
-            // If detect mode is active, route to detector instead of PTT action
             webView.evaluateJavascript(
-                "if(typeof window.__pttDetect==='function'){window.__pttDetect(" + keyCode + ");}else if(typeof window.__pttDown==='function'){window.__pttDown();}",
+                "if(typeof window.__pttDown==='function'){window.__pttDown();}",
                 null
             );
             return true;
         }
+
         return super.onKeyDown(keyCode, event);
     }
 
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event) {
-        if (isPttKey(keyCode) && webView != null) {
+        if (webView == null) return super.onKeyUp(keyCode, event);
+        if (isPttKey(keyCode)) {
             if (pttWakeLock != null && pttWakeLock.isHeld()) {
                 pttWakeLock.release();
             }
