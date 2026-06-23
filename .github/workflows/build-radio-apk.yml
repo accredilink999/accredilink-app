@@ -11,6 +11,9 @@ on:
       - '.github/workflows/build-radio-apk.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -49,7 +52,7 @@ jobs:
         run: npx cap sync android
 
       - name: Write google-services.json
-        run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
+        run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json || cp android/app/google-services.json android/app/google-services.json
 
       - name: Write local.properties
         run: echo "sdk.dir=$ANDROID_HOME" > android/local.properties
@@ -61,16 +64,22 @@ jobs:
         run: |
           cd android
           ./gradlew assembleRadioDebug --no-daemon --stacktrace 2>&1 | tee /tmp/gradle_output.txt
-          EXIT_CODE=${PIPESTATUS[0]}
-          if [ $EXIT_CODE -ne 0 ]; then
-            echo "## Gradle Build Failed" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            grep -E "(error:|FAILED|Exception|Could not resolve|BUILD FAILED)" /tmp/gradle_output.txt | tail -40 >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          fi
-          exit $EXIT_CODE
+          exit ${PIPESTATUS[0]}
 
-      - name: Find and upload APK
+      - name: Push error log on failure
+        if: failure()
+        run: |
+          tail -100 /tmp/gradle_output.txt > gradle_error.txt
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          git add gradle_error.txt
+          git commit -m "ci: gradle error log [skip ci]"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: carecall-radio-debug
