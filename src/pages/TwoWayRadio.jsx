@@ -1793,6 +1793,13 @@ export default function TwoWayRadio() {
               <div className={`w-2 h-2 rounded-full ${anyoneSpeaking ? 'bg-red-300 animate-pulse' : 'bg-slate-600'}`} />
               <span className={`text-[10px] font-black tracking-widest ${anyoneSpeaking ? 'text-red-200' : 'text-slate-600'}`}>ON AIR</span>
             </div>
+            {isRadioMode && (
+              <button onClick={() => window.AndroidApp?.minimize()}
+                className="text-slate-500 hover:text-slate-300 p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+                title="Minimise to home screen">
+                <Home className="w-4 h-4" />
+              </button>
+            )}
             <div className="relative">
               <button onClick={() => setShowSettings(v => !v)} className="text-slate-500 hover:text-slate-300 p-1.5 rounded-lg hover:bg-slate-800 transition-colors">
                 <Settings className="w-4 h-4" />

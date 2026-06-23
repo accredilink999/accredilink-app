@@ -37,9 +37,10 @@ public class MainActivity extends BridgeActivity {
     private static final int MIC_PERMISSION_REQUEST = 1001;
 
     // Inrico T320 / PoC handset keycodes for the hardware PTT button
+    // 139 (KEYCODE_MENU) deliberately excluded — it's used by Android for
+    // navigation / app switching and intercepting it breaks scroll + multitasking.
     private static final int KEYCODE_PTT         = 280;
     private static final int KEYCODE_INRICO_SIDE = 293;
-    private static final int KEYCODE_MENU_PTT    = 139;
 
     // LED notification
     private static final int    LED_NOTIF_ID = 9001;
@@ -91,12 +92,19 @@ public class MainActivity extends BridgeActivity {
         // Expose LED bridge to JavaScript — called from TwoWayRadio when isOnline changes
         webView.addJavascriptInterface(new LedBridge(), "AndroidLED");
 
-        // Radio flavor: inject localStorage flag so React app boots to radio page
+        // Expose app control bridge: minimize() sends app to background without exiting.
+        // Needed on T320 which has no visible software navigation bar.
+        webView.addJavascriptInterface(new AndroidAppBridge(), "AndroidApp");
+
+        // Radio flavor: inject localStorage flags so React app boots to radio page
+        // and the PTT key is pre-bound to T320's hardware keycode (280) on first run.
         if (BuildConfig.FLAVOR.equals("radio")) {
             webView.post(() -> webView.evaluateJavascript(
                 "localStorage.setItem('carecall_radio_mode','true');" +
-                // Also enable keep-awake via Web Wake Lock as belt-and-braces
-                "localStorage.setItem('radio_keep_awake','true');",
+                "localStorage.setItem('radio_keep_awake','true');" +
+                "if (!localStorage.getItem('radio_ptt_keycode')) {" +
+                "  localStorage.setItem('radio_ptt_keycode','280');" +
+                "}",
                 null
             ));
         }
@@ -202,6 +210,13 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
+    private class AndroidAppBridge {
+        @JavascriptInterface
+        public void minimize() {
+            runOnUiThread(() -> moveTaskToBack(true));
+        }
+    }
+
     // ── Hardware PTT key forwarding ───────────────────────────────────────────
     // Inrico T320 PTT fires KEYCODE_PTT (280). We intercept it here, acquire a
     // wake lock to ensure the screen is bright, then inject a synthetic keydown
@@ -209,8 +224,7 @@ public class MainActivity extends BridgeActivity {
 
     private boolean isPttKey(int keyCode) {
         return keyCode == KEYCODE_PTT
-            || keyCode == KEYCODE_INRICO_SIDE
-            || keyCode == KEYCODE_MENU_PTT;
+            || keyCode == KEYCODE_INRICO_SIDE;
     }
 
     @Override

@@ -216,12 +216,7 @@ const AppShell = () => {
   const isRadioMode = localStorage.getItem('carecall_radio_mode') === 'true';
   if (isRadioMode) {
     if (!isAuthenticated) return <Login />;
-    return (
-      <>
-        <AutoPushRegistration />
-        <TwoWayRadio />
-      </>
-    );
+    return <TwoWayRadio />;
   }
   // ────────────────────────────────────────────────────────────────────────
 
