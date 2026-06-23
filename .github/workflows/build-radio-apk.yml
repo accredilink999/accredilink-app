@@ -51,9 +51,6 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Write google-services.json
-        run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json || cp android/app/google-services.json android/app/google-services.json
-
       - name: Write local.properties
         run: echo "sdk.dir=$ANDROID_HOME" > android/local.properties
 
