@@ -1803,10 +1803,18 @@ export default function TwoWayRadio() {
 
         {/* ── RADIO DEVICE HEADER ── */}
         <div className={`border-b ${theme.header}`}>
+          {testMode && <div className="bg-amber-500 px-4 py-1"><span className="text-white text-xs font-bold">TEST MODE — alerts only go to you</span></div>}
+          {isRadioMode ? (
+            /* T320 native app: minimal title only — no decorative chrome needed */
+            <div className="px-4 py-3 flex items-center gap-2">
+              <Radio className={`w-4 h-4 shrink-0 ${theme.accent}`} />
+              <span className={`font-black text-sm tracking-widest uppercase ${theme.accent}`}>CareCall Radio</span>
+            </div>
+          ) : (
+            <>
           <div className="h-2 bg-black/30 flex gap-[3px] px-3 pt-1">
             {Array.from({ length: 32 }).map((_, i) => <div key={i} className="flex-1 h-full bg-white/10 rounded-full" />)}
           </div>
-          {testMode && <div className="bg-amber-500 px-4 py-1"><span className="text-white text-xs font-bold">TEST MODE — alerts only go to you</span></div>}
           <div className="px-4 pt-3 pb-2 flex items-center gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
@@ -1849,6 +1857,8 @@ export default function TwoWayRadio() {
           <div className="h-2 bg-black/30 flex gap-[3px] px-3 pb-1">
             {Array.from({ length: 32 }).map((_, i) => <div key={i} className="flex-1 h-full bg-white/10 rounded-full" />)}
           </div>
+            </>
+          )}
         </div>
 
         {/* ── MISSED CALL STICKY ALERT ── */}
