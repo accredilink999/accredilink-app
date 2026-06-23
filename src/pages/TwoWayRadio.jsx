@@ -1272,18 +1272,23 @@ export default function TwoWayRadio() {
     const cancelTimeout = setTimeout(() => {
       setDetectingPTTKey(false);
       document.removeEventListener('keydown', handler, true);
+      delete window.__pttDetect;
     }, 10000);
+    function confirm(code) {
+      clearTimeout(cancelTimeout);
+      setPttKeyCode(code);
+      localStorage.setItem('radio_ptt_keycode', String(code));
+      setDetectingPTTKey(false);
+      document.removeEventListener('keydown', handler, true);
+      delete window.__pttDetect;
+      toast.success(`PTT key bound — keycode ${code}`);
+    }
+    // Android APK path: MainActivity calls window.__pttDetect(keyCode) when detect is active
+    window.__pttDetect = (code) => { if (code > 0) confirm(code); };
+    // Web/PWA path: catch a real keyboard event
     function handler(e) {
       const code = e.keyCode;
-      if (code > 0 && code !== 27) {
-        e.preventDefault();
-        clearTimeout(cancelTimeout);
-        setPttKeyCode(code);
-        localStorage.setItem('radio_ptt_keycode', String(code));
-        setDetectingPTTKey(false);
-        document.removeEventListener('keydown', handler, true);
-        toast.success(`PTT key bound — keycode ${code}`);
-      }
+      if (code > 0 && code !== 27) { e.preventDefault(); confirm(code); }
     }
     document.addEventListener('keydown', handler, true);
   }, []);

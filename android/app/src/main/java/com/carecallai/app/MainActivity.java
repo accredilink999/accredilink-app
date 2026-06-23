@@ -259,8 +259,9 @@ public class MainActivity extends BridgeActivity {
             // Call window.__pttDown() directly — more reliable than KeyboardEvent
             // because new KeyboardEvent({keyCode:N}) does not set e.keyCode in all
             // Chromium WebView versions (it's a legacy read-only property).
+            // If detect mode is active, route to detector instead of PTT action
             webView.evaluateJavascript(
-                "if(typeof window.__pttDown==='function'){window.__pttDown();}",
+                "if(typeof window.__pttDetect==='function'){window.__pttDetect(" + keyCode + ");}else if(typeof window.__pttDown==='function'){window.__pttDown();}",
                 null
             );
             return true;
