@@ -365,7 +365,19 @@ export default function TwoWayRadio() {
   });
 
   // Handset hardware settings
-  const [pttKeyCode, setPttKeyCode]           = useState(() => parseInt(localStorage.getItem('radio_ptt_keycode') || '0'));
+  const [pttKeyCode, setPttKeyCode] = useState(() => {
+    const stored = parseInt(localStorage.getItem('radio_ptt_keycode') || '0');
+    if (stored) return stored;
+    // Synchronous fallback: ask the native bridge before evaluateJavascript has run
+    try {
+      const fromBridge = window.AndroidApp?.getDefaultPttKeyCode?.();
+      if (fromBridge) {
+        const code = parseInt(fromBridge);
+        if (code) { localStorage.setItem('radio_ptt_keycode', String(code)); return code; }
+      }
+    } catch (_) {}
+    return 0;
+  });
   const [keepAwake, setKeepAwake]             = useState(() => localStorage.getItem('radio_keep_awake') === 'true');
   const [wakeOnIncoming, setWakeOnIncoming]   = useState(() => localStorage.getItem('radio_wake_on_incoming') === 'true');
   const [bringToFront, setBringToFront]       = useState(() => localStorage.getItem('radio_bring_to_front') === 'true');
@@ -1097,11 +1109,13 @@ export default function TwoWayRadio() {
   // Auto-join assigned channel on load.
   // Regular staff: always auto-join their assigned channel.
   // Admins: skip (they pick channels manually).
-  // Control devices: always auto-join — they are fixed to one area's channel.
+  // Control devices: auto-join their assigned channel.
+  // In radio handset mode the device is free to join any channel manually.
   useEffect(() => {
     if (!user?.id || !myUid || !clientRef.current) return;
     const isRegularAdmin = (user?.role === 'super_admin' || user?.role === 'admin') && !isControlDevice;
     if (isRegularAdmin) return;
+    if (isRadioMode) return; // T320 picks channels manually — no auto-join
     const myRecord = staff.find(s => s.id === user.id);
     if (!myRecord?.radio_channel_id) return;
     const ch = channels.find(c => c.id === myRecord.radio_channel_id);

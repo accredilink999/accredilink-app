@@ -215,6 +215,13 @@ public class MainActivity extends BridgeActivity {
         public void minimize() {
             runOnUiThread(() -> moveTaskToBack(true));
         }
+
+        // Called synchronously from the React useState initializer to get the
+        // default PTT keycode before evaluateJavascript injection has run.
+        @JavascriptInterface
+        public String getDefaultPttKeyCode() {
+            return String.valueOf(KEYCODE_PTT); // "280"
+        }
     }
 
     // ── Hardware PTT key forwarding ───────────────────────────────────────────
