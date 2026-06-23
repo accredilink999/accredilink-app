@@ -69,7 +69,7 @@ jobs:
       - name: Push error log on failure
         if: failure()
         run: |
-          tail -100 /tmp/gradle_output.txt > gradle_error.txt
+          { grep -E "^> Task|Caused by:|Execution failed|^> [A-Z]" /tmp/gradle_output.txt | head -50; echo "===TAIL==="; tail -20 /tmp/gradle_output.txt; } > gradle_error.txt
           git config user.email "actions@github.com"
           git config user.name "GitHub Actions"
           git add gradle_error.txt
