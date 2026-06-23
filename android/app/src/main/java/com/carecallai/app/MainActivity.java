@@ -263,6 +263,19 @@ public class MainActivity extends BridgeActivity {
         return super.onKeyUp(keyCode, event);
     }
 
+    // ── Back button ───────────────────────────────────────────────────────────
+    // In radio flavor: pressing back minimises to the Android home screen
+    // instead of closing the app or navigating browser history.
+
+    @Override
+    public void onBackPressed() {
+        if (BuildConfig.FLAVOR.equals("radio")) {
+            moveTaskToBack(true);
+        } else {
+            super.onBackPressed();
+        }
+    }
+
     /** Bring this activity to the foreground if it's been pushed back. */
     private void moveTaskToFront() {
         try {
