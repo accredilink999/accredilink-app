@@ -31,8 +31,7 @@ jobs:
           accept-android-sdk-licenses: true
 
       - name: Install SDK packages
-        run: |
-          sdkmanager --install "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0" "platform-tools"
 
       - name: Set up Node 20
         uses: actions/setup-node@v4
@@ -56,11 +55,14 @@ jobs:
         run: chmod +x android/gradlew
 
       - name: Build radio debug APK
-        run: cd android && ./gradlew assembleRadioDebug --no-daemon --stacktrace 2>&1 | tail -100
+        run: cd android && ./gradlew assembleRadioDebug --no-daemon
+
+      - name: Find APK
+        run: find android/app/build/outputs/apk -name "*.apk" | tee /tmp/apk_path.txt
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: carecall-radio-debug
-          path: android/app/build/outputs/apk/radio/debug/app-radio-debug.apk
+          path: android/app/build/outputs/apk/**/*.apk
           retention-days: 30
