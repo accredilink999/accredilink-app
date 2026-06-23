@@ -1212,19 +1212,17 @@ export default function TwoWayRadio() {
   }, [keepAwake]);
 
   // ── Hardware PTT key listener (Inrico T320 side key / any mapped keycode) ─
-  // Uses refs so the handler doesn't need to be re-registered on every render
+  // All refs updated directly during render (not in useEffect) so the keydown
+  // closure always reads the latest value with zero timing gap.
   const pttModeRef              = useRef(pttMode);
   const isTalkingRef            = useRef(isTalking);
   const incomingCallRef         = useRef(incomingCall);
   const acceptIncomingCallRef   = useRef(null);
-  // initiateP2PCall is recreated each render (closes over selectedPerson/user).
-  // Keeping it in a ref means the stale keydown closure always calls the latest version.
   const initiateP2PCallRef      = useRef(null);
+  pttModeRef.current            = pttMode;
+  isTalkingRef.current          = isTalking;
+  incomingCallRef.current       = incomingCall;
   initiateP2PCallRef.current    = initiateP2PCall;
-  useEffect(() => { pttModeRef.current            = pttMode;            }, [pttMode]);
-  useEffect(() => { isTalkingRef.current          = isTalking;          }, [isTalking]);
-  useEffect(() => { incomingCallRef.current       = incomingCall;       }, [incomingCall]);
-  // keep stable pointer to latest acceptIncomingCall so keyboard handler stays fresh
   acceptIncomingCallRef.current = acceptIncomingCall;
 
   useEffect(() => {
@@ -1959,8 +1957,8 @@ export default function TwoWayRadio() {
           </div>
         )}
 
-        {/* ── ACTIVE CHANNEL WINDOW ── */}
-        {(() => {
+        {/* ── ACTIVE CHANNEL WINDOW — hidden on T320 (control is in all channels) ── */}
+        {!isRadioMode && (() => {
           const myRecord = staff.find(s => s.id === user?.id);
           const myChannel = myRecord?.radio_channel_id ? channels.find(c => c.id === myRecord.radio_channel_id) : null;
           const displayCh = activeChannel && activeChannel.id !== '__ptp' && activeChannel.id !== '__sos' ? activeChannel : myChannel;
@@ -1981,7 +1979,31 @@ export default function TwoWayRadio() {
         })()}
 
         {/* ── MY STATUS ── */}
-        {(() => {
+        {isRadioMode ? (
+          /* T320: simple Available / Not Available toggle — no shift tracking */
+          (() => {
+            const myStatus = getStaffStatus(user?.id);
+            const isAvailable = myStatus === 'available';
+            return (
+              <div className="px-4 pt-4 pb-1 flex gap-3">
+                <button onClick={() => setMyRadioStatus('available')}
+                  className={`flex-1 flex items-center justify-center gap-2 rounded-2xl py-4 border-2 transition-all active:scale-[0.97] ${
+                    isAvailable ? 'bg-green-900/50 border-green-500' : 'bg-slate-900 border-slate-700'
+                  }`}>
+                  <span className={`w-3 h-3 rounded-full ${isAvailable ? 'bg-green-400' : 'bg-slate-600'}`} />
+                  <span className={`text-sm font-bold ${isAvailable ? 'text-green-300' : 'text-slate-500'}`}>Available</span>
+                </button>
+                <button onClick={() => setMyRadioStatus('dnd')}
+                  className={`flex-1 flex items-center justify-center gap-2 rounded-2xl py-4 border-2 transition-all active:scale-[0.97] ${
+                    !isAvailable ? 'bg-slate-700 border-slate-500' : 'bg-slate-900 border-slate-700'
+                  }`}>
+                  <span className={`w-3 h-3 rounded-full ${!isAvailable ? 'bg-slate-300' : 'bg-slate-600'}`} />
+                  <span className={`text-sm font-bold ${!isAvailable ? 'text-slate-200' : 'text-slate-500'}`}>Not Available</span>
+                </button>
+              </div>
+            );
+          })()
+        ) : (() => {
           const myStatus = getStaffStatus(user?.id);
           const cs = getCombinedStatus(user?.id);
           const activeShift = todayShifts.find(s => s.staff_id === user?.id && s.clock_in_time && !s.clock_out_time && s.status !== 'cancelled');
