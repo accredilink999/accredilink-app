@@ -2076,52 +2076,36 @@ export default function TwoWayRadio() {
             {channels.map(ch => {
               const members = channelMembersById[ch.id] || [];
               const isActive = isJoined && activeChannel?.id === ch.id;
-              const isExpanded = expandedChannelId === ch.id;
+              const isExpanded = isRadioMode ? true : expandedChannelId === ch.id;
               return (
                 <div key={ch.id} className={`rounded-2xl border-2 overflow-hidden transition-colors ${
                   isActive ? 'border-green-500 bg-green-950/40' : 'border-green-800/60 bg-slate-900'
                 }`}>
                   {/* Channel header row */}
-                  <button
-                    onClick={() => {
-                      if (isRadioMode) {
-                        // T320: tap row to join / leave directly — no separate button needed
-                        if (isActive) {
-                          leaveChannel().then(() => { setActiveChannel(null); setSelectedPerson(null); setGroupBroadcastActive(false); });
-                        } else {
-                          joinChannel(ch.name).then(() => { setActiveChannel(ch); setSelectedPerson(null); });
-                        }
-                      } else {
-                        setExpandedChannelId(isExpanded ? null : ch.id);
-                      }
-                    }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${isActive ? 'bg-green-900/30' : 'hover:bg-green-950/30'}`}>
+                  <div className={`w-full flex items-center gap-3 px-4 py-3 ${isActive ? 'bg-green-900/30' : ''} ${!isRadioMode ? 'cursor-pointer hover:bg-green-950/30' : ''}`}
+                    onClick={!isRadioMode ? () => setExpandedChannelId(isExpanded ? null : ch.id) : undefined}>
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isActive ? 'bg-green-600' : 'bg-green-900/50'}`}>
                       <Radio className={`w-4 h-4 ${isActive ? 'text-white' : 'text-green-400'}`} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-white font-semibold text-sm truncate">{ch.name}</p>
-                      <p className="text-slate-500 text-xs">{members.length} member{members.length !== 1 ? 's' : ''}{isActive ? ' · Active' : ''}</p>
+                      <p className="text-slate-500 text-xs">{members.length} member{members.length !== 1 ? 's' : ''}</p>
                     </div>
-                    {/* Admin controls — hidden on T320 radio handset */}
+                    {/* Admin controls — hidden on T320 */}
                     {!isRadioMode && isSuperAdmin && (
                       <button onClick={e => { e.stopPropagation(); setManagingChannelId(ch.id); }}
                         className="text-slate-600 hover:text-teal-400 p-1.5 transition-colors shrink-0">
                         <Users className="w-4 h-4" />
                       </button>
                     )}
-                    {/* Broadcast toggle — shown when active, hidden on T320 (uses hardware PTT) */}
                     {isActive && !isRadioMode && (
                       <button onClick={e => { e.stopPropagation(); setGroupBroadcastActive(v => !v); }}
                         className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-colors shrink-0 ${
-                          groupBroadcastActive
-                            ? 'bg-teal-600 border-teal-500 text-white'
-                            : 'border-slate-600 text-slate-400 hover:border-teal-700 hover:text-teal-400'
+                          groupBroadcastActive ? 'bg-teal-600 border-teal-500 text-white' : 'border-slate-600 text-slate-400 hover:border-teal-700 hover:text-teal-400'
                         }`}>
                         {groupBroadcastActive ? '📡 On Air' : 'Broadcast'}
                       </button>
                     )}
-                    {/* Join / Leave — desktop/web admin only; T320 taps the whole row */}
                     {!isRadioMode && isSuperAdmin && (isActive ? (
                       <button onClick={e => { e.stopPropagation(); leaveChannel().then(() => { setActiveChannel(null); setSelectedPerson(null); setGroupBroadcastActive(false); }); }}
                         className="text-red-400 text-xs font-bold px-3 py-1.5 rounded-full border border-red-800 hover:bg-red-900/30 transition-colors shrink-0">
@@ -2139,16 +2123,10 @@ export default function TwoWayRadio() {
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     )}
-                    {/* Active badge on T320 (replaces ChevronDown) */}
-                    {isRadioMode
-                      ? isActive
-                        ? <span className="text-green-400 text-xs font-bold shrink-0">● Active</span>
-                        : <span className="text-slate-600 text-xs shrink-0">Tap to join</span>
-                      : <ChevronDown className={`w-4 h-4 text-slate-600 shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                    }
-                  </button>
+                    {!isRadioMode && <ChevronDown className={`w-4 h-4 text-slate-600 shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />}
+                  </div>
 
-                  {/* Members — only shown when expanded */}
+                  {/* Members — always visible in radio mode, expand/collapse on web */}
                   {isExpanded && (
                     <div className="border-t border-green-900/40">
                       {members.length > 0 ? (
