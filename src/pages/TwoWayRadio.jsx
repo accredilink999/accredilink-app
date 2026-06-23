@@ -1213,6 +1213,10 @@ export default function TwoWayRadio() {
   const isTalkingRef            = useRef(isTalking);
   const incomingCallRef         = useRef(incomingCall);
   const acceptIncomingCallRef   = useRef(null);
+  // initiateP2PCall is recreated each render (closes over selectedPerson/user).
+  // Keeping it in a ref means the stale keydown closure always calls the latest version.
+  const initiateP2PCallRef      = useRef(null);
+  initiateP2PCallRef.current    = initiateP2PCall;
   useEffect(() => { pttModeRef.current            = pttMode;            }, [pttMode]);
   useEffect(() => { isTalkingRef.current          = isTalking;          }, [isTalking]);
   useEffect(() => { incomingCallRef.current       = incomingCall;       }, [incomingCall]);
@@ -1226,7 +1230,7 @@ export default function TwoWayRadio() {
       e.preventDefault(); e.stopPropagation();
       // If there's an incoming call, PTT accepts it instead of transmitting
       if (incomingCallRef.current) { acceptIncomingCallRef.current?.(); return; }
-      if (pttModeRef.current === 'p2p') initiateP2PCall();
+      if (pttModeRef.current === 'p2p') initiateP2PCallRef.current?.();
       else if (pttModeRef.current === 'group') { playPTTTone('up'); startTalking(); }
     };
     const handleUp = (e) => {
@@ -2067,9 +2071,20 @@ export default function TwoWayRadio() {
                 <div key={ch.id} className={`rounded-2xl border-2 overflow-hidden transition-colors ${
                   isActive ? 'border-green-500 bg-green-950/40' : 'border-green-800/60 bg-slate-900'
                 }`}>
-                  {/* Channel header row — tap to expand member list */}
+                  {/* Channel header row */}
                   <button
-                    onClick={() => setExpandedChannelId(isExpanded ? null : ch.id)}
+                    onClick={() => {
+                      if (isRadioMode) {
+                        // T320: tap row to join / leave directly — no separate button needed
+                        if (isActive) {
+                          leaveChannel().then(() => { setActiveChannel(null); setSelectedPerson(null); setGroupBroadcastActive(false); });
+                        } else {
+                          joinChannel(ch.name).then(() => { setActiveChannel(ch); setSelectedPerson(null); });
+                        }
+                      } else {
+                        setExpandedChannelId(isExpanded ? null : ch.id);
+                      }
+                    }}
                     className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${isActive ? 'bg-green-900/30' : 'hover:bg-green-950/30'}`}>
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isActive ? 'bg-green-600' : 'bg-green-900/50'}`}>
                       <Radio className={`w-4 h-4 ${isActive ? 'text-white' : 'text-green-400'}`} />
@@ -2078,15 +2093,15 @@ export default function TwoWayRadio() {
                       <p className="text-white font-semibold text-sm truncate">{ch.name}</p>
                       <p className="text-slate-500 text-xs">{members.length} member{members.length !== 1 ? 's' : ''}{isActive ? ' · Active' : ''}</p>
                     </div>
-                    {/* Admin controls */}
-                    {isSuperAdmin && (
+                    {/* Admin controls — hidden on T320 radio handset */}
+                    {!isRadioMode && isSuperAdmin && (
                       <button onClick={e => { e.stopPropagation(); setManagingChannelId(ch.id); }}
                         className="text-slate-600 hover:text-teal-400 p-1.5 transition-colors shrink-0">
                         <Users className="w-4 h-4" />
                       </button>
                     )}
-                    {/* Broadcast toggle — shown when this channel is active */}
-                    {isActive && (
+                    {/* Broadcast toggle — shown when active, hidden on T320 (uses hardware PTT) */}
+                    {isActive && !isRadioMode && (
                       <button onClick={e => { e.stopPropagation(); setGroupBroadcastActive(v => !v); }}
                         className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-colors shrink-0 ${
                           groupBroadcastActive
@@ -2096,8 +2111,8 @@ export default function TwoWayRadio() {
                         {groupBroadcastActive ? '📡 On Air' : 'Broadcast'}
                       </button>
                     )}
-                    {/* Join / Leave — admin only */}
-                    {isSuperAdmin && (isActive ? (
+                    {/* Join / Leave — desktop/web admin only; T320 taps the whole row */}
+                    {!isRadioMode && isSuperAdmin && (isActive ? (
                       <button onClick={e => { e.stopPropagation(); leaveChannel().then(() => { setActiveChannel(null); setSelectedPerson(null); setGroupBroadcastActive(false); }); }}
                         className="text-red-400 text-xs font-bold px-3 py-1.5 rounded-full border border-red-800 hover:bg-red-900/30 transition-colors shrink-0">
                         Leave
@@ -2109,12 +2124,18 @@ export default function TwoWayRadio() {
                         {joining ? '…' : 'Join'}
                       </button>
                     ))}
-                    {isSuperAdmin && (
+                    {!isRadioMode && isSuperAdmin && (
                       <button onClick={e => { e.stopPropagation(); deleteChannelMutation.mutate(ch.id); }} className="text-slate-700 hover:text-red-400 p-1 transition-colors shrink-0">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     )}
-                    <ChevronDown className={`w-4 h-4 text-slate-600 shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                    {/* Active badge on T320 (replaces ChevronDown) */}
+                    {isRadioMode
+                      ? isActive
+                        ? <span className="text-green-400 text-xs font-bold shrink-0">● Active</span>
+                        : <span className="text-slate-600 text-xs shrink-0">Tap to join</span>
+                      : <ChevronDown className={`w-4 h-4 text-slate-600 shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                    }
                   </button>
 
                   {/* Members — only shown when expanded */}
