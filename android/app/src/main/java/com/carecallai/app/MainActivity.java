@@ -260,16 +260,6 @@ public class MainActivity extends BridgeActivity {
         } catch (Exception ignored) {}
     }
 
-    // ── onResume — re-apply keep-screen-on flag ───────────────────────────────
-    @Override
-    protected void onResume() {
-        super.onResume();
-        // Ensure keep-screen-on is re-applied after activity lifecycle events
-        if (BuildConfig.FLAVOR.equals("radio")) {
-            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        }
-    }
-
     // ── Microphone permission ─────────────────────────────────────────────────
 
     private void requestMicPermission() {

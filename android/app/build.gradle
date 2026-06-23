@@ -3,6 +3,10 @@ apply plugin: 'com.android.application'
 android {
     namespace "com.carecallai.app"
     compileSdk rootProject.ext.compileSdkVersion
+    buildFeatures {
+        buildConfig true
+    }
+
     defaultConfig {
         applicationId "com.carecallai.app"
         minSdkVersion rootProject.ext.minSdkVersion
