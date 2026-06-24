@@ -1553,7 +1553,7 @@ export default function TwoWayRadio() {
       else if (pttModeRef.current === 'group') { playPTTTone('up'); startTalkingRef.current?.(); }
     };
     const pttUp = () => {
-      if (isTalkingRef.current) { playPTTTone('down'); stopTalkingRef.current?.(); }
+      if (pttModeRef.current === 'group') { playPTTTone('down'); stopTalkingRef.current?.(); }
       else if (pttModeRef.current === 'p2p') { playPTTTone('down'); }
     };
 
