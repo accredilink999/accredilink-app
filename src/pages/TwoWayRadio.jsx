@@ -190,22 +190,18 @@ function playOutgoingTone() {
   let timer = null;
 
   if (isRadio) {
-    // Radio: oscillator grant tone (low→high) — wait for resume so clock is running
-    const scheduleGrant = () => {
-      [880, 1400].forEach((freq, i) => {
-        const osc = ctx.createOscillator(), gain = ctx.createGain();
-        osc.connect(gain); gain.connect(ctx.destination);
-        osc.frequency.value = freq; osc.type = 'sine';
-        const t = ctx.currentTime + i * 0.075;
-        gain.gain.setValueAtTime(0, t);
-        gain.gain.linearRampToValueAtTime(0.85 * vol, t + 0.003);
-        gain.gain.setValueAtTime(0.85 * vol, t + 0.058);
-        gain.gain.linearRampToValueAtTime(0, t + 0.072);
-        osc.start(t); osc.stop(t + 0.075);
-      });
-    };
-    if (ctx.state === 'running') { scheduleGrant(); }
-    else { ctx.resume().then(scheduleGrant).catch(() => {}); }
+    // Radio: oscillator grant tone (low→high)
+    [880, 1400].forEach((freq, i) => {
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq; osc.type = 'sine';
+      const t = ctx.currentTime + i * 0.075;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.85 * vol, t + 0.003);
+      gain.gain.setValueAtTime(0.85 * vol, t + 0.058);
+      gain.gain.linearRampToValueAtTime(0, t + 0.072);
+      osc.start(t); osc.stop(t + 0.075);
+    });
   } else {
     // PWA: play Beep Bop.aac as the dial-start sound (user gesture available)
     const pre = _preloaded['/radio-tones/Beep Bop.aac'];
@@ -243,23 +239,18 @@ function playPTTTone(type) {
     const vol = getToneVolume();
     const ctx = getAudioCtx(); if (!ctx) return;
     const freqs = type === 'up' ? [880, 1400] : [1400, 880];
-    const schedule = () => {
-      const now = ctx.currentTime;
-      freqs.forEach((freq, i) => {
-        const osc = ctx.createOscillator(), gain = ctx.createGain();
-        osc.connect(gain); gain.connect(ctx.destination);
-        osc.frequency.value = freq; osc.type = 'sine';
-        const t = now + i * 0.075;
-        gain.gain.setValueAtTime(0, t);
-        gain.gain.linearRampToValueAtTime(0.92 * vol, t + 0.003);
-        gain.gain.setValueAtTime(0.92 * vol, t + 0.058);
-        gain.gain.linearRampToValueAtTime(0, t + 0.072);
-        osc.start(t); osc.stop(t + 0.075);
-      });
-    };
-    // Wait for resume so oscillators are scheduled against a running clock
-    if (ctx.state === 'running') { schedule(); }
-    else { ctx.resume().then(schedule).catch(() => {}); }
+    const now = ctx.currentTime;
+    freqs.forEach((freq, i) => {
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq; osc.type = 'sine';
+      const t = now + i * 0.075;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.92 * vol, t + 0.003);
+      gain.gain.setValueAtTime(0.92 * vol, t + 0.058);
+      gain.gain.linearRampToValueAtTime(0, t + 0.072);
+      osc.start(t); osc.stop(t + 0.075);
+    });
   } catch {}
 }
 
