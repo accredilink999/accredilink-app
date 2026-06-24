@@ -263,20 +263,23 @@ public class MainActivity extends BridgeActivity {
                 if (pttWakeLock != null && !pttWakeLock.isHeld())
                     pttWakeLock.acquire(10 * 60 * 1000L);
                 moveTaskToFront();
-                // Inject a synthetic touch at (1,1) to establish user-gesture context
-                // in the WebView before calling JS — Android requires a real gesture
-                // for getUserMedia; evaluateJavascript alone doesn't qualify.
-                injectTouch(android.view.MotionEvent.ACTION_DOWN);
-                injectTouch(android.view.MotionEvent.ACTION_UP);
+                // Forward the REAL KeyEvent to the WebView BEFORE evaluateJavascript.
+                // A genuine hardware KeyEvent activates the Blink renderer frame
+                // (user-gesture context) via Android's IPC queue. Because IPC is FIFO,
+                // the keydown is processed first (frame activated), then evaluateJavascript
+                // runs second — inside an activated frame where getUserMedia is permitted
+                // without any screen tap.
+                super.dispatchKeyEvent(event);
                 webView.evaluateJavascript(
                     "if(typeof window.__pttDetect==='function'){window.__pttDetect(" + keyCode + ");}else if(typeof window.__pttDown==='function'){window.__pttDown();}",
                     null
                 );
-                return true; // consume — stops the key reaching WebView and toggling selection
+                return true;
             }
             if (action == KeyEvent.ACTION_UP) {
                 if (pttWakeLock != null && pttWakeLock.isHeld())
                     pttWakeLock.release();
+                super.dispatchKeyEvent(event);
                 webView.evaluateJavascript(
                     "if(typeof window.__pttUp==='function'){window.__pttUp();}",
                     null
