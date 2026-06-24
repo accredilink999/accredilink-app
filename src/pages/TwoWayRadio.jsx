@@ -530,8 +530,8 @@ export default function TwoWayRadio() {
   // Declared early so hooks below can reference them without TDZ errors
   const isInChannel = isJoined && activeChannel;
   // Once joined to any channel (P2P or group), PTT = push-to-talk.
-  // Only initiate a call if not yet in a channel but a person is selected.
-  const pttMode = isInChannel ? 'group' : selectedPerson ? 'p2p' : 'disabled';
+  // Disabled while an outgoing call is pending (prevents re-initiation mid-ring).
+  const pttMode = isInChannel ? 'group' : (selectedPerson && !outgoingCall) ? 'p2p' : 'disabled';
 
   // Channel member grouping
   // Admin / control-device users appear in ALL channels so staff can always call them back.
@@ -723,19 +723,17 @@ export default function TwoWayRadio() {
           playCallbackRequestTone();
         }
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'radio_calls' }, payload => {
+      // Callee-side updates: caller cancels, or either party ends an active call
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'radio_calls', filter: `callee_id=eq.${user.id}` }, payload => {
         const call = payload.new;
-        const cur = outgoingRef.current;
-
-        // Either party ended the call — hang up and return to main
+        // Either party ended the call — hang up
         if (call.status === 'ended' && call.id === activeCallIdRef.current) {
           activeCallIdRef.current = null;
           stopTone();
           leaveChannel().then(() => { setActiveChannel(null); setView('main'); });
           return;
         }
-
-        // Caller cancelled before callee answered — stop ringing on callee side
+        // Caller cancelled before we answered
         setIncomingCall(prev => {
           if (prev && prev.callId === call.id && (call.status === 'cancelled' || call.status === 'declined')) {
             stopTone();
@@ -743,8 +741,19 @@ export default function TwoWayRadio() {
           }
           return prev;
         });
-
-        // Caller-side: response from callee
+      })
+      // Caller-side updates: callee accepted/declined/callback, or either party ends
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'radio_calls', filter: `caller_id=eq.${user.id}` }, payload => {
+        const call = payload.new;
+        const cur = outgoingRef.current;
+        // Either party ended the call
+        if (call.status === 'ended' && call.id === activeCallIdRef.current) {
+          activeCallIdRef.current = null;
+          stopTone();
+          leaveChannel().then(() => { setActiveChannel(null); setView('main'); });
+          return;
+        }
+        // Response to our outgoing call
         if (!cur || call.id !== cur.callId) return;
         stopTone();
         if (call.status === 'accepted') {
