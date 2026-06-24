@@ -534,25 +534,53 @@ export default function Layout({ children, currentPageName }) {
     if (globalRingStopRef.current) { globalRingStopRef.current(); globalRingStopRef.current = null; }
   }, []);
 
+  const globalAudioCtxRef = useRef(null);
   const playGlobalRing = useCallback(() => {
     stopGlobalRing();
+    let stopped = false;
+
+    // Play Alert tone.aac in a loop (PWA with prior domain interaction)
+    let alertAudio = null;
     try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      alertAudio = new Audio('/radio-tones/Alert tone.aac');
+      alertAudio.volume = 0.9;
+      const step = () => {
+        if (stopped || !alertAudio) return;
+        alertAudio.currentTime = 0;
+        alertAudio.play().catch(() => {});
+      };
+      alertAudio.addEventListener('ended', () => { if (!stopped) setTimeout(step, 300); });
+      step();
+    } catch {}
+
+    // Oscillator ring runs in parallel as reinforcement
+    try {
+      if (!globalAudioCtxRef.current || globalAudioCtxRef.current.state === 'closed') {
+        globalAudioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (globalAudioCtxRef.current.state === 'suspended') globalAudioCtxRef.current.resume().catch(() => {});
+      const ctx = globalAudioCtxRef.current;
       const freqs = [880, 1100, 880, 1100, 660];
-      let i = 0; let stopped = false;
+      let idx = 0;
       const next = () => {
         if (stopped) return;
-        const osc = ctx.createOscillator(); const gain = ctx.createGain();
-        osc.connect(gain); gain.connect(ctx.destination);
-        osc.frequency.value = freqs[i % freqs.length]; i++;
-        gain.gain.setValueAtTime(0.3, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
-        osc.start(); osc.stop(ctx.currentTime + 0.18);
-        osc.onended = next;
+        try {
+          const osc = ctx.createOscillator(); const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.frequency.value = freqs[idx % freqs.length]; idx++;
+          gain.gain.setValueAtTime(0.3, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+          osc.start(); osc.stop(ctx.currentTime + 0.18);
+          osc.onended = next;
+        } catch {}
       };
       next();
-      globalRingStopRef.current = () => { stopped = true; try { ctx.close(); } catch {} };
     } catch {}
+
+    globalRingStopRef.current = () => {
+      stopped = true;
+      if (alertAudio) { try { alertAudio.pause(); alertAudio.currentTime = 0; } catch {} alertAudio = null; }
+    };
   }, [stopGlobalRing]);
 
   useEffect(() => {

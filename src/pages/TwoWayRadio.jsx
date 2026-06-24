@@ -159,30 +159,38 @@ function playAlarm() {
 }
 
 // Outgoing call dialling tone — grant beep then synthesised ring loop.
-// Pure oscillator path so it works in radio mode where new Audio().play()
-// silently fails without a real user gesture (evaluateJavascript context).
+// PWA: plays the Beep Bop.aac file (works with real user gesture from the call button).
+// Radio mode: pure oscillators (new Audio().play() silently fails in evaluateJavascript context).
 function playOutgoingTone() {
   if (localStorage.getItem('radio_silent_mode') === 'true') return () => {};
   if (playCustomSound('outgoing')) return () => {};
+  const isRadio = localStorage.getItem('carecall_radio_mode') === 'true';
   const vol = getToneVolume();
   const ctx = getAudioCtx(); if (!ctx) return () => {};
   let active = true;
   let timer = null;
 
-  // Initial grant tone: low→high (same shape as PTT-up)
-  [880, 1400].forEach((freq, i) => {
-    const osc = ctx.createOscillator(), gain = ctx.createGain();
-    osc.connect(gain); gain.connect(ctx.destination);
-    osc.frequency.value = freq; osc.type = 'sine';
-    const t = ctx.currentTime + i * 0.075;
-    gain.gain.setValueAtTime(0, t);
-    gain.gain.linearRampToValueAtTime(0.85 * vol, t + 0.003);
-    gain.gain.setValueAtTime(0.85 * vol, t + 0.058);
-    gain.gain.linearRampToValueAtTime(0, t + 0.072);
-    osc.start(t); osc.stop(t + 0.075);
-  });
+  if (isRadio) {
+    // Radio: oscillator grant tone (low→high), no AAC file
+    [880, 1400].forEach((freq, i) => {
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq; osc.type = 'sine';
+      const t = ctx.currentTime + i * 0.075;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.85 * vol, t + 0.003);
+      gain.gain.setValueAtTime(0.85 * vol, t + 0.058);
+      gain.gain.linearRampToValueAtTime(0, t + 0.072);
+      osc.start(t); osc.stop(t + 0.075);
+    });
+  } else {
+    // PWA: play Beep Bop.aac as the dial-start sound (user gesture available)
+    const pre = _preloaded['/radio-tones/Beep Bop.aac'];
+    if (pre) { pre.currentTime = 0; pre.volume = vol; pre.play().catch(() => {}); }
+    else { try { const a = new Audio('/radio-tones/Beep Bop.aac'); a.volume = vol; a.play().catch(() => {}); } catch {} }
+  }
 
-  // Ring burst loop starts 200ms after the grant tone
+  // Ring burst loop (both modes) — starts after grant tone/file
   const ringFreqs = [400, 600, 800, 600, 400];
   const burst = () => {
     if (!active) return;
@@ -196,7 +204,9 @@ function playOutgoingTone() {
       osc.start(t); osc.stop(t + 0.10);
     });
   };
-  setTimeout(() => { if (active) { burst(); timer = setInterval(burst, 2400); } }, 200);
+  // Give the AAC file time to play before the ring loop starts
+  const delay = isRadio ? 200 : 700;
+  setTimeout(() => { if (active) { burst(); timer = setInterval(burst, 2400); } }, delay);
 
   return () => { active = false; if (timer) clearInterval(timer); };
 }
@@ -304,7 +314,7 @@ export default function TwoWayRadio() {
   const joinedChRef     = useRef(null);
   const stopToneRef     = useRef(null);
   const outgoingRef     = useRef(null);
-  const activeCallIdRef = useRef(null); // tracks active P2P call so either party can end it
+  const activeCallIdRef  = useRef(null); // tracks active P2P call so either party can end it
 
   // Realtime channel ref for emergency broadcast
   const rtEmergencyRef = useRef(null);
@@ -844,31 +854,41 @@ export default function TwoWayRadio() {
   const stopTone = () => { if (stopToneRef.current) { stopToneRef.current(); stopToneRef.current = null; } };
   const stopAlarm = () => { if (stopAlarmRef.current) { stopAlarmRef.current(); stopAlarmRef.current = null; } };
 
-  // ── Deep-link: pending call on mount ─────────────────────────────────────
-  // When the app opens from a push notification at /TwoWayRadio?call=CHANNEL,
-  // the Realtime INSERT already fired before the app loaded and is missed.
-  // Query the DB directly for a pending call addressed to us on that channel.
-  useEffect(() => {
-    if (!user?.id) return;
-    const params = new URLSearchParams(window.location.search);
-    const callChannel = params.get('call');
-    if (!callChannel) return;
-    supabase
+  // ── Pending call catch-up ────────────────────────────────────────────────
+  // Realtime only delivers events while the WebSocket is connected.
+  // This query runs on mount (cold open / auth ready), on URL change
+  // (notification tap on an open tab via client.navigate), and on
+  // visibilitychange (PWA returns from background after socket drop).
+  const checkPendingCall = useCallback(async () => {
+    if (!user?.id || activeCallIdRef.current || incomingCallRef.current) return;
+    const since = new Date(Date.now() - 60000).toISOString();
+    const { data } = await supabase
       .from('radio_calls')
       .select('id, caller_id, channel_name, created_at')
-      .eq('channel_name', callChannel)
       .eq('callee_id', user.id)
       .eq('status', 'pending')
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!data) return;
-        if (Date.now() - new Date(data.created_at).getTime() > 60000) return;
-        const caller = staffRef.current?.find(s => s.id === data.caller_id)
-          || { id: data.caller_id, full_name: 'Team Member' };
-        setIncomingCall({ callId: data.id, caller, channelName: data.channel_name });
-        stopTone(); stopToneRef.current = playTone([880, 1100, 880, 1100, 660], true);
-      });
-  }, [user?.id]);
+      .gt('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!data || incomingCallRef.current?.callId === data.id) return;
+    const caller = staffRef.current?.find(s => s.id === data.caller_id)
+      || { id: data.caller_id, full_name: 'Team Member' };
+    stopTone();
+    setIncomingCall({ callId: data.id, caller, channelName: data.channel_name });
+    stopToneRef.current = playTone([880, 1100, 880, 1100, 660], true);
+    navigate(createPageUrl('TwoWayRadio'));
+  }, [user?.id, navigate]);
+
+  // Trigger on auth ready / user change / URL change (notification deep-link)
+  useEffect(() => { checkPendingCall(); }, [checkPendingCall, location.search]);
+
+  // Trigger when PWA returns to foreground (catches Realtime socket drop)
+  useEffect(() => {
+    const onVisible = () => { if (!document.hidden) checkPendingCall(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [checkPendingCall]);
 
   // ── Supabase Realtime subscriptions ──────────────────────────────────────
   useEffect(() => {
