@@ -109,25 +109,28 @@ function playTone(freqs, loop = false) {
           let active = true;
           const step = () => {
             if (!active) return;
-            // Route through Web Audio so gain can exceed 1.0 for extra loudness
+            let playedViaWebAudio = false;
+            // Route through Web Audio for gain boost — only if context is already running
             try {
               const ctx = getAudioCtx();
-              if (ctx) {
+              if (ctx && ctx.state === 'running') {
                 const a = new Audio(snd.url);
                 a.crossOrigin = 'anonymous';
                 const src = ctx.createMediaElementSource(a);
                 const boost = ctx.createGain();
-                boost.gain.value = Math.min(vol * 2.0, 3.0); // up to 3× louder
+                boost.gain.value = Math.min(vol * 2.0, 3.0);
                 src.connect(boost); boost.connect(ctx.destination);
                 a.play().catch(() => {});
                 a.addEventListener('ended', () => { if (active) setTimeout(step, 300); });
-                return;
+                playedViaWebAudio = true;
               }
             } catch {}
-            // Fallback: plain Audio element
-            const a = new Audio(snd.url); a.volume = Math.min(vol, 1.0);
-            a.play().catch(() => {});
-            a.addEventListener('ended', () => { if (active) setTimeout(step, 300); });
+            // Fallback: plain Audio — always used when context is suspended or WebAudio fails
+            if (!playedViaWebAudio) {
+              const a = new Audio(snd.url); a.volume = Math.min(vol, 1.0);
+              a.play().catch(() => {});
+              a.addEventListener('ended', () => { if (active) setTimeout(step, 300); });
+            }
           };
           step();
           return () => { active = false; };
@@ -562,6 +565,7 @@ export default function TwoWayRadio() {
       try { localStorage.setItem('dismissedMissedCalls', JSON.stringify([...next])); } catch {}
       return next;
     });
+    if (ids.length) supabase.from('radio_calls').update({ status: 'seen' }).in('id', ids).then(() => {});
   };
 
   const urlPreview = new URLSearchParams(window.location.search).get('preview');
@@ -877,7 +881,7 @@ export default function TwoWayRadio() {
   // visibilitychange (PWA returns from background after socket drop).
   const checkPendingCall = useCallback(async () => {
     if (!user?.id || activeCallIdRef.current || incomingCallRef.current) return;
-    const since = new Date(Date.now() - 60000).toISOString();
+    const since = new Date(Date.now() - 90000).toISOString();
     const { data } = await supabase
       .from('radio_calls')
       .select('id, caller_id, channel_name, created_at')
@@ -916,7 +920,7 @@ export default function TwoWayRadio() {
       .channel(`radio-calls-in-${user.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'radio_calls', filter: `callee_id=eq.${user.id}` }, payload => {
         const call = payload.new;
-        if (Date.now() - new Date(call.created_at).getTime() > 30000) return;
+        if (Date.now() - new Date(call.created_at).getTime() > 90000) return;
         if (call.status === 'pending') {
           const caller = staffRef.current.find(s => s.id === call.caller_id);
           setIncomingCall({ callId: call.id, caller, channelName: call.channel_name });
@@ -935,7 +939,24 @@ export default function TwoWayRadio() {
         if (call.status === 'ended' && call.id === activeCallIdRef.current) {
           activeCallIdRef.current = null;
           stopTone();
-          leaveChannel().then(() => { setActiveChannel(null); setView('main'); });
+          leaveChannel().then(() => { setActiveChannel(null); setView('main'); setSelectedPerson(null); });
+          return;
+        }
+        // Another device dismissed a missed call or callback request — sync locally
+        if (call.status === 'seen') {
+          setDismissedMissedIds(prev => {
+            const next = new Set([...prev, call.id]);
+            try { localStorage.setItem('dismissedMissedCalls', JSON.stringify([...next])); } catch {}
+            return next;
+          });
+          return;
+        }
+        if (call.status === 'acknowledged') {
+          setDismissedCbReqIds(prev => {
+            const next = new Set([...prev, call.id]);
+            try { localStorage.setItem('dismissedCallbackRequests', JSON.stringify([...next])); } catch {}
+            return next;
+          });
           return;
         }
         // Caller cancelled before we answered
@@ -955,7 +976,16 @@ export default function TwoWayRadio() {
         if (call.status === 'ended' && call.id === activeCallIdRef.current) {
           activeCallIdRef.current = null;
           stopTone();
-          leaveChannel().then(() => { setActiveChannel(null); setView('main'); });
+          leaveChannel().then(() => { setActiveChannel(null); setView('main'); setSelectedPerson(null); });
+          return;
+        }
+        // Another device dismissed this missed call — sync locally
+        if (call.status === 'seen') {
+          setDismissedMissedIds(prev => {
+            const next = new Set([...prev, call.id]);
+            try { localStorage.setItem('dismissedMissedCalls', JSON.stringify([...next])); } catch {}
+            return next;
+          });
           return;
         }
         // Response to our outgoing call
@@ -971,7 +1001,7 @@ export default function TwoWayRadio() {
         } else if (call.status === 'declined') {
           stopTone();
           toast('Call was declined');
-          setOutgoingCall(null); setCallDeclined(false);
+          setOutgoingCall(null); setCallDeclined(false); setSelectedPerson(null);
         }
       })
       .subscribe();
@@ -1045,6 +1075,7 @@ export default function TwoWayRadio() {
       try { localStorage.setItem('dismissedCallbackRequests', JSON.stringify([...next])); } catch {}
       return next;
     });
+    if (ids.length) supabase.from('radio_calls').update({ status: 'acknowledged' }).in('id', ids).then(() => {});
   };
 
   const callBackFromRequest = (req) => {
@@ -1086,7 +1117,7 @@ export default function TwoWayRadio() {
         priority: 'high', action_url: '/TwoWayRadio', send_push: true,
       }).catch(() => {});
     }
-    setOutgoingCall(null); setCallDeclined(false);
+    setOutgoingCall(null); setCallDeclined(false); setSelectedPerson(null);
   };
 
   const acceptIncomingCall = async () => {
@@ -1107,7 +1138,7 @@ export default function TwoWayRadio() {
     activeCallIdRef.current = null; // clear before DB update so we don't self-trigger
     if (callId) await supabase.from('radio_calls').update({ status: 'ended' }).eq('id', callId);
     await leaveChannel();
-    setActiveChannel(null); setView('main');
+    setActiveChannel(null); setView('main'); setSelectedPerson(null);
   };
 
   const declineIncomingCall = async (status = 'callback') => {
@@ -1513,6 +1544,7 @@ export default function TwoWayRadio() {
     };
     const pttUp = () => {
       if (isTalkingRef.current) { playPTTTone('down'); stopTalkingRef.current?.(); }
+      else if (pttModeRef.current === 'p2p') { playPTTTone('down'); }
     };
 
     // Android native bridge: MainActivity calls window.__pttDown() / window.__pttUp()
@@ -2569,8 +2601,8 @@ export default function TwoWayRadio() {
             <Phone className="w-5 h-5" /> Call me back — {selectedPerson.full_name}
           </button>
           <button onClick={() => setSelectedPerson(null)}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-slate-800/95 backdrop-blur border border-slate-700 text-slate-300 text-sm touch-manipulation">
-            <X className="w-4 h-4" /> Deselect — press PTT to call
+            className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-red-700/95 backdrop-blur border border-red-500 text-white text-base font-bold touch-manipulation active:scale-[0.98] transition-transform">
+            <X className="w-5 h-5" /> Deselect
           </button>
         </div>
       )}
