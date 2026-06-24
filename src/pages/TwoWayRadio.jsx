@@ -16,7 +16,6 @@ import {
   AlertTriangle, MapPin, MicOff, X, ChevronDown, MessageSquare, Settings, UserPlus, Home
 } from 'lucide-react';
 import RadioShiftTab from './radio/RadioShiftTab';
-import AlerterTab from './radio/AlerterTab';
 import RadioSettingsTab from './radio/RadioSettingsTab';
 import { RADIO_THEMES } from './radio/radioThemes';
 
@@ -406,11 +405,9 @@ export default function TwoWayRadio() {
 
   // Tab navigation, theme, and per-device settings (all localStorage-backed for PWA/native)
   const [radioTheme, setRadioTheme]     = useState(() => localStorage.getItem('radio_theme') || 'blue');
-  const [radioTab, setRadioTab]         = useState('radio'); // 'radio' | 'alerter' | 'shift' | 'settings'
+  const [radioTab, setRadioTab]         = useState('radio'); // 'radio' | 'shift' | 'settings'
   const [silentMode, setSilentMode]     = useState(() => localStorage.getItem('radio_silent_mode') === 'true');
   const [toneVolume, setToneVolume]     = useState(() => { const v = parseFloat(localStorage.getItem('radio_tone_volume') || '1'); return isNaN(v) ? 1 : v; });
-  const [alerterEnabled, setAlerterEnabledState] = useState(() => localStorage.getItem('radio_alerter_enabled') !== 'false');
-  const setAlerterEnabled = (v) => { setAlerterEnabledState(v); localStorage.setItem('radio_alerter_enabled', String(v)); };
   const [showAllAreas, setShowAllAreas] = useState(() => localStorage.getItem('radio_show_all_areas') !== 'false');
   const [areaToggles, setAreaToggles]   = useState(() => { try { return JSON.parse(localStorage.getItem('radio_area_toggles') || '{}'); } catch { return {}; } });
   const [customSounds, setCustomSounds] = useState(() => {
@@ -560,7 +557,6 @@ export default function TwoWayRadio() {
     } catch { return new Set(); }
   });
   const dismissMissedCalls = (...ids) => {
-    if (ids.length) supabase.from('radio_calls').update({ status: 'seen' }).in('id', ids).then(() => {});
     setDismissedMissedIds(prev => {
       const next = new Set([...prev, ...ids]);
       try { localStorage.setItem('dismissedMissedCalls', JSON.stringify([...next])); } catch {}
@@ -614,9 +610,7 @@ export default function TwoWayRadio() {
   const resolveRecipients = (ids) => testMode ? (user?.id ? [user.id] : []) : ids;
 
 
-  // 90-second outgoing call timeout → offer text alert
-  // Extended from 30s to give iPhone PWA users time to open the app manually
-  // (iOS PWA has no background push notifications without Home Screen install)
+  // 30-second outgoing call timeout → offer text alert
   useEffect(() => {
     if (outgoingCall?.callId) {
       callTimeoutRef.current = setTimeout(async () => {
@@ -627,7 +621,7 @@ export default function TwoWayRadio() {
         await supabase.from('radio_calls').update({ status: 'cancelled' }).eq('id', cur.callId);
         setOutgoingCall(null); setCallDeclined(false);
         setTextAlertModal({ callee: calleeInfo });
-      }, 90000);
+      }, 30000);
     } else {
       if (callTimeoutRef.current) { clearTimeout(callTimeoutRef.current); callTimeoutRef.current = null; }
     }
@@ -883,7 +877,7 @@ export default function TwoWayRadio() {
   // visibilitychange (PWA returns from background after socket drop).
   const checkPendingCall = useCallback(async () => {
     if (!user?.id || activeCallIdRef.current || incomingCallRef.current) return;
-    const since = new Date(Date.now() - 90000).toISOString();
+    const since = new Date(Date.now() - 60000).toISOString();
     const { data } = await supabase
       .from('radio_calls')
       .select('id, caller_id, channel_name, created_at')
@@ -1046,7 +1040,6 @@ export default function TwoWayRadio() {
   };
 
   const dismissCallbackRequest = (...ids) => {
-    if (ids.length) supabase.from('radio_calls').update({ status: 'acknowledged' }).in('id', ids).then(() => {});
     setDismissedCbReqIds(prev => {
       const next = new Set([...prev, ...ids]);
       try { localStorage.setItem('dismissedCallbackRequests', JSON.stringify([...next])); } catch {}
@@ -2103,17 +2096,12 @@ export default function TwoWayRadio() {
 
         {/* ── TAB BAR ── */}
         <div className={`flex border-b backdrop-blur ${theme.tabBar}`}>
-          {([
-            'radio',
-            ...(isControlDevice ? ['alerter'] : []),
-            ...(isSuperAdmin && !isControlDevice ? ['shift'] : []),
-            'settings',
-          ]).map(key => (
+          {(['radio', ...(isSuperAdmin ? ['shift'] : []), 'settings']).map(key => (
             <button key={key} onClick={() => setRadioTab(key)}
               className={`flex-1 py-2.5 text-xs font-black uppercase tracking-wider transition-colors touch-manipulation ${
                 radioTab === key ? theme.tabActive : theme.tabInactive
               }`}>
-              {key === 'radio' ? 'Radio' : key === 'alerter' ? 'Alerter' : key === 'shift' ? 'Shift' : 'Settings'}
+              {key === 'radio' ? 'Radio' : key === 'shift' ? 'Current Shift' : 'Settings'}
             </button>
           ))}
         </div>
@@ -2526,25 +2514,17 @@ export default function TwoWayRadio() {
         )}
         </>)}
 
-        {radioTab === 'alerter' && isControlDevice && (
-          <AlerterTab
-            todayShifts={todayShifts}
-            todayShiftCalls={todayShiftCalls}
-            staff={staff}
-            alerterEnabled={alerterEnabled}
-          />
-        )}
-
-        {radioTab === 'shift' && isSuperAdmin && !isControlDevice && (
-          <RadioShiftTab
-            todayShiftCalls={todayShiftCalls}
-            todayShifts={todayShifts}
-            rotaAreas={areas}
-            staff={staff}
-            navigate={navigate}
-            createPageUrl={createPageUrl}
-            isControlDevice={isControlDevice}
-          />
+        {radioTab === 'shift' && (isSuperAdmin
+          ? <RadioShiftTab
+              todayShiftCalls={todayShiftCalls}
+              todayShifts={todayShifts}
+              rotaAreas={areas}
+              staff={staff}
+              navigate={navigate}
+              createPageUrl={createPageUrl}
+              isControlDevice={isControlDevice}
+            />
+          : <p className="text-slate-600 text-xs text-center mt-16 px-8">Shift overview is available to admins only.</p>
         )}
 
         {radioTab === 'settings' && (
@@ -2574,8 +2554,6 @@ export default function TwoWayRadio() {
             setRadioTheme={setRadioTheme}
             toneVolume={toneVolume}
             setToneVolume={v => { setToneVolume(v); localStorage.setItem('radio_tone_volume', String(v)); }}
-            alerterEnabled={alerterEnabled}
-            setAlerterEnabled={setAlerterEnabled}
           />
         )}
 
