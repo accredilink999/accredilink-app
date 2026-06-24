@@ -652,7 +652,19 @@ export default function TwoWayRadio() {
       setRemoteUsers([...c.remoteUsers]);
     });
     c.on('user-unpublished', u => { setSpeakingUids(p => { const n = new Set(p); n.delete(u.uid); return n; }); setRemoteUsers([...c.remoteUsers]); });
-    c.on('user-left',       u => { setSpeakingUids(p => { const n = new Set(p); n.delete(u.uid); return n; }); setRemoteUsers([...c.remoteUsers]); });
+    c.on('user-left',       u => {
+      setSpeakingUids(p => { const n = new Set(p); n.delete(u.uid); return n; });
+      setRemoteUsers([...c.remoteUsers]);
+      // If this was a P2P call and the remote party left, auto-end our side.
+      // Covers the case where the radio exits without calling endP2PCall()
+      // (back button, crash) so the DB update might not have happened.
+      if (c.remoteUsers.length === 0 && activeCallIdRef.current) {
+        const callId = activeCallIdRef.current;
+        activeCallIdRef.current = null;
+        supabase.from('radio_calls').update({ status: 'ended' }).eq('id', callId).then(() => {});
+        leaveChannel().then(() => { setActiveChannel(null); setView('main'); });
+      }
+    });
     c.on('user-joined',     () => setRemoteUsers([...c.remoteUsers]));
     return () => { leaveChannel(); c.removeAllListeners(); };
   }, []);
@@ -660,12 +672,18 @@ export default function TwoWayRadio() {
   // ── Agora helpers ─────────────────────────────────────────────────────────
   const leaveChannel = async () => {
     try {
+      // If we're leaving mid-call (e.g. back button, unmount) without endP2PCall,
+      // mark the DB row ended so the remote party knows to hang up.
+      const callId = activeCallIdRef.current;
+      if (callId) {
+        activeCallIdRef.current = null;
+        supabase.from('radio_calls').update({ status: 'ended' }).eq('id', callId).then(() => {});
+      }
       if (micTrackRef.current) {
         try { await clientRef.current.unpublish(micTrackRef.current); } catch {}
       }
-      // Stop native recording if active
       if (window.AndroidApp?.closeNativeMic) window.AndroidApp.closeNativeMic();
-      nativePcmQueueRef.current = [];
+      nativePcmQueueRef.current = new Float32Array(0);
       if (clientRef.current && clientRef.current.connectionState !== 'DISCONNECTED') await clientRef.current.leave();
     } catch {}
     setIsJoined(false); setIsTalking(false); setIsHandsFree(false);
@@ -687,37 +705,38 @@ export default function TwoWayRadio() {
   };
 
   // ── Native mic pipeline (radio mode only) ────────────────────────────────
-  // Avoids getUserMedia entirely by capturing audio via Android AudioRecord in Java
-  // and piping raw PCM-16 to an AudioContext ScriptProcessorNode → MediaStreamDestination
-  // → Agora createCustomAudioTrack. No user gesture ever needed.
-  const nativeMicCtxRef    = useRef(null); // 16 kHz AudioContext for the PCM pipeline
-  const nativeMicNodeRef   = useRef(null); // ScriptProcessorNode
-  const nativeMicDestRef   = useRef(null); // MediaStreamAudioDestinationNode
-  const nativePcmQueueRef  = useRef([]);   // Float32Array chunks from Java
+  const nativeMicCtxRef   = useRef(null);
+  const nativeMicNodeRef  = useRef(null);
+  const nativeMicDestRef  = useRef(null);
+  // Flat accumulation buffer — avoids size-mismatch gaps from a chunk queue
+  const nativePcmQueueRef = useRef(new Float32Array(0));
 
   const setupNativeMicTrack = useCallback(async () => {
     if (micTrackRef.current) return micTrackRef.current;
     try {
-      // 16 kHz AudioContext for the mic pipeline.
-      // On Chrome 80+ a second AudioContext auto-resumes when the tab already has
-      // an active AudioContext (the shared tone ctx). On older versions we try resume.
-      const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      const JAVA_RATE = 16000; // AudioRecord sample rate in Java
+
+      // Try to get a 16 kHz context; older WebViews may ignore the hint and
+      // return their native rate (44100/48000). We detect and resample below.
+      const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: JAVA_RATE });
       if (ctx.state === 'suspended') { try { await ctx.resume(); } catch {} }
       nativeMicCtxRef.current = ctx;
+      const CTX_RATE = ctx.sampleRate; // actual rate — may differ from JAVA_RATE
 
-      // ScriptProcessorNode drains the PCM queue into the audio graph.
-      // bufferSize 1024 = 64ms at 16 kHz — acceptable PTT latency.
-      const node = ctx.createScriptProcessor(1024, 0, 1);
+      // ScriptProcessorNode drains the accumulation buffer sample-by-sample.
+      // bufferSize 4096 gives plenty of headroom regardless of CTX_RATE.
+      const node = ctx.createScriptProcessor(4096, 0, 1);
       node.onaudioprocess = (e) => {
-        const out = e.outputBuffer.getChannelData(0);
-        const q   = nativePcmQueueRef.current;
-        if (q.length > 0) {
-          const chunk = q.shift();
-          const len = Math.min(chunk.length, out.length);
-          for (let i = 0; i < len; i++) out[i] = chunk[i];
-          for (let i = len; i < out.length; i++) out[i] = 0;
+        const out   = e.outputBuffer.getChannelData(0);
+        const n     = out.length;
+        const accum = nativePcmQueueRef.current;
+        if (accum.length >= n) {
+          out.set(accum.subarray(0, n));
+          nativePcmQueueRef.current = accum.slice(n); // copy remaining
         } else {
-          out.fill(0);
+          out.set(accum);
+          out.fill(0, accum.length);
+          nativePcmQueueRef.current = new Float32Array(0);
         }
       };
       nativeMicNodeRef.current = node;
@@ -726,15 +745,34 @@ export default function TwoWayRadio() {
       node.connect(dest);
       nativeMicDestRef.current = dest;
 
-      // JS callback: Java calls this with base64 PCM-16 chunks
+      // Java calls this with base64 PCM-16 @ JAVA_RATE.
+      // We decode → Float32, resample to CTX_RATE, append to accumulation buffer.
       window.__nativePcm = (b64) => {
         const bin   = atob(b64);
         const bytes = new Uint8Array(bin.length);
         for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
         const int16 = new Int16Array(bytes.buffer);
-        const f32   = new Float32Array(int16.length);
-        for (let i = 0; i < int16.length; i++) f32[i] = int16[i] / 32768.0;
-        nativePcmQueueRef.current.push(f32);
+
+        // Linear interpolation resample from JAVA_RATE → CTX_RATE.
+        // If rates match the ratio is 1.0 and output equals input.
+        const ratio   = JAVA_RATE / CTX_RATE;
+        const outLen  = Math.round(int16.length / ratio);
+        const resampled = new Float32Array(outLen);
+        for (let i = 0; i < outLen; i++) {
+          const pos  = i * ratio;
+          const idx  = Math.floor(pos);
+          const frac = pos - idx;
+          const a    = idx     < int16.length ? int16[idx]     / 32768.0 : 0;
+          const b    = idx + 1 < int16.length ? int16[idx + 1] / 32768.0 : 0;
+          resampled[i] = a + frac * (b - a);
+        }
+
+        // Append to flat accumulation buffer
+        const prev = nativePcmQueueRef.current;
+        const next = new Float32Array(prev.length + resampled.length);
+        next.set(prev);
+        next.set(resampled, prev.length);
+        nativePcmQueueRef.current = next;
       };
       window.__nativeMicError = (msg) => toast.error('Mic error: ' + msg);
 
@@ -789,7 +827,7 @@ export default function TwoWayRadio() {
     try {
       if (micTrackRef.current) await clientRef.current.unpublish(micTrackRef.current);
       if (isRadioMode && window.AndroidApp?.closeNativeMic) window.AndroidApp.closeNativeMic();
-      nativePcmQueueRef.current = []; // drain any queued PCM
+      nativePcmQueueRef.current = new Float32Array(0); // drain accumulation buffer
     } catch {}
     setIsTalking(false);
   };
