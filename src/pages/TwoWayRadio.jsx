@@ -505,7 +505,9 @@ export default function TwoWayRadio() {
 
   // Declared early so hooks below can reference them without TDZ errors
   const isInChannel = isJoined && activeChannel;
-  const pttMode     = selectedPerson ? 'p2p' : (isInChannel && groupBroadcastActive) ? 'group' : 'disabled';
+  // Once joined to any channel (P2P or group), PTT = push-to-talk.
+  // Only initiate a call if not yet in a channel but a person is selected.
+  const pttMode = isInChannel ? 'group' : selectedPerson ? 'p2p' : 'disabled';
 
   // Channel member grouping
   // Admin / control-device users appear in ALL channels so staff can always call them back.
