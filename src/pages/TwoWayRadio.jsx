@@ -119,7 +119,8 @@ function playTone(freqs, loop = false) {
       }
     } catch {}
   }
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  // Use shared context — avoids creating a suspended new context in background tabs
+  const ctx = getAudioCtx(); if (!ctx) return () => {};
   let timer = null;
   const burst = () => freqs.forEach((freq, i) => {
     const osc = ctx.createOscillator(), gain = ctx.createGain();
@@ -132,7 +133,7 @@ function playTone(freqs, loop = false) {
   });
   burst();
   if (loop) timer = setInterval(burst, 2400);
-  return () => { if (timer) clearInterval(timer); ctx.close().catch(() => {}); };
+  return () => { if (timer) clearInterval(timer); }; // never close shared ctx
 }
 
 function playAlarm() {
@@ -157,37 +158,47 @@ function playAlarm() {
   return () => { active = false; ctx.close().catch(() => {}); };
 }
 
-// Outgoing call dialling tone — Beep Bop once then synthesised ring loop
+// Outgoing call dialling tone — grant beep then synthesised ring loop.
+// Pure oscillator path so it works in radio mode where new Audio().play()
+// silently fails without a real user gesture (evaluateJavascript context).
 function playOutgoingTone() {
   if (localStorage.getItem('radio_silent_mode') === 'true') return () => {};
   if (playCustomSound('outgoing')) return () => {};
   const vol = getToneVolume();
+  const ctx = getAudioCtx(); if (!ctx) return () => {};
   let active = true;
-  const beepBop = new Audio('/radio-tones/Beep Bop.aac');
-  beepBop.volume = vol;
-  beepBop.play().catch(() => {});
-  let ringStop = null;
-  beepBop.addEventListener('ended', () => {
-    if (!active) return;
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const freqs = [400, 600, 800, 600, 400];
-    const burst = () => {
-      if (!active) return;
-      freqs.forEach((freq, i) => {
-        const osc = ctx.createOscillator(), gain = ctx.createGain();
-        osc.connect(gain); gain.connect(ctx.destination);
-        osc.frequency.value = freq; osc.type = 'sine';
-        const t = ctx.currentTime + i * 0.11;
-        gain.gain.setValueAtTime(0.85 * vol, t);
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.10);
-        osc.start(t); osc.stop(t + 0.10);
-      });
-    };
-    burst();
-    const timer = setInterval(burst, 2400);
-    ringStop = () => { clearInterval(timer); ctx.close().catch(() => {}); };
+  let timer = null;
+
+  // Initial grant tone: low→high (same shape as PTT-up)
+  [880, 1400].forEach((freq, i) => {
+    const osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = freq; osc.type = 'sine';
+    const t = ctx.currentTime + i * 0.075;
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.85 * vol, t + 0.003);
+    gain.gain.setValueAtTime(0.85 * vol, t + 0.058);
+    gain.gain.linearRampToValueAtTime(0, t + 0.072);
+    osc.start(t); osc.stop(t + 0.075);
   });
-  return () => { active = false; beepBop.pause(); if (ringStop) ringStop(); };
+
+  // Ring burst loop starts 200ms after the grant tone
+  const ringFreqs = [400, 600, 800, 600, 400];
+  const burst = () => {
+    if (!active) return;
+    ringFreqs.forEach((freq, i) => {
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq; osc.type = 'sine';
+      const t = ctx.currentTime + i * 0.11;
+      gain.gain.setValueAtTime(0.85 * vol, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.10);
+      osc.start(t); osc.stop(t + 0.10);
+    });
+  };
+  setTimeout(() => { if (active) { burst(); timer = setInterval(burst, 2400); } }, 200);
+
+  return () => { active = false; if (timer) clearInterval(timer); };
 }
 
 // UK TETRA/Airwave-style PTT tones — loud, sharp, two-tone
@@ -833,6 +844,32 @@ export default function TwoWayRadio() {
   const stopTone = () => { if (stopToneRef.current) { stopToneRef.current(); stopToneRef.current = null; } };
   const stopAlarm = () => { if (stopAlarmRef.current) { stopAlarmRef.current(); stopAlarmRef.current = null; } };
 
+  // ── Deep-link: pending call on mount ─────────────────────────────────────
+  // When the app opens from a push notification at /TwoWayRadio?call=CHANNEL,
+  // the Realtime INSERT already fired before the app loaded and is missed.
+  // Query the DB directly for a pending call addressed to us on that channel.
+  useEffect(() => {
+    if (!user?.id) return;
+    const params = new URLSearchParams(window.location.search);
+    const callChannel = params.get('call');
+    if (!callChannel) return;
+    supabase
+      .from('radio_calls')
+      .select('id, caller_id, channel_name, created_at')
+      .eq('channel_name', callChannel)
+      .eq('callee_id', user.id)
+      .eq('status', 'pending')
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!data) return;
+        if (Date.now() - new Date(data.created_at).getTime() > 60000) return;
+        const caller = staffRef.current?.find(s => s.id === data.caller_id)
+          || { id: data.caller_id, full_name: 'Team Member' };
+        setIncomingCall({ callId: data.id, caller, channelName: data.channel_name });
+        stopTone(); stopToneRef.current = playTone([880, 1100, 880, 1100, 660], true);
+      });
+  }, [user?.id]);
+
   // ── Supabase Realtime subscriptions ──────────────────────────────────────
   useEffect(() => {
     if (!user?.id) return;
@@ -994,13 +1031,22 @@ export default function TwoWayRadio() {
     stopTone();
     if (outgoingCall?.callId) {
       await supabase.from('radio_calls').update({ status: 'cancelled' }).eq('id', outgoingCall.callId);
-      // Push notification to callee so they know about the missed call even if app is closed
       const callerName = user?.full_name || 'A team member';
+      // Auto-insert a callback_request so the callee's Realtime fires immediately
+      // and shows the "missed call from X" banner without them doing anything.
+      supabase.from('radio_calls').insert({
+        caller_id: user.id,
+        callee_id: outgoingCall.callee.id,
+        channel_name: `cbr_${user.id.slice(0, 8)}`,
+        status: 'callback_request',
+        organization_id: getOrgId(),
+      }).then(() => {});
+      // Push for when callee's app is closed
       base44.functions.invoke('createNotification', {
         recipient_ids: resolveRecipients([outgoingCall.callee.id]),
         type: 'radio_call',
         title: `📵 Missed call from ${callerName}`,
-        message: 'You missed a radio call. Tap to call back.',
+        message: 'Tap to call back on Team Radio.',
         priority: 'high', action_url: '/TwoWayRadio', send_push: true,
       }).catch(() => {});
     }

@@ -78,7 +78,7 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// Handle notification click: navigate existing window to the action URL or open app
+// Handle notification click: focus existing window or open app
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const url = event.notification.data?.url || '/';
@@ -87,16 +87,15 @@ self.addEventListener('notificationclick', (event) => {
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {
         if (client.url.startsWith(self.location.origin)) {
-          // Navigate the existing tab to the action URL so ?call= param is present,
-          // which bypasses the PIN screen for incoming call notifications.
-          if ('navigate' in client) client.navigate(url);
+          // Post message so React can handle navigation without a full reload.
+          // Also try navigate() for the ?call= PIN-bypass — falls back gracefully if unsupported.
+          client.postMessage({ type: 'NOTIFICATION_CLICK', data: event.notification.data });
+          if ('navigate' in client) client.navigate(url).catch(() => {});
           if ('focus'    in client) return client.focus();
           return;
         }
       }
-      if (self.clients.openWindow) {
-        return self.clients.openWindow(url);
-      }
+      return self.clients.openWindow(url);
     })
   );
 });
