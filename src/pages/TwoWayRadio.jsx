@@ -151,20 +151,38 @@ function playAlarm() {
   return () => { active = false; ctx.close().catch(() => {}); };
 }
 
-// Outgoing call dialling tone — loops Beep Bop.aac until stopped
+// Outgoing call dialling tone — Beep Bop once then synthesised ring loop
 function playOutgoingTone() {
   if (localStorage.getItem('radio_silent_mode') === 'true') return () => {};
   if (playCustomSound('outgoing')) return () => {};
   let active = true;
-  const step = () => {
+  // Play Beep Bop once as call-initiated confirmation, then loop the ring tone
+  const beepBop = new Audio('/radio-tones/Beep Bop.aac');
+  beepBop.volume = 1.0;
+  beepBop.play().catch(() => {});
+  let ringStop = null;
+  beepBop.addEventListener('ended', () => {
     if (!active) return;
-    const a = new Audio('/radio-tones/Beep Bop.aac');
-    a.volume = 1.0;
-    a.play().catch(() => {});
-    a.addEventListener('ended', () => { if (active) setTimeout(step, 200); });
-  };
-  step();
-  return () => { active = false; };
+    // Start looping ring tone after Beep Bop finishes
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const freqs = [400, 600, 800, 600, 400];
+    const burst = () => {
+      if (!active) return;
+      freqs.forEach((freq, i) => {
+        const osc = ctx.createOscillator(), gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = freq; osc.type = 'sine';
+        const t = ctx.currentTime + i * 0.11;
+        gain.gain.setValueAtTime(0.85, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.10);
+        osc.start(t); osc.stop(t + 0.10);
+      });
+    };
+    burst();
+    const timer = setInterval(burst, 2400);
+    ringStop = () => { clearInterval(timer); ctx.close().catch(() => {}); };
+  });
+  return () => { active = false; beepBop.pause(); if (ringStop) ringStop(); };
 }
 
 // UK TETRA/Airwave-style PTT tones — loud, sharp, two-tone
