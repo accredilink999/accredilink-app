@@ -208,24 +208,14 @@ function playPTTTone(type) {
   } catch {}
 }
 
-// Call-end tone — three descending tones (bip-bop-boop)
+// Call-end tone — Bop Beep audio file (APK + PWA)
 function playCallEndTone() {
   if (localStorage.getItem('radio_silent_mode') === 'true') return;
   if (playCustomSound('call_end')) return;
   try {
-    const ctx = getAudioCtx(); if (!ctx) return;
-    const now = ctx.currentTime;
-    [1200, 900, 600].forEach((freq, i) => {
-      const osc = ctx.createOscillator(), gain = ctx.createGain();
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.frequency.value = freq; osc.type = 'sine';
-      const t = now + i * 0.095;
-      gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.85, t + 0.003);
-      gain.gain.setValueAtTime(0.85, t + 0.065);
-      gain.gain.linearRampToValueAtTime(0, t + 0.088);
-      osc.start(t); osc.stop(t + 0.095);
-    });
+    const a = new Audio('/radio-tones/Bop Beep.aac');
+    a.volume = 1.0;
+    a.play().catch(() => {});
   } catch {}
 }
 
@@ -1233,6 +1223,12 @@ export default function TwoWayRadio() {
   // Pre-warm AudioContext on mount so first PTT tone fires instantly
   useEffect(() => { getAudioCtx(); }, []);
 
+  // Radio mode: T320 is always staffed when powered on — auto-set status to available
+  useEffect(() => {
+    if (!isRadioMode || !user?.id) return;
+    base44.entities.User.update(user.id, { radio_status: 'available' }).catch(() => {});
+  }, [isRadioMode, user?.id]);
+
   // ── Wake lock — keep screen on while radio page is open ──────────────────
   useEffect(() => {
     if (!keepAwake || !navigator.wakeLock) return;
@@ -1260,6 +1256,8 @@ export default function TwoWayRadio() {
   incomingCallRef.current       = incomingCall;
   initiateP2PCallRef.current    = initiateP2PCall;
   acceptIncomingCallRef.current = acceptIncomingCall;
+  const startEmergencyCountdownRef  = useRef(null);
+  startEmergencyCountdownRef.current = startEmergencyCountdown;
 
   useEffect(() => {
     // Core PTT logic — called by both the Android direct bridge AND the keyboard listener.
@@ -1277,8 +1275,10 @@ export default function TwoWayRadio() {
     // Android native bridge: MainActivity calls window.__pttDown() / window.__pttUp()
     // directly instead of dispatching a KeyboardEvent. This avoids the Chromium WebView
     // bug where new KeyboardEvent({keyCode:280}) does not actually set e.keyCode.
-    window.__pttDown = pttDown;
-    window.__pttUp   = pttUp;
+    window.__pttDown    = pttDown;
+    window.__pttUp      = pttUp;
+    // Red button long-press (KEYCODE_INRICO_SIDE 293) — triggers SOS
+    window.__sosLongPress = () => startEmergencyCountdownRef.current?.();
 
     // Keyboard fallback — for web browser testing with a mapped key
     if (!pttKeyCode) return;
@@ -1941,7 +1941,7 @@ export default function TwoWayRadio() {
         </div>
 
         {/* ── MISSED CALL STICKY ALERT ── */}
-        {unreadMissed.length > 0 && (
+        {!isRadioMode && unreadMissed.length > 0 && (
           <div className="sticky top-0 z-30 bg-amber-600 shadow-lg">
             <div className="flex items-center gap-3 px-4 py-3">
               <PhoneOff className="w-4 h-4 text-white shrink-0" />
@@ -1994,7 +1994,7 @@ export default function TwoWayRadio() {
         )}
 
         {/* ── CALLBACK REQUEST STICKY ALERT ── */}
-        {unreadCbRequests.length > 0 && (
+        {!isRadioMode && unreadCbRequests.length > 0 && (
           <div className="sticky top-0 z-30 bg-teal-700 shadow-lg">
             <div className="flex items-center gap-3 px-4 py-3">
               <Phone className="w-4 h-4 text-white shrink-0" />
@@ -2010,7 +2010,7 @@ export default function TwoWayRadio() {
               {unreadCbRequests.length === 1 && (
                 <button
                   onClick={() => callBackFromRequest(unreadCbRequests[0])}
-                  className="bg-white text-teal-700 text-xs font-bold px-3 py-1.5 rounded-lg active:scale-95 transition-transform touch-manipulation shrink-0">
+                  className="bg-white text-teal-700 text-sm font-bold px-5 py-2.5 rounded-xl active:scale-95 transition-transform touch-manipulation shrink-0">
                   Call Back
                 </button>
               )}
@@ -2056,31 +2056,7 @@ export default function TwoWayRadio() {
         })()}
 
         {/* ── MY STATUS ── */}
-        {isRadioMode ? (
-          /* T320: simple Available / Not Available toggle — no shift tracking */
-          (() => {
-            const myStatus = getStaffStatus(user?.id);
-            const isAvailable = myStatus === 'available';
-            return (
-              <div className="px-4 pt-4 pb-1 flex gap-3">
-                <button onClick={() => setMyRadioStatus('available')}
-                  className={`flex-1 flex items-center justify-center gap-2 rounded-2xl py-4 border-2 transition-all active:scale-[0.97] ${
-                    isAvailable ? 'bg-green-900/50 border-green-500' : 'bg-slate-900 border-slate-700'
-                  }`}>
-                  <span className={`w-3 h-3 rounded-full ${isAvailable ? 'bg-green-400' : 'bg-slate-600'}`} />
-                  <span className={`text-sm font-bold ${isAvailable ? 'text-green-300' : 'text-slate-500'}`}>Available</span>
-                </button>
-                <button onClick={() => setMyRadioStatus('dnd')}
-                  className={`flex-1 flex items-center justify-center gap-2 rounded-2xl py-4 border-2 transition-all active:scale-[0.97] ${
-                    !isAvailable ? 'bg-slate-700 border-slate-500' : 'bg-slate-900 border-slate-700'
-                  }`}>
-                  <span className={`w-3 h-3 rounded-full ${!isAvailable ? 'bg-slate-300' : 'bg-slate-600'}`} />
-                  <span className={`text-sm font-bold ${!isAvailable ? 'text-slate-200' : 'text-slate-500'}`}>Not Available</span>
-                </button>
-              </div>
-            );
-          })()
-        ) : (() => {
+        {isRadioMode ? null : (() => {
           const myStatus = getStaffStatus(user?.id);
           const cs = getCombinedStatus(user?.id);
           const activeShift = todayShifts.find(s => s.staff_id === user?.id && s.clock_in_time && !s.clock_out_time && s.status !== 'cancelled');
@@ -2351,8 +2327,8 @@ export default function TwoWayRadio() {
         </div>
       )}
 
-      {/* ── SOS BUTTON — fixed round, bottom left ── */}
-      {radioTab === 'radio' && !emergencyActive && (
+      {/* ── SOS BUTTON — fixed round, bottom left (PWA only — APK uses red button long-press) ── */}
+      {!isRadioMode && radioTab === 'radio' && !emergencyActive && (
         <button
           onClick={startEmergencyCountdown}
           disabled={emergencyCountdown !== null}

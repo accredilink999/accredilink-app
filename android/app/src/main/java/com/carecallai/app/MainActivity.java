@@ -52,6 +52,10 @@ public class MainActivity extends BridgeActivity {
     // Wake lock — acquired on PTT press to bring screen on if it went dark
     private PowerManager.WakeLock pttWakeLock;
 
+    // Long-press SOS: red button held for 800ms triggers emergency
+    private final android.os.Handler sosHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private Runnable sosRunnable = null;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -244,8 +248,7 @@ public class MainActivity extends BridgeActivity {
     // event into the WebView so the React app's document.addEventListener fires.
 
     private boolean isPttKey(int keyCode) {
-        return keyCode == KEYCODE_PTT
-            || keyCode == KEYCODE_INRICO_SIDE;
+        return keyCode == KEYCODE_PTT;
     }
 
     // T320 PTT arrives via dispatchKeyEvent (not onKeyDown) — intercept here.
@@ -273,6 +276,23 @@ public class MainActivity extends BridgeActivity {
                     "if(typeof window.__pttUp==='function'){window.__pttUp();}",
                     null
                 );
+                return true;
+            }
+        }
+
+        // Red button (KEYCODE_INRICO_SIDE 293) — long press (800ms) triggers SOS
+        if (keyCode == KEYCODE_INRICO_SIDE && event.getRepeatCount() == 0) {
+            if (action == KeyEvent.ACTION_DOWN) {
+                final WebView wv = webView;
+                sosRunnable = () -> wv.evaluateJavascript(
+                    "if(typeof window.__sosLongPress==='function'){window.__sosLongPress();}",
+                    null
+                );
+                sosHandler.postDelayed(sosRunnable, 800);
+                return true;
+            }
+            if (action == KeyEvent.ACTION_UP) {
+                if (sosRunnable != null) { sosHandler.removeCallbacks(sosRunnable); sosRunnable = null; }
                 return true;
             }
         }
