@@ -39,7 +39,7 @@ public class MainActivity extends BridgeActivity {
     // Inrico T320 / PoC handset keycodes for the hardware PTT button
     // 139 (KEYCODE_MENU) deliberately excluded — it's used by Android for
     // navigation / app switching and intercepting it breaks scroll + multitasking.
-    private static final int KEYCODE_PTT         = 280;
+    private static final int KEYCODE_PTT         = 230; // confirmed keycode from T320 hardware
     private static final int KEYCODE_INRICO_SIDE = 293;
 
     // LED notification
@@ -89,19 +89,6 @@ public class MainActivity extends BridgeActivity {
 
         webView = getBridge().getWebView();
 
-        // Intercept key events delivered directly to the WebView (bypassing Activity onKeyDown).
-        // The T320 PTT button routes directly to the focused View — this catches it.
-        webView.setOnKeyListener((v, keyCode, event) -> {
-            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
-                Toast.makeText(this, "WV KEY: " + keyCode, Toast.LENGTH_SHORT).show();
-                webView.evaluateJavascript(
-                    "if(typeof window.__pttDetect==='function'){window.__pttDetect(" + keyCode + ");}else if(typeof window.__pttDown==='function'){window.__pttDown();}",
-                    null
-                );
-            }
-            return false; // let WebView also process it normally
-        });
-
         // Expose LED bridge to JavaScript — called from TwoWayRadio when isOnline changes
         webView.addJavascriptInterface(new LedBridge(), "AndroidLED");
 
@@ -116,7 +103,7 @@ public class MainActivity extends BridgeActivity {
                 "localStorage.setItem('carecall_radio_mode','true');" +
                 "localStorage.setItem('radio_keep_awake','true');" +
                 "if (!localStorage.getItem('radio_ptt_keycode')) {" +
-                "  localStorage.setItem('radio_ptt_keycode','280');" +
+                "  localStorage.setItem('radio_ptt_keycode','230');" +
                 "}",
                 null
             ));
@@ -261,73 +248,44 @@ public class MainActivity extends BridgeActivity {
             || keyCode == KEYCODE_INRICO_SIDE;
     }
 
+    // T320 PTT arrives via dispatchKeyEvent (not onKeyDown) — intercept here.
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        // dispatchKeyEvent fires before onKeyDown — catches events that go directly
-        // to the WebView without passing through the Activity's key handler.
-        if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0
-                && webView != null) {
-            int keyCode = event.getKeyCode();
-            Toast.makeText(this, "DISPATCH KEY: " + keyCode, Toast.LENGTH_SHORT).show();
-            webView.evaluateJavascript(
-                "if(typeof window.__pttDetect==='function'){window.__pttDetect(" + keyCode + ");}else if(typeof window.__pttDown==='function'&&" + keyCode + "===" + KEYCODE_PTT + "){window.__pttDown();}",
-                null
-            );
+        if (webView == null) return super.dispatchKeyEvent(event);
+        int keyCode = event.getKeyCode();
+        int action  = event.getAction();
+
+        if (isPttKey(keyCode) && event.getRepeatCount() == 0) {
+            if (action == KeyEvent.ACTION_DOWN) {
+                if (pttWakeLock != null && !pttWakeLock.isHeld())
+                    pttWakeLock.acquire(10 * 60 * 1000L);
+                moveTaskToFront();
+                webView.evaluateJavascript(
+                    "if(typeof window.__pttDetect==='function'){window.__pttDetect(" + keyCode + ");}else if(typeof window.__pttDown==='function'){window.__pttDown();}",
+                    null
+                );
+                return true; // consume — stops the key reaching WebView and toggling selection
+            }
+            if (action == KeyEvent.ACTION_UP) {
+                if (pttWakeLock != null && pttWakeLock.isHeld())
+                    pttWakeLock.release();
+                webView.evaluateJavascript(
+                    "if(typeof window.__pttUp==='function'){window.__pttUp();}",
+                    null
+                );
+                return true;
+            }
         }
-        return super.dispatchKeyEvent(event);
-    }
 
-    @Override
-    public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (event.getRepeatCount() > 0) return super.onKeyDown(keyCode, event);
-        if (webView == null) return super.onKeyDown(keyCode, event);
-
-        Toast.makeText(this, "KEY: " + keyCode, Toast.LENGTH_SHORT).show();
-
-        // During detect mode: forward EVERY key to JS so we can discover the
-        // actual keycode the T320 PTT button sends (may not be 280 or 293).
-        boolean isSystemKey = (keyCode == KeyEvent.KEYCODE_BACK
-                            || keyCode == KeyEvent.KEYCODE_VOLUME_UP
-                            || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
-                            || keyCode == KeyEvent.KEYCODE_POWER
-                            || keyCode == KeyEvent.KEYCODE_HOME);
-        if (!isSystemKey) {
+        // Detect mode: forward any non-PTT key so user can bind a different key
+        if (action == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
             webView.evaluateJavascript(
                 "if(typeof window.__pttDetect==='function'){window.__pttDetect(" + keyCode + ");}",
                 null
             );
         }
 
-        // Normal PTT operation — only for known PTT keycodes
-        if (isPttKey(keyCode)) {
-            if (pttWakeLock != null && !pttWakeLock.isHeld()) {
-                pttWakeLock.acquire(10 * 60 * 1000L);
-            }
-            moveTaskToFront();
-            webView.evaluateJavascript(
-                "if(typeof window.__pttDown==='function'){window.__pttDown();}",
-                null
-            );
-            return true;
-        }
-
-        return super.onKeyDown(keyCode, event);
-    }
-
-    @Override
-    public boolean onKeyUp(int keyCode, KeyEvent event) {
-        if (webView == null) return super.onKeyUp(keyCode, event);
-        if (isPttKey(keyCode)) {
-            if (pttWakeLock != null && pttWakeLock.isHeld()) {
-                pttWakeLock.release();
-            }
-            webView.evaluateJavascript(
-                "if(typeof window.__pttUp==='function'){window.__pttUp();}",
-                null
-            );
-            return true;
-        }
-        return super.onKeyUp(keyCode, event);
+        return super.dispatchKeyEvent(event);
     }
 
     // ── Back button ───────────────────────────────────────────────────────────
