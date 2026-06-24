@@ -109,7 +109,23 @@ function playTone(freqs, loop = false) {
           let active = true;
           const step = () => {
             if (!active) return;
-            const a = new Audio(snd.url); a.volume = vol;
+            // Route through Web Audio so gain can exceed 1.0 for extra loudness
+            try {
+              const ctx = getAudioCtx();
+              if (ctx) {
+                const a = new Audio(snd.url);
+                a.crossOrigin = 'anonymous';
+                const src = ctx.createMediaElementSource(a);
+                const boost = ctx.createGain();
+                boost.gain.value = Math.min(vol * 2.0, 3.0); // up to 3× louder
+                src.connect(boost); boost.connect(ctx.destination);
+                a.play().catch(() => {});
+                a.addEventListener('ended', () => { if (active) setTimeout(step, 300); });
+                return;
+              }
+            } catch {}
+            // Fallback: plain Audio element
+            const a = new Audio(snd.url); a.volume = Math.min(vol, 1.0);
             a.play().catch(() => {});
             a.addEventListener('ended', () => { if (active) setTimeout(step, 300); });
           };

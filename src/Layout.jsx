@@ -543,7 +543,7 @@ export default function Layout({ children, currentPageName }) {
     let alertAudio = null;
     try {
       alertAudio = new Audio('/radio-tones/Alert tone.aac');
-      alertAudio.volume = 0.9;
+      alertAudio.volume = 1.0;
       const step = () => {
         if (stopped || !alertAudio) return;
         alertAudio.currentTime = 0;
@@ -568,7 +568,7 @@ export default function Layout({ children, currentPageName }) {
           const osc = ctx.createOscillator(); const gain = ctx.createGain();
           osc.connect(gain); gain.connect(ctx.destination);
           osc.frequency.value = freqs[idx % freqs.length]; idx++;
-          gain.gain.setValueAtTime(0.3, ctx.currentTime);
+          gain.gain.setValueAtTime(1.0, ctx.currentTime);
           gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
           osc.start(); osc.stop(ctx.currentTime + 0.18);
           osc.onended = next;
