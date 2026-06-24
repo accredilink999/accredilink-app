@@ -151,6 +151,22 @@ function playAlarm() {
   return () => { active = false; ctx.close().catch(() => {}); };
 }
 
+// Outgoing call dialling tone — loops Beep Bop.aac until stopped
+function playOutgoingTone() {
+  if (localStorage.getItem('radio_silent_mode') === 'true') return () => {};
+  if (playCustomSound('outgoing')) return () => {};
+  let active = true;
+  const step = () => {
+    if (!active) return;
+    const a = new Audio('/radio-tones/Beep Bop.aac');
+    a.volume = 1.0;
+    a.play().catch(() => {});
+    a.addEventListener('ended', () => { if (active) setTimeout(step, 200); });
+  };
+  step();
+  return () => { active = false; };
+}
+
 // UK TETRA/Airwave-style PTT tones — loud, sharp, two-tone
 // talk-up (grant): low→high beep-bop  talk-down (clear): high→low bop-beep
 function playPTTTone(type) {
@@ -775,7 +791,7 @@ export default function TwoWayRadio() {
     if (error) { toast.error('Failed to initiate call'); return; }
     setOutgoingCall({ callId: callRecord.id, callee: target, channelName: chName });
     setCallDeclined(false);
-    stopTone(); stopToneRef.current = playTone([400, 600, 800, 600, 400], true);
+    stopTone(); stopToneRef.current = playOutgoingTone();
     const callerName = user?.full_name || user?.email || 'A team member';
     base44.functions.invoke('createNotification', {
       recipient_ids: resolveRecipients([target.id]), type: 'radio_call',
