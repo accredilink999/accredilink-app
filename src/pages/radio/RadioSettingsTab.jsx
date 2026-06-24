@@ -78,6 +78,7 @@ export default function RadioSettingsTab({
   bringToFront, setBringToFront, detectingPTTKey, onDetectPTTKey, onSetPTTKey, onClearPTTKey,
   isControlDevice,
   radioTheme, setRadioTheme,
+  toneVolume, setToneVolume,
 }) {
   const saveSound = (key, file) => {
     if (!file) return;
@@ -178,6 +179,22 @@ export default function RadioSettingsTab({
           label="Audio Tones"
           desc="PTT beeps, ring tones and call-end sounds"
         />
+        <div className="flex items-center gap-3 py-2">
+          <Volume2 className="w-4 h-4 text-slate-400 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-white text-sm font-semibold">Tone Volume</p>
+            <p className="text-slate-400 text-xs">Alert, PTT and ring tones only — does not affect call audio</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <input
+              type="range" min="0" max="1" step="0.05"
+              value={toneVolume ?? 1}
+              onChange={e => setToneVolume(parseFloat(e.target.value))}
+              className="w-24 accent-teal-500"
+            />
+            <span className="text-slate-300 text-xs w-8 text-right">{Math.round((toneVolume ?? 1) * 100)}%</span>
+          </div>
+        </div>
         <Toggle
           value={showAllAreas}
           onChange={v => { setShowAllAreas(v); localStorage.setItem('radio_show_all_areas', String(v)); }}

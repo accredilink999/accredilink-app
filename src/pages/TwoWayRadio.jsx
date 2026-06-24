@@ -92,9 +92,14 @@ function playCustomSound(key) {
   } catch { return false; }
 }
 
+function getToneVolume() {
+  const v = parseFloat(localStorage.getItem('radio_tone_volume') || '1');
+  return isNaN(v) ? 1.0 : Math.max(0, Math.min(1, v));
+}
+
 function playTone(freqs, loop = false) {
   if (localStorage.getItem('radio_silent_mode') === 'true') return () => {};
-  // Custom incoming ring sound (loops until stop() is called)
+  const vol = getToneVolume();
   if (loop) {
     try {
       const stored = localStorage.getItem('radio_custom_sounds');
@@ -104,7 +109,7 @@ function playTone(freqs, loop = false) {
           let active = true;
           const step = () => {
             if (!active) return;
-            const a = new Audio(snd.url); a.volume = 1.0;
+            const a = new Audio(snd.url); a.volume = vol;
             a.play().catch(() => {});
             a.addEventListener('ended', () => { if (active) setTimeout(step, 300); });
           };
@@ -121,7 +126,7 @@ function playTone(freqs, loop = false) {
     osc.connect(gain); gain.connect(ctx.destination);
     osc.frequency.value = freq; osc.type = 'sine';
     const t = ctx.currentTime + i * 0.11;
-    gain.gain.setValueAtTime(0.85, t);
+    gain.gain.setValueAtTime(0.85 * vol, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.10);
     osc.start(t); osc.stop(t + 0.10);
   });
@@ -131,6 +136,7 @@ function playTone(freqs, loop = false) {
 }
 
 function playAlarm() {
+  const vol = getToneVolume();
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
   let active = true;
   const pulse = () => {
@@ -141,7 +147,7 @@ function playAlarm() {
       osc.connect(gain); gain.connect(ctx.destination);
       osc.frequency.value = freq; osc.type = 'square';
       const t = ctx.currentTime + i * 0.12;
-      gain.gain.setValueAtTime(0.85, t);
+      gain.gain.setValueAtTime(0.85 * vol, t);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
       osc.start(t); osc.stop(t + 0.11);
     });
@@ -155,15 +161,14 @@ function playAlarm() {
 function playOutgoingTone() {
   if (localStorage.getItem('radio_silent_mode') === 'true') return () => {};
   if (playCustomSound('outgoing')) return () => {};
+  const vol = getToneVolume();
   let active = true;
-  // Play Beep Bop once as call-initiated confirmation, then loop the ring tone
   const beepBop = new Audio('/radio-tones/Beep Bop.aac');
-  beepBop.volume = 1.0;
+  beepBop.volume = vol;
   beepBop.play().catch(() => {});
   let ringStop = null;
   beepBop.addEventListener('ended', () => {
     if (!active) return;
-    // Start looping ring tone after Beep Bop finishes
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const freqs = [400, 600, 800, 600, 400];
     const burst = () => {
@@ -173,7 +178,7 @@ function playOutgoingTone() {
         osc.connect(gain); gain.connect(ctx.destination);
         osc.frequency.value = freq; osc.type = 'sine';
         const t = ctx.currentTime + i * 0.11;
-        gain.gain.setValueAtTime(0.85, t);
+        gain.gain.setValueAtTime(0.85 * vol, t);
         gain.gain.exponentialRampToValueAtTime(0.001, t + 0.10);
         osc.start(t); osc.stop(t + 0.10);
       });
@@ -191,6 +196,7 @@ function playPTTTone(type) {
   if (localStorage.getItem('radio_silent_mode') === 'true') return;
   if (playCustomSound(type === 'up' ? 'ptt_up' : 'ptt_down')) return;
   try {
+    const vol = getToneVolume();
     const ctx = getAudioCtx(); if (!ctx) return;
     const freqs = type === 'up' ? [880, 1400] : [1400, 880];
     const now = ctx.currentTime;
@@ -200,8 +206,8 @@ function playPTTTone(type) {
       osc.frequency.value = freq; osc.type = 'sine';
       const t = now + i * 0.075;
       gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.92, t + 0.003); // sharp attack
-      gain.gain.setValueAtTime(0.92, t + 0.058);
+      gain.gain.linearRampToValueAtTime(0.92 * vol, t + 0.003);
+      gain.gain.setValueAtTime(0.92 * vol, t + 0.058);
       gain.gain.linearRampToValueAtTime(0, t + 0.072);
       osc.start(t); osc.stop(t + 0.075);
     });
@@ -214,7 +220,7 @@ function playCallEndTone() {
   if (playCustomSound('call_end')) return;
   try {
     const a = new Audio('/radio-tones/Bop Beep.aac');
-    a.volume = 1.0;
+    a.volume = getToneVolume();
     a.play().catch(() => {});
   } catch {}
 }
@@ -224,6 +230,7 @@ function playCallConnectedTone() {
   if (localStorage.getItem('radio_silent_mode') === 'true') return;
   if (playCustomSound('call_connected')) return;
   try {
+    const vol = getToneVolume();
     const ctx = getAudioCtx(); if (!ctx) return;
     const now = ctx.currentTime;
     [880, 1400].forEach((freq, i) => {
@@ -232,8 +239,8 @@ function playCallConnectedTone() {
       osc.frequency.value = freq; osc.type = 'sine';
       const t = now + i * 0.075;
       gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.8, t + 0.003);
-      gain.gain.setValueAtTime(0.8, t + 0.058);
+      gain.gain.linearRampToValueAtTime(0.8 * vol, t + 0.003);
+      gain.gain.setValueAtTime(0.8 * vol, t + 0.058);
       gain.gain.linearRampToValueAtTime(0, t + 0.072);
       osc.start(t); osc.stop(t + 0.075);
     });
@@ -244,8 +251,8 @@ function playCallConnectedTone() {
 function playCallbackRequestTone() {
   if (localStorage.getItem('radio_silent_mode') === 'true') return;
   if (playCustomSound('callback_request')) return;
-  // Synthesised fallback: descending double-beep (bop-beep feel)
   try {
+    const vol = getToneVolume();
     const ctx = getAudioCtx(); if (!ctx) return;
     const now = ctx.currentTime;
     [1400, 880].forEach((freq, i) => {
@@ -254,8 +261,8 @@ function playCallbackRequestTone() {
       osc.frequency.value = freq; osc.type = 'sine';
       const t = now + i * 0.075;
       gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.8, t + 0.003);
-      gain.gain.setValueAtTime(0.8, t + 0.058);
+      gain.gain.linearRampToValueAtTime(0.8 * vol, t + 0.003);
+      gain.gain.setValueAtTime(0.8 * vol, t + 0.058);
       gain.gain.linearRampToValueAtTime(0, t + 0.072);
       osc.start(t); osc.stop(t + 0.075);
     });
@@ -362,6 +369,7 @@ export default function TwoWayRadio() {
   const [radioTheme, setRadioTheme]     = useState(() => localStorage.getItem('radio_theme') || 'blue');
   const [radioTab, setRadioTab]         = useState('radio'); // 'radio' | 'shift' | 'settings'
   const [silentMode, setSilentMode]     = useState(() => localStorage.getItem('radio_silent_mode') === 'true');
+  const [toneVolume, setToneVolume]     = useState(() => { const v = parseFloat(localStorage.getItem('radio_tone_volume') || '1'); return isNaN(v) ? 1 : v; });
   const [showAllAreas, setShowAllAreas] = useState(() => localStorage.getItem('radio_show_all_areas') !== 'false');
   const [areaToggles, setAreaToggles]   = useState(() => { try { return JSON.parse(localStorage.getItem('radio_area_toggles') || '{}'); } catch { return {}; } });
   const [customSounds, setCustomSounds] = useState(() => {
@@ -2319,6 +2327,8 @@ export default function TwoWayRadio() {
             isControlDevice={isControlDevice}
             radioTheme={radioTheme}
             setRadioTheme={setRadioTheme}
+            toneVolume={toneVolume}
+            setToneVolume={v => { setToneVolume(v); localStorage.setItem('radio_tone_volume', String(v)); }}
           />
         )}
 
