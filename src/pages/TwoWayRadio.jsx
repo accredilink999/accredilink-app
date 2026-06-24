@@ -705,10 +705,11 @@ export default function TwoWayRadio() {
   };
 
   // ── Native mic pipeline (radio mode only) ────────────────────────────────
-  const nativeMicCtxRef   = useRef(null);
+  // Uses the SHARED AudioContext (_sharedCtx via getAudioCtx) so the mic pipeline
+  // never creates a second context — a second context on Android WebView suspends
+  // the first, silencing all PTT tones (playPTTTone, dial-out, beep-bop).
   const nativeMicNodeRef  = useRef(null);
   const nativeMicDestRef  = useRef(null);
-  // Flat accumulation buffer — avoids size-mismatch gaps from a chunk queue
   const nativePcmQueueRef = useRef(new Float32Array(0));
 
   const setupNativeMicTrack = useCallback(async () => {
@@ -716,15 +717,14 @@ export default function TwoWayRadio() {
     try {
       const JAVA_RATE = 16000; // AudioRecord sample rate in Java
 
-      // Try to get a 16 kHz context; older WebViews may ignore the hint and
-      // return their native rate (44100/48000). We detect and resample below.
-      const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: JAVA_RATE });
-      if (ctx.state === 'suspended') { try { await ctx.resume(); } catch {} }
-      nativeMicCtxRef.current = ctx;
-      const CTX_RATE = ctx.sampleRate; // actual rate — may differ from JAVA_RATE
+      // Reuse the shared context — keeps tones working during and after PTT.
+      const ctx = getAudioCtx();
+      if (!ctx) { toast.error('Audio not ready'); return null; }
+      const CTX_RATE = ctx.sampleRate;
 
-      // ScriptProcessorNode drains the accumulation buffer sample-by-sample.
-      // bufferSize 4096 gives plenty of headroom regardless of CTX_RATE.
+      // ScriptProcessorNode drains the PCM accumulation buffer.
+      // Output goes to MediaStreamDestination (not speakers), so it never
+      // interferes with oscillator-based PTT tones on the same context.
       const node = ctx.createScriptProcessor(4096, 0, 1);
       node.onaudioprocess = (e) => {
         const out   = e.outputBuffer.getChannelData(0);
@@ -732,7 +732,7 @@ export default function TwoWayRadio() {
         const accum = nativePcmQueueRef.current;
         if (accum.length >= n) {
           out.set(accum.subarray(0, n));
-          nativePcmQueueRef.current = accum.slice(n); // copy remaining
+          nativePcmQueueRef.current = accum.slice(n);
         } else {
           out.set(accum);
           out.fill(0, accum.length);
@@ -746,32 +746,30 @@ export default function TwoWayRadio() {
       nativeMicDestRef.current = dest;
 
       // Java calls this with base64 PCM-16 @ JAVA_RATE.
-      // We decode → Float32, resample to CTX_RATE, append to accumulation buffer.
+      // Decode → Float32, 2× gain (hardware mic is quiet), resample to CTX_RATE.
       window.__nativePcm = (b64) => {
         const bin   = atob(b64);
         const bytes = new Uint8Array(bin.length);
         for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
         const int16 = new Int16Array(bytes.buffer);
 
-        // Linear interpolation resample from JAVA_RATE → CTX_RATE.
-        // If rates match the ratio is 1.0 and output equals input.
-        const ratio   = JAVA_RATE / CTX_RATE;
-        const outLen  = Math.round(int16.length / ratio);
-        const resampled = new Float32Array(outLen);
+        const ratio  = JAVA_RATE / CTX_RATE;
+        const outLen = Math.round(int16.length / ratio);
+        const chunk  = new Float32Array(outLen);
         for (let i = 0; i < outLen; i++) {
           const pos  = i * ratio;
           const idx  = Math.floor(pos);
           const frac = pos - idx;
           const a    = idx     < int16.length ? int16[idx]     / 32768.0 : 0;
           const b    = idx + 1 < int16.length ? int16[idx + 1] / 32768.0 : 0;
-          resampled[i] = a + frac * (b - a);
+          // 2× gain — clamp to ±1 to prevent distortion
+          chunk[i] = Math.max(-1, Math.min(1, (a + frac * (b - a)) * 2.0));
         }
 
-        // Append to flat accumulation buffer
         const prev = nativePcmQueueRef.current;
-        const next = new Float32Array(prev.length + resampled.length);
+        const next = new Float32Array(prev.length + chunk.length);
         next.set(prev);
-        next.set(resampled, prev.length);
+        next.set(chunk, prev.length);
         nativePcmQueueRef.current = next;
       };
       window.__nativeMicError = (msg) => toast.error('Mic error: ' + msg);
@@ -2160,7 +2158,7 @@ export default function TwoWayRadio() {
         )}
 
         {/* ── CALLBACK REQUEST STICKY ALERT ── */}
-        {!isRadioMode && unreadCbRequests.length > 0 && (
+        {unreadCbRequests.length > 0 && (
           <div className="sticky top-0 z-30 bg-teal-700 shadow-lg">
             <div className="flex items-center gap-3 px-4 py-3">
               <Phone className="w-4 h-4 text-white shrink-0" />
