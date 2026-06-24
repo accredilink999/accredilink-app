@@ -190,18 +190,22 @@ function playOutgoingTone() {
   let timer = null;
 
   if (isRadio) {
-    // Radio: oscillator grant tone (low→high), no AAC file
-    [880, 1400].forEach((freq, i) => {
-      const osc = ctx.createOscillator(), gain = ctx.createGain();
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.frequency.value = freq; osc.type = 'sine';
-      const t = ctx.currentTime + i * 0.075;
-      gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.85 * vol, t + 0.003);
-      gain.gain.setValueAtTime(0.85 * vol, t + 0.058);
-      gain.gain.linearRampToValueAtTime(0, t + 0.072);
-      osc.start(t); osc.stop(t + 0.075);
-    });
+    // Radio: oscillator grant tone (low→high) — wait for resume so clock is running
+    const scheduleGrant = () => {
+      [880, 1400].forEach((freq, i) => {
+        const osc = ctx.createOscillator(), gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = freq; osc.type = 'sine';
+        const t = ctx.currentTime + i * 0.075;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.85 * vol, t + 0.003);
+        gain.gain.setValueAtTime(0.85 * vol, t + 0.058);
+        gain.gain.linearRampToValueAtTime(0, t + 0.072);
+        osc.start(t); osc.stop(t + 0.075);
+      });
+    };
+    if (ctx.state === 'running') { scheduleGrant(); }
+    else { ctx.resume().then(scheduleGrant).catch(() => {}); }
   } else {
     // PWA: play Beep Bop.aac as the dial-start sound (user gesture available)
     const pre = _preloaded['/radio-tones/Beep Bop.aac'];
@@ -239,18 +243,23 @@ function playPTTTone(type) {
     const vol = getToneVolume();
     const ctx = getAudioCtx(); if (!ctx) return;
     const freqs = type === 'up' ? [880, 1400] : [1400, 880];
-    const now = ctx.currentTime;
-    freqs.forEach((freq, i) => {
-      const osc = ctx.createOscillator(), gain = ctx.createGain();
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.frequency.value = freq; osc.type = 'sine';
-      const t = now + i * 0.075;
-      gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.92 * vol, t + 0.003);
-      gain.gain.setValueAtTime(0.92 * vol, t + 0.058);
-      gain.gain.linearRampToValueAtTime(0, t + 0.072);
-      osc.start(t); osc.stop(t + 0.075);
-    });
+    const schedule = () => {
+      const now = ctx.currentTime;
+      freqs.forEach((freq, i) => {
+        const osc = ctx.createOscillator(), gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = freq; osc.type = 'sine';
+        const t = now + i * 0.075;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.92 * vol, t + 0.003);
+        gain.gain.setValueAtTime(0.92 * vol, t + 0.058);
+        gain.gain.linearRampToValueAtTime(0, t + 0.072);
+        osc.start(t); osc.stop(t + 0.075);
+      });
+    };
+    // Wait for resume so oscillators are scheduled against a running clock
+    if (ctx.state === 'running') { schedule(); }
+    else { ctx.resume().then(schedule).catch(() => {}); }
   } catch {}
 }
 
@@ -696,14 +705,15 @@ export default function TwoWayRadio() {
     c.on('user-left',       u => {
       setSpeakingUids(p => { const n = new Set(p); n.delete(u.uid); return n; });
       setRemoteUsers([...c.remoteUsers]);
-      // If this was a P2P call and the remote party left, auto-end our side.
-      // Covers the case where the radio exits without calling endP2PCall()
-      // (back button, crash) so the DB update might not have happened.
-      if (c.remoteUsers.length === 0 && activeCallIdRef.current) {
+      // Remote party left — end our side regardless of whether Realtime already fired.
+      // setView ref ensures we end even if activeCallIdRef was already cleared by Realtime.
+      if (c.remoteUsers.length === 0) {
         const callId = activeCallIdRef.current;
-        activeCallIdRef.current = null;
-        supabase.from('radio_calls').update({ status: 'ended' }).eq('id', callId).then(() => {});
-        leaveChannel().then(() => { setActiveChannel(null); setView('main'); });
+        if (callId) {
+          activeCallIdRef.current = null;
+          supabase.from('radio_calls').update({ status: 'ended' }).eq('id', callId).then(() => {});
+        }
+        leaveChannel().then(() => { setActiveChannel(null); setView('main'); setSelectedPerson(null); });
       }
     });
     c.on('user-joined',     () => setRemoteUsers([...c.remoteUsers]));
