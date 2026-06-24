@@ -412,6 +412,19 @@ export default function Layout({ children, currentPageName }) {
     return () => subscription.unsubscribe();
   }, [user?.id]);
 
+  // ─── Service worker notification deeplink ────────────────────────
+  useEffect(() => {
+    if (!navigator.serviceWorker) return;
+    const handler = (event) => {
+      const url = event.data?.data?.action_url || event.data?.data?.url;
+      if (event.data?.type === 'NOTIFICATION_CLICK' && url) {
+        navigate(url);
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', handler);
+    return () => navigator.serviceWorker.removeEventListener('message', handler);
+  }, [navigate]);
+
   // ─── Global incoming radio call ───────────────────────────────────
   const [globalIncomingCall, setGlobalIncomingCall] = useState(null);
   const globalRingStopRef = useRef(null);
