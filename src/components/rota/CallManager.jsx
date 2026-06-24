@@ -224,39 +224,23 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
     onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['shift-calls', shift?.id] });
 
-      // Auto-check-in the partner's matching call and notify them
+      // Notify partner that their colleague has checked in — they book in independently
       if (shift?.paired_shift_id && data.service_user_id) {
         try {
           const pairedShift = await base44.entities.Shift.read(shift.paired_shift_id);
           if (pairedShift?.staff_id && pairedShift.staff_id !== shift.staff_id) {
-            // Find and auto-check-in the partner's matching call if it's still pending
-            const partnerCalls = await ShiftCallApi.filter({ shift_id: pairedShift.id }, 'scheduled_time', 100);
-            const partnerMatch = partnerCalls.find(pc =>
-              pc.scheduled_time === data.scheduled_time &&
-              pc.call_date === data.call_date &&
-              (pc.service_user_id === data.service_user_id || pc.service_user_name === data.service_user_name) &&
-              pc.status === 'pending' && !pc.clock_in_time
-            );
-            if (partnerMatch) {
-              await ShiftCallApi.update(partnerMatch.id, {
-                clock_in_time: new Date().toISOString(),
-                status: 'in_progress',
-              });
-              queryClient.invalidateQueries({ queryKey: ['paired-shift-calls', shift.paired_shift_id] });
-            }
-            // Notify the partner
             base44.functions.invoke('createNotification', {
               recipient_ids: [pairedShift.staff_id],
               type: 'care_log',
-              title: `Checked in: ${data.service_user_name || 'Client'}`,
-              message: `${shift?.staff_name || 'Your partner'} has checked in to ${data.service_user_name}'s call — your call has also been marked in progress.`,
+              title: `Partner checked in: ${data.service_user_name || 'Client'}`,
+              message: `${shift?.staff_name || 'Your partner'} has checked in to ${data.service_user_name}'s call.`,
               priority: 'normal',
               action_url: '/Rota',
               send_push: true,
             }).catch(e => console.warn('Partner checkin notification failed:', e));
           }
         } catch (e) {
-          console.warn('Could not auto-check-in partner call:', e);
+          console.warn('Could not notify partner of check-in:', e);
         }
       }
 
@@ -770,40 +754,8 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
     c => c.status === 'in_progress' && !!c.clock_in_time && !c.clock_out_time
   ) || null;
 
-  // If any of MY own calls have log_required set (partner said I'm filling it), block the whole UI
-  const pendingLogCalls = (isMyShift || isAdmin)
-    ? (freshCalls || calls).filter(c => c.log_required === true && !c.care_log_id)
-    : [];
-
   return (
     <div className="space-y-4">
-      {(isMyShift || isAdmin) && pendingLogCalls.length > 0 && (
-        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 space-y-2">
-          <p className="text-sm font-semibold text-orange-800 flex items-center gap-2">
-            <FileText className="w-4 h-4 flex-shrink-0" />
-            {pendingLogCalls.length} outstanding care log{pendingLogCalls.length !== 1 ? 's' : ''}
-          </p>
-          {pendingLogCalls.map(call => (
-            <div key={call.id} className="flex items-center justify-between gap-3">
-              <p className="text-sm text-orange-800 truncate">{call.service_user_name} ({call.scheduled_time})</p>
-              <Button
-                size="sm"
-                onClick={() => {
-                  try { localStorage.removeItem(`draft:careLog:${shift?.id || 'new'}`); } catch (e) {}
-                  if (!call.clock_out_time) {
-                    ShiftCallApi.update(call.id, { clock_out_time: new Date().toISOString() })
-                      .catch(e => console.warn('Clock out failed:', e));
-                  }
-                  setTimeout(() => onOpenCareLog(call), 80);
-                }}
-                className="bg-orange-600 hover:bg-orange-700 flex-shrink-0"
-              >
-                Fill Log
-              </Button>
-            </div>
-          ))}
-        </div>
-      )}
       {isAdmin && (
         <div className="flex gap-2">
           <Button

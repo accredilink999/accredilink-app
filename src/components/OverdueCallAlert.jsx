@@ -76,7 +76,7 @@ export default function OverdueCallAlert({ userId }) {
       // Check for overdue pending calls
       const { data: myShifts } = await supabase
         .from('shifts')
-        .select('id')
+        .select('id, paired_shift_id')
         .eq('staff_id', userId)
         .eq('date', today)
         .in('status', ['scheduled', 'in_progress']);
@@ -102,7 +102,26 @@ export default function OverdueCallAlert({ userId }) {
             .eq('call_date', today)
             .lt('scheduled_time', cutoffTime)
             .or(`delay_until.is.null,delay_until.lt.${now.toISOString()}`);
-          callAlerts = (calls || []).map(c => ({ ...c, _type: 'call' }));
+
+          // For paired shifts: suppress the overdue alert if the partner has already
+          // checked in to the same call — one of the pair being there is sufficient.
+          const pairedShiftIds = myShifts.map(s => s.paired_shift_id).filter(Boolean);
+          const partnerCheckedInKeys = new Set();
+          if (pairedShiftIds.length > 0) {
+            const { data: partnerCalls } = await supabase
+              .from('shift_calls')
+              .select('service_user_id, service_user_name, scheduled_time, call_date')
+              .in('shift_id', pairedShiftIds)
+              .eq('call_date', today)
+              .not('clock_in_time', 'is', null);
+            (partnerCalls || []).forEach(pc => {
+              partnerCheckedInKeys.add(`${pc.call_date}|${pc.scheduled_time}|${pc.service_user_id || pc.service_user_name}`);
+            });
+          }
+
+          callAlerts = (calls || [])
+            .filter(c => !partnerCheckedInKeys.has(`${c.call_date}|${c.scheduled_time}|${c.service_user_id || c.service_user_name}`))
+            .map(c => ({ ...c, _type: 'call' }));
         }
       }
 
