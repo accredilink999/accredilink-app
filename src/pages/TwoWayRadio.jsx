@@ -1241,13 +1241,7 @@ export default function TwoWayRadio() {
     // Android native bridge: MainActivity calls window.__pttDown() / window.__pttUp()
     // directly instead of dispatching a KeyboardEvent. This avoids the Chromium WebView
     // bug where new KeyboardEvent({keyCode:280}) does not actually set e.keyCode.
-    window.__pttDown = () => {
-      // DEBUG: visible toast so we can confirm Android is reaching JS
-      const mode = pttModeRef.current;
-      const hasPerson = !!initiateP2PCallRef.current;
-      import('sonner').then(({ toast: t }) => t.info(`PTT▼ mode=${mode} fn=${hasPerson}`, { duration: 3000 })).catch(() => {});
-      pttDown();
-    };
+    window.__pttDown = pttDown;
     window.__pttUp   = pttUp;
 
     // Keyboard fallback — for web browser testing with a mapped key
