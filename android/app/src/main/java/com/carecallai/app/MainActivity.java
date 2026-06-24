@@ -263,6 +263,11 @@ public class MainActivity extends BridgeActivity {
                 if (pttWakeLock != null && !pttWakeLock.isHeld())
                     pttWakeLock.acquire(10 * 60 * 1000L);
                 moveTaskToFront();
+                // Inject a synthetic touch at (1,1) to establish user-gesture context
+                // in the WebView before calling JS — Android requires a real gesture
+                // for getUserMedia; evaluateJavascript alone doesn't qualify.
+                injectTouch(android.view.MotionEvent.ACTION_DOWN);
+                injectTouch(android.view.MotionEvent.ACTION_UP);
                 webView.evaluateJavascript(
                     "if(typeof window.__pttDetect==='function'){window.__pttDetect(" + keyCode + ");}else if(typeof window.__pttDown==='function'){window.__pttDown();}",
                     null
@@ -319,6 +324,17 @@ public class MainActivity extends BridgeActivity {
         } else {
             super.onBackPressed();
         }
+    }
+
+    /** Dispatch a synthetic touch at (1,1) into the WebView to satisfy Android's
+     *  user-gesture requirement for getUserMedia before evaluateJavascript fires. */
+    private void injectTouch(int action) {
+        try {
+            long now = android.os.SystemClock.uptimeMillis();
+            android.view.MotionEvent ev = android.view.MotionEvent.obtain(now, now, action, 1f, 1f, 0);
+            webView.dispatchTouchEvent(ev);
+            ev.recycle();
+        } catch (Exception ignored) {}
     }
 
     /** Bring this activity to the foreground if it's been pushed back. */
