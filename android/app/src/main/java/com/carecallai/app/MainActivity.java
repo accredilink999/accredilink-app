@@ -89,6 +89,19 @@ public class MainActivity extends BridgeActivity {
 
         webView = getBridge().getWebView();
 
+        // Intercept key events delivered directly to the WebView (bypassing Activity onKeyDown).
+        // The T320 PTT button routes directly to the focused View — this catches it.
+        webView.setOnKeyListener((v, keyCode, event) -> {
+            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+                Toast.makeText(this, "WV KEY: " + keyCode, Toast.LENGTH_SHORT).show();
+                webView.evaluateJavascript(
+                    "if(typeof window.__pttDetect==='function'){window.__pttDetect(" + keyCode + ");}else if(typeof window.__pttDown==='function'){window.__pttDown();}",
+                    null
+                );
+            }
+            return false; // let WebView also process it normally
+        });
+
         // Expose LED bridge to JavaScript — called from TwoWayRadio when isOnline changes
         webView.addJavascriptInterface(new LedBridge(), "AndroidLED");
 
@@ -249,12 +262,26 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        // dispatchKeyEvent fires before onKeyDown — catches events that go directly
+        // to the WebView without passing through the Activity's key handler.
+        if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0
+                && webView != null) {
+            int keyCode = event.getKeyCode();
+            Toast.makeText(this, "DISPATCH KEY: " + keyCode, Toast.LENGTH_SHORT).show();
+            webView.evaluateJavascript(
+                "if(typeof window.__pttDetect==='function'){window.__pttDetect(" + keyCode + ");}else if(typeof window.__pttDown==='function'&&" + keyCode + "===" + KEYCODE_PTT + "){window.__pttDown();}",
+                null
+            );
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
+    @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (event.getRepeatCount() > 0) return super.onKeyDown(keyCode, event);
         if (webView == null) return super.onKeyDown(keyCode, event);
 
-        // DIAGNOSTIC: native Android toast so we can see if onKeyDown fires at ALL
-        // for the PTT button — independent of JavaScript.
         Toast.makeText(this, "KEY: " + keyCode, Toast.LENGTH_SHORT).show();
 
         // During detect mode: forward EVERY key to JS so we can discover the
