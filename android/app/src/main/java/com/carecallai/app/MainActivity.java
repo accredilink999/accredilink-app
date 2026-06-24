@@ -253,9 +253,12 @@ public class MainActivity extends BridgeActivity {
         if (event.getRepeatCount() > 0) return super.onKeyDown(keyCode, event);
         if (webView == null) return super.onKeyDown(keyCode, event);
 
+        // DIAGNOSTIC: native Android toast so we can see if onKeyDown fires at ALL
+        // for the PTT button — independent of JavaScript.
+        Toast.makeText(this, "KEY: " + keyCode, Toast.LENGTH_SHORT).show();
+
         // During detect mode: forward EVERY key to JS so we can discover the
         // actual keycode the T320 PTT button sends (may not be 280 or 293).
-        // Exclude common Android system keys that would give a false result.
         boolean isSystemKey = (keyCode == KeyEvent.KEYCODE_BACK
                             || keyCode == KeyEvent.KEYCODE_VOLUME_UP
                             || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
