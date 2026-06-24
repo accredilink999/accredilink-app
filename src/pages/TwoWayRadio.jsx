@@ -2317,12 +2317,12 @@ export default function TwoWayRadio() {
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
           <button
             onClick={() => sendCallbackRequest(selectedPerson)}
-            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-teal-800/95 backdrop-blur border border-teal-600 text-teal-200 text-xs font-semibold touch-manipulation active:scale-[0.98] transition-transform">
-            <Phone className="w-3.5 h-3.5" /> Call me back — {selectedPerson.full_name}
+            className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-teal-800/95 backdrop-blur border border-teal-600 text-teal-200 text-base font-bold touch-manipulation active:scale-[0.98] transition-transform">
+            <Phone className="w-5 h-5" /> Call me back — {selectedPerson.full_name}
           </button>
           <button onClick={() => setSelectedPerson(null)}
-            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-slate-800/95 backdrop-blur border border-slate-700 text-slate-300 text-xs touch-manipulation">
-            <X className="w-3.5 h-3.5" /> Deselect — press PTT to call
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-slate-800/95 backdrop-blur border border-slate-700 text-slate-300 text-sm touch-manipulation">
+            <X className="w-4 h-4" /> Deselect — press PTT to call
           </button>
         </div>
       )}
