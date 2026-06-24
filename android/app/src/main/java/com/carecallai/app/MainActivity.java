@@ -8,6 +8,9 @@ import android.app.NotificationManager;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.media.AudioFormat;
+import android.media.AudioRecord;
+import android.media.MediaRecorder;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -239,6 +242,76 @@ public class MainActivity extends BridgeActivity {
                 }
                 moveTaskToFront();
             });
+        }
+
+        // ── Native mic bridge ─────────────────────────────────────────────────
+        // Captures audio via Android AudioRecord (no getUserMedia / no user gesture
+        // required) and streams raw PCM-16 chunks to JavaScript as base64 strings.
+        // This bypasses WebView's getUserMedia user-gesture restriction entirely.
+
+        private AudioRecord nativeAudioRecord = null;
+        private Thread      nativeAudioThread = null;
+        private volatile boolean nativeAudioActive = false;
+        private static final int NATIVE_SAMPLE_RATE = 16000; // 16 kHz mono PCM-16
+
+        @JavascriptInterface
+        public void openNativeMic() {
+            if (nativeAudioActive) return;
+            if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                webView.post(() -> webView.evaluateJavascript(
+                    "window.__nativeMicError&&window.__nativeMicError('RECORD_AUDIO permission not granted')", null));
+                return;
+            }
+            try {
+                int minBuf = AudioRecord.getMinBufferSize(
+                    NATIVE_SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
+                // Use 4× min buffer to reduce risk of overflow while evaluateJavascript is queued
+                int bufSize = Math.max(minBuf * 4, NATIVE_SAMPLE_RATE / 10 * 2); // at least 100ms
+                nativeAudioRecord = new AudioRecord(
+                    MediaRecorder.AudioSource.MIC,
+                    NATIVE_SAMPLE_RATE,
+                    AudioFormat.CHANNEL_IN_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT,
+                    bufSize
+                );
+                if (nativeAudioRecord.getState() != AudioRecord.STATE_INITIALIZED) {
+                    webView.post(() -> webView.evaluateJavascript(
+                        "window.__nativeMicError&&window.__nativeMicError('AudioRecord init failed')", null));
+                    return;
+                }
+                nativeAudioRecord.startRecording();
+                nativeAudioActive = true;
+                // Each chunk = 40ms of audio = 640 samples × 2 bytes = 1280 bytes
+                final int chunkSamples = NATIVE_SAMPLE_RATE * 40 / 1000;
+                final byte[] buf = new byte[chunkSamples * 2];
+                nativeAudioThread = new Thread(() -> {
+                    while (nativeAudioActive) {
+                        int read = nativeAudioRecord.read(buf, 0, buf.length);
+                        if (read > 0) {
+                            final String b64 = android.util.Base64.encodeToString(
+                                buf, 0, read, android.util.Base64.NO_WRAP);
+                            webView.post(() -> webView.evaluateJavascript(
+                                "window.__nativePcm&&window.__nativePcm('" + b64 + "')", null));
+                        }
+                    }
+                }, "NativeMicThread");
+                nativeAudioThread.setDaemon(true);
+                nativeAudioThread.start();
+            } catch (Exception e) {
+                final String msg = e.getMessage();
+                webView.post(() -> webView.evaluateJavascript(
+                    "window.__nativeMicError&&window.__nativeMicError('" + msg + "')", null));
+            }
+        }
+
+        @JavascriptInterface
+        public void closeNativeMic() {
+            nativeAudioActive = false;
+            if (nativeAudioRecord != null) {
+                try { nativeAudioRecord.stop(); nativeAudioRecord.release(); } catch (Exception ignored) {}
+                nativeAudioRecord = null;
+            }
+            nativeAudioThread = null;
         }
     }
 

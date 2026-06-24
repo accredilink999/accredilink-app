@@ -660,12 +660,12 @@ export default function TwoWayRadio() {
   // ── Agora helpers ─────────────────────────────────────────────────────────
   const leaveChannel = async () => {
     try {
-      // Unpublish mic if transmitting, but KEEP the track alive — destroying it
-      // means the next call must call getUserMedia again, which fails on Android
-      // when triggered outside a real user gesture (hardware PTT via evaluateJavascript).
       if (micTrackRef.current) {
         try { await clientRef.current.unpublish(micTrackRef.current); } catch {}
       }
+      // Stop native recording if active
+      if (window.AndroidApp?.closeNativeMic) window.AndroidApp.closeNativeMic();
+      nativePcmQueueRef.current = [];
       if (clientRef.current && clientRef.current.connectionState !== 'DISCONNECTED') await clientRef.current.leave();
     } catch {}
     setIsJoined(false); setIsTalking(false); setIsHandsFree(false);
@@ -686,20 +686,92 @@ export default function TwoWayRadio() {
     setJoining(false);
   };
 
+  // ── Native mic pipeline (radio mode only) ────────────────────────────────
+  // Avoids getUserMedia entirely by capturing audio via Android AudioRecord in Java
+  // and piping raw PCM-16 to an AudioContext ScriptProcessorNode → MediaStreamDestination
+  // → Agora createCustomAudioTrack. No user gesture ever needed.
+  const nativeMicCtxRef    = useRef(null); // 16 kHz AudioContext for the PCM pipeline
+  const nativeMicNodeRef   = useRef(null); // ScriptProcessorNode
+  const nativeMicDestRef   = useRef(null); // MediaStreamAudioDestinationNode
+  const nativePcmQueueRef  = useRef([]);   // Float32Array chunks from Java
+
+  const setupNativeMicTrack = useCallback(async () => {
+    if (micTrackRef.current) return micTrackRef.current;
+    try {
+      // 16 kHz AudioContext for the mic pipeline.
+      // On Chrome 80+ a second AudioContext auto-resumes when the tab already has
+      // an active AudioContext (the shared tone ctx). On older versions we try resume.
+      const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      if (ctx.state === 'suspended') { try { await ctx.resume(); } catch {} }
+      nativeMicCtxRef.current = ctx;
+
+      // ScriptProcessorNode drains the PCM queue into the audio graph.
+      // bufferSize 1024 = 64ms at 16 kHz — acceptable PTT latency.
+      const node = ctx.createScriptProcessor(1024, 0, 1);
+      node.onaudioprocess = (e) => {
+        const out = e.outputBuffer.getChannelData(0);
+        const q   = nativePcmQueueRef.current;
+        if (q.length > 0) {
+          const chunk = q.shift();
+          const len = Math.min(chunk.length, out.length);
+          for (let i = 0; i < len; i++) out[i] = chunk[i];
+          for (let i = len; i < out.length; i++) out[i] = 0;
+        } else {
+          out.fill(0);
+        }
+      };
+      nativeMicNodeRef.current = node;
+
+      const dest = ctx.createMediaStreamDestination();
+      node.connect(dest);
+      nativeMicDestRef.current = dest;
+
+      // JS callback: Java calls this with base64 PCM-16 chunks
+      window.__nativePcm = (b64) => {
+        const bin   = atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const int16 = new Int16Array(bytes.buffer);
+        const f32   = new Float32Array(int16.length);
+        for (let i = 0; i < int16.length; i++) f32[i] = int16[i] / 32768.0;
+        nativePcmQueueRef.current.push(f32);
+      };
+      window.__nativeMicError = (msg) => toast.error('Mic error: ' + msg);
+
+      const track = AgoraRTC.createCustomAudioTrack({
+        mediaStreamTrack: dest.stream.getAudioTracks()[0],
+      });
+      micTrackRef.current = track;
+      return track;
+    } catch (e) {
+      toast.error('Mic setup failed: ' + e.message);
+      return null;
+    }
+  }, []);
+
   const startTalking = async () => {
     if (!isJoined || isTalking) return;
     shouldTalkRef.current = true;
     try {
-      // Reuse existing mic track — never call getUserMedia again once we have it.
-      // Hardware PTT (evaluateJavascript) cannot satisfy the user-gesture requirement
-      // for getUserMedia on Android; keeping the track alive sidesteps this entirely.
       if (!micTrackRef.current) {
-        micTrackRef.current = await AgoraRTC.createMicrophoneAudioTrack();
+        if (isRadioMode && window.AndroidApp?.openNativeMic) {
+          // Native path — AudioRecord in Java, no getUserMedia, no user-gesture needed
+          const track = await setupNativeMicTrack();
+          if (!track) { shouldTalkRef.current = false; return; }
+        } else {
+          // PWA / browser path — standard WebRTC getUserMedia
+          micTrackRef.current = await AgoraRTC.createMicrophoneAudioTrack();
+        }
+      }
+      // For the native path: tell Java to start recording into the pipeline
+      if (isRadioMode && window.AndroidApp?.openNativeMic) {
+        window.AndroidApp.openNativeMic();
       }
       await clientRef.current.publish(micTrackRef.current);
       setMicPermission('granted');
       if (!shouldTalkRef.current) {
         try { await clientRef.current.unpublish(micTrackRef.current); } catch {}
+        if (isRadioMode && window.AndroidApp?.closeNativeMic) window.AndroidApp.closeNativeMic();
         return;
       }
       setIsTalking(true);
@@ -715,9 +787,9 @@ export default function TwoWayRadio() {
     if (isHandsFree) return;
     if (isTalking) playPTTTone('down');
     try {
-      // Unpublish only — keep the track alive so the next PTT press is instant
-      // and never needs to call getUserMedia again.
-      if (micTrackRef.current) { await clientRef.current.unpublish(micTrackRef.current); }
+      if (micTrackRef.current) await clientRef.current.unpublish(micTrackRef.current);
+      if (isRadioMode && window.AndroidApp?.closeNativeMic) window.AndroidApp.closeNativeMic();
+      nativePcmQueueRef.current = []; // drain any queued PCM
     } catch {}
     setIsTalking(false);
   };
