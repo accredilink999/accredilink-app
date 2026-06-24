@@ -46,12 +46,16 @@ self.addEventListener('push', (event) => {
   }
 
   const notification = payload.notification || {}
+  const data = payload.data || {}
   const title = notification.title || 'Care Call'
+  const isCall = data.type === 'radio_call'
   const options = {
     body: notification.body || '',
     icon: '/pwa-192x192.png',
     badge: '/pwa-192x192.png',
-    data: payload.data || {},
+    data,
+    requireInteraction: isCall, // keep call notifications on screen until tapped
+    vibrate: isCall ? [300, 100, 300, 100, 300] : [200, 100, 200],
   }
 
   event.waitUntil(self.registration.showNotification(title, options))

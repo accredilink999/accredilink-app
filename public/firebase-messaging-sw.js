@@ -46,14 +46,16 @@ async function initMessaging() {
 
     messaging.onBackgroundMessage((payload) => {
       const title = payload.notification?.title || 'Care Call AI';
+      const data  = payload.data || {};
+      const isCall = data.type === 'radio_call';
       const options = {
         body: payload.notification?.body || '',
         icon: payload.notification?.icon || '/pwa-192x192.png',
         badge: '/pwa-64x64.png',
-        tag: payload.data?.tag || 'care-call-notification',
-        data: payload.data || {},
-        vibrate: [200, 100, 200],
-        requireInteraction: payload.data?.requireInteraction === 'true',
+        tag: data.tag || 'care-call-notification',
+        data,
+        vibrate: isCall ? [300, 100, 300, 100, 300] : [200, 100, 200],
+        requireInteraction: isCall || data.requireInteraction === 'true',
       };
 
       self.registration.showNotification(title, options);
@@ -76,7 +78,7 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// Handle notification click: focus existing window or open app
+// Handle notification click: navigate existing window to the action URL or open app
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const url = event.notification.data?.url || '/';
@@ -84,9 +86,11 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {
-        if (client.url.startsWith(self.location.origin) && 'focus' in client) {
-          client.focus();
-          client.postMessage({ type: 'NOTIFICATION_CLICK', data: event.notification.data });
+        if (client.url.startsWith(self.location.origin)) {
+          // Navigate the existing tab to the action URL so ?call= param is present,
+          // which bypasses the PIN screen for incoming call notifications.
+          if ('navigate' in client) client.navigate(url);
+          if ('focus'    in client) return client.focus();
           return;
         }
       }

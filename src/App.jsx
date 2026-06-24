@@ -24,7 +24,7 @@ import TermsConsentGate from '@/components/TermsConsentGate';
 import { supabase } from '@/api/supabaseClient';
 import PinLockScreen from '@/components/auth/PinLockScreen';
 import PinSetupModal from '@/components/auth/PinSetupModal';
-import { hasPin, isPinSessionUnlocked, wasPinPromptShown } from '@/utils/pinUtils';
+import { hasPin, isPinSessionUnlocked, setPinSessionUnlocked, wasPinPromptShown } from '@/utils/pinUtils';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -53,6 +53,14 @@ const AppShell = () => {
   useEffect(() => {
     if (!isAuthenticated || !user?.id || pinCheckedRef.current) return;
     pinCheckedRef.current = true;
+
+    // Incoming call notification deep link — the call times out before the user
+    // can unlock, so auto-unlock the PIN session. Supabase session is still required.
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('call')) {
+      setPinSessionUnlocked();
+      return;
+    }
 
     if (hasPin(user.id) && !isPinSessionUnlocked()) {
       // User has a PIN and hasn't unlocked this session → show lock screen
