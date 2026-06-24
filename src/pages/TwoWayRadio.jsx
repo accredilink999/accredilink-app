@@ -641,6 +641,11 @@ export default function TwoWayRadio() {
     const c = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
     clientRef.current = c;
     c.on('user-published', async (u, t) => {
+      // Grab mic BEFORE subscribing to remote audio — Android locks the audio
+      // hardware when playback starts, making subsequent getUserMedia fail.
+      if (t === 'audio' && !micTrackRef.current) {
+        try { micTrackRef.current = await AgoraRTC.createMicrophoneAudioTrack(); } catch {}
+      }
       await c.subscribe(u, t);
       if (t === 'audio') { u.audioTrack?.play(); setSpeakingUids(p => new Set([...p, u.uid])); }
       setRemoteUsers([...c.remoteUsers]);
