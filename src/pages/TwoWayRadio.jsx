@@ -2103,7 +2103,12 @@ export default function TwoWayRadio() {
 
         {/* ── TAB BAR ── */}
         <div className={`flex border-b backdrop-blur ${theme.tabBar}`}>
-          {(['radio', ...(isSuperAdmin ? ['alerter', 'shift'] : []), 'settings']).map(key => (
+          {([
+            'radio',
+            ...(isControlDevice ? ['alerter'] : []),
+            ...(isSuperAdmin && !isControlDevice ? ['shift'] : []),
+            'settings',
+          ]).map(key => (
             <button key={key} onClick={() => setRadioTab(key)}
               className={`flex-1 py-2.5 text-xs font-black uppercase tracking-wider transition-colors touch-manipulation ${
                 radioTab === key ? theme.tabActive : theme.tabInactive
@@ -2521,27 +2526,25 @@ export default function TwoWayRadio() {
         )}
         </>)}
 
-        {radioTab === 'alerter' && (isSuperAdmin
-          ? <AlerterTab
-              todayShifts={todayShifts}
-              todayShiftCalls={todayShiftCalls}
-              staff={staff}
-              alerterEnabled={alerterEnabled}
-            />
-          : <p className="text-slate-600 text-xs text-center mt-16 px-8">Alerter is available to admins only.</p>
+        {radioTab === 'alerter' && isControlDevice && (
+          <AlerterTab
+            todayShifts={todayShifts}
+            todayShiftCalls={todayShiftCalls}
+            staff={staff}
+            alerterEnabled={alerterEnabled}
+          />
         )}
 
-        {radioTab === 'shift' && (isSuperAdmin
-          ? <RadioShiftTab
-              todayShiftCalls={todayShiftCalls}
-              todayShifts={todayShifts}
-              rotaAreas={areas}
-              staff={staff}
-              navigate={navigate}
-              createPageUrl={createPageUrl}
-              isControlDevice={isControlDevice}
-            />
-          : <p className="text-slate-600 text-xs text-center mt-16 px-8">Shift overview is available to admins only.</p>
+        {radioTab === 'shift' && isSuperAdmin && !isControlDevice && (
+          <RadioShiftTab
+            todayShiftCalls={todayShiftCalls}
+            todayShifts={todayShifts}
+            rotaAreas={areas}
+            staff={staff}
+            navigate={navigate}
+            createPageUrl={createPageUrl}
+            isControlDevice={isControlDevice}
+          />
         )}
 
         {radioTab === 'settings' && (

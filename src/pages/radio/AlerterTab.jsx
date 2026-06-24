@@ -299,8 +299,6 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
           {visibleAlerts.map((alert, idx) => {
             const isNew  = !ackedIds.has(alert.id);
             const urgent = alert.priority === 'URGENT';
-            const color  = urgent ? 'amber-300' : 'amber-400';
-            const dimColor = urgent ? 'amber-600' : 'amber-700';
             return (
               <div key={alert.id}
                 className={`border-b border-amber-900/30 ${isNew ? 'bg-amber-950/10' : 'opacity-60'}`}>
@@ -310,8 +308,8 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
                     <p key={li}
                       className={`font-mono text-[11px] tracking-wider leading-tight ${
                         li === 0
-                          ? `text-${color} font-bold ${isNew && blinkOn && li === 0 ? '' : ''}`
-                          : `text-${dimColor}`
+                          ? (urgent ? 'text-amber-300 font-bold' : 'text-amber-400 font-bold')
+                          : (urgent ? 'text-amber-600' : 'text-amber-700')
                       }`}>
                       {line}
                     </p>
