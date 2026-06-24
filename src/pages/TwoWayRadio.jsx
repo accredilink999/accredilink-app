@@ -286,6 +286,13 @@ export default function TwoWayRadio() {
   // On T320 handsets the PTT side bars are unnecessary — hardware button is used
   const isRadioMode = localStorage.getItem('carecall_radio_mode') === 'true';
 
+  // Radio mode requires one real screen tap to pre-create the mic track.
+  // Without this, the first hardware PTT press triggers getUserMedia without a
+  // user-gesture context (evaluateJavascript doesn't qualify on Android WebView)
+  // and the mic call fails with NotReadableError. After the tap the track is kept
+  // alive permanently — PTT just publishes/unpublishes it.
+  const [micReady, setMicReady] = useState(!isRadioMode);
+
   // Agora refs
   const clientRef       = useRef(null);
   const micTrackRef     = useRef(null);
@@ -689,13 +696,16 @@ export default function TwoWayRadio() {
     if (!isJoined || isTalking) return;
     shouldTalkRef.current = true;
     try {
-      const track = await AgoraRTC.createMicrophoneAudioTrack();
-      micTrackRef.current = track;
-      await clientRef.current.publish(track);
+      // Reuse existing mic track — never call getUserMedia again once we have it.
+      // Hardware PTT (evaluateJavascript) cannot satisfy the user-gesture requirement
+      // for getUserMedia on Android; keeping the track alive sidesteps this entirely.
+      if (!micTrackRef.current) {
+        micTrackRef.current = await AgoraRTC.createMicrophoneAudioTrack();
+      }
+      await clientRef.current.publish(micTrackRef.current);
       setMicPermission('granted');
-      // If user released before the track was ready, stop immediately
       if (!shouldTalkRef.current) {
-        try { await clientRef.current.unpublish(track); track.stop(); track.close(); micTrackRef.current = null; } catch {}
+        try { await clientRef.current.unpublish(micTrackRef.current); } catch {}
         return;
       }
       setIsTalking(true);
@@ -708,10 +718,12 @@ export default function TwoWayRadio() {
 
   const stopTalking = async () => {
     shouldTalkRef.current = false;
-    if (isHandsFree) return; // don't stop if in hands-free emergency mode
+    if (isHandsFree) return;
     if (isTalking) playPTTTone('down');
     try {
-      if (micTrackRef.current) { await clientRef.current.unpublish(micTrackRef.current); micTrackRef.current.stop(); micTrackRef.current.close(); micTrackRef.current = null; }
+      // Unpublish only — keep the track alive so the next PTT press is instant
+      // and never needs to call getUserMedia again.
+      if (micTrackRef.current) { await clientRef.current.unpublish(micTrackRef.current); }
     } catch {}
     setIsTalking(false);
   };
@@ -1250,9 +1262,10 @@ export default function TwoWayRadio() {
   // Pre-warm AudioContext on mount so first PTT tone fires instantly
   useEffect(() => { getAudioCtx(); }, []);
 
-  // Pre-warm mic on first user touch — Android WebView requires a real user gesture
-  // for getUserMedia; async callbacks (realtime, evaluateJavascript) don't qualify.
+  // Mic pre-warm for PWA mode (non-radio) — on first screen touch, create the track
+  // so it exists before any PTT press. Radio mode handles this via the activation splash.
   useEffect(() => {
+    if (isRadioMode) return; // splash handles it for radio mode
     const prewarm = async () => {
       if (micTrackRef.current) return;
       try { micTrackRef.current = await AgoraRTC.createMicrophoneAudioTrack(); } catch {}
@@ -1263,7 +1276,7 @@ export default function TwoWayRadio() {
       document.removeEventListener('pointerdown', prewarm);
       document.removeEventListener('touchstart',  prewarm);
     };
-  }, []);
+  }, [isRadioMode]);
 
   // Radio mode: T320 is always staffed when powered on — auto-set status to available
   useEffect(() => {
@@ -1823,6 +1836,32 @@ export default function TwoWayRadio() {
   })();
 
   const theme = RADIO_THEMES[radioTheme] || RADIO_THEMES.blue;
+
+  // Radio mode activation splash — one tap to create the mic track from a real
+  // user gesture before any PTT press can happen.
+  if (isRadioMode && !micReady) {
+    return (
+      <div
+        className="fixed inset-0 z-[99999] bg-slate-900 flex flex-col items-center justify-center select-none"
+        onPointerDown={async () => {
+          try {
+            if (!micTrackRef.current) {
+              micTrackRef.current = await AgoraRTC.createMicrophoneAudioTrack();
+            }
+          } catch (e) {
+            // Permission denied or hardware error — let them retry
+            toast.error('Microphone error: ' + (e.message || e.name));
+            return;
+          }
+          setMicReady(true);
+        }}
+      >
+        <Radio className="w-20 h-20 text-teal-400 mb-6" />
+        <h1 className="text-white text-3xl font-black tracking-wide mb-2">CareCall Radio</h1>
+        <p className="text-slate-400 text-lg">Tap anywhere to activate</p>
+      </div>
+    );
+  }
 
   return (
     <>
