@@ -610,7 +610,9 @@ export default function TwoWayRadio() {
   const resolveRecipients = (ids) => testMode ? (user?.id ? [user.id] : []) : ids;
 
 
-  // 30-second outgoing call timeout → offer text alert
+  // 90-second outgoing call timeout → offer text alert
+  // Extended from 30s to give iPhone PWA users time to open the app manually
+  // (iOS PWA has no background push notifications without Home Screen install)
   useEffect(() => {
     if (outgoingCall?.callId) {
       callTimeoutRef.current = setTimeout(async () => {
@@ -621,7 +623,7 @@ export default function TwoWayRadio() {
         await supabase.from('radio_calls').update({ status: 'cancelled' }).eq('id', cur.callId);
         setOutgoingCall(null); setCallDeclined(false);
         setTextAlertModal({ callee: calleeInfo });
-      }, 30000);
+      }, 90000);
     } else {
       if (callTimeoutRef.current) { clearTimeout(callTimeoutRef.current); callTimeoutRef.current = null; }
     }
@@ -877,7 +879,7 @@ export default function TwoWayRadio() {
   // visibilitychange (PWA returns from background after socket drop).
   const checkPendingCall = useCallback(async () => {
     if (!user?.id || activeCallIdRef.current || incomingCallRef.current) return;
-    const since = new Date(Date.now() - 60000).toISOString();
+    const since = new Date(Date.now() - 90000).toISOString();
     const { data } = await supabase
       .from('radio_calls')
       .select('id, caller_id, channel_name, created_at')

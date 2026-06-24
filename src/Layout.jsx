@@ -590,7 +590,7 @@ export default function Layout({ children, currentPageName }) {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'radio_calls', filter: `callee_id=eq.${user.id}` }, payload => {
         const call = payload.new;
         if (call.status !== 'pending') return;
-        if (Date.now() - new Date(call.created_at).getTime() > 30000) return;
+        if (Date.now() - new Date(call.created_at).getTime() > 90000) return;
         // TwoWayRadio page has its own overlay + ring — don't double up
         if (currentPageNameRef.current === 'TwoWayRadio') return;
         const caller = globalStaffRef.current.find(s => s.id === call.caller_id)

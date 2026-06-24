@@ -53,8 +53,9 @@ self.addEventListener('push', (event) => {
     body: notification.body || '',
     icon: '/pwa-192x192.png',
     badge: '/pwa-192x192.png',
+    tag: isCall ? `radio-call-${Date.now()}` : undefined,
     data,
-    requireInteraction: isCall, // keep call notifications on screen until tapped
+    requireInteraction: isCall,
     vibrate: isCall ? [300, 100, 300, 100, 300] : [200, 100, 200],
   }
 

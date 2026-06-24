@@ -52,7 +52,7 @@ async function initMessaging() {
         body: payload.notification?.body || '',
         icon: payload.notification?.icon || '/pwa-192x192.png',
         badge: '/pwa-64x64.png',
-        tag: data.tag || 'care-call-notification',
+        tag: isCall ? `radio-call-${Date.now()}` : (data.tag || 'care-call-notification'),
         data,
         vibrate: isCall ? [300, 100, 300, 100, 300] : [200, 100, 200],
         requireInteraction: isCall || data.requireInteraction === 'true',
