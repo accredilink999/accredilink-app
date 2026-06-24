@@ -557,6 +557,7 @@ export default function TwoWayRadio() {
     } catch { return new Set(); }
   });
   const dismissMissedCalls = (...ids) => {
+    if (ids.length) supabase.from('radio_calls').update({ status: 'seen' }).in('id', ids).then(() => {});
     setDismissedMissedIds(prev => {
       const next = new Set([...prev, ...ids]);
       try { localStorage.setItem('dismissedMissedCalls', JSON.stringify([...next])); } catch {}
@@ -1042,6 +1043,7 @@ export default function TwoWayRadio() {
   };
 
   const dismissCallbackRequest = (...ids) => {
+    if (ids.length) supabase.from('radio_calls').update({ status: 'acknowledged' }).in('id', ids).then(() => {});
     setDismissedCbReqIds(prev => {
       const next = new Set([...prev, ...ids]);
       try { localStorage.setItem('dismissedCallbackRequests', JSON.stringify([...next])); } catch {}
@@ -1654,7 +1656,17 @@ export default function TwoWayRadio() {
   );
 
   const IncomingCallOverlay = incomingCall && (
-    <div className="fixed inset-0 z-50 bg-slate-950/95 flex flex-col items-center justify-center gap-8 px-6">
+    <div className="fixed inset-0 z-50 bg-slate-950/95 flex flex-col items-center justify-center gap-8 px-6"
+      onClick={() => {
+        // iOS Safari blocks audio until a user gesture — any tap on this overlay unlocks it
+        const ctx = getAudioCtx();
+        if (ctx?.state === 'suspended') {
+          ctx.resume().then(() => {
+            if (stopToneRef.current) return; // already ringing
+            stopToneRef.current = playTone([880, 1100, 880, 1100, 660], true);
+          }).catch(() => {});
+        }
+      }}>
       <div className="relative">
         <div className="absolute inset-0 rounded-full bg-green-500/20 animate-ping scale-150" />
         <div className="w-28 h-28 rounded-full bg-slate-800 border-4 border-green-500 flex items-center justify-center text-4xl font-bold text-white">

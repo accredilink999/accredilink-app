@@ -479,6 +479,7 @@ export default function Layout({ children, currentPageName }) {
     } catch { return new Set(); }
   });
   const dismissBannerCalls = (...ids) => {
+    if (ids.length) supabase.from('radio_calls').update({ status: 'seen' }).in('id', ids).then(() => {});
     setDismissedBannerIds(prev => {
       const next = new Set([...prev, ...ids]);
       try { localStorage.setItem('dismissedMissedCalls', JSON.stringify([...next])); } catch {}
@@ -486,6 +487,7 @@ export default function Layout({ children, currentPageName }) {
     });
   };
   const dismissCbBannerCalls = (...ids) => {
+    if (ids.length) supabase.from('radio_calls').update({ status: 'acknowledged' }).in('id', ids).then(() => {});
     setDismissedCbBannerIds(prev => {
       const next = new Set([...prev, ...ids]);
       try { localStorage.setItem('dismissedCallbackRequests', JSON.stringify([...next])); } catch {}
