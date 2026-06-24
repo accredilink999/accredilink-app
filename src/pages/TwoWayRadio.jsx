@@ -667,11 +667,6 @@ export default function TwoWayRadio() {
     setJoining(true);
     try {
       if (joinedChRef.current) await leaveChannel();
-      // Pre-create mic track BEFORE joining so Android audio session doesn't conflict
-      // with remote audio playback (NotReadableError on getUserMedia after subscribe)
-      if (!micTrackRef.current) {
-        try { micTrackRef.current = await AgoraRTC.createMicrophoneAudioTrack(); } catch {}
-      }
       const token = await buildAgoraToken(channelName, myUid);
       await clientRef.current.join(AGORA_APP_ID, channelName, token, myUid);
       joinedChRef.current = channelName;
@@ -1244,6 +1239,21 @@ export default function TwoWayRadio() {
 
   // Pre-warm AudioContext on mount so first PTT tone fires instantly
   useEffect(() => { getAudioCtx(); }, []);
+
+  // Pre-warm mic on first user touch — Android WebView requires a real user gesture
+  // for getUserMedia; async callbacks (realtime, evaluateJavascript) don't qualify.
+  useEffect(() => {
+    const prewarm = async () => {
+      if (micTrackRef.current) return;
+      try { micTrackRef.current = await AgoraRTC.createMicrophoneAudioTrack(); } catch {}
+    };
+    document.addEventListener('pointerdown', prewarm, { once: true });
+    document.addEventListener('touchstart',  prewarm, { once: true });
+    return () => {
+      document.removeEventListener('pointerdown', prewarm);
+      document.removeEventListener('touchstart',  prewarm);
+    };
+  }, []);
 
   // Radio mode: T320 is always staffed when powered on — auto-set status to available
   useEffect(() => {
