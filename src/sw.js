@@ -71,9 +71,12 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {
-        if (client.url.includes(self.location.origin) && 'focus' in client) {
-          client.navigate(url)
-          return client.focus()
+        if (client.url.includes(self.location.origin)) {
+          // postMessage lets React Router handle navigation without a full reload
+          client.postMessage({ type: 'NOTIFICATION_CLICK', data: event.notification.data })
+          if ('navigate' in client) client.navigate(url).catch(() => {})
+          if ('focus'    in client) return client.focus()
+          return
         }
       }
       return self.clients.openWindow(url)
