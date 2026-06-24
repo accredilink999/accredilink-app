@@ -16,6 +16,7 @@ import {
   AlertTriangle, MapPin, MicOff, X, ChevronDown, MessageSquare, Settings, UserPlus, Home
 } from 'lucide-react';
 import RadioShiftTab from './radio/RadioShiftTab';
+import AlerterTab from './radio/AlerterTab';
 import RadioSettingsTab from './radio/RadioSettingsTab';
 import { RADIO_THEMES } from './radio/radioThemes';
 
@@ -405,9 +406,11 @@ export default function TwoWayRadio() {
 
   // Tab navigation, theme, and per-device settings (all localStorage-backed for PWA/native)
   const [radioTheme, setRadioTheme]     = useState(() => localStorage.getItem('radio_theme') || 'blue');
-  const [radioTab, setRadioTab]         = useState('radio'); // 'radio' | 'shift' | 'settings'
+  const [radioTab, setRadioTab]         = useState('radio'); // 'radio' | 'alerter' | 'shift' | 'settings'
   const [silentMode, setSilentMode]     = useState(() => localStorage.getItem('radio_silent_mode') === 'true');
   const [toneVolume, setToneVolume]     = useState(() => { const v = parseFloat(localStorage.getItem('radio_tone_volume') || '1'); return isNaN(v) ? 1 : v; });
+  const [alerterEnabled, setAlerterEnabledState] = useState(() => localStorage.getItem('radio_alerter_enabled') !== 'false');
+  const setAlerterEnabled = (v) => { setAlerterEnabledState(v); localStorage.setItem('radio_alerter_enabled', String(v)); };
   const [showAllAreas, setShowAllAreas] = useState(() => localStorage.getItem('radio_show_all_areas') !== 'false');
   const [areaToggles, setAreaToggles]   = useState(() => { try { return JSON.parse(localStorage.getItem('radio_area_toggles') || '{}'); } catch { return {}; } });
   const [customSounds, setCustomSounds] = useState(() => {
@@ -1656,17 +1659,7 @@ export default function TwoWayRadio() {
   );
 
   const IncomingCallOverlay = incomingCall && (
-    <div className="fixed inset-0 z-50 bg-slate-950/95 flex flex-col items-center justify-center gap-8 px-6"
-      onClick={() => {
-        // iOS Safari blocks audio until a user gesture — any tap on this overlay unlocks it
-        const ctx = getAudioCtx();
-        if (ctx?.state === 'suspended') {
-          ctx.resume().then(() => {
-            if (stopToneRef.current) return; // already ringing
-            stopToneRef.current = playTone([880, 1100, 880, 1100, 660], true);
-          }).catch(() => {});
-        }
-      }}>
+    <div className="fixed inset-0 z-50 bg-slate-950/95 flex flex-col items-center justify-center gap-8 px-6">
       <div className="relative">
         <div className="absolute inset-0 rounded-full bg-green-500/20 animate-ping scale-150" />
         <div className="w-28 h-28 rounded-full bg-slate-800 border-4 border-green-500 flex items-center justify-center text-4xl font-bold text-white">
@@ -2110,12 +2103,12 @@ export default function TwoWayRadio() {
 
         {/* ── TAB BAR ── */}
         <div className={`flex border-b backdrop-blur ${theme.tabBar}`}>
-          {(['radio', ...(isSuperAdmin ? ['shift'] : []), 'settings']).map(key => (
+          {(['radio', ...(isSuperAdmin ? ['alerter', 'shift'] : []), 'settings']).map(key => (
             <button key={key} onClick={() => setRadioTab(key)}
               className={`flex-1 py-2.5 text-xs font-black uppercase tracking-wider transition-colors touch-manipulation ${
                 radioTab === key ? theme.tabActive : theme.tabInactive
               }`}>
-              {key === 'radio' ? 'Radio' : key === 'shift' ? 'Current Shift' : 'Settings'}
+              {key === 'radio' ? 'Radio' : key === 'alerter' ? 'Alerter' : key === 'shift' ? 'Shift' : 'Settings'}
             </button>
           ))}
         </div>
@@ -2528,6 +2521,16 @@ export default function TwoWayRadio() {
         )}
         </>)}
 
+        {radioTab === 'alerter' && (isSuperAdmin
+          ? <AlerterTab
+              todayShifts={todayShifts}
+              todayShiftCalls={todayShiftCalls}
+              staff={staff}
+              alerterEnabled={alerterEnabled}
+            />
+          : <p className="text-slate-600 text-xs text-center mt-16 px-8">Alerter is available to admins only.</p>
+        )}
+
         {radioTab === 'shift' && (isSuperAdmin
           ? <RadioShiftTab
               todayShiftCalls={todayShiftCalls}
@@ -2568,6 +2571,8 @@ export default function TwoWayRadio() {
             setRadioTheme={setRadioTheme}
             toneVolume={toneVolume}
             setToneVolume={v => { setToneVolume(v); localStorage.setItem('radio_tone_volume', String(v)); }}
+            alerterEnabled={alerterEnabled}
+            setAlerterEnabled={setAlerterEnabled}
           />
         )}
 
