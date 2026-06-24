@@ -1260,11 +1260,15 @@ export default function TwoWayRadio() {
   const incomingCallRef         = useRef(incomingCall);
   const acceptIncomingCallRef   = useRef(null);
   const initiateP2PCallRef      = useRef(null);
+  const startTalkingRef         = useRef(null);
+  const stopTalkingRef          = useRef(null);
   pttModeRef.current            = pttMode;
   isTalkingRef.current          = isTalking;
   incomingCallRef.current       = incomingCall;
   initiateP2PCallRef.current    = initiateP2PCall;
   acceptIncomingCallRef.current = acceptIncomingCall;
+  startTalkingRef.current       = startTalking;
+  stopTalkingRef.current        = stopTalking;
   const startEmergencyCountdownRef  = useRef(null);
   startEmergencyCountdownRef.current = startEmergencyCountdown;
 
@@ -1275,10 +1279,10 @@ export default function TwoWayRadio() {
     const pttDown = () => {
       if (incomingCallRef.current) { acceptIncomingCallRef.current?.(); return; }
       if (pttModeRef.current === 'p2p') initiateP2PCallRef.current?.();
-      else if (pttModeRef.current === 'group') { playPTTTone('up'); startTalking(); }
+      else if (pttModeRef.current === 'group') { playPTTTone('up'); startTalkingRef.current?.(); }
     };
     const pttUp = () => {
-      if (isTalkingRef.current) { playPTTTone('down'); stopTalking(); }
+      if (isTalkingRef.current) { playPTTTone('down'); stopTalkingRef.current?.(); }
     };
 
     // Android native bridge: MainActivity calls window.__pttDown() / window.__pttUp()
