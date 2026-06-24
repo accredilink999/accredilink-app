@@ -281,8 +281,8 @@ public class MainActivity extends BridgeActivity {
                 }
                 nativeAudioRecord.startRecording();
                 nativeAudioActive = true;
-                // Each chunk = 40ms of audio = 640 samples × 2 bytes = 1280 bytes
-                final int chunkSamples = NATIVE_SAMPLE_RATE * 40 / 1000;
+                // Each chunk = 20ms of audio = 320 samples × 2 bytes = 640 bytes
+                final int chunkSamples = NATIVE_SAMPLE_RATE * 20 / 1000;
                 final byte[] buf = new byte[chunkSamples * 2];
                 nativeAudioThread = new Thread(() -> {
                     while (nativeAudioActive) {

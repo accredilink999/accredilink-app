@@ -725,7 +725,7 @@ export default function TwoWayRadio() {
       // ScriptProcessorNode drains the PCM accumulation buffer.
       // Output goes to MediaStreamDestination (not speakers), so it never
       // interferes with oscillator-based PTT tones on the same context.
-      const node = ctx.createScriptProcessor(4096, 0, 1);
+      const node = ctx.createScriptProcessor(2048, 0, 1);
       node.onaudioprocess = (e) => {
         const out   = e.outputBuffer.getChannelData(0);
         const n     = out.length;
