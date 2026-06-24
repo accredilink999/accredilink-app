@@ -659,7 +659,12 @@ export default function TwoWayRadio() {
   // ── Agora helpers ─────────────────────────────────────────────────────────
   const leaveChannel = async () => {
     try {
-      if (micTrackRef.current) { micTrackRef.current.stop(); micTrackRef.current.close(); micTrackRef.current = null; }
+      // Unpublish mic if transmitting, but KEEP the track alive — destroying it
+      // means the next call must call getUserMedia again, which fails on Android
+      // when triggered outside a real user gesture (hardware PTT via evaluateJavascript).
+      if (micTrackRef.current) {
+        try { await clientRef.current.unpublish(micTrackRef.current); } catch {}
+      }
       if (clientRef.current && clientRef.current.connectionState !== 'DISCONNECTED') await clientRef.current.leave();
     } catch {}
     setIsJoined(false); setIsTalking(false); setIsHandsFree(false);
