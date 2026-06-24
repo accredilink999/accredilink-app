@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import {
   Radio, Mic, Users, Plus, Trash2, PhoneOff,
   Volume2, Loader2, Signal, ChevronLeft, Phone, Bell,
-  AlertTriangle, MapPin, MicOff, X, ChevronDown, MessageSquare, Settings, UserPlus, Home
+  AlertTriangle, MapPin, MicOff, X, ChevronDown, Settings, UserPlus, Home
 } from 'lucide-react';
 import RadioShiftTab from './radio/RadioShiftTab';
 import RadioSettingsTab from './radio/RadioSettingsTab';
@@ -466,8 +466,6 @@ export default function TwoWayRadio() {
   const [detectingPTTKey, setDetectingPTTKey] = useState(false);
 
   // 30s call timeout → text alert modal
-  const [textAlertModal, setTextAlertModal] = useState(null);
-  const [textAlertMsg, setTextAlertMsg] = useState('');
   const callTimeoutRef = useRef(null);
 
   useEffect(() => { outgoingRef.current = outgoingCall; }, [outgoingCall]);
@@ -623,17 +621,15 @@ export default function TwoWayRadio() {
   const resolveRecipients = (ids) => testMode ? (user?.id ? [user.id] : []) : ids;
 
 
-  // 30-second outgoing call timeout → offer text alert
+  // 30-second outgoing call timeout → cancel and return to idle
   useEffect(() => {
     if (outgoingCall?.callId) {
       callTimeoutRef.current = setTimeout(async () => {
         const cur = outgoingRef.current;
         if (!cur?.callId) return;
-        const calleeInfo = cur.callee;
         if (stopToneRef.current) { stopToneRef.current(); stopToneRef.current = null; }
         await supabase.from('radio_calls').update({ status: 'cancelled' }).eq('id', cur.callId);
-        setOutgoingCall(null); setCallDeclined(false);
-        setTextAlertModal({ callee: calleeInfo });
+        setOutgoingCall(null); setCallDeclined(false); setSelectedPerson(null);
       }, 30000);
     } else {
       if (callTimeoutRef.current) { clearTimeout(callTimeoutRef.current); callTimeoutRef.current = null; }
@@ -1784,52 +1780,6 @@ export default function TwoWayRadio() {
     </div>
   );
 
-  // Text-alert modal — shown when a 30s call times out
-  const TextAlertModal = textAlertModal && (
-    <div className="fixed inset-0 z-[80] bg-slate-950/98 flex flex-col items-center justify-center gap-6 px-6">
-      <div className="w-16 h-16 rounded-full bg-amber-600/20 flex items-center justify-center">
-        <PhoneOff className="w-8 h-8 text-amber-400" />
-      </div>
-      <div className="text-center">
-        <p className="text-white text-xl font-bold">No Answer</p>
-        <p className="text-slate-400 text-sm mt-1">{textAlertModal.callee?.full_name || 'They'} didn't pick up</p>
-        <p className="text-slate-500 text-xs mt-1">Leave a text alert so they can call back?</p>
-      </div>
-      <div className="w-full max-w-sm">
-        <textarea
-          value={textAlertMsg}
-          onChange={e => setTextAlertMsg(e.target.value)}
-          placeholder="Optional message (e.g. Call me when free)"
-          rows={3}
-          className="w-full bg-slate-800 text-white rounded-xl px-4 py-3 text-sm border border-slate-700 focus:border-teal-500 focus:outline-none resize-none"
-          autoFocus
-        />
-      </div>
-      <div className="flex gap-3 w-full max-w-sm">
-        <button onClick={() => { setTextAlertModal(null); setTextAlertMsg(''); }}
-          className="flex-1 py-4 rounded-2xl border border-slate-700 text-slate-400 font-semibold text-sm active:scale-95 transition-transform">
-          Dismiss
-        </button>
-        <button
-          onClick={async () => {
-            const callerName = user?.full_name || user?.email || 'A team member';
-            const msg = textAlertMsg.trim() || 'Tried to reach you on radio';
-            await base44.functions.invoke('createNotification', {
-              recipient_ids: resolveRecipients([textAlertModal.callee.id]),
-              type: 'radio_call',
-              title: `📞 Missed radio call from ${callerName}`,
-              message: msg, priority: 'high',
-              action_url: '/TwoWayRadio', send_push: true,
-            }).catch(() => {});
-            toast.success('Alert sent to ' + textAlertModal.callee.full_name);
-            setTextAlertModal(null); setTextAlertMsg('');
-          }}
-          className="flex-1 py-4 rounded-2xl bg-teal-600 text-white font-bold text-sm active:scale-95 transition-transform flex items-center justify-center gap-2">
-          <MessageSquare className="w-4 h-4" />Send Alert
-        </button>
-      </div>
-    </div>
-  );
 
   // ════════════════════════════════════════════════════════════════════════════
   // PTT VIEW
@@ -1841,7 +1791,6 @@ export default function TwoWayRadio() {
       {IncomingCallOverlay}
       {OutgoingCallOverlay}
       {IncomingEmergencyOverlay}
-      {TextAlertModal}
 
       {/* Fixed full-height PTT side bar — hidden on T320 (hardware PTT) */}
       {!isHandsFree && !isRadioMode && (
@@ -2073,7 +2022,6 @@ export default function TwoWayRadio() {
       {IncomingCallOverlay}
       {OutgoingCallOverlay}
       {IncomingEmergencyOverlay}
-      {TextAlertModal}
       {ManageModal}
 
       {/* ── PTT SIDE BAR — centred on edge, smaller pill — hidden on T320 (hardware PTT) ── */}
