@@ -1795,8 +1795,8 @@ export default function TwoWayRadio() {
 
       <div className="h-screen overflow-y-auto pb-28" style={theme.bgStyle}>
 
-        {/* ── APP HOME BAR — hidden for control devices, they have no access to the rest of the app ── */}
-        {isControlDevice ? (
+        {/* ── APP HOME BAR — hidden in radio mode (back button handles minimise) ── */}
+        {isRadioMode ? null : isControlDevice ? (
           <div
             className={`w-full flex items-center gap-3 px-5 font-semibold text-base flex-shrink-0 ${theme.homeBar}`}
             style={{ paddingTop: `calc(0.875rem + env(safe-area-inset-top))`, paddingBottom: '0.875rem' }}
@@ -1809,12 +1809,12 @@ export default function TwoWayRadio() {
           </div>
         ) : (
           <button
-            onClick={() => isRadioMode ? window.AndroidApp?.minimize() : navigate(createPageUrl('Dashboard'))}
+            onClick={() => navigate(createPageUrl('Dashboard'))}
             className={`w-full flex items-center gap-3 px-5 font-semibold text-base flex-shrink-0 touch-manipulation ${theme.homeBar}`}
             style={{ paddingTop: `calc(0.875rem + env(safe-area-inset-top))`, paddingBottom: '0.875rem' }}
           >
             <Home className="w-5 h-5 shrink-0" />
-            <span>{isRadioMode ? 'Minimise' : 'App Home'}</span>
+            <span>App Home</span>
           </button>
         )}
 
