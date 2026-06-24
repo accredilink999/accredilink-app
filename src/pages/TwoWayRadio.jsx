@@ -667,6 +667,11 @@ export default function TwoWayRadio() {
     setJoining(true);
     try {
       if (joinedChRef.current) await leaveChannel();
+      // Pre-create mic track BEFORE joining so Android audio session doesn't conflict
+      // with remote audio playback (NotReadableError on getUserMedia after subscribe)
+      if (!micTrackRef.current) {
+        try { micTrackRef.current = await AgoraRTC.createMicrophoneAudioTrack(); } catch {}
+      }
       const token = await buildAgoraToken(channelName, myUid);
       await clientRef.current.join(AGORA_APP_ID, channelName, token, myUid);
       joinedChRef.current = channelName;
