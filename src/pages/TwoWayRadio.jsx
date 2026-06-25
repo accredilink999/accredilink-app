@@ -146,8 +146,10 @@ function playTone(freqs, loop = false) {
       }
     } catch {}
   }
+  // Use shared context — avoids creating a suspended new context in background tabs
+  const ctx = getAudioCtx(); if (!ctx) return () => {};
   let timer = null;
-  const burst = () => withRunningCtx(ctx => freqs.forEach((freq, i) => {
+  const burst = () => freqs.forEach((freq, i) => {
     const osc = ctx.createOscillator(), gain = ctx.createGain();
     osc.connect(gain); gain.connect(ctx.destination);
     osc.frequency.value = freq; osc.type = 'sine';
@@ -155,10 +157,10 @@ function playTone(freqs, loop = false) {
     gain.gain.setValueAtTime(0.85 * vol, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.10);
     osc.start(t); osc.stop(t + 0.10);
-  }));
+  });
   burst();
   if (loop) timer = setInterval(burst, 2400);
-  return () => { if (timer) clearInterval(timer); };
+  return () => { if (timer) clearInterval(timer); }; // never close shared ctx
 }
 
 function playAlarm() {
@@ -1079,7 +1081,8 @@ export default function TwoWayRadio() {
   const initiateP2PCall = async (overridePerson = null) => {
     const target = overridePerson || selectedPerson;
     if (!target || !user?.id) return;
-    const chName = `ptp_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`;
+    const ids = [user.id, target.id].sort();
+    const chName = `ptp_${ids[0].slice(0, 8)}_${ids[1].slice(0, 8)}`;
     const { data: callRecord, error } = await supabase.from('radio_calls').insert({
       caller_id: user.id, callee_id: target.id,
       channel_name: chName, status: 'pending', organization_id: getOrgId(),
