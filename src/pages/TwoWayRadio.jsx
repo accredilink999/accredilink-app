@@ -703,7 +703,21 @@ export default function TwoWayRadio() {
         leaveChannel().then(() => { setActiveChannel(null); setView('main'); setSelectedPerson(null); });
       }
     });
-    c.on('user-joined',     () => setRemoteUsers([...c.remoteUsers]));
+    c.on('user-joined', (u) => {
+      setRemoteUsers([...c.remoteUsers]);
+      // If we're in an outgoing P2P call and the callee just joined Agora,
+      // the call is connected — use Agora's own event instead of waiting for
+      // Supabase Realtime 'accepted' which can be delayed on mobile.
+      const cur = outgoingRef.current;
+      if (cur) {
+        activeCallIdRef.current = cur.callId;
+        setOutgoingCall(null); setCallDeclined(false);
+        stopTone();
+        playCallConnectedTone();
+        setActiveChannel({ name: `📞 ${cur.callee?.full_name || 'Call'}`, id: '__ptp' });
+        setView('ptt');
+      }
+    });
     return () => { leaveChannel(); c.removeAllListeners(); };
   }, []);
 
@@ -1010,7 +1024,12 @@ export default function TwoWayRadio() {
         if (call.status === 'accepted') {
           activeCallIdRef.current = call.id;
           setOutgoingCall(null); setCallDeclined(false);
-          joinChannel(call.channel_name).then(() => { playCallConnectedTone(); setActiveChannel({ name: `📞 ${cur.callee?.full_name}`, id: '__ptp' }); setView('ptt'); });
+          // user-joined may have already connected us; only join if not already in channel
+          if (joinedChRef.current === call.channel_name) {
+            playCallConnectedTone(); setActiveChannel({ name: `📞 ${cur.callee?.full_name}`, id: '__ptp' }); setView('ptt');
+          } else {
+            joinChannel(call.channel_name).then(() => { playCallConnectedTone(); setActiveChannel({ name: `📞 ${cur.callee?.full_name}`, id: '__ptp' }); setView('ptt'); });
+          }
         } else if (call.status === 'callback') {
           setCallDeclined(true);
           setTimeout(() => { setOutgoingCall(null); setCallDeclined(false); }, 4000);
@@ -1060,6 +1079,8 @@ export default function TwoWayRadio() {
     setOutgoingCall({ callId: callRecord.id, callee: target, channelName: chName });
     setCallDeclined(false);
     stopTone(); stopToneRef.current = playOutgoingTone();
+    // Pre-join Agora so user-joined fires the moment callee answers — more reliable than Realtime
+    joinChannel(chName);
     const callerName = user?.full_name || user?.email || 'A team member';
     base44.functions.invoke('createNotification', {
       recipient_ids: resolveRecipients([target.id]), type: 'radio_call',
