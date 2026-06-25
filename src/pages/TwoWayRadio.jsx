@@ -2231,7 +2231,7 @@ export default function TwoWayRadio() {
               <div className="flex-1 min-w-0">
                 {unreadMissed.length === 1 ? (() => {
                   const call = unreadMissed[0];
-                  const personId = call.status === 'callback' ? call.caller_id : call.callee_id;
+                  const personId = (call.status === 'callback' || call.status === 'cancelled') ? call.caller_id : call.callee_id;
                   const name = staff.find(s => s.id === personId)?.full_name || 'Team Member';
                   return (
                     <>
@@ -2261,7 +2261,7 @@ export default function TwoWayRadio() {
             {unreadMissed.length > 1 && (
               <div className="px-4 pb-3 space-y-1.5">
                 {unreadMissed.map(call => {
-                  const personId = call.status === 'callback' ? call.caller_id : call.callee_id;
+                  const personId = (call.status === 'callback' || call.status === 'cancelled') ? call.caller_id : call.callee_id;
                   const name = staff.find(s => s.id === personId)?.full_name || 'Team Member';
                   return (
                     <div key={call.id} className="flex items-center gap-2 bg-amber-700/40 rounded-lg px-3 py-2">
