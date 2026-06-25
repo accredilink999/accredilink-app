@@ -341,6 +341,7 @@ export default function TwoWayRadio() {
   const outgoingRef     = useRef(null);
   const activeCallIdRef  = useRef(null); // tracks active P2P call so either party can end it
   const activeChannelRef = useRef(null); // mirrors activeChannel state for use inside stale closures
+  const pjPromiseRef    = useRef(null);  // holds the pre-join Promise so Realtime can await it
 
   // Realtime channel ref for emergency broadcast
   const rtEmergencyRef = useRef(null);
@@ -1036,12 +1037,23 @@ export default function TwoWayRadio() {
         if (call.status === 'accepted') {
           activeCallIdRef.current = call.id;
           setOutgoingCall(null); setCallDeclined(false);
+          const showPtt = () => {
+            playCallConnectedTone();
+            setActiveChannel({ name: `📞 ${cur.callee?.full_name}`, id: '__ptp' });
+            setView('ptt');
+          };
           if (joinedChRef.current === call.channel_name) {
-            playCallConnectedTone(); setActiveChannel({ name: `📞 ${cur.callee?.full_name}`, id: '__ptp' }); setView('ptt');
-          } else {
-            joinChannel(call.channel_name).then(() => {
-              playCallConnectedTone(); setActiveChannel({ name: `📞 ${cur.callee?.full_name}`, id: '__ptp' }); setView('ptt');
+            // Pre-join already finished — show PTT immediately
+            showPtt();
+          } else if (pjPromiseRef.current) {
+            // Pre-join still in progress — await it, then verify or re-join
+            const p = pjPromiseRef.current; pjPromiseRef.current = null;
+            p.then(() => {
+              if (joinedChRef.current === call.channel_name) { showPtt(); }
+              else { joinChannel(call.channel_name).then(showPtt); }
             });
+          } else {
+            joinChannel(call.channel_name).then(showPtt);
           }
         } else if (call.status === 'callback') {
           setCallDeclined(true);
@@ -1093,8 +1105,8 @@ export default function TwoWayRadio() {
     setCallDeclined(false);
     stopTone(); stopToneRef.current = playOutgoingTone();
     // Both devices pre-join Agora so user-joined fires the moment the callee answers.
-    // This is more reliable than waiting for the Supabase Realtime 'accepted' event.
-    joinChannel(chName);
+    // Store the promise so the Realtime 'accepted' handler can await it instead of racing.
+    pjPromiseRef.current = joinChannel(chName);
     const callerName = user?.full_name || user?.email || 'A team member';
     base44.functions.invoke('createNotification', {
       recipient_ids: resolveRecipients([target.id]), type: 'radio_call',
