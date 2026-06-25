@@ -621,9 +621,8 @@ export default function TwoWayRadio() {
         if (!cur?.callId) return;
         if (stopToneRef.current) { stopToneRef.current(); stopToneRef.current = null; }
         await supabase.from('radio_calls').update({ status: 'cancelled' }).eq('id', cur.callId);
-        leaveChannel();
         setOutgoingCall(null); setCallDeclined(false); setSelectedPerson(null);
-      }, 30000);
+      }, 60000);
     } else {
       if (callTimeoutRef.current) { clearTimeout(callTimeoutRef.current); callTimeoutRef.current = null; }
     }
@@ -747,6 +746,7 @@ export default function TwoWayRadio() {
 
   const joinChannel = async (channelName) => {
     if (!myUid || !clientRef.current) return;
+    if (joinedChRef.current === channelName) return; // already in this channel — skip
     setJoining(true);
     try {
       if (joinedChRef.current) await leaveChannel();
