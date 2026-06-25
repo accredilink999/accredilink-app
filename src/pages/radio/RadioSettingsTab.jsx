@@ -206,11 +206,11 @@ export default function RadioSettingsTab({
           <div className="flex items-center gap-2 shrink-0">
             <input
               type="range" min="50" max="500" step="10"
-              value={callVolume ?? 200}
+              value={callVolume ?? 300}
               onChange={e => setCallVolume(parseInt(e.target.value, 10))}
               className="w-24 accent-teal-500"
             />
-            <span className="text-slate-300 text-xs w-8 text-right">{Math.round(((callVolume ?? 200) / 100) * 100)}%</span>
+            <span className="text-slate-300 text-xs w-8 text-right">{callVolume ?? 300}%</span>
           </div>
         </div>
         <Toggle
