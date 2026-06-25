@@ -1081,8 +1081,7 @@ export default function TwoWayRadio() {
   const initiateP2PCall = async (overridePerson = null) => {
     const target = overridePerson || selectedPerson;
     if (!target || !user?.id) return;
-    const ids = [user.id, target.id].sort();
-    const chName = `ptp_${ids[0].slice(0, 8)}_${ids[1].slice(0, 8)}`;
+    const chName = `ptp_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`;
     const { data: callRecord, error } = await supabase.from('radio_calls').insert({
       caller_id: user.id, callee_id: target.id,
       channel_name: chName, status: 'pending', organization_id: getOrgId(),
