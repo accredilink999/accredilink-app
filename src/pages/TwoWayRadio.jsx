@@ -620,6 +620,7 @@ export default function TwoWayRadio() {
         const cur = outgoingRef.current;
         if (!cur?.callId) return;
         if (stopToneRef.current) { stopToneRef.current(); stopToneRef.current = null; }
+        await leaveChannel(); // leave Agora before signalling cancellation so callee can't callback into a stale session
         await supabase.from('radio_calls').update({ status: 'cancelled' }).eq('id', cur.callId);
         setOutgoingCall(null); setCallDeclined(false); setSelectedPerson(null);
       }, 60000);
@@ -746,7 +747,6 @@ export default function TwoWayRadio() {
 
   const joinChannel = async (channelName) => {
     if (!myUid || !clientRef.current) return;
-    if (joinedChRef.current === channelName) return; // already in this channel — skip
     setJoining(true);
     try {
       if (joinedChRef.current) await leaveChannel();
