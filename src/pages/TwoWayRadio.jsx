@@ -1081,8 +1081,9 @@ export default function TwoWayRadio() {
     setOutgoingCall({ callId: callRecord.id, callee: target, channelName: chName });
     setCallDeclined(false);
     stopTone(); stopToneRef.current = playOutgoingTone();
-    // Pre-join Agora so user-joined fires the moment callee answers — more reliable than Realtime
-    joinChannel(chName);
+    // APK pre-joins Agora so user-joined fires the moment callee answers (Realtime is unreliable
+    // on mobile WebView). PWA relies on the Realtime 'accepted' handler which is reliable on browser.
+    if (isRadioMode) joinChannel(chName);
     const callerName = user?.full_name || user?.email || 'A team member';
     base44.functions.invoke('createNotification', {
       recipient_ids: resolveRecipients([target.id]), type: 'radio_call',
