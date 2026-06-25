@@ -922,6 +922,19 @@ export default function TwoWayRadio() {
           const caller = staffRef.current.find(s => s.id === call.caller_id);
           setIncomingCall({ callId: call.id, caller, channelName: call.channel_name });
           stopTone(); stopToneRef.current = playTone([880, 1100, 880, 1100, 660], true);
+          // When PWA is backgrounded, FCM onMessage is consumed silently — show a system notification directly
+          if (document.hidden && 'serviceWorker' in navigator) {
+            const callerName = caller?.full_name || 'Team Member';
+            navigator.serviceWorker.ready.then(reg => reg.showNotification(`📞 ${callerName} is calling`, {
+              body: 'Tap to answer on Team Radio.',
+              icon: '/pwa-192x192.png',
+              badge: '/pwa-64x64.png',
+              tag: `radio-call-${call.id}`,
+              data: { action_url: `/TwoWayRadio?call=${call.channel_name}` },
+              requireInteraction: true,
+              vibrate: [300, 100, 300, 100, 300],
+            })).catch(() => {});
+          }
           // Wake screen and bring app to front on T320 handset
           window.AndroidApp?.wakeForCall?.();
         } else if (call.status === 'callback_request') {
@@ -956,7 +969,13 @@ export default function TwoWayRadio() {
           });
           return;
         }
-        // Caller cancelled before we answered
+        // Caller cancelled before we answered — also close any backgrounded system notification
+        if ((call.status === 'cancelled' || call.status === 'declined') && 'serviceWorker' in navigator) {
+          navigator.serviceWorker.ready.then(reg =>
+            reg.getNotifications({ tag: `radio-call-${call.id}` })
+              .then(notifs => notifs.forEach(n => n.close()))
+          ).catch(() => {});
+        }
         setIncomingCall(prev => {
           if (prev && prev.callId === call.id && (call.status === 'cancelled' || call.status === 'declined')) {
             stopTone();
