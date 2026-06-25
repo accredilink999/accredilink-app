@@ -685,7 +685,7 @@ export default function TwoWayRadio() {
         try { micTrackRef.current = await AgoraRTC.createMicrophoneAudioTrack(); } catch {}
       }
       await c.subscribe(u, t);
-      if (t === 'audio') { u.audioTrack?.play(); setSpeakingUids(p => new Set([...p, u.uid])); }
+      if (t === 'audio') { u.audioTrack?.play(); u.audioTrack?.setVolume(300); setSpeakingUids(p => new Set([...p, u.uid])); }
       setRemoteUsers([...c.remoteUsers]);
     });
     c.on('user-unpublished', u => { setSpeakingUids(p => { const n = new Set(p); n.delete(u.uid); return n; }); setRemoteUsers([...c.remoteUsers]); });
