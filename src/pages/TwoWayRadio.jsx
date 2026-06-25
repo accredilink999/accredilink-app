@@ -619,7 +619,6 @@ export default function TwoWayRadio() {
       callTimeoutRef.current = setTimeout(async () => {
         const cur = outgoingRef.current;
         if (!cur?.callId) return;
-        toast.error('DBG: 60s timeout fired!');
         if (stopToneRef.current) { stopToneRef.current(); stopToneRef.current = null; }
         await leaveChannel();
         await supabase.from('radio_calls').update({ status: 'cancelled' }).eq('id', cur.callId);
