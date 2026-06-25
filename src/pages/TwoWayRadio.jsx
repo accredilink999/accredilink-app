@@ -1210,13 +1210,15 @@ export default function TwoWayRadio() {
     initiateP2PCall(person);
   };
 
-  const callBackFromMissed = (call) => {
+  const callBackFromMissed = async (call) => {
+    stopTone();
     const personId = (call.status === 'callback' || call.status === 'cancelled') ? call.caller_id : call.callee_id;
     const person = staffRef.current.find(s => s.id === personId);
     if (!person) { toast.error('Could not find that person'); return; }
     dismissMissedCalls(call.id);
+    if (call.id) await supabase.from('radio_calls').update({ status: 'callback' }).eq('id', call.id);
     setSelectedPerson(person);
-    initiateP2PCall(person);
+    await initiateP2PCall(person);
   };
 
   const cancelOutgoingCall = async () => {
