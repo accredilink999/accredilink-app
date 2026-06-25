@@ -749,12 +749,14 @@ export default function TwoWayRadio() {
     if (!myUid || !clientRef.current) return;
     setJoining(true);
     try {
-      if (joinedChRef.current) await leaveChannel();
+      // Use the real Agora connection state rather than joinedChRef, which can
+      // drift out of sync if a previous leave/join failed silently.
+      if (clientRef.current.connectionState !== 'DISCONNECTED') await leaveChannel();
       const token = await buildAgoraToken(channelName, myUid);
       await clientRef.current.join(AGORA_APP_ID, channelName, token, myUid);
       joinedChRef.current = channelName;
       setIsJoined(true);
-    } catch (e) { toast.error('Could not join: ' + e.message); }
+    } catch (e) { toast.error('Could not join: ' + (e.code ?? e.message)); }
     setJoining(false);
   };
 
