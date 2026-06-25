@@ -197,27 +197,6 @@ function playOutgoingTone() {
   let active = true;
   let timer = null;
 
-  if (isRadio) {
-    // Radio: oscillator grant tone (low→high)
-    [880, 1400].forEach((freq, i) => {
-      const osc = ctx.createOscillator(), gain = ctx.createGain();
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.frequency.value = freq; osc.type = 'sine';
-      const t = ctx.currentTime + i * 0.075;
-      gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.85 * vol, t + 0.003);
-      gain.gain.setValueAtTime(0.85 * vol, t + 0.058);
-      gain.gain.linearRampToValueAtTime(0, t + 0.072);
-      osc.start(t); osc.stop(t + 0.075);
-    });
-  } else {
-    // PWA: play Beep Bop.aac as the dial-start sound (user gesture available)
-    const pre = _preloaded['/radio-tones/Beep Bop.aac'];
-    if (pre) { pre.currentTime = 0; pre.volume = vol; pre.play().catch(() => {}); }
-    else { try { const a = new Audio('/radio-tones/Beep Bop.aac'); a.volume = vol; a.play().catch(() => {}); } catch {} }
-  }
-
-  // Ring burst loop (both modes) — starts after grant tone/file
   const ringFreqs = [400, 600, 800, 600, 400];
   const burst = () => {
     if (!active) return;
@@ -231,9 +210,39 @@ function playOutgoingTone() {
       osc.start(t); osc.stop(t + 0.10);
     });
   };
-  // Give the AAC file time to play before the ring loop starts
-  const delay = isRadio ? 200 : 700;
-  setTimeout(() => { if (active) { burst(); timer = setInterval(burst, 2400); } }, delay);
+
+  const doPlay = () => {
+    if (!active) return;
+    if (isRadio) {
+      // Radio: oscillator grant tone (low→high)
+      [880, 1400].forEach((freq, i) => {
+        const osc = ctx.createOscillator(), gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = freq; osc.type = 'sine';
+        const t = ctx.currentTime + i * 0.075;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.85 * vol, t + 0.003);
+        gain.gain.setValueAtTime(0.85 * vol, t + 0.058);
+        gain.gain.linearRampToValueAtTime(0, t + 0.072);
+        osc.start(t); osc.stop(t + 0.075);
+      });
+    } else {
+      // PWA: play Beep Bop.aac as the dial-start sound
+      const pre = _preloaded['/radio-tones/Beep Bop.aac'];
+      if (pre) { pre.currentTime = 0; pre.volume = vol; pre.play().catch(() => {}); }
+      else { try { const a = new Audio('/radio-tones/Beep Bop.aac'); a.volume = vol; a.play().catch(() => {}); } catch {} }
+    }
+    // Ring burst loop — starts after grant tone/file
+    const delay = isRadio ? 200 : 700;
+    setTimeout(() => { if (active) { burst(); timer = setInterval(burst, 2400); } }, delay);
+  };
+
+  // Resume suspended context (e.g. after 60s idle on missed-call callback)
+  if (ctx.state !== 'running') {
+    ctx.resume().then(doPlay).catch(() => {});
+  } else {
+    doPlay();
+  }
 
   return () => { active = false; if (timer) clearInterval(timer); };
 }
@@ -751,12 +760,20 @@ export default function TwoWayRadio() {
       if (c.remoteUsers.length === 0) {
         const callId = activeCallIdRef.current;
         addDbgRef.current?.(`UL id=${callId?'✓':'✗'} ch=${activeChannelRef.current?'✓':'✗'}`);
-        if (!callId && !activeChannelRef.current) return;
-        if (callId) {
-          activeCallIdRef.current = null;
-          supabase.from('radio_calls').update({ status: 'ended' }).eq('id', callId).then(() => {});
-        }
-        leaveChannel().then(() => { setActiveChannel(null); setView('main'); setSelectedPerson(null); });
+        if (!callId && !activeChannelRef.current) return; // pre-join, no active call
+        // Grace period: handles the render race (activeCallIdRef set by user-joined ref before
+        // React renders activeChannel) and transient Agora disconnects on mobile.
+        setTimeout(() => {
+          if (c.remoteUsers.length > 0) { addDbgRef.current?.('UL:rejoined'); return; }
+          const currentCallId = activeCallIdRef.current;
+          addDbgRef.current?.(`UL→MAIN id=${currentCallId?'✓':'✗'}`);
+          if (!currentCallId && !activeChannelRef.current) return;
+          if (currentCallId) {
+            activeCallIdRef.current = null;
+            supabase.from('radio_calls').update({ status: 'ended' }).eq('id', currentCallId).then(() => {});
+          }
+          leaveChannel().then(() => { setActiveChannel(null); setView('main'); setSelectedPerson(null); });
+        }, 1500);
       }
     });
     c.on('user-joined', (u) => {
@@ -1141,8 +1158,7 @@ export default function TwoWayRadio() {
   const initiateP2PCall = async (overridePerson = null) => {
     const target = overridePerson || selectedPerson;
     if (!target || !user?.id) return;
-    const ids = [user.id, target.id].sort();
-    const chName = `ptp_${ids[0].slice(0, 8)}_${ids[1].slice(0, 8)}`;
+    const chName = `ptp_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`;
     const { data: callRecord, error } = await supabase.from('radio_calls').insert({
       caller_id: user.id, callee_id: target.id,
       channel_name: chName, status: 'pending', organization_id: getOrgId(),
