@@ -461,7 +461,6 @@ export default function TwoWayRadio() {
   // 30s call timeout → text alert modal
   const callTimeoutRef = useRef(null);
 
-  useEffect(() => { outgoingRef.current = outgoingCall; }, [outgoingCall]);
 
   // ── Queries ───────────────────────────────────────────────────────────────
   const { data: user }         = useQuery({ queryKey: ['currentUser'], queryFn: () => base44.auth.me() });
@@ -1568,6 +1567,7 @@ export default function TwoWayRadio() {
   isTalkingRef.current          = isTalking;
   callVolumeRef.current         = callVolume;
   incomingCallRef.current       = incomingCall;
+  outgoingRef.current           = outgoingCall;
   initiateP2PCallRef.current    = initiateP2PCall;
   acceptIncomingCallRef.current = acceptIncomingCall;
   startTalkingRef.current       = startTalking;
