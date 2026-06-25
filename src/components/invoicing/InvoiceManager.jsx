@@ -547,13 +547,21 @@ export default function InvoiceManager({ invoices, clients, settings }) {
       // Get old template to find matching draft invoices
       const { data: oldTemplate } = await supabase
         .from('recurring_invoices')
-        .select('period_from, period_to')
+        .select('period_from, period_to, next_invoice_date')
         .eq('id', id)
         .single();
 
+      // If period_from changed and next_invoice_date was in sync with the old period_from, advance it too
+      const finalUpdates = { ...updates };
+      if (oldTemplate && updates.period_from && updates.period_from !== oldTemplate.period_from) {
+        if (!updates.next_invoice_date && oldTemplate.next_invoice_date === oldTemplate.period_from) {
+          finalUpdates.next_invoice_date = updates.period_from;
+        }
+      }
+
       const { error } = await supabase
         .from('recurring_invoices')
-        .update(updates)
+        .update(finalUpdates)
         .eq('id', id);
       if (error) throw error;
 
@@ -3642,7 +3650,14 @@ function EditRecurringTemplateForm({ template, onSave, onCancel, isLoading }) {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Period From</label>
-            <Input type="date" value={formData.period_from} onChange={(e) => setFormData({ ...formData, period_from: e.target.value })} />
+            <Input type="date" value={formData.period_from} onChange={(e) => {
+              const newFrom = e.target.value;
+              setFormData(prev => ({
+                ...prev,
+                period_from: newFrom,
+                next_invoice_date: prev.next_invoice_date === prev.period_from ? newFrom : prev.next_invoice_date,
+              }));
+            }} />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Period To</label>
