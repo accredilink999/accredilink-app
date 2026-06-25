@@ -411,6 +411,8 @@ export default function TwoWayRadio() {
   const [radioTab, setRadioTab]         = useState('radio'); // 'radio' | 'shift' | 'settings'
   const [silentMode, setSilentMode]     = useState(() => localStorage.getItem('radio_silent_mode') === 'true');
   const [toneVolume, setToneVolume]     = useState(() => { const v = parseFloat(localStorage.getItem('radio_tone_volume') || '1'); return isNaN(v) ? 1 : v; });
+  const [callVolume, setCallVolume]     = useState(() => { const v = parseInt(localStorage.getItem('radio_call_volume') || '200', 10); return isNaN(v) ? 200 : v; });
+  const callVolumeRef = useRef(callVolume);
   const [showAllAreas, setShowAllAreas] = useState(() => localStorage.getItem('radio_show_all_areas') !== 'false');
   const [areaToggles, setAreaToggles]   = useState(() => { try { return JSON.parse(localStorage.getItem('radio_area_toggles') || '{}'); } catch { return {}; } });
   const [customSounds, setCustomSounds] = useState(() => {
@@ -685,7 +687,7 @@ export default function TwoWayRadio() {
         try { micTrackRef.current = await AgoraRTC.createMicrophoneAudioTrack(); } catch {}
       }
       await c.subscribe(u, t);
-      if (t === 'audio') { u.audioTrack?.play(); u.audioTrack?.setVolume(300); setSpeakingUids(p => new Set([...p, u.uid])); }
+      if (t === 'audio') { u.audioTrack?.play(); u.audioTrack?.setVolume(callVolumeRef.current); setSpeakingUids(p => new Set([...p, u.uid])); }
       setRemoteUsers([...c.remoteUsers]);
     });
     c.on('user-unpublished', u => { setSpeakingUids(p => { const n = new Set(p); n.delete(u.uid); return n; }); setRemoteUsers([...c.remoteUsers]); });
@@ -1562,6 +1564,7 @@ export default function TwoWayRadio() {
   const stopTalkingRef          = useRef(null);
   pttModeRef.current            = pttMode;
   isTalkingRef.current          = isTalking;
+  callVolumeRef.current         = callVolume;
   incomingCallRef.current       = incomingCall;
   initiateP2PCallRef.current    = initiateP2PCall;
   acceptIncomingCallRef.current = acceptIncomingCall;
@@ -2575,6 +2578,8 @@ export default function TwoWayRadio() {
             setRadioTheme={setRadioTheme}
             toneVolume={toneVolume}
             setToneVolume={v => { setToneVolume(v); localStorage.setItem('radio_tone_volume', String(v)); }}
+            callVolume={callVolume}
+            setCallVolume={v => { setCallVolume(v); callVolumeRef.current = v; localStorage.setItem('radio_call_volume', String(v)); }}
           />
         )}
 

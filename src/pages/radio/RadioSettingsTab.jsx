@@ -79,6 +79,7 @@ export default function RadioSettingsTab({
   isControlDevice,
   radioTheme, setRadioTheme,
   toneVolume, setToneVolume,
+  callVolume, setCallVolume,
   alerterEnabled, setAlerterEnabled,
 }) {
   const saveSound = (key, file) => {
@@ -184,7 +185,7 @@ export default function RadioSettingsTab({
           <Volume2 className="w-4 h-4 text-slate-400 shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-white text-sm font-semibold">Tone Volume</p>
-            <p className="text-slate-400 text-xs">Alert, PTT and ring tones only — does not affect call audio</p>
+            <p className="text-slate-400 text-xs">Alert, PTT and ring tones only</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <input
@@ -194,6 +195,22 @@ export default function RadioSettingsTab({
               className="w-24 accent-teal-500"
             />
             <span className="text-slate-300 text-xs w-8 text-right">{Math.round((toneVolume ?? 1) * 100)}%</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 py-2">
+          <Volume2 className="w-4 h-4 text-slate-400 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-white text-sm font-semibold">Call Audio Volume</p>
+            <p className="text-slate-400 text-xs">Voice volume during live P2P calls</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <input
+              type="range" min="50" max="500" step="10"
+              value={callVolume ?? 200}
+              onChange={e => setCallVolume(parseInt(e.target.value, 10))}
+              className="w-24 accent-teal-500"
+            />
+            <span className="text-slate-300 text-xs w-8 text-right">{Math.round(((callVolume ?? 200) / 100) * 100)}%</span>
           </div>
         </div>
         <Toggle
