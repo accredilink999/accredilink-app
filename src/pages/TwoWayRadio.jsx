@@ -362,6 +362,12 @@ export default function TwoWayRadio() {
   const staffRef = useRef([]);
 
   // ── State ─────────────────────────────────────────────────────────────────
+  const [dbgLog, setDbgLog] = useState([]);
+  const addDbgRef = useRef(null); // ref so stale closures (Agora handlers) can call it
+  addDbgRef.current = (msg) => {
+    const ts = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    setDbgLog(p => [...p.slice(-6), `${ts} ${msg}`]);
+  };
   const [view, setView]                     = useState('main');
   const [isJoined, setIsJoined]             = useState(false);
   const [isTalking, setIsTalking]           = useState(false);
@@ -648,17 +654,20 @@ export default function TwoWayRadio() {
       if (!outgoingRef.current || outgoingRef.current.callId !== callId) { clearInterval(pollTimer); return; }
       try {
         const { data } = await supabase.from('radio_calls').select('status').eq('id', callId).maybeSingle();
+        addDbgRef.current?.(`POLL:${data?.status??'null'}`);
         if (data?.status === 'accepted') {
           clearInterval(pollTimer);
-          if (activeCallIdRef.current === callId) return; // Realtime already handled it
+          if (activeCallIdRef.current === callId) { addDbgRef.current?.('POLL:already handled'); return; }
           activeCallIdRef.current = callId;
           setOutgoingCall(null); setCallDeclined(false);
           stopTone();
           const showPtt = () => {
+            addDbgRef.current?.('→PTT(poll)');
             playCallConnectedTone();
             setActiveChannel({ name: `📞 ${callee?.full_name}`, id: '__ptp' });
             setView('ptt');
           };
+          addDbgRef.current?.(`POLL→acc jCh=${joinedChRef.current?'✓':'✗'} pj=${pjPromiseRef.current?'✓':'✗'}`);
           if (joinedChRef.current === channelName) {
             showPtt();
           } else if (pjPromiseRef.current) {
@@ -670,7 +679,7 @@ export default function TwoWayRadio() {
         } else if (['cancelled', 'ended', 'declined'].includes(data?.status)) {
           clearInterval(pollTimer);
         }
-      } catch {}
+      } catch (e) { addDbgRef.current?.(`POLL✗ ${e.message}`); }
     }, 3000);
     return () => clearInterval(pollTimer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -741,8 +750,7 @@ export default function TwoWayRadio() {
       setRemoteUsers([...c.remoteUsers]);
       if (c.remoteUsers.length === 0) {
         const callId = activeCallIdRef.current;
-        // Ignore if we're pre-joining a P2P channel before the call is established.
-        // An active call or active channel must exist before we tear down.
+        addDbgRef.current?.(`UL id=${callId?'✓':'✗'} ch=${activeChannelRef.current?'✓':'✗'}`);
         if (!callId && !activeChannelRef.current) return;
         if (callId) {
           activeCallIdRef.current = null;
@@ -753,10 +761,8 @@ export default function TwoWayRadio() {
     });
     c.on('user-joined', (u) => {
       setRemoteUsers([...c.remoteUsers]);
-      // If we're in an outgoing P2P call and the callee just joined Agora,
-      // the call is connected — use Agora's own event instead of waiting for
-      // Supabase Realtime 'accepted' which can be delayed on mobile.
       const cur = outgoingRef.current;
+      addDbgRef.current?.(`UJ uid=${u.uid} cur=${cur?'✓':'✗'}`);
       if (cur) {
         activeCallIdRef.current = cur.callId;
         setOutgoingCall(null); setCallDeclined(false);
@@ -793,16 +799,19 @@ export default function TwoWayRadio() {
 
   const joinChannel = async (channelName) => {
     if (!myUid || !clientRef.current) return;
+    addDbgRef.current?.(`JN:${channelName.slice(-6)} st=${clientRef.current.connectionState}`);
     setJoining(true);
     try {
-      // Use the real Agora connection state rather than joinedChRef, which can
-      // drift out of sync if a previous leave/join failed silently.
       if (clientRef.current.connectionState !== 'DISCONNECTED') await leaveChannel();
       const token = await buildAgoraToken(channelName, myUid);
       await clientRef.current.join(AGORA_APP_ID, channelName, token, myUid);
       joinedChRef.current = channelName;
       setIsJoined(true);
-    } catch (e) { toast.error('Could not join: ' + (e.code ?? e.message)); }
+      addDbgRef.current?.(`JN✓ ${channelName.slice(-6)}`);
+    } catch (e) {
+      addDbgRef.current?.(`JN✗ ${e.code??e.message}`);
+      toast.error('Could not join: ' + (e.code ?? e.message));
+    }
     setJoining(false);
   };
 
@@ -1072,15 +1081,16 @@ export default function TwoWayRadio() {
         if (!cur || call.id !== cur.callId) return;
         stopTone();
         if (call.status === 'accepted') {
+          addDbgRef.current?.(`RT:acc jCh=${joinedChRef.current?'✓':'✗'} pj=${pjPromiseRef.current?'✓':'✗'}`);
           activeCallIdRef.current = call.id;
           setOutgoingCall(null); setCallDeclined(false);
           const showPtt = () => {
+            addDbgRef.current?.('→PTT(RT)');
             playCallConnectedTone();
             setActiveChannel({ name: `📞 ${cur.callee?.full_name}`, id: '__ptp' });
             setView('ptt');
           };
           if (joinedChRef.current === call.channel_name) {
-            // Pre-join already finished — show PTT immediately
             showPtt();
           } else if (pjPromiseRef.current) {
             // Pre-join still in progress — await it, then verify or re-join
@@ -1137,12 +1147,11 @@ export default function TwoWayRadio() {
       caller_id: user.id, callee_id: target.id,
       channel_name: chName, status: 'pending', organization_id: getOrgId(),
     }).select().single();
-    if (error) { toast.error('Failed to initiate call'); return; }
+    if (error) { addDbgRef.current?.(`INIT✗ ${error.message}`); toast.error('Failed to initiate call'); return; }
+    addDbgRef.current?.(`INIT✓ id=${callRecord.id.slice(-4)}`);
     setOutgoingCall({ callId: callRecord.id, callee: target, channelName: chName });
     setCallDeclined(false);
     stopTone(); stopToneRef.current = playOutgoingTone();
-    // Both devices pre-join Agora so user-joined fires the moment the callee answers.
-    // Store the promise so the Realtime 'accepted' handler can await it instead of racing.
     pjPromiseRef.current = joinChannel(chName);
     const callerName = user?.full_name || user?.email || 'A team member';
     base44.functions.invoke('createNotification', {
@@ -2115,6 +2124,12 @@ export default function TwoWayRadio() {
 
   return (
     <>
+      {/* DEBUG LOG — remove before ship */}
+      {dbgLog.length > 0 && (
+        <div style={{ position: 'fixed', bottom: 120, left: 4, right: 4, zIndex: 99999, background: 'rgba(0,0,0,0.85)', borderRadius: 6, padding: '6px 8px', pointerEvents: 'none' }}>
+          {dbgLog.map((e, i) => <div key={i} style={{ color: '#4ade80', fontSize: 10, fontFamily: 'monospace', lineHeight: '1.4' }}>{e}</div>)}
+        </div>
+      )}
       {EmergencyCountdownOverlay}
       {ActiveEmergencyBanner}
       {IncomingCallOverlay}
