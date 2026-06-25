@@ -68,6 +68,14 @@ function getAudioCtx() {
     return _sharedCtx;
   } catch { return null; }
 }
+// Run fn(ctx) only once the context is confirmed running — avoids scheduling
+// oscillators at a frozen currentTime when the context is mid-resume.
+function withRunningCtx(fn) {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  if (ctx.state === 'running') { try { fn(ctx); } catch {} return; }
+  ctx.resume().then(() => { try { fn(ctx); } catch {} }).catch(() => {});
+}
 
 // Preload bundled tones so they play instantly on PTT press (no network fetch delay)
 const _preloaded = {};
@@ -235,10 +243,9 @@ function playOutgoingTone() {
 function playPTTTone(type) {
   if (localStorage.getItem('radio_silent_mode') === 'true') return;
   if (playCustomSound(type === 'up' ? 'ptt_up' : 'ptt_down')) return;
-  try {
-    const vol = getToneVolume();
-    const ctx = getAudioCtx(); if (!ctx) return;
-    const freqs = type === 'up' ? [880, 1400] : [1400, 880];
+  const vol = getToneVolume();
+  const freqs = type === 'up' ? [880, 1400] : [1400, 880];
+  withRunningCtx(ctx => {
     const now = ctx.currentTime;
     freqs.forEach((freq, i) => {
       const osc = ctx.createOscillator(), gain = ctx.createGain();
@@ -251,7 +258,7 @@ function playPTTTone(type) {
       gain.gain.linearRampToValueAtTime(0, t + 0.072);
       osc.start(t); osc.stop(t + 0.075);
     });
-  } catch {}
+  });
 }
 
 // Call-end tone — Bop Beep audio file (APK + PWA)
@@ -269,9 +276,8 @@ function playCallEndTone() {
 function playCallConnectedTone() {
   if (localStorage.getItem('radio_silent_mode') === 'true') return;
   if (playCustomSound('call_connected')) return;
-  try {
-    const vol = getToneVolume();
-    const ctx = getAudioCtx(); if (!ctx) return;
+  const vol = getToneVolume();
+  withRunningCtx(ctx => {
     const now = ctx.currentTime;
     [880, 1400].forEach((freq, i) => {
       const osc = ctx.createOscillator(), gain = ctx.createGain();
@@ -284,7 +290,7 @@ function playCallConnectedTone() {
       gain.gain.linearRampToValueAtTime(0, t + 0.072);
       osc.start(t); osc.stop(t + 0.075);
     });
-  } catch {}
+  });
 }
 
 // Callback-request alert tone — uses callback_request slot (defaults to Bop Beep)
