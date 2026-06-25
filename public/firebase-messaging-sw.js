@@ -90,8 +90,7 @@ self.addEventListener('notificationclick', (event) => {
           // Post message so React can handle navigation without a full reload.
           // Also try navigate() for the ?call= PIN-bypass — falls back gracefully if unsupported.
           client.postMessage({ type: 'NOTIFICATION_CLICK', data: event.notification.data });
-          if ('navigate' in client) client.navigate(url).catch(() => {});
-          if ('focus'    in client) return client.focus();
+          if ('focus' in client) return client.focus();
           return;
         }
       }

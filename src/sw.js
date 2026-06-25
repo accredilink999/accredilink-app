@@ -72,10 +72,11 @@ self.addEventListener('notificationclick', (event) => {
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {
         if (client.url.includes(self.location.origin)) {
-          // postMessage lets React Router handle navigation without a full reload
+          // postMessage lets React Router handle navigation without a hard reload.
+          // Do NOT call client.navigate() — it races with postMessage and causes
+          // a page reload that wipes the soft navigation before it completes.
           client.postMessage({ type: 'NOTIFICATION_CLICK', data: event.notification.data })
-          if ('navigate' in client) client.navigate(url).catch(() => {})
-          if ('focus'    in client) return client.focus()
+          if ('focus' in client) return client.focus()
           return
         }
       }
