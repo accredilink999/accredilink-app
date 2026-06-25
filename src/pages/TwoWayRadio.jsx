@@ -622,6 +622,7 @@ export default function TwoWayRadio() {
         if (!cur?.callId) return;
         if (stopToneRef.current) { stopToneRef.current(); stopToneRef.current = null; }
         await supabase.from('radio_calls').update({ status: 'cancelled' }).eq('id', cur.callId);
+        leaveChannel();
         setOutgoingCall(null); setCallDeclined(false); setSelectedPerson(null);
       }, 30000);
     } else {
@@ -1156,6 +1157,7 @@ export default function TwoWayRadio() {
         priority: 'high', action_url: '/TwoWayRadio', send_push: true,
       }).catch(() => {});
     }
+    leaveChannel();
     setOutgoingCall(null); setCallDeclined(false); setSelectedPerson(null);
   };
 
