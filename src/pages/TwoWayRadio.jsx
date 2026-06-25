@@ -619,6 +619,7 @@ export default function TwoWayRadio() {
       callTimeoutRef.current = setTimeout(async () => {
         const cur = outgoingRef.current;
         if (!cur?.callId) return;
+        toast.error('DBG: 60s timeout fired!');
         if (stopToneRef.current) { stopToneRef.current(); stopToneRef.current = null; }
         await leaveChannel();
         await supabase.from('radio_calls').update({ status: 'cancelled' }).eq('id', cur.callId);
@@ -695,6 +696,7 @@ export default function TwoWayRadio() {
       setSpeakingUids(p => { const n = new Set(p); n.delete(u.uid); return n; });
       setRemoteUsers([...c.remoteUsers]);
       if (c.remoteUsers.length === 0) {
+        toast.error(`DBG user-left uid=${u.uid} callId=${activeCallIdRef.current ?? 'null'}`);
         const callId = activeCallIdRef.current;
         if (callId) {
           activeCallIdRef.current = null;
@@ -1021,15 +1023,18 @@ export default function TwoWayRadio() {
           return;
         }
         // Response to our outgoing call
-        if (!cur || call.id !== cur.callId) return;
+        if (!cur || call.id !== cur.callId) { toast.error(`DBG RT: no cur or id mismatch cur=${cur?.callId} call=${call.id}`); return; }
         stopTone();
         if (call.status === 'accepted') {
           activeCallIdRef.current = call.id;
           setOutgoingCall(null); setCallDeclined(false);
           if (joinedChRef.current === call.channel_name) {
+            toast('DBG: already in ch');
             playCallConnectedTone(); setActiveChannel({ name: `📞 ${cur.callee?.full_name}`, id: '__ptp' }); setView('ptt');
           } else {
+            toast('DBG: joining ch...');
             joinChannel(call.channel_name).then(() => {
+              toast('DBG: joined → PTT');
               playCallConnectedTone(); setActiveChannel({ name: `📞 ${cur.callee?.full_name}`, id: '__ptp' }); setView('ptt');
             });
           }
@@ -1560,7 +1565,6 @@ export default function TwoWayRadio() {
   // closure always reads the latest value with zero timing gap.
   const pttModeRef              = useRef(pttMode);
   const isTalkingRef            = useRef(isTalking);
-  const isJoinedRef             = useRef(isJoined);
   const incomingCallRef         = useRef(incomingCall);
   const acceptIncomingCallRef   = useRef(null);
   const initiateP2PCallRef      = useRef(null);
@@ -1568,7 +1572,6 @@ export default function TwoWayRadio() {
   const stopTalkingRef          = useRef(null);
   pttModeRef.current            = pttMode;
   isTalkingRef.current          = isTalking;
-  isJoinedRef.current           = isJoined;
   callVolumeRef.current         = callVolume;
   incomingCallRef.current       = incomingCall;
   outgoingRef.current           = outgoingCall;
@@ -1585,19 +1588,12 @@ export default function TwoWayRadio() {
     // effect only runs once (no stale closure problem).
     const pttDown = () => {
       if (incomingCallRef.current) { acceptIncomingCallRef.current?.(); return; }
-      // In an active P2P call (joined + p2p channel) PTT talks, not dials
-      if (pttModeRef.current === 'group' || (pttModeRef.current === 'p2p' && isJoinedRef.current)) {
-        playPTTTone('up'); startTalkingRef.current?.();
-      } else {
-        initiateP2PCallRef.current?.();
-      }
+      if (pttModeRef.current === 'p2p') initiateP2PCallRef.current?.();
+      else if (pttModeRef.current === 'group') { playPTTTone('up'); startTalkingRef.current?.(); }
     };
     const pttUp = () => {
-      if (pttModeRef.current === 'group' || (pttModeRef.current === 'p2p' && isJoinedRef.current)) {
-        playPTTTone('down'); stopTalkingRef.current?.();
-      } else {
-        playPTTTone('down');
-      }
+      if (pttModeRef.current === 'group') { playPTTTone('down'); stopTalkingRef.current?.(); }
+      else if (pttModeRef.current === 'p2p') { playPTTTone('down'); }
     };
 
     // Android native bridge: MainActivity calls window.__pttDown() / window.__pttUp()
