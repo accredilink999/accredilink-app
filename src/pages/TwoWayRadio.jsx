@@ -340,6 +340,7 @@ export default function TwoWayRadio() {
   const stopToneRef     = useRef(null);
   const outgoingRef     = useRef(null);
   const activeCallIdRef  = useRef(null); // tracks active P2P call so either party can end it
+  const activeChannelRef = useRef(null); // mirrors activeChannel state for use inside stale closures
 
   // Realtime channel ref for emergency broadcast
   const rtEmergencyRef = useRef(null);
@@ -702,6 +703,9 @@ export default function TwoWayRadio() {
       setRemoteUsers([...c.remoteUsers]);
       if (c.remoteUsers.length === 0) {
         const callId = activeCallIdRef.current;
+        // Ignore if we're pre-joining a P2P channel before the call is established.
+        // An active call or active channel must exist before we tear down.
+        if (!callId && !activeChannelRef.current) return;
         if (callId) {
           activeCallIdRef.current = null;
           supabase.from('radio_calls').update({ status: 'ended' }).eq('id', callId).then(() => {});
@@ -1033,12 +1037,9 @@ export default function TwoWayRadio() {
           activeCallIdRef.current = call.id;
           setOutgoingCall(null); setCallDeclined(false);
           if (joinedChRef.current === call.channel_name) {
-            toast('DBG: already in ch');
             playCallConnectedTone(); setActiveChannel({ name: `📞 ${cur.callee?.full_name}`, id: '__ptp' }); setView('ptt');
           } else {
-            toast('DBG: joining ch...');
             joinChannel(call.channel_name).then(() => {
-              toast('DBG: joined → PTT');
               playCallConnectedTone(); setActiveChannel({ name: `📞 ${cur.callee?.full_name}`, id: '__ptp' }); setView('ptt');
             });
           }
@@ -1091,9 +1092,9 @@ export default function TwoWayRadio() {
     setOutgoingCall({ callId: callRecord.id, callee: target, channelName: chName });
     setCallDeclined(false);
     stopTone(); stopToneRef.current = playOutgoingTone();
-    // APK pre-joins Agora so user-joined fires the moment callee answers (Realtime is unreliable
-    // on mobile WebView). PWA relies on the Realtime 'accepted' handler which is reliable on browser.
-    if (isRadioMode) joinChannel(chName);
+    // Both devices pre-join Agora so user-joined fires the moment the callee answers.
+    // This is more reliable than waiting for the Supabase Realtime 'accepted' event.
+    joinChannel(chName);
     const callerName = user?.full_name || user?.email || 'A team member';
     base44.functions.invoke('createNotification', {
       recipient_ids: resolveRecipients([target.id]), type: 'radio_call',
@@ -1579,6 +1580,7 @@ export default function TwoWayRadio() {
   callVolumeRef.current         = callVolume;
   incomingCallRef.current       = incomingCall;
   outgoingRef.current           = outgoingCall;
+  activeChannelRef.current      = activeChannel;
   initiateP2PCallRef.current    = initiateP2PCall;
   acceptIncomingCallRef.current = acceptIncomingCall;
   startTalkingRef.current       = startTalking;
