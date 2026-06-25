@@ -695,7 +695,6 @@ export default function TwoWayRadio() {
       setSpeakingUids(p => { const n = new Set(p); n.delete(u.uid); return n; });
       setRemoteUsers([...c.remoteUsers]);
       if (c.remoteUsers.length === 0) {
-        toast.error(`DBG user-left uid=${u.uid} callId=${activeCallIdRef.current ?? 'null'}`);
         const callId = activeCallIdRef.current;
         if (callId) {
           activeCallIdRef.current = null;
@@ -1022,7 +1021,7 @@ export default function TwoWayRadio() {
           return;
         }
         // Response to our outgoing call
-        if (!cur || call.id !== cur.callId) { toast.error(`DBG RT: no cur or id mismatch cur=${cur?.callId} call=${call.id}`); return; }
+        if (!cur || call.id !== cur.callId) return;
         stopTone();
         if (call.status === 'accepted') {
           activeCallIdRef.current = call.id;
