@@ -619,8 +619,9 @@ export default function TwoWayRadio() {
       callTimeoutRef.current = setTimeout(async () => {
         const cur = outgoingRef.current;
         if (!cur?.callId) return;
+        toast.error('DBG: 60s timeout fired!');
         if (stopToneRef.current) { stopToneRef.current(); stopToneRef.current = null; }
-        await leaveChannel(); // leave Agora before signalling cancellation so callee can't callback into a stale session
+        await leaveChannel();
         await supabase.from('radio_calls').update({ status: 'cancelled' }).eq('id', cur.callId);
         setOutgoingCall(null); setCallDeclined(false); setSelectedPerson(null);
       }, 60000);
@@ -694,8 +695,8 @@ export default function TwoWayRadio() {
     c.on('user-left',       u => {
       setSpeakingUids(p => { const n = new Set(p); n.delete(u.uid); return n; });
       setRemoteUsers([...c.remoteUsers]);
-      console.log('[Radio] user-left uid=', u.uid, 'remoteUsers after=', c.remoteUsers.length, 'activeCallId=', activeCallIdRef.current);
       if (c.remoteUsers.length === 0) {
+        toast.error(`DBG user-left uid=${u.uid} callId=${activeCallIdRef.current ?? 'null'}`);
         const callId = activeCallIdRef.current;
         if (callId) {
           activeCallIdRef.current = null;
@@ -1022,20 +1023,18 @@ export default function TwoWayRadio() {
           return;
         }
         // Response to our outgoing call
-        console.log('[Radio] caller UPDATE status=', call.status, 'callId=', call.id, 'cur=', cur?.callId, 'joinedCh=', joinedChRef.current);
-        if (!cur || call.id !== cur.callId) return;
+        if (!cur || call.id !== cur.callId) { toast.error(`DBG RT: no cur or id mismatch cur=${cur?.callId} call=${call.id}`); return; }
         stopTone();
         if (call.status === 'accepted') {
           activeCallIdRef.current = call.id;
           setOutgoingCall(null); setCallDeclined(false);
-          // user-joined may have already connected us; only join if not already in channel
           if (joinedChRef.current === call.channel_name) {
-            console.log('[Radio] already in channel — connecting directly');
+            toast('DBG: already in ch');
             playCallConnectedTone(); setActiveChannel({ name: `📞 ${cur.callee?.full_name}`, id: '__ptp' }); setView('ptt');
           } else {
-            console.log('[Radio] joining channel', call.channel_name);
+            toast('DBG: joining ch...');
             joinChannel(call.channel_name).then(() => {
-              console.log('[Radio] joined — setting PTT view');
+              toast('DBG: joined → PTT');
               playCallConnectedTone(); setActiveChannel({ name: `📞 ${cur.callee?.full_name}`, id: '__ptp' }); setView('ptt');
             });
           }
