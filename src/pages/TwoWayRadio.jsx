@@ -371,12 +371,7 @@ export default function TwoWayRadio() {
   const staffRef = useRef([]);
 
   // ── State ─────────────────────────────────────────────────────────────────
-  const [dbgLog, setDbgLog] = useState([]);
-  const addDbgRef = useRef(null); // ref so stale closures (Agora handlers) can call it
-  addDbgRef.current = (msg) => {
-    const ts = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-    setDbgLog(p => [...p.slice(-6), `${ts} ${msg}`]);
-  };
+  const addDbgRef = useRef(null);
   const [view, setView]                     = useState('main');
   const [isJoined, setIsJoined]             = useState(false);
   const [isTalking, setIsTalking]           = useState(false);
@@ -2142,12 +2137,6 @@ export default function TwoWayRadio() {
 
   return (
     <>
-      {/* DEBUG LOG — remove before ship */}
-      {dbgLog.length > 0 && (
-        <div style={{ position: 'fixed', bottom: 120, left: 4, right: 4, zIndex: 99999, background: 'rgba(0,0,0,0.85)', borderRadius: 6, padding: '6px 8px', pointerEvents: 'none' }}>
-          {dbgLog.map((e, i) => <div key={i} style={{ color: '#4ade80', fontSize: 10, fontFamily: 'monospace', lineHeight: '1.4' }}>{e}</div>)}
-        </div>
-      )}
       {EmergencyCountdownOverlay}
       {ActiveEmergencyBanner}
       {IncomingCallOverlay}
