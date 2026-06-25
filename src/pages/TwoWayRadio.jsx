@@ -639,6 +639,43 @@ export default function TwoWayRadio() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [outgoingCall?.callId]);
 
+  // Polling fallback — Realtime can miss the 'accepted' event if the WebSocket dropped during
+  // an idle period (e.g. 60s missed call). Poll the DB every 3s to catch what Realtime missed.
+  useEffect(() => {
+    if (!outgoingCall?.callId) return;
+    const { callId, channelName, callee } = outgoingCall;
+    const pollTimer = setInterval(async () => {
+      if (!outgoingRef.current || outgoingRef.current.callId !== callId) { clearInterval(pollTimer); return; }
+      try {
+        const { data } = await supabase.from('radio_calls').select('status').eq('id', callId).maybeSingle();
+        if (data?.status === 'accepted') {
+          clearInterval(pollTimer);
+          if (activeCallIdRef.current === callId) return; // Realtime already handled it
+          activeCallIdRef.current = callId;
+          setOutgoingCall(null); setCallDeclined(false);
+          stopTone();
+          const showPtt = () => {
+            playCallConnectedTone();
+            setActiveChannel({ name: `📞 ${callee?.full_name}`, id: '__ptp' });
+            setView('ptt');
+          };
+          if (joinedChRef.current === channelName) {
+            showPtt();
+          } else if (pjPromiseRef.current) {
+            const p = pjPromiseRef.current; pjPromiseRef.current = null;
+            p.then(() => joinedChRef.current === channelName ? showPtt() : joinChannel(channelName).then(showPtt));
+          } else {
+            joinChannel(channelName).then(showPtt);
+          }
+        } else if (['cancelled', 'ended', 'declined'].includes(data?.status)) {
+          clearInterval(pollTimer);
+        }
+      } catch {}
+    }, 3000);
+    return () => clearInterval(pollTimer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outgoingCall?.callId]);
+
   const getStaffStatus = useCallback((staffId) => {
     const shifts = todayShifts.filter(s => s.staff_id === staffId && s.status !== 'cancelled');
     // Actively clocked in → shift status takes priority (auto, cannot be overridden)
