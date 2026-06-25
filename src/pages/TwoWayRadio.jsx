@@ -197,27 +197,6 @@ function playOutgoingTone() {
   let active = true;
   let timer = null;
 
-  if (isRadio) {
-    // Radio: oscillator grant tone (low→high)
-    [880, 1400].forEach((freq, i) => {
-      const osc = ctx.createOscillator(), gain = ctx.createGain();
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.frequency.value = freq; osc.type = 'sine';
-      const t = ctx.currentTime + i * 0.075;
-      gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.85 * vol, t + 0.003);
-      gain.gain.setValueAtTime(0.85 * vol, t + 0.058);
-      gain.gain.linearRampToValueAtTime(0, t + 0.072);
-      osc.start(t); osc.stop(t + 0.075);
-    });
-  } else {
-    // PWA: play Beep Bop.aac as the dial-start sound (user gesture available)
-    const pre = _preloaded['/radio-tones/Beep Bop.aac'];
-    if (pre) { pre.currentTime = 0; pre.volume = vol; pre.play().catch(() => {}); }
-    else { try { const a = new Audio('/radio-tones/Beep Bop.aac'); a.volume = vol; a.play().catch(() => {}); } catch {} }
-  }
-
-  // Ring burst loop (both modes) — starts after grant tone/file
   const ringFreqs = [400, 600, 800, 600, 400];
   const burst = () => {
     if (!active) return;
@@ -231,9 +210,39 @@ function playOutgoingTone() {
       osc.start(t); osc.stop(t + 0.10);
     });
   };
-  // Give the AAC file time to play before the ring loop starts
-  const delay = isRadio ? 200 : 700;
-  setTimeout(() => { if (active) { burst(); timer = setInterval(burst, 2400); } }, delay);
+
+  const doPlay = () => {
+    if (!active) return;
+    if (isRadio) {
+      // Radio: oscillator grant tone (low→high)
+      [880, 1400].forEach((freq, i) => {
+        const osc = ctx.createOscillator(), gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = freq; osc.type = 'sine';
+        const t = ctx.currentTime + i * 0.075;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.85 * vol, t + 0.003);
+        gain.gain.setValueAtTime(0.85 * vol, t + 0.058);
+        gain.gain.linearRampToValueAtTime(0, t + 0.072);
+        osc.start(t); osc.stop(t + 0.075);
+      });
+    } else {
+      // PWA: play Beep Bop.aac as the dial-start sound
+      const pre = _preloaded['/radio-tones/Beep Bop.aac'];
+      if (pre) { pre.currentTime = 0; pre.volume = vol; pre.play().catch(() => {}); }
+      else { try { const a = new Audio('/radio-tones/Beep Bop.aac'); a.volume = vol; a.play().catch(() => {}); } catch {} }
+    }
+    // Ring burst loop — starts after grant tone/file
+    const delay = isRadio ? 200 : 700;
+    setTimeout(() => { if (active) { burst(); timer = setInterval(burst, 2400); } }, delay);
+  };
+
+  // Resume suspended context (e.g. after 60s idle on missed-call callback)
+  if (ctx.state !== 'running') {
+    ctx.resume().then(doPlay).catch(() => {});
+  } else {
+    doPlay();
+  }
 
   return () => { active = false; if (timer) clearInterval(timer); };
 }
@@ -340,6 +349,8 @@ export default function TwoWayRadio() {
   const stopToneRef     = useRef(null);
   const outgoingRef     = useRef(null);
   const activeCallIdRef  = useRef(null); // tracks active P2P call so either party can end it
+  const activeChannelRef = useRef(null); // mirrors activeChannel state for use inside stale closures
+  const pjPromiseRef    = useRef(null);  // holds the pre-join Promise so Realtime can await it
 
   // Realtime channel ref for emergency broadcast
   const rtEmergencyRef = useRef(null);
@@ -360,6 +371,12 @@ export default function TwoWayRadio() {
   const staffRef = useRef([]);
 
   // ── State ─────────────────────────────────────────────────────────────────
+  const [dbgLog, setDbgLog] = useState([]);
+  const addDbgRef = useRef(null); // ref so stale closures (Agora handlers) can call it
+  addDbgRef.current = (msg) => {
+    const ts = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    setDbgLog(p => [...p.slice(-6), `${ts} ${msg}`]);
+  };
   const [view, setView]                     = useState('main');
   const [isJoined, setIsJoined]             = useState(false);
   const [isTalking, setIsTalking]           = useState(false);
@@ -637,6 +654,46 @@ export default function TwoWayRadio() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [outgoingCall?.callId]);
 
+  // Polling fallback — Realtime can miss the 'accepted' event if the WebSocket dropped during
+  // an idle period (e.g. 60s missed call). Poll the DB every 3s to catch what Realtime missed.
+  useEffect(() => {
+    if (!outgoingCall?.callId) return;
+    const { callId, channelName, callee } = outgoingCall;
+    const pollTimer = setInterval(async () => {
+      if (!outgoingRef.current || outgoingRef.current.callId !== callId) { clearInterval(pollTimer); return; }
+      try {
+        const { data } = await supabase.from('radio_calls').select('status').eq('id', callId).maybeSingle();
+        addDbgRef.current?.(`POLL:${data?.status??'null'}`);
+        if (data?.status === 'accepted') {
+          clearInterval(pollTimer);
+          if (activeCallIdRef.current === callId) { addDbgRef.current?.('POLL:already handled'); return; }
+          activeCallIdRef.current = callId;
+          setOutgoingCall(null); setCallDeclined(false);
+          stopTone();
+          const showPtt = () => {
+            addDbgRef.current?.('→PTT(poll)');
+            playCallConnectedTone();
+            setActiveChannel({ name: `📞 ${callee?.full_name}`, id: '__ptp' });
+            setView('ptt');
+          };
+          addDbgRef.current?.(`POLL→acc jCh=${joinedChRef.current?'✓':'✗'} pj=${pjPromiseRef.current?'✓':'✗'}`);
+          if (joinedChRef.current === channelName) {
+            showPtt();
+          } else if (pjPromiseRef.current) {
+            const p = pjPromiseRef.current; pjPromiseRef.current = null;
+            p.then(() => joinedChRef.current === channelName ? showPtt() : joinChannel(channelName).then(showPtt));
+          } else {
+            joinChannel(channelName).then(showPtt);
+          }
+        } else if (['cancelled', 'ended', 'declined'].includes(data?.status)) {
+          clearInterval(pollTimer);
+        }
+      } catch (e) { addDbgRef.current?.(`POLL✗ ${e.message}`); }
+    }, 3000);
+    return () => clearInterval(pollTimer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outgoingCall?.callId]);
+
   const getStaffStatus = useCallback((staffId) => {
     const shifts = todayShifts.filter(s => s.staff_id === staffId && s.status !== 'cancelled');
     // Actively clocked in → shift status takes priority (auto, cannot be overridden)
@@ -702,19 +759,27 @@ export default function TwoWayRadio() {
       setRemoteUsers([...c.remoteUsers]);
       if (c.remoteUsers.length === 0) {
         const callId = activeCallIdRef.current;
-        if (callId) {
-          activeCallIdRef.current = null;
-          supabase.from('radio_calls').update({ status: 'ended' }).eq('id', callId).then(() => {});
-        }
-        leaveChannel().then(() => { setActiveChannel(null); setView('main'); setSelectedPerson(null); });
+        addDbgRef.current?.(`UL id=${callId?'✓':'✗'} ch=${activeChannelRef.current?'✓':'✗'}`);
+        if (!callId && !activeChannelRef.current) return; // pre-join, no active call
+        // Grace period: handles the render race (activeCallIdRef set by user-joined ref before
+        // React renders activeChannel) and transient Agora disconnects on mobile.
+        setTimeout(() => {
+          if (c.remoteUsers.length > 0) { addDbgRef.current?.('UL:rejoined'); return; }
+          const currentCallId = activeCallIdRef.current;
+          addDbgRef.current?.(`UL→MAIN id=${currentCallId?'✓':'✗'}`);
+          if (!currentCallId && !activeChannelRef.current) return;
+          if (currentCallId) {
+            activeCallIdRef.current = null;
+            supabase.from('radio_calls').update({ status: 'ended' }).eq('id', currentCallId).then(() => {});
+          }
+          leaveChannel().then(() => { setActiveChannel(null); setView('main'); setSelectedPerson(null); });
+        }, 1500);
       }
     });
     c.on('user-joined', (u) => {
       setRemoteUsers([...c.remoteUsers]);
-      // If we're in an outgoing P2P call and the callee just joined Agora,
-      // the call is connected — use Agora's own event instead of waiting for
-      // Supabase Realtime 'accepted' which can be delayed on mobile.
       const cur = outgoingRef.current;
+      addDbgRef.current?.(`UJ uid=${u.uid} cur=${cur?'✓':'✗'}`);
       if (cur) {
         activeCallIdRef.current = cur.callId;
         setOutgoingCall(null); setCallDeclined(false);
@@ -751,16 +816,19 @@ export default function TwoWayRadio() {
 
   const joinChannel = async (channelName) => {
     if (!myUid || !clientRef.current) return;
+    addDbgRef.current?.(`JN:${channelName.slice(-6)} st=${clientRef.current.connectionState}`);
     setJoining(true);
     try {
-      // Use the real Agora connection state rather than joinedChRef, which can
-      // drift out of sync if a previous leave/join failed silently.
       if (clientRef.current.connectionState !== 'DISCONNECTED') await leaveChannel();
       const token = await buildAgoraToken(channelName, myUid);
       await clientRef.current.join(AGORA_APP_ID, channelName, token, myUid);
       joinedChRef.current = channelName;
       setIsJoined(true);
-    } catch (e) { toast.error('Could not join: ' + (e.code ?? e.message)); }
+      addDbgRef.current?.(`JN✓ ${channelName.slice(-6)}`);
+    } catch (e) {
+      addDbgRef.current?.(`JN✗ ${e.code??e.message}`);
+      toast.error('Could not join: ' + (e.code ?? e.message));
+    }
     setJoining(false);
   };
 
@@ -1030,17 +1098,26 @@ export default function TwoWayRadio() {
         if (!cur || call.id !== cur.callId) return;
         stopTone();
         if (call.status === 'accepted') {
+          addDbgRef.current?.(`RT:acc jCh=${joinedChRef.current?'✓':'✗'} pj=${pjPromiseRef.current?'✓':'✗'}`);
           activeCallIdRef.current = call.id;
           setOutgoingCall(null); setCallDeclined(false);
+          const showPtt = () => {
+            addDbgRef.current?.('→PTT(RT)');
+            playCallConnectedTone();
+            setActiveChannel({ name: `📞 ${cur.callee?.full_name}`, id: '__ptp' });
+            setView('ptt');
+          };
           if (joinedChRef.current === call.channel_name) {
-            toast('DBG: already in ch');
-            playCallConnectedTone(); setActiveChannel({ name: `📞 ${cur.callee?.full_name}`, id: '__ptp' }); setView('ptt');
-          } else {
-            toast('DBG: joining ch...');
-            joinChannel(call.channel_name).then(() => {
-              toast('DBG: joined → PTT');
-              playCallConnectedTone(); setActiveChannel({ name: `📞 ${cur.callee?.full_name}`, id: '__ptp' }); setView('ptt');
+            showPtt();
+          } else if (pjPromiseRef.current) {
+            // Pre-join still in progress — await it, then verify or re-join
+            const p = pjPromiseRef.current; pjPromiseRef.current = null;
+            p.then(() => {
+              if (joinedChRef.current === call.channel_name) { showPtt(); }
+              else { joinChannel(call.channel_name).then(showPtt); }
             });
+          } else {
+            joinChannel(call.channel_name).then(showPtt);
           }
         } else if (call.status === 'callback') {
           setCallDeclined(true);
@@ -1081,19 +1158,17 @@ export default function TwoWayRadio() {
   const initiateP2PCall = async (overridePerson = null) => {
     const target = overridePerson || selectedPerson;
     if (!target || !user?.id) return;
-    const ids = [user.id, target.id].sort();
-    const chName = `ptp_${ids[0].slice(0, 8)}_${ids[1].slice(0, 8)}`;
+    const chName = `ptp_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`;
     const { data: callRecord, error } = await supabase.from('radio_calls').insert({
       caller_id: user.id, callee_id: target.id,
       channel_name: chName, status: 'pending', organization_id: getOrgId(),
     }).select().single();
-    if (error) { toast.error('Failed to initiate call'); return; }
+    if (error) { addDbgRef.current?.(`INIT✗ ${error.message}`); toast.error('Failed to initiate call'); return; }
+    addDbgRef.current?.(`INIT✓ id=${callRecord.id.slice(-4)}`);
     setOutgoingCall({ callId: callRecord.id, callee: target, channelName: chName });
     setCallDeclined(false);
     stopTone(); stopToneRef.current = playOutgoingTone();
-    // APK pre-joins Agora so user-joined fires the moment callee answers (Realtime is unreliable
-    // on mobile WebView). PWA relies on the Realtime 'accepted' handler which is reliable on browser.
-    if (isRadioMode) joinChannel(chName);
+    pjPromiseRef.current = joinChannel(chName);
     const callerName = user?.full_name || user?.email || 'A team member';
     base44.functions.invoke('createNotification', {
       recipient_ids: resolveRecipients([target.id]), type: 'radio_call',
@@ -1135,13 +1210,15 @@ export default function TwoWayRadio() {
     initiateP2PCall(person);
   };
 
-  const callBackFromMissed = (call) => {
+  const callBackFromMissed = async (call) => {
+    stopTone();
     const personId = (call.status === 'callback' || call.status === 'cancelled') ? call.caller_id : call.callee_id;
     const person = staffRef.current.find(s => s.id === personId);
     if (!person) { toast.error('Could not find that person'); return; }
     dismissMissedCalls(call.id);
+    if (call.id) await supabase.from('radio_calls').update({ status: 'callback' }).eq('id', call.id);
     setSelectedPerson(person);
-    initiateP2PCall(person);
+    await initiateP2PCall(person);
   };
 
   const cancelOutgoingCall = async () => {
@@ -1579,6 +1656,7 @@ export default function TwoWayRadio() {
   callVolumeRef.current         = callVolume;
   incomingCallRef.current       = incomingCall;
   outgoingRef.current           = outgoingCall;
+  activeChannelRef.current      = activeChannel;
   initiateP2PCallRef.current    = initiateP2PCall;
   acceptIncomingCallRef.current = acceptIncomingCall;
   startTalkingRef.current       = startTalking;
@@ -2064,6 +2142,12 @@ export default function TwoWayRadio() {
 
   return (
     <>
+      {/* DEBUG LOG — remove before ship */}
+      {dbgLog.length > 0 && (
+        <div style={{ position: 'fixed', bottom: 120, left: 4, right: 4, zIndex: 99999, background: 'rgba(0,0,0,0.85)', borderRadius: 6, padding: '6px 8px', pointerEvents: 'none' }}>
+          {dbgLog.map((e, i) => <div key={i} style={{ color: '#4ade80', fontSize: 10, fontFamily: 'monospace', lineHeight: '1.4' }}>{e}</div>)}
+        </div>
+      )}
       {EmergencyCountdownOverlay}
       {ActiveEmergencyBanner}
       {IncomingCallOverlay}
