@@ -243,25 +243,10 @@ function playOutgoingTone() {
 // talk-up (grant): low→high beep-bop  talk-down (clear): high→low bop-beep
 function playPTTTone(type) {
   if (localStorage.getItem('radio_silent_mode') === 'true') return;
-  // Only use custom sounds for user-uploaded files (not built-in /radio-tones/ URLs).
-  // Built-in TETRA tones go through the oscillator path so they actually play on APK.
-  try {
-    const stored = localStorage.getItem('radio_custom_sounds');
-    if (stored) {
-      const key = type === 'up' ? 'ptt_up' : 'ptt_down';
-      const snd = JSON.parse(stored)[key];
-      if (snd?.url && !snd.url.startsWith('/radio-tones/')) {
-        const pre = _preloaded[snd.url];
-        if (pre) { pre.currentTime = 0; pre.volume = 1.0; pre.play().catch(() => {}); }
-        else { const a = new Audio(snd.url); a.volume = 1.0; a.play().catch(() => {}); }
-        return;
-      }
-    }
-  } catch {}
+  if (playCustomSound(type === 'up' ? 'ptt_up' : 'ptt_down')) return;
   const vol = getToneVolume();
   const ctx = getAudioCtx();
   if (ctx?.state === 'running') {
-    // AudioContext ready — synthesised oscillator tones (reliable on APK and PWA)
     const freqs = type === 'up' ? [880, 1400] : [1400, 880];
     const now = ctx.currentTime;
     freqs.forEach((freq, i) => {
@@ -276,7 +261,6 @@ function playPTTTone(type) {
       osc.start(t); osc.stop(t + 0.075);
     });
   } else {
-    // AudioContext not yet running (APK first press) — fall back to preloaded AAC
     const url = type === 'up' ? '/radio-tones/Beep Bop.aac' : '/radio-tones/Bop Beep.aac';
     const pre = _preloaded[url];
     if (pre) { pre.currentTime = 0; pre.volume = Math.min(vol, 1.0); pre.play().catch(() => {}); }
