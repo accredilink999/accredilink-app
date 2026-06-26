@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { format, parseISO, differenceInMinutes, subDays } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
-import { BellOff, CheckCheck, Trash2, BellRing, Wifi, ChevronDown } from 'lucide-react';
+import {
+  BellRing, BellOff, CheckCheck, Trash2, ChevronDown, ChevronUp,
+  ChevronLeft, User, UserRound, Clock, AlertTriangle, MessageSquare,
+  AlertOctagon, CheckCircle, Radio, History,
+} from 'lucide-react';
 import { supabase } from '@/api/supabaseClient';
 
 // ── Pager tone — MP3-based ────────────────────────────────────────────────────
@@ -52,12 +56,21 @@ const LATE_CALL_MINS      = 15;
 const CALL_OVERRUN_MINS   = 50;
 const LATE_CLOCK_OUT_MINS = 60;
 
+// ── Field icon map ────────────────────────────────────────────────────────────
+const FIELD_ICONS = {
+  user:    User,
+  person:  UserRound,
+  clock:   Clock,
+  alert:   AlertTriangle,
+  message: MessageSquare,
+  urgent:  AlertOctagon,
+};
+
 // ── Alert builder ─────────────────────────────────────────────────────────────
 function buildAlerts(todayShifts, todayShiftCalls, staff, todayStr, now) {
   const alerts = [];
-  const ts = format(now, 'dd/MM/yyyy HH:mm');
 
-  // ── 1. LATE_SHIFT_CLOCK_IN ─────────────────────────────────────────────────
+  // 1. LATE_SHIFT_CLOCK_IN
   todayShifts.forEach(s => {
     if (['completed', 'cancelled', 'available_cover', 'available'].includes(s.status)) return;
     if (s.clock_in_time) return;
@@ -66,36 +79,24 @@ function buildAlerts(todayShifts, todayShiftCalls, staff, todayStr, now) {
       const start = parseISO(`${s.date || todayStr}T${s.start_time}`);
       const minsLate = differenceInMinutes(now, start);
       if (minsLate < LATE_CLOCK_IN_MINS) return;
-      const staffName = (s.staff_name || staff.find(u => u.id === s.staff_id)?.full_name || 'UNKNOWN').toUpperCase();
+      const staffName = (s.staff_name || staff.find(u => u.id === s.staff_id)?.full_name || 'Unknown').toUpperCase();
       alerts.push({
         id:       `late_clockin_${s.id}`,
         type:     'LATE_SHIFT_CLOCK_IN',
         priority: 'HIGH',
-        timestamp: now,
+        title:    'Staff Late Clock On',
         refId:    s.id,
-        lines: [
-          '** ALERT — STAFF LATE CLOCK ON **',
-          staffName,
-          `SHIFT START: ${s.start_time.slice(0, 5)} HRS · ${minsLate} MINS OVERDUE`,
-          'Staff member has not clocked on to their shift. Please attempt contact.',
-          ts,
+        fields: [
+          { icon: 'user',    label: 'Staff Member',    value: staffName },
+          { icon: 'clock',   label: 'Shift Start',     value: `${s.start_time.slice(0, 5)} HRS` },
+          { icon: 'alert',   label: 'Overdue',         value: `${minsLate} minutes` },
+          { icon: 'message', label: 'Action Required', value: 'Staff member has not clocked on to their shift. Please attempt contact.' },
         ],
       });
-
-      // For paired shifts — also alert for paired staff if they haven't clocked in
-      if (s.paired_shift_id && s.paired_staff_name) {
-        const pairedShift = todayShifts.find(ps => ps.id === s.paired_shift_id);
-        if (pairedShift && !pairedShift.clock_in_time &&
-          !['completed', 'cancelled', 'available_cover', 'available'].includes(pairedShift.status)) {
-          // Paired shift alert is generated when we iterate over pairedShift — avoid duplicates
-          // by only alerting if this shift's id is lexically smaller (ensures one alert per pair)
-          // Actually: each shift generates its own alert independently, which is correct per spec
-        }
-      }
     } catch {}
   });
 
-  // ── 2. LATE_CALL_CHECKIN ───────────────────────────────────────────────────
+  // 2. LATE_CALL_CHECKIN
   todayShiftCalls.forEach(c => {
     if (c.status !== 'pending') return;
     if (!c.scheduled_time) return;
@@ -103,50 +104,38 @@ function buildAlerts(todayShifts, todayShiftCalls, staff, todayStr, now) {
       const due = parseISO(`${todayStr}T${c.scheduled_time}`);
       const minsLate = differenceInMinutes(now, due);
       if (minsLate < LATE_CALL_MINS) return;
-
-      // Paired shift check: if the paired shift has a call checked in within 30 mins, skip
       const pairedShiftId = c.shifts?.paired_shift_id;
       if (pairedShiftId) {
-        const pairedCallCheckedIn = todayShiftCalls.some(other =>
+        const pairedIn = todayShiftCalls.some(other =>
           other.shift_id === pairedShiftId &&
           other.status !== 'pending' &&
           other.scheduled_time &&
-          Math.abs(differenceInMinutes(
-            parseISO(`${todayStr}T${other.scheduled_time}`),
-            due
-          )) <= 30
+          Math.abs(differenceInMinutes(parseISO(`${todayStr}T${other.scheduled_time}`), due)) <= 30
         );
-        if (pairedCallCheckedIn) return;
+        if (pairedIn) return;
       }
-
-      const staffName = (
-        c.shifts?.staff_name ||
-        staff.find(u => u.id === c.shifts?.staff_id)?.full_name ||
-        'UNKNOWN'
-      ).toUpperCase();
-      const clientName = (c.service_user_name || 'CLIENT').toUpperCase();
-
+      const staffName = (c.shifts?.staff_name || staff.find(u => u.id === c.shifts?.staff_id)?.full_name || 'Unknown').toUpperCase();
+      const clientName = (c.service_user_name || 'Unknown Client').toUpperCase();
       alerts.push({
         id:       `late_call_${c.id}`,
         type:     'LATE_CALL_CHECKIN',
         priority: 'HIGH',
-        timestamp: now,
+        title:    'Late Client Check-In',
         refId:    c.id,
-        lines: [
-          '** ALERT — LATE CLIENT CHECK-IN **',
-          `${staffName} → ${clientName}`,
-          `CALL DUE: ${c.scheduled_time.slice(0, 5)} HRS · ${minsLate} MINS OVERDUE`,
-          'Nobody has checked in to this care call. Please verify staff welfare.',
-          ts,
+        fields: [
+          { icon: 'user',    label: 'Staff Member',    value: staffName },
+          { icon: 'person',  label: 'Client',          value: clientName },
+          { icon: 'clock',   label: 'Call Due',        value: `${c.scheduled_time.slice(0, 5)} HRS` },
+          { icon: 'alert',   label: 'Overdue',         value: `${minsLate} minutes` },
+          { icon: 'message', label: 'Action Required', value: 'Nobody has checked in to this care call. Please verify staff welfare.' },
         ],
       });
     } catch {}
   });
 
-  // ── 3. CALL_OVERRUN ────────────────────────────────────────────────────────
+  // 3. CALL_OVERRUN
   todayShiftCalls.forEach(c => {
     if (!['in_progress', 'started'].includes(c.status)) return;
-    // Use clock_in_time if available, else fall back to scheduled_time
     const startRef = c.clock_in_time || c.scheduled_time;
     if (!startRef) return;
     try {
@@ -155,58 +144,50 @@ function buildAlerts(todayShifts, todayShiftCalls, staff, todayStr, now) {
         : parseISO(`${todayStr}T${c.scheduled_time}`);
       const minsIn = differenceInMinutes(now, startTime);
       if (minsIn < CALL_OVERRUN_MINS) return;
-
-      const staffName = (
-        c.shifts?.staff_name ||
-        staff.find(u => u.id === c.shifts?.staff_id)?.full_name ||
-        'UNKNOWN'
-      ).toUpperCase();
-      const clientName = (c.service_user_name || 'CLIENT').toUpperCase();
+      const staffName = (c.shifts?.staff_name || staff.find(u => u.id === c.shifts?.staff_id)?.full_name || 'Unknown').toUpperCase();
+      const clientName = (c.service_user_name || 'Unknown Client').toUpperCase();
       const timeLabel = c.clock_in_time
         ? format(new Date(c.clock_in_time), 'HH:mm')
         : c.scheduled_time?.slice(0, 5) || '??:??';
-
       alerts.push({
         id:       `overrun_${c.id}`,
         type:     'CALL_OVERRUN',
         priority: 'URGENT',
-        timestamp: now,
+        title:    'Care Call Overrun',
         refId:    c.id,
-        lines: [
-          '** URGENT — CARE CALL OVERRUN **',
-          `${staffName} WITH ${clientName}`,
-          `STARTED: approx ${timeLabel} HRS · ${minsIn} MINS`,
-          'Staff not booked out after 50 minutes. CHECK WELFARE IMMEDIATELY.',
-          ts,
+        fields: [
+          { icon: 'user',    label: 'Staff Member',    value: staffName },
+          { icon: 'person',  label: 'Client',          value: clientName },
+          { icon: 'clock',   label: 'Call Started',    value: `approx ${timeLabel} HRS` },
+          { icon: 'alert',   label: 'Duration',        value: `${minsIn} minutes and counting` },
+          { icon: 'urgent',  label: 'Action Required', value: 'Staff not booked out after 50 minutes. CHECK WELFARE IMMEDIATELY.' },
         ],
       });
     } catch {}
   });
 
-  // ── 4. LATE_SHIFT_CLOCK_OUT ────────────────────────────────────────────────
+  // 4. LATE_SHIFT_CLOCK_OUT
   todayShifts.forEach(s => {
     if (['cancelled', 'available_cover', 'available'].includes(s.status)) return;
-    if (!s.clock_in_time) return;  // must have clocked IN
-    if (s.clock_out_time) return;  // already clocked out
+    if (!s.clock_in_time) return;
+    if (s.clock_out_time) return;
     if (!s.end_time) return;
     try {
       const end = parseISO(`${s.date || todayStr}T${s.end_time}`);
       const minsOverdue = differenceInMinutes(now, end);
       if (minsOverdue < LATE_CLOCK_OUT_MINS) return;
-      const staffName = (s.staff_name || staff.find(u => u.id === s.staff_id)?.full_name || 'UNKNOWN').toUpperCase();
-
+      const staffName = (s.staff_name || staff.find(u => u.id === s.staff_id)?.full_name || 'Unknown').toUpperCase();
       alerts.push({
         id:       `late_clockout_${s.id}`,
         type:     'LATE_SHIFT_CLOCK_OUT',
         priority: 'HIGH',
-        timestamp: now,
+        title:    'Shift Not Booked Off',
         refId:    s.id,
-        lines: [
-          '** ALERT — SHIFT NOT BOOKED OFF **',
-          staffName,
-          `SHIFT ENDED: ${s.end_time.slice(0, 5)} HRS · ${minsOverdue} MINS OVERDUE`,
-          'Staff member has not booked off their shift. Please attempt contact.',
-          ts,
+        fields: [
+          { icon: 'user',    label: 'Staff Member',    value: staffName },
+          { icon: 'clock',   label: 'Shift Ended',     value: `${s.end_time.slice(0, 5)} HRS` },
+          { icon: 'alert',   label: 'Overdue',         value: `${minsOverdue} minutes` },
+          { icon: 'message', label: 'Action Required', value: 'Staff member has not booked off their shift. Please attempt contact.' },
         ],
       });
     } catch {}
@@ -215,13 +196,7 @@ function buildAlerts(todayShifts, todayShiftCalls, staff, todayStr, now) {
   return alerts;
 }
 
-// ── Scanline CSS ───────────────────────────────────────────────────────────────
-const scanlineStyle = {
-  backgroundImage: 'repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.18) 2px,rgba(0,0,0,0.18) 4px)',
-  backgroundSize: '100% 4px',
-};
-
-// ── Alert History (past logs from Supabase) ───────────────────────────────────
+// ── Alert History (log panel) ─────────────────────────────────────────────────
 function AlertHistory() {
   const [open, setOpen] = useState(false);
   const orgId = getOrgId();
@@ -243,7 +218,6 @@ function AlertHistory() {
     refetchInterval: open ? 60000 : false,
   });
 
-  // Group by log_date
   const grouped = useMemo(() => {
     const map = new Map();
     for (const log of logs) {
@@ -255,30 +229,30 @@ function AlertHistory() {
   }, [logs]);
 
   return (
-    <div className="rounded-xl border border-slate-800 overflow-hidden" style={{ background: '#0a0a0a' }}>
+    <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
       <button
         onClick={() => setOpen(p => !p)}
         className="w-full flex items-center justify-between px-4 py-3 text-left"
       >
-        <span className="font-mono text-amber-600/80 text-[10px] uppercase tracking-widest">Alert History (7 days)</span>
-        <ChevronDown className={`w-3.5 h-3.5 text-amber-800 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <div className="flex items-center gap-2">
+          <History className="w-4 h-4 text-teal-700" />
+          <span className="text-gray-700 text-sm font-medium">Alert History (7 days)</span>
+        </div>
+        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
-        <div className="border-t border-amber-900/30 max-h-96 overflow-y-auto">
-          {isLoading && (
-            <p className="font-mono text-amber-900/60 text-[10px] px-4 py-3 tracking-wider">LOADING…</p>
-          )}
+        <div className="border-t border-gray-100 max-h-96 overflow-y-auto">
+          {isLoading && <p className="text-gray-400 text-sm px-4 py-3">Loading…</p>}
           {!isLoading && grouped.length === 0 && (
-            <p className="font-mono text-amber-900/50 text-[10px] px-4 py-3 tracking-wider">NO LOGS IN LAST 7 DAYS</p>
+            <p className="text-gray-400 text-sm px-4 py-3">No logs in last 7 days</p>
           )}
           {grouped.map(([date, entries]) => {
             let displayDate = date;
             try { displayDate = format(parseISO(date), 'dd/MM/yyyy'); } catch {}
             return (
-              <div key={date} className="border-b border-amber-900/20 last:border-b-0">
-                <p className="font-mono text-amber-700/60 text-[9px] uppercase tracking-[0.3em] px-4 py-1.5 border-b border-amber-900/20"
-                  style={{ background: '#0d0800' }}>
+              <div key={date}>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 py-2 bg-gray-50 border-b border-gray-100">
                   {displayDate}
                 </p>
                 {entries.map(log => {
@@ -286,19 +260,15 @@ function AlertHistory() {
                   let timeLabel = '';
                   try { timeLabel = format(new Date(log.triggered_at), 'HH:mm'); } catch {}
                   return (
-                    <div key={log.id} className="px-4 py-2 border-b border-amber-900/10 last:border-b-0 space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded font-bold tracking-wide ${
-                          isUrgent ? 'bg-red-900/40 text-red-400' : 'bg-amber-900/40 text-amber-500'
-                        }`}>{log.alert_type || log.priority}</span>
-                        <span className="font-mono text-amber-900/50 text-[9px]">{timeLabel}</span>
+                    <div key={log.id} className="px-4 py-3 border-b border-gray-50 last:border-b-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          isUrgent ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'
+                        }`}>{log.priority}</span>
+                        <span className="text-gray-400 text-xs">{timeLabel}</span>
                       </div>
-                      {log.title && (
-                        <p className="font-mono text-amber-600/80 text-[10px] tracking-wider leading-tight">{log.title}</p>
-                      )}
-                      {log.body && (
-                        <p className="font-mono text-amber-800/60 text-[9px] leading-tight">{log.body}</p>
-                      )}
+                      {log.title && <p className="text-gray-800 text-sm font-medium">{log.title}</p>}
+                      {log.body && <p className="text-gray-500 text-xs mt-0.5 leading-snug">{log.body}</p>}
                     </div>
                   );
                 })}
@@ -311,10 +281,12 @@ function AlertHistory() {
   );
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// ── Main component ────────────────────────────────────────────────────────────
 export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], staff = [], alerterEnabled = true }) {
   const todayStr = format(new Date(), 'yyyy-MM-dd');
-  const [now, setNow] = useState(() => new Date());
+  const [now, setNow]           = useState(() => new Date());
+  const [selectedId, setSelectedId] = useState(null); // null = list view
+  const [showHistory, setShowHistory] = useState(false);
   const [ackedIds, setAckedIds] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem('alerter_acked') || '[]')); } catch { return new Set(); }
   });
@@ -322,19 +294,44 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
     try { return new Set(JSON.parse(localStorage.getItem('alerter_deleted') || '[]')); } catch { return new Set(); }
   });
   const [silenced, setSilenced] = useState(false);
-  const [blinkOn, setBlinkOn] = useState(true);
-  const clockRef = useRef(null);
-  const blinkRef = useRef(null);
-  const loggedIdsRef = useRef(new Set());
-  const prevHasNewRef = useRef(false);
+  const [blinkOn, setBlinkOn]   = useState(true);
 
-  // Refresh alert detection every 30s (tighter polling for alerter)
+  const clockRef       = useRef(null);
+  const blinkRef       = useRef(null);
+  const loggedIdsRef   = useRef(new Set());
+  const prevHasNewRef  = useRef(false);
+  const firstSeenRef   = useRef({});
+
+  // 30s poll
   useEffect(() => {
     clockRef.current = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(clockRef.current);
   }, []);
 
-  // Wake lock — keep screen on while there are new unacknowledged alerts (APK)
+  // Blink
+  useEffect(() => {
+    blinkRef.current = setInterval(() => setBlinkOn(p => !p), 700);
+    return () => clearInterval(blinkRef.current);
+  }, []);
+
+  const allAlerts    = useMemo(() => buildAlerts(todayShifts, todayShiftCalls, staff, todayStr, now), [todayShifts, todayShiftCalls, staff, todayStr, now]);
+  const visibleAlerts = allAlerts.filter(a => !deletedIds.has(a.id));
+  const newAlerts    = visibleAlerts.filter(a => !ackedIds.has(a.id));
+  const hasNew       = newAlerts.length > 0;
+
+  // Track first-seen timestamps
+  useEffect(() => {
+    allAlerts.forEach(a => {
+      if (!firstSeenRef.current[a.id]) firstSeenRef.current[a.id] = new Date();
+    });
+  }, [allAlerts]);
+
+  // Auto-select first new alert when one arrives and nothing selected
+  useEffect(() => {
+    if (hasNew && !selectedId) setSelectedId(newAlerts[0]?.id || null);
+  }, [hasNew]); // eslint-disable-line
+
+  // Wake lock while new alerts active
   useEffect(() => {
     if (!hasNew || !('wakeLock' in navigator)) return;
     let lock = null;
@@ -348,71 +345,50 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
     };
   }, [hasNew]);
 
-  // Blink indicator at 1Hz while new alerts exist
-  useEffect(() => {
-    blinkRef.current = setInterval(() => setBlinkOn(p => !p), 700);
-    return () => clearInterval(blinkRef.current);
-  }, []);
-
-  const allAlerts = useMemo(
-    () => buildAlerts(todayShifts, todayShiftCalls, staff, todayStr, now),
-    [todayShifts, todayShiftCalls, staff, todayStr, now]
-  );
-
-  const visibleAlerts = allAlerts.filter(a => !deletedIds.has(a.id));
-  const newAlerts     = visibleAlerts.filter(a => !ackedIds.has(a.id));
-  const hasNew        = newAlerts.length > 0;
-
-  // Pager tone: start when new unsilenced alerts, stop otherwise
+  // Pager tone
   useEffect(() => {
     if (!alerterEnabled) { stopPagerLoop(); return; }
-    if (hasNew && !silenced) { startPagerLoop(); }
-    else { stopPagerLoop(); }
+    if (hasNew && !silenced) startPagerLoop();
+    else stopPagerLoop();
     return () => stopPagerLoop();
   }, [hasNew, silenced, alerterEnabled]);
 
-  // Reset silenced when a brand-new alert ID appears
+  // Reset silenced on new alert
   const prevNewIdsRef = useRef(new Set());
   useEffect(() => {
     const currentIds = new Set(newAlerts.map(a => a.id));
-    const hasReallyNew = [...currentIds].some(id => !prevNewIdsRef.current.has(id));
-    if (hasReallyNew) setSilenced(false);
+    if ([...currentIds].some(id => !prevNewIdsRef.current.has(id))) setSilenced(false);
     prevNewIdsRef.current = currentIds;
   }, [newAlerts]);
 
-  // APK wake: show service worker notification when hasNew transitions false→true
+  // APK notification wake
   useEffect(() => {
-    if (hasNew && !prevHasNewRef.current) {
-      if ('Notification' in window) {
-        navigator.serviceWorker?.ready.then(reg =>
-          reg.showNotification('⚠️ CareCall Alerter', {
-            body: `${newAlerts.length} new alert${newAlerts.length > 1 ? 's' : ''}`,
-            tag: 'alerter',
-            renotify: true,
-            requireInteraction: true,
-          })
-        ).catch(() => {});
-      }
+    if (hasNew && !prevHasNewRef.current && 'Notification' in window) {
+      navigator.serviceWorker?.ready.then(reg =>
+        reg.showNotification('⚠️ CareCall Alerter', {
+          body: `${newAlerts.length} new alert${newAlerts.length > 1 ? 's' : ''}`,
+          tag: 'alerter', renotify: true, requireInteraction: true,
+        })
+      ).catch(() => {});
     }
     prevHasNewRef.current = hasNew;
   }, [hasNew, newAlerts.length]);
 
-  // Supabase logging — fire-and-forget for new alert IDs
+  // Supabase logging
   useEffect(() => {
     const orgId = getOrgId();
     if (!orgId) return;
     allAlerts.forEach(alert => {
       if (loggedIdsRef.current.has(alert.id)) return;
       loggedIdsRef.current.add(alert.id);
-      const logDate = format(new Date(), 'yyyy-MM-dd');
       supabase.from('alerter_logs').insert({
         alert_id:        alert.id,
         alert_type:      alert.type,
         priority:        alert.priority,
-        title:           alert.lines[0],
-        body:            alert.lines.join(' | '),
+        title:           alert.title,
+        body:            alert.fields.map(f => `${f.label}: ${f.value}`).join(' | '),
         ref_id:          alert.refId,
-        log_date:        logDate,
+        log_date:        format(new Date(), 'yyyy-MM-dd'),
         organization_id: orgId,
       }).then(() => {}).catch(() => {});
     });
@@ -437,7 +413,12 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
       try { localStorage.setItem('alerter_acked', JSON.stringify([...next])); } catch {}
       return next;
     });
-  }, []);
+    if (selectedId === id) {
+      const idx = visibleAlerts.findIndex(a => a.id === id);
+      const next = visibleAlerts[idx + 1] || visibleAlerts[idx - 1] || null;
+      setSelectedId(next?.id || null);
+    }
+  }, [selectedId, visibleAlerts]);
 
   const ackAll = useCallback(() => {
     const ids = visibleAlerts.map(a => a.id);
@@ -449,192 +430,257 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
     setSilenced(true);
   }, [visibleAlerts]);
 
-  const timeStr = format(now, 'HH:mm:ss');
+  const timeStr = format(now, 'HH:mm');
 
+  // ── Selected alert detail ──────────────────────────────────────────────────
+  const selectedAlert = selectedId ? visibleAlerts.find(a => a.id === selectedId) : null;
+  const selectedIdx   = selectedAlert ? visibleAlerts.findIndex(a => a.id === selectedId) : -1;
+  const canPrev       = selectedIdx > 0;
+  const canNext       = selectedIdx < visibleAlerts.length - 1;
+
+  const goNext = () => { if (canNext) setSelectedId(visibleAlerts[selectedIdx + 1].id); };
+  const goPrev = () => { if (canPrev) setSelectedId(visibleAlerts[selectedIdx - 1].id); };
+
+  // ── Disabled state ────────────────────────────────────────────────────────
   if (!alerterEnabled) {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-3">
-        <BellOff className="w-8 h-8 text-slate-700" />
-        <p className="text-slate-600 text-xs text-center">Alerter is disabled.<br />Enable it in Settings.</p>
+        <BellOff className="w-8 h-8 text-gray-300" />
+        <p className="text-gray-400 text-sm text-center">Alerter disabled.<br />Enable it in Settings.</p>
       </div>
     );
   }
 
-  return (
-    <div className="pb-32 px-3 pt-3 space-y-3">
-
-      {/* ── Pager bezel ───────────────────────────────────────────────── */}
-      <div className="rounded-2xl overflow-hidden border-4 border-slate-700 shadow-2xl shadow-black/80"
-        style={{ background: '#0a0a0a' }}>
-
-        {/* Header bar */}
-        <div className="flex items-center justify-between px-3 py-2 border-b border-amber-900/40"
-          style={{ background: '#0f0a00' }}>
-          <div className="flex items-center gap-2">
-            {/* Signal bars */}
-            <div className="flex items-end gap-0.5">
-              {[2, 4, 6, 8].map((h, i) => (
-                <div key={i} className="w-1 rounded-sm bg-amber-500/70" style={{ height: h }} />
-              ))}
-            </div>
-            <span className="font-mono text-amber-500 text-[10px] font-bold tracking-widest">MOTOROLA</span>
+  // ── Teal header (shared) ──────────────────────────────────────────────────
+  const Header = ({ onBack, title, subtitle }) => (
+    <div className="flex items-center justify-between px-4 py-3" style={{ background: '#0f766e' }}>
+      <div className="flex items-center gap-2">
+        {onBack ? (
+          <button onClick={onBack} className="flex items-center gap-1 text-white/90 touch-manipulation mr-1">
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+        ) : (
+          <Radio className="w-5 h-5 text-white" />
+        )}
+        <div>
+          <p className="text-white font-semibold leading-tight">{title}</p>
+          {subtitle && <p className="text-teal-100 text-xs leading-tight">{subtitle}</p>}
+        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="text-teal-100 text-sm">{timeStr}</span>
+        {hasNew && (
+          <div className={`flex items-center gap-1 transition-opacity duration-200 ${blinkOn ? 'opacity-100' : 'opacity-20'}`}>
+            <div className="w-2 h-2 rounded-full bg-red-400 shadow-[0_0_6px_rgba(248,113,113,0.8)]" />
+            <span className="text-white text-xs font-bold">{newAlerts.length}</span>
           </div>
-          <span className="font-mono text-amber-400 text-[11px] tracking-widest">{timeStr}</span>
-          {hasNew && (
-            <div className={`flex items-center gap-1 transition-opacity ${blinkOn ? 'opacity-100' : 'opacity-0'}`}>
-              <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_6px_2px_rgba(239,68,68,0.7)]" />
-              <span className="font-mono text-red-400 text-[10px] font-bold">{newAlerts.length} NEW</span>
+        )}
+      </div>
+    </div>
+  );
+
+  // ── Detail view ────────────────────────────────────────────────────────────
+  if (selectedAlert) {
+    const isNew    = !ackedIds.has(selectedAlert.id);
+    const isUrgent = selectedAlert.priority === 'URGENT';
+    const receivedAt = firstSeenRef.current[selectedAlert.id] || now;
+
+    return (
+      <div className="flex flex-col" style={{ background: '#f5f5f5', minHeight: '100%' }}>
+        <Header
+          onBack={() => setSelectedId(null)}
+          title="Pager"
+          subtitle={`Message ${selectedIdx + 1} of ${visibleAlerts.length}`}
+        />
+
+        <div className="flex-1 overflow-y-auto pb-36">
+          {/* Card */}
+          <div className="m-3 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+
+            {/* Card header */}
+            <div className="flex items-start gap-3 p-4 border-b border-gray-100">
+              <BellRing className={`w-6 h-6 mt-0.5 flex-shrink-0 ${isUrgent ? 'text-red-500' : 'text-teal-700'}`} />
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-gray-900 text-base">{selectedAlert.title}</p>
+                <p className="text-gray-500 text-xs mt-0.5">
+                  Received: {format(receivedAt, 'dd/MM/yyyy HH:mm')}
+                </p>
+                <p className="text-sm mt-0.5">
+                  Priority:{' '}
+                  <span className={`font-semibold ${isUrgent ? 'text-red-500' : 'text-orange-500'}`}>
+                    {isUrgent ? 'Urgent' : 'High'}
+                  </span>
+                </p>
+              </div>
+              {isNew && (
+                <span className={`text-[10px] font-bold px-2 py-1 rounded-full flex-shrink-0 ${
+                  isUrgent ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'
+                }`}>NEW</span>
+              )}
             </div>
-          )}
-          {!hasNew && (
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-green-500" />
-              <span className="font-mono text-green-500 text-[10px]">ALL CLEAR</span>
+
+            {/* Fields */}
+            {selectedAlert.fields.map((field, fi) => {
+              const Icon = FIELD_ICONS[field.icon] || MessageSquare;
+              const isActionField = field.icon === 'urgent' || (field.icon === 'message' && field.label === 'Action Required');
+              return (
+                <div key={fi} className="flex gap-3 px-4 py-3 border-b border-gray-50 last:border-b-0">
+                  <Icon className={`w-5 h-5 flex-shrink-0 mt-0.5 ${isUrgent && isActionField ? 'text-red-500' : 'text-teal-700'}`} />
+                  <div>
+                    <p className="font-semibold text-gray-800 text-sm">{field.label}</p>
+                    <p className={`text-sm mt-0.5 leading-snug ${
+                      isUrgent && isActionField ? 'text-red-600 font-semibold' : 'text-gray-600'
+                    }`}>{field.value}</p>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* REF */}
+            <div className="px-4 py-2 bg-gray-50 border-t border-gray-100">
+              <p className="text-gray-400 text-[10px] font-mono">REF: {selectedAlert.refId?.slice(0, 8).toUpperCase()}</p>
             </div>
-          )}
+          </div>
         </div>
 
-        {/* LCD display area */}
-        <div className="relative" style={{ ...scanlineStyle, background: '#050300' }}>
-
-          {/* Model label */}
-          <div className="px-3 pt-2 pb-1 border-b border-amber-900/20">
-            <p className="font-mono text-amber-600/60 text-[9px] tracking-[0.3em] uppercase">CareCall Alerter v2 · Control</p>
+        {/* Fixed bottom controls */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 space-y-2 shadow-lg">
+          {/* Prev / Next navigation */}
+          <div className="flex items-center justify-between gap-2">
+            <button
+              onClick={goPrev}
+              disabled={!canPrev}
+              className={`flex items-center gap-1 px-4 py-2 rounded-lg border text-sm font-medium touch-manipulation ${
+                canPrev ? 'border-teal-700 text-teal-700 active:bg-teal-50' : 'border-gray-200 text-gray-300'
+              }`}
+            >
+              <ChevronUp className="w-4 h-4" /> Prev
+            </button>
+            <span className="text-gray-400 text-xs">{selectedIdx + 1} / {visibleAlerts.length}</span>
+            <button
+              onClick={goNext}
+              disabled={!canNext}
+              className={`flex items-center gap-1 px-4 py-2 rounded-lg border text-sm font-medium touch-manipulation ${
+                canNext ? 'border-teal-700 text-teal-700 active:bg-teal-50' : 'border-gray-200 text-gray-300'
+              }`}
+            >
+              Next <ChevronDown className="w-4 h-4" />
+            </button>
           </div>
 
-          {/* No alerts */}
-          {visibleAlerts.length === 0 && (
-            <div className="px-4 py-8 text-center">
-              <p className="font-mono text-green-500 text-sm tracking-widest">** ALL CLEAR **</p>
-              <p className="font-mono text-green-700 text-[10px] mt-2 tracking-wider">NO OUTSTANDING ALERTS</p>
-              <p className="font-mono text-green-800/60 text-[9px] mt-1">{format(now, 'dd/MM/yyyy HH:mm')}</p>
-            </div>
-          )}
-
-          {/* Alert messages */}
-          {visibleAlerts.map((alert) => {
-            const isNew  = !ackedIds.has(alert.id);
-            const urgent = alert.priority === 'URGENT';
-            return (
-              <div key={alert.id}
-                className={`border-b border-amber-900/30 ${isNew ? 'bg-amber-950/10' : 'opacity-60'}`}>
-                {/* Message body */}
-                <div className="px-3 pt-3 pb-2 space-y-0.5">
-                  {alert.lines.map((line, li) => {
-                    // Last line is the timestamp — style differently
-                    const isTimestamp = li === alert.lines.length - 1;
-                    return (
-                      <p key={li}
-                        className={`font-mono tracking-wider leading-tight ${
-                          isTimestamp
-                            ? 'text-amber-900/60 text-[9px] mt-1'
-                            : li === 0
-                              ? (urgent ? 'text-red-400 font-bold text-[11px]' : 'text-amber-400 font-bold text-[11px]')
-                              : (urgent ? 'text-amber-500 text-[11px]' : 'text-amber-700 text-[11px]')
-                        }`}>
-                        {line}
-                      </p>
-                    );
-                  })}
-                  <p className="font-mono text-amber-900/50 text-[9px] mt-0.5 tracking-widest">
-                    REF:{alert.refId?.slice(0, 8).toUpperCase()}
-                  </p>
-                </div>
-
-                {/* Controls */}
-                <div className="flex gap-1.5 px-3 pb-3">
-                  {isNew && !silenced && (
-                    <button
-                      onClick={() => { stopPagerLoop(); setSilenced(true); }}
-                      className="flex items-center gap-1 px-2 py-1 rounded border border-amber-800/50 bg-amber-950/40 text-amber-500 font-mono text-[9px] tracking-wider active:bg-amber-900/40 touch-manipulation">
-                      <BellOff className="w-2.5 h-2.5" />SILENCE
-                    </button>
-                  )}
-                  {isNew && (
-                    <button
-                      onClick={() => ack(alert.id)}
-                      className="flex items-center gap-1 px-2 py-1 rounded border border-amber-700/50 bg-amber-900/30 text-amber-400 font-mono text-[9px] tracking-wider active:bg-amber-800/40 touch-manipulation">
-                      <CheckCheck className="w-2.5 h-2.5" />ACK
-                    </button>
-                  )}
-                  <button
-                    onClick={() => del(alert.id)}
-                    className="flex items-center gap-1 px-2 py-1 rounded border border-red-900/40 bg-red-950/20 text-red-600 font-mono text-[9px] tracking-wider active:bg-red-900/30 touch-manipulation">
-                    <Trash2 className="w-2.5 h-2.5" />DELETE
-                  </button>
-                  {!isNew && (
-                    <span className="flex items-center gap-1 px-2 py-1 text-amber-900/60 font-mono text-[9px] tracking-wider">
-                      <CheckCheck className="w-2.5 h-2.5" />ACKNOWLEDGED
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Silence all / Ack all strip */}
-          {hasNew && visibleAlerts.length > 1 && (
-            <div className="px-3 py-2 border-t border-amber-900/30 flex gap-2">
+          {/* Action buttons */}
+          <div className="flex gap-2">
+            {isNew && !silenced && (
               <button
                 onClick={() => { stopPagerLoop(); setSilenced(true); }}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded border border-amber-800/40 bg-amber-950/30 text-amber-600 font-mono text-[10px] tracking-wider active:bg-amber-900/30 touch-manipulation">
-                <BellOff className="w-3 h-3" />SILENCE ALL
+                className="flex-1 border border-teal-700 text-teal-700 rounded-lg py-3 text-sm font-semibold active:bg-teal-50 touch-manipulation"
+              >
+                SILENCE
               </button>
+            )}
+            {isNew ? (
               <button
-                onClick={ackAll}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded border border-amber-700/40 bg-amber-900/20 text-amber-500 font-mono text-[10px] tracking-wider active:bg-amber-800/30 touch-manipulation">
-                <CheckCheck className="w-3 h-3" />ACK ALL
+                onClick={() => { ack(selectedAlert.id); goNext(); }}
+                className="flex-1 text-white rounded-lg py-3 text-sm font-semibold active:opacity-90 touch-manipulation"
+                style={{ background: '#0f766e' }}
+              >
+                ACKNOWLEDGE
               </button>
-            </div>
-          )}
-
-          {/* Standby footer */}
-          <div className="px-3 py-1.5 flex items-center justify-between border-t border-amber-900/20">
-            <span className="font-mono text-amber-900/50 text-[9px] tracking-widest">STANDBY</span>
-            <div className="flex items-center gap-1">
-              <Wifi className="w-2.5 h-2.5 text-amber-900/40" />
-              <span className="font-mono text-amber-900/40 text-[9px]">LIVE</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Bezel bottom strip */}
-        <div className="h-3 flex items-center justify-center gap-1"
-          style={{ background: '#080808' }}>
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="w-1 h-1 rounded-full bg-slate-700/60" />
-          ))}
-        </div>
-      </div>
-
-      {/* ── Status summary under pager ─────────────────────────────────────── */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 space-y-1">
-        <p className="font-mono text-slate-500 text-[9px] uppercase tracking-widest">Alert Summary</p>
-        <div className="grid grid-cols-3 gap-2 mt-1">
-          <div className="text-center">
-            <p className="font-mono text-amber-400 text-lg font-bold">{visibleAlerts.length}</p>
-            <p className="font-mono text-slate-600 text-[9px] tracking-wider">TOTAL</p>
-          </div>
-          <div className="text-center">
-            <p className={`font-mono text-lg font-bold ${hasNew ? 'text-red-400' : 'text-slate-600'}`}>{newAlerts.length}</p>
-            <p className="font-mono text-slate-600 text-[9px] tracking-wider">UNREAD</p>
-          </div>
-          <div className="text-center">
-            <p className="font-mono text-slate-500 text-lg font-bold">{visibleAlerts.length - newAlerts.length}</p>
-            <p className="font-mono text-slate-600 text-[9px] tracking-wider">ACK'D</p>
+            ) : (
+              <div className="flex-1 flex items-center justify-center gap-1.5 text-gray-400 text-sm border border-gray-200 rounded-lg py-3">
+                <CheckCheck className="w-4 h-4" /> Acknowledged
+              </div>
+            )}
+            <button
+              onClick={() => del(selectedAlert.id)}
+              className="border border-red-200 text-red-400 rounded-lg px-4 py-3 active:bg-red-50 touch-manipulation"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </div>
+    );
+  }
 
-      {/* ── Alert History (scrollable past logs) ──────────────────────────── */}
-      <AlertHistory />
+  // ── List view ──────────────────────────────────────────────────────────────
+  return (
+    <div className="flex flex-col" style={{ background: '#f5f5f5', minHeight: '100%' }}>
+      <Header
+        title="Pager"
+        subtitle={hasNew ? `${newAlerts.length} unread alert${newAlerts.length !== 1 ? 's' : ''}` : 'All clear'}
+      />
 
-      {/* ── Future: Emergency message from family ──────────────────────────── */}
-      <div className="rounded-xl border border-slate-800/40 bg-slate-900/30 px-4 py-3">
-        <p className="font-mono text-slate-700 text-[9px] uppercase tracking-widest">Emergency Message (Family)</p>
-        <p className="font-mono text-slate-800 text-[9px] mt-1">— Coming soon: families can page control direct from the website —</p>
+      <div className="flex-1 overflow-y-auto pb-32 space-y-0">
+
+        {/* All clear state */}
+        {visibleAlerts.length === 0 && (
+          <div className="m-4 bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
+            <CheckCircle className="w-12 h-12 mx-auto mb-3" style={{ color: '#0f766e' }} />
+            <p className="font-semibold text-gray-800 text-lg">All Clear</p>
+            <p className="text-gray-500 text-sm mt-1">No outstanding alerts</p>
+            <p className="text-gray-400 text-xs mt-1">{format(now, 'dd/MM/yyyy HH:mm')}</p>
+          </div>
+        )}
+
+        {/* Alert list rows */}
+        {visibleAlerts.length > 0 && (
+          <div className="m-3 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            {visibleAlerts.map((alert, idx) => {
+              const isNew    = !ackedIds.has(alert.id);
+              const isUrgent = alert.priority === 'URGENT';
+              const receivedAt = firstSeenRef.current[alert.id] || now;
+              const preview  = alert.fields.find(f => f.icon === 'user')?.value || '';
+              return (
+                <button
+                  key={alert.id}
+                  onClick={() => setSelectedId(alert.id)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-left border-b border-gray-50 last:border-b-0 active:bg-gray-50 touch-manipulation ${isNew ? '' : 'opacity-60'}`}
+                >
+                  <BellRing className={`w-5 h-5 flex-shrink-0 ${isUrgent ? 'text-red-500' : 'text-teal-700'}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className={`font-semibold text-sm truncate ${isNew ? 'text-gray-900' : 'text-gray-500'}`}>{alert.title}</p>
+                      {isNew && (
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                          isUrgent ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'
+                        }`}>{isUrgent ? 'URGENT' : 'HIGH'}</span>
+                      )}
+                    </div>
+                    <p className="text-gray-500 text-xs truncate">{preview}</p>
+                    <p className="text-gray-400 text-[10px]">{format(receivedAt, 'dd/MM/yyyy HH:mm')}</p>
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-gray-300 flex-shrink-0 -rotate-90" />
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Bulk actions */}
+        {hasNew && visibleAlerts.length > 1 && (
+          <div className="mx-3 flex gap-2">
+            <button
+              onClick={() => { stopPagerLoop(); setSilenced(true); }}
+              className="flex-1 border border-teal-700 text-teal-700 rounded-lg py-3 text-sm font-semibold active:bg-teal-50 touch-manipulation"
+            >
+              SILENCE ALL
+            </button>
+            <button
+              onClick={ackAll}
+              className="flex-1 text-white rounded-lg py-3 text-sm font-semibold active:opacity-90 touch-manipulation"
+              style={{ background: '#0f766e' }}
+            >
+              ACK ALL
+            </button>
+          </div>
+        )}
+
+        {/* Alert History */}
+        <div className="mx-3 mt-3">
+          <AlertHistory />
+        </div>
       </div>
-
     </div>
   );
 }
