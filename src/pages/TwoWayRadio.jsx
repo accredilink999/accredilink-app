@@ -245,8 +245,10 @@ function playPTTTone(type) {
   if (localStorage.getItem('radio_silent_mode') === 'true') return;
   if (playCustomSound(type === 'up' ? 'ptt_up' : 'ptt_down')) return;
   const vol = getToneVolume();
-  const freqs = type === 'up' ? [880, 1400] : [1400, 880];
-  withRunningCtx(ctx => {
+  const ctx = getAudioCtx();
+  if (ctx?.state === 'running') {
+    // AudioContext ready — synthesised oscillator tones
+    const freqs = type === 'up' ? [880, 1400] : [1400, 880];
     const now = ctx.currentTime;
     freqs.forEach((freq, i) => {
       const osc = ctx.createOscillator(), gain = ctx.createGain();
@@ -259,7 +261,12 @@ function playPTTTone(type) {
       gain.gain.linearRampToValueAtTime(0, t + 0.072);
       osc.start(t); osc.stop(t + 0.075);
     });
-  });
+  } else {
+    // AudioContext not yet running (APK first press) — fall back to preloaded AAC
+    const url = type === 'up' ? '/radio-tones/Beep Bop.aac' : '/radio-tones/Bop Beep.aac';
+    const pre = _preloaded[url];
+    if (pre) { pre.currentTime = 0; pre.volume = Math.min(vol, 1.0); pre.play().catch(() => {}); }
+  }
 }
 
 // Call-end tone — use preloaded AAC for APK reliability
@@ -904,6 +911,8 @@ export default function TwoWayRadio() {
     shouldTalkRef.current = false;
     if (isHandsFree) return;
     if (isTalking) playPTTTone('down');
+    // 250ms hold-open: transmit the last syllable before closing mic
+    await new Promise(r => setTimeout(r, 250));
     try {
       if (micTrackRef.current) await clientRef.current.unpublish(micTrackRef.current);
       if (isRadioMode && window.AndroidApp?.closeNativeMic) window.AndroidApp.closeNativeMic();
@@ -1618,8 +1627,7 @@ export default function TwoWayRadio() {
     };
     const pttUp = () => {
       if (pttModeRef.current === 'group') {
-        stopTalkingRef.current?.();          // release mic first so AudioContext can resume
-        setTimeout(() => playPTTTone('down'), 60); // tone after mic released
+        stopTalkingRef.current?.(); // stopTalking plays the down tone then closes mic after 250ms
       }
       else if (pttModeRef.current === 'p2p') { playPTTTone('down'); }
     };
