@@ -537,21 +537,17 @@ export default function TwoWayRadio() {
     queryFn: async () => {
       if (!user?.id) return [];
       const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const [{ data: cbCalls }, { data: dcCalls }, { data: cancelledCalls }] = await Promise.all([
+      const [{ data: cbCalls }, { data: cancelledCalls }] = await Promise.all([
         // I was called and said "call back"
         supabase.from('radio_calls').select('id, caller_id, callee_id, status, created_at')
           .eq('callee_id', user.id).eq('status', 'callback').gt('created_at', since)
-          .order('created_at', { ascending: false }),
-        // I called someone and they declined
-        supabase.from('radio_calls').select('id, caller_id, callee_id, status, created_at')
-          .eq('caller_id', user.id).eq('status', 'declined').gt('created_at', since)
           .order('created_at', { ascending: false }),
         // Someone called me but I didn't answer (30s timeout → cancelled)
         supabase.from('radio_calls').select('id, caller_id, callee_id, status, created_at')
           .eq('callee_id', user.id).eq('status', 'cancelled').gt('created_at', since)
           .order('created_at', { ascending: false }),
       ]);
-      return [...(cbCalls || []), ...(dcCalls || []), ...(cancelledCalls || [])]
+      return [...(cbCalls || []), ...(cancelledCalls || [])]
         .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
         .slice(0, 20);
     },
