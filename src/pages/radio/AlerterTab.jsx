@@ -26,6 +26,13 @@ export function getAlertToneFile() {
 export async function setupPagerAudio() {}
 export async function preloadPagerBuffer() {}
 
+function getAlertVolume() {
+  const level = localStorage.getItem('alerter_volume') || 'high';
+  if (level === 'medium') return 0.5;
+  if (level === 'low')    return 0.25;
+  return 1.0;
+}
+
 // Preload at module load so the file is buffered before first alert
 function _getEl() {
   if (!_pagerEl || _pagerEl.src !== window.location.origin + getAlertToneFile()) {
@@ -41,7 +48,7 @@ function _playOnce() {
   try {
     const el = _getEl();
     el.currentTime = 0;
-    el.volume = 1.0;
+    el.volume = getAlertVolume();
     el.play().catch(() => {});
   } catch {}
 }
