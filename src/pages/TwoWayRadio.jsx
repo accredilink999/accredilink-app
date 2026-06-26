@@ -239,18 +239,27 @@ function playOutgoingTone() {
   return () => { active = false; if (timer) clearInterval(timer); };
 }
 
-// UK TETRA/Airwave-style PTT tones — use preloaded AAC files for APK reliability
-// Oscillators fail on APK after mic grab suspends the AudioContext
+// UK TETRA/Airwave-style PTT tones — loud, sharp, two-tone
+// talk-up (grant): low→high beep-bop  talk-down (clear): high→low bop-beep
 function playPTTTone(type) {
   if (localStorage.getItem('radio_silent_mode') === 'true') return;
   if (playCustomSound(type === 'up' ? 'ptt_up' : 'ptt_down')) return;
-  const url = type === 'up' ? '/radio-tones/Beep Bop.aac' : '/radio-tones/Bop Beep.aac';
   const vol = getToneVolume();
-  try {
-    const pre = _preloaded[url];
-    if (pre) { pre.currentTime = 0; pre.volume = Math.min(vol, 1.0); pre.play().catch(() => {}); }
-    else { const a = new Audio(url); a.volume = Math.min(vol, 1.0); a.play().catch(() => {}); }
-  } catch {}
+  const freqs = type === 'up' ? [880, 1400] : [1400, 880];
+  withRunningCtx(ctx => {
+    const now = ctx.currentTime;
+    freqs.forEach((freq, i) => {
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq; osc.type = 'sine';
+      const t = now + i * 0.075;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.92 * vol, t + 0.003);
+      gain.gain.setValueAtTime(0.92 * vol, t + 0.058);
+      gain.gain.linearRampToValueAtTime(0, t + 0.072);
+      osc.start(t); osc.stop(t + 0.075);
+    });
+  });
 }
 
 // Call-end tone — use preloaded AAC for APK reliability
@@ -1597,7 +1606,10 @@ export default function TwoWayRadio() {
       else if (pttModeRef.current === 'group') { playPTTTone('up'); startTalkingRef.current?.(); }
     };
     const pttUp = () => {
-      if (pttModeRef.current === 'group') { playPTTTone('down'); stopTalkingRef.current?.(); }
+      if (pttModeRef.current === 'group') {
+        stopTalkingRef.current?.();          // release mic first so AudioContext can resume
+        setTimeout(() => playPTTTone('down'), 60); // tone after mic released
+      }
       else if (pttModeRef.current === 'p2p') { playPTTTone('down'); }
     };
 
