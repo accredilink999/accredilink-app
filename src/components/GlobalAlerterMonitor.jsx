@@ -26,12 +26,6 @@ export default function GlobalAlerterMonitor() {
     return () => clearInterval(t);
   }, []);
 
-  // Pre-unlock audio as soon as alerter is enabled — getUserMedia with already-granted
-  // mic permission resolves without a gesture, unlocking AudioContext for pager tones
-  useEffect(() => {
-    if (alerterEnabled) setupPagerAudio();
-  }, [alerterEnabled]);
-
   // User flags — shared cache key with TwoWayRadio
   const { data: userFlags } = useQuery({
     queryKey: ['userFlags', user?.id],
@@ -50,6 +44,11 @@ export default function GlobalAlerterMonitor() {
   const urlPreview = new URLSearchParams(window.location.search).get('preview') || '';
   const isControlDevice = !!userFlags?.is_control_device || urlPreview === 'control';
   const alerterEnabled = isControlDevice || !!userFlags?.alerter_enabled;
+
+  // Unlock AudioContext early via getUserMedia (mic already granted) so pager fires without gesture
+  useEffect(() => {
+    if (alerterEnabled) setupPagerAudio();
+  }, [alerterEnabled]);
 
   // Shifts
   const { data: rawShifts = [] } = useQuery({
