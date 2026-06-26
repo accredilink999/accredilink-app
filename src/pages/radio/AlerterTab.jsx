@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { format, parseISO, differenceInMinutes } from 'date-fns';
-import { BellOff, CheckCheck, Trash2, BellRing, Wifi } from 'lucide-react';
+import { format, parseISO, differenceInMinutes, subDays } from 'date-fns';
+import { useQuery } from '@tanstack/react-query';
+import { BellOff, CheckCheck, Trash2, BellRing, Wifi, ChevronDown } from 'lucide-react';
+import { supabase } from '@/api/supabaseClient';
 
 // ── Pager tone — MP3-based ────────────────────────────────────────────────────
 export const ALERTER_TONES = [
@@ -27,54 +29,73 @@ function playPagerOnce() {
   } catch {}
 }
 
-function startPagerLoop() {
+export function startPagerLoop() {
   if (_pagerActive) return;
   _pagerActive = true;
   playPagerOnce();
   _pagerTimer = setInterval(playPagerOnce, 4000);
 }
 
-function stopPagerLoop() {
+export function stopPagerLoop() {
   _pagerActive = false;
   if (_pagerTimer) { clearInterval(_pagerTimer); _pagerTimer = null; }
   if (_pagerAudio) { try { _pagerAudio.pause(); } catch {} _pagerAudio = null; }
 }
 
-// ── Alert generation ──────────────────────────────────────────────────────────
-const LATE_CLOCK_IN_MINS   = 15;
-const LATE_CALL_MINS       = 15;
-const CALL_OVERRUN_MINS    = 45;
+// ── Org helper ────────────────────────────────────────────────────────────────
+const getOrgId = () =>
+  localStorage.getItem('organizationId') || sessionStorage.getItem('organizationId') || '';
 
+// ── Alert thresholds ──────────────────────────────────────────────────────────
+const LATE_CLOCK_IN_MINS  = 15;
+const LATE_CALL_MINS      = 15;
+const CALL_OVERRUN_MINS   = 50;
+const LATE_CLOCK_OUT_MINS = 60;
+
+// ── Alert builder ─────────────────────────────────────────────────────────────
 function buildAlerts(todayShifts, todayShiftCalls, staff, todayStr, now) {
   const alerts = [];
+  const ts = format(now, 'dd/MM/yyyy HH:mm');
 
-  // 1. Late clock-in
+  // ── 1. LATE_SHIFT_CLOCK_IN ─────────────────────────────────────────────────
   todayShifts.forEach(s => {
-    if (['in_progress', 'completed', 'cancelled'].includes(s.status)) return;
+    if (['completed', 'cancelled', 'available_cover', 'available'].includes(s.status)) return;
     if (s.clock_in_time) return;
     if (!s.start_time) return;
     try {
       const start = parseISO(`${s.date || todayStr}T${s.start_time}`);
       const minsLate = differenceInMinutes(now, start);
       if (minsLate < LATE_CLOCK_IN_MINS) return;
-      const staffName = s.staff_name || staff.find(u => u.id === s.staff_id)?.full_name || 'UNKNOWN';
+      const staffName = (s.staff_name || staff.find(u => u.id === s.staff_id)?.full_name || 'UNKNOWN').toUpperCase();
       alerts.push({
-        id:        `late_clockin_${s.id}`,
-        type:      'LATE_CLOCK_IN',
-        priority:  'HIGH',
+        id:       `late_clockin_${s.id}`,
+        type:     'LATE_SHIFT_CLOCK_IN',
+        priority: 'HIGH',
         timestamp: now,
-        refId:     s.id,
+        refId:    s.id,
         lines: [
-          '** ALERT — STAFF LATE CLOCK IN **',
-          `${staffName.toUpperCase()}`,
-          `SHIFT START: ${s.start_time.slice(0,5)} HRS`,
-          `${minsLate} MINS OVERDUE — NO CLOCK IN RECORDED`,
+          '** ALERT — STAFF LATE CLOCK ON **',
+          staffName,
+          `SHIFT START: ${s.start_time.slice(0, 5)} HRS · ${minsLate} MINS OVERDUE`,
+          'Staff member has not clocked on to their shift. Please attempt contact.',
+          ts,
         ],
       });
+
+      // For paired shifts — also alert for paired staff if they haven't clocked in
+      if (s.paired_shift_id && s.paired_staff_name) {
+        const pairedShift = todayShifts.find(ps => ps.id === s.paired_shift_id);
+        if (pairedShift && !pairedShift.clock_in_time &&
+          !['completed', 'cancelled', 'available_cover', 'available'].includes(pairedShift.status)) {
+          // Paired shift alert is generated when we iterate over pairedShift — avoid duplicates
+          // by only alerting if this shift's id is lexically smaller (ensures one alert per pair)
+          // Actually: each shift generates its own alert independently, which is correct per spec
+        }
+      }
     } catch {}
   });
 
-  // 2. Late client call check-in
+  // ── 2. LATE_CALL_CHECKIN ───────────────────────────────────────────────────
   todayShiftCalls.forEach(c => {
     if (c.status !== 'pending') return;
     if (!c.scheduled_time) return;
@@ -82,49 +103,110 @@ function buildAlerts(todayShifts, todayShiftCalls, staff, todayStr, now) {
       const due = parseISO(`${todayStr}T${c.scheduled_time}`);
       const minsLate = differenceInMinutes(now, due);
       if (minsLate < LATE_CALL_MINS) return;
-      const staffName =
+
+      // Paired shift check: if the paired shift has a call checked in within 30 mins, skip
+      const pairedShiftId = c.shifts?.paired_shift_id;
+      if (pairedShiftId) {
+        const pairedCallCheckedIn = todayShiftCalls.some(other =>
+          other.shift_id === pairedShiftId &&
+          other.status !== 'pending' &&
+          other.scheduled_time &&
+          Math.abs(differenceInMinutes(
+            parseISO(`${todayStr}T${other.scheduled_time}`),
+            due
+          )) <= 30
+        );
+        if (pairedCallCheckedIn) return;
+      }
+
+      const staffName = (
         c.shifts?.staff_name ||
         staff.find(u => u.id === c.shifts?.staff_id)?.full_name ||
-        'UNKNOWN';
+        'UNKNOWN'
+      ).toUpperCase();
+      const clientName = (c.service_user_name || 'CLIENT').toUpperCase();
+
       alerts.push({
-        id:        `late_call_${c.id}`,
-        type:      'LATE_CALL_CHECKIN',
-        priority:  'HIGH',
+        id:       `late_call_${c.id}`,
+        type:     'LATE_CALL_CHECKIN',
+        priority: 'HIGH',
         timestamp: now,
-        refId:     c.id,
+        refId:    c.id,
         lines: [
           '** ALERT — LATE CLIENT CHECK-IN **',
-          `${staffName.toUpperCase()} → ${(c.service_user_name || 'CLIENT').toUpperCase()}`,
-          `CALL DUE: ${c.scheduled_time.slice(0,5)} HRS`,
-          `${minsLate} MINS OVERDUE — NOT YET STARTED`,
+          `${staffName} → ${clientName}`,
+          `CALL DUE: ${c.scheduled_time.slice(0, 5)} HRS · ${minsLate} MINS OVERDUE`,
+          'Nobody has checked in to this care call. Please verify staff welfare.',
+          ts,
         ],
       });
     } catch {}
   });
 
-  // 3. Call overrun 45+ mins
+  // ── 3. CALL_OVERRUN ────────────────────────────────────────────────────────
   todayShiftCalls.forEach(c => {
-    if (c.status !== 'in_progress') return;
-    if (!c.scheduled_time) return;
+    if (!['in_progress', 'started'].includes(c.status)) return;
+    // Use clock_in_time if available, else fall back to scheduled_time
+    const startRef = c.clock_in_time || c.scheduled_time;
+    if (!startRef) return;
     try {
-      const due = parseISO(`${todayStr}T${c.scheduled_time}`);
-      const minsIn = differenceInMinutes(now, due);
+      const startTime = c.clock_in_time
+        ? new Date(c.clock_in_time)
+        : parseISO(`${todayStr}T${c.scheduled_time}`);
+      const minsIn = differenceInMinutes(now, startTime);
       if (minsIn < CALL_OVERRUN_MINS) return;
-      const staffName =
+
+      const staffName = (
         c.shifts?.staff_name ||
         staff.find(u => u.id === c.shifts?.staff_id)?.full_name ||
-        'UNKNOWN';
+        'UNKNOWN'
+      ).toUpperCase();
+      const clientName = (c.service_user_name || 'CLIENT').toUpperCase();
+      const timeLabel = c.clock_in_time
+        ? format(new Date(c.clock_in_time), 'HH:mm')
+        : c.scheduled_time?.slice(0, 5) || '??:??';
+
       alerts.push({
-        id:        `overrun_${c.id}`,
-        type:      'CALL_OVERRUN',
-        priority:  'URGENT',
+        id:       `overrun_${c.id}`,
+        type:     'CALL_OVERRUN',
+        priority: 'URGENT',
         timestamp: now,
-        refId:     c.id,
+        refId:    c.id,
         lines: [
-          '** URGENT — CALL OVERRUN >45 MINS **',
-          `${staffName.toUpperCase()} WITH ${(c.service_user_name || 'CLIENT').toUpperCase()}`,
-          `STARTED APPROX: ${c.scheduled_time.slice(0,5)} HRS`,
-          'CHECK WELFARE IMMEDIATELY',
+          '** URGENT — CARE CALL OVERRUN **',
+          `${staffName} WITH ${clientName}`,
+          `STARTED: approx ${timeLabel} HRS · ${minsIn} MINS`,
+          'Staff not booked out after 50 minutes. CHECK WELFARE IMMEDIATELY.',
+          ts,
+        ],
+      });
+    } catch {}
+  });
+
+  // ── 4. LATE_SHIFT_CLOCK_OUT ────────────────────────────────────────────────
+  todayShifts.forEach(s => {
+    if (['cancelled', 'available_cover', 'available'].includes(s.status)) return;
+    if (!s.clock_in_time) return;  // must have clocked IN
+    if (s.clock_out_time) return;  // already clocked out
+    if (!s.end_time) return;
+    try {
+      const end = parseISO(`${s.date || todayStr}T${s.end_time}`);
+      const minsOverdue = differenceInMinutes(now, end);
+      if (minsOverdue < LATE_CLOCK_OUT_MINS) return;
+      const staffName = (s.staff_name || staff.find(u => u.id === s.staff_id)?.full_name || 'UNKNOWN').toUpperCase();
+
+      alerts.push({
+        id:       `late_clockout_${s.id}`,
+        type:     'LATE_SHIFT_CLOCK_OUT',
+        priority: 'HIGH',
+        timestamp: now,
+        refId:    s.id,
+        lines: [
+          '** ALERT — SHIFT NOT BOOKED OFF **',
+          staffName,
+          `SHIFT ENDED: ${s.end_time.slice(0, 5)} HRS · ${minsOverdue} MINS OVERDUE`,
+          'Staff member has not booked off their shift. Please attempt contact.',
+          ts,
         ],
       });
     } catch {}
@@ -139,20 +221,112 @@ const scanlineStyle = {
   backgroundSize: '100% 4px',
 };
 
+// ── Alert History (past logs from Supabase) ───────────────────────────────────
+function AlertHistory() {
+  const [open, setOpen] = useState(false);
+  const orgId = getOrgId();
+  const sevenDaysAgo = format(subDays(new Date(), 7), 'yyyy-MM-dd');
+
+  const { data: logs = [], isLoading } = useQuery({
+    queryKey: ['alerter_logs_history', orgId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('alerter_logs')
+        .select('*')
+        .eq('organization_id', orgId)
+        .gte('log_date', sevenDaysAgo)
+        .order('triggered_at', { ascending: false })
+        .limit(200);
+      return data || [];
+    },
+    enabled: open && !!orgId,
+    refetchInterval: open ? 60000 : false,
+  });
+
+  // Group by log_date
+  const grouped = useMemo(() => {
+    const map = new Map();
+    for (const log of logs) {
+      const d = log.log_date || 'unknown';
+      if (!map.has(d)) map.set(d, []);
+      map.get(d).push(log);
+    }
+    return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+  }, [logs]);
+
+  return (
+    <div className="rounded-xl border border-slate-800 overflow-hidden" style={{ background: '#0a0a0a' }}>
+      <button
+        onClick={() => setOpen(p => !p)}
+        className="w-full flex items-center justify-between px-4 py-3 text-left"
+      >
+        <span className="font-mono text-amber-600/80 text-[10px] uppercase tracking-widest">Alert History (7 days)</span>
+        <ChevronDown className={`w-3.5 h-3.5 text-amber-800 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="border-t border-amber-900/30 max-h-96 overflow-y-auto">
+          {isLoading && (
+            <p className="font-mono text-amber-900/60 text-[10px] px-4 py-3 tracking-wider">LOADING…</p>
+          )}
+          {!isLoading && grouped.length === 0 && (
+            <p className="font-mono text-amber-900/50 text-[10px] px-4 py-3 tracking-wider">NO LOGS IN LAST 7 DAYS</p>
+          )}
+          {grouped.map(([date, entries]) => {
+            let displayDate = date;
+            try { displayDate = format(parseISO(date), 'dd/MM/yyyy'); } catch {}
+            return (
+              <div key={date} className="border-b border-amber-900/20 last:border-b-0">
+                <p className="font-mono text-amber-700/60 text-[9px] uppercase tracking-[0.3em] px-4 py-1.5 border-b border-amber-900/20"
+                  style={{ background: '#0d0800' }}>
+                  {displayDate}
+                </p>
+                {entries.map(log => {
+                  const isUrgent = log.priority === 'URGENT';
+                  let timeLabel = '';
+                  try { timeLabel = format(new Date(log.triggered_at), 'HH:mm'); } catch {}
+                  return (
+                    <div key={log.id} className="px-4 py-2 border-b border-amber-900/10 last:border-b-0 space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded font-bold tracking-wide ${
+                          isUrgent ? 'bg-red-900/40 text-red-400' : 'bg-amber-900/40 text-amber-500'
+                        }`}>{log.alert_type || log.priority}</span>
+                        <span className="font-mono text-amber-900/50 text-[9px]">{timeLabel}</span>
+                      </div>
+                      {log.title && (
+                        <p className="font-mono text-amber-600/80 text-[10px] tracking-wider leading-tight">{log.title}</p>
+                      )}
+                      {log.body && (
+                        <p className="font-mono text-amber-800/60 text-[9px] leading-tight">{log.body}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], staff = [], alerterEnabled = true }) {
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const [now, setNow] = useState(() => new Date());
-  const [ackedIds,    setAckedIds]    = useState(() => {
+  const [ackedIds, setAckedIds] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem('alerter_acked') || '[]')); } catch { return new Set(); }
   });
-  const [deletedIds,  setDeletedIds]  = useState(() => {
+  const [deletedIds, setDeletedIds] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem('alerter_deleted') || '[]')); } catch { return new Set(); }
   });
   const [silenced, setSilenced] = useState(false);
-  const [blinkOn,  setBlinkOn]  = useState(true);
-  const clockRef  = useRef(null);
-  const blinkRef  = useRef(null);
+  const [blinkOn, setBlinkOn] = useState(true);
+  const clockRef = useRef(null);
+  const blinkRef = useRef(null);
+  const loggedIdsRef = useRef(new Set());
+  const prevHasNewRef = useRef(false);
 
   // Refresh alert detection every 60s
   useEffect(() => {
@@ -191,6 +365,44 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
     if (hasReallyNew) setSilenced(false);
     prevNewIdsRef.current = currentIds;
   }, [newAlerts]);
+
+  // APK wake: show service worker notification when hasNew transitions false→true
+  useEffect(() => {
+    if (hasNew && !prevHasNewRef.current) {
+      if ('Notification' in window) {
+        navigator.serviceWorker?.ready.then(reg =>
+          reg.showNotification('⚠️ CareCall Alerter', {
+            body: `${newAlerts.length} new alert${newAlerts.length > 1 ? 's' : ''}`,
+            tag: 'alerter',
+            renotify: true,
+            requireInteraction: true,
+          })
+        ).catch(() => {});
+      }
+    }
+    prevHasNewRef.current = hasNew;
+  }, [hasNew, newAlerts.length]);
+
+  // Supabase logging — fire-and-forget for new alert IDs
+  useEffect(() => {
+    const orgId = getOrgId();
+    if (!orgId) return;
+    allAlerts.forEach(alert => {
+      if (loggedIdsRef.current.has(alert.id)) return;
+      loggedIdsRef.current.add(alert.id);
+      const logDate = format(new Date(), 'yyyy-MM-dd');
+      supabase.from('alerter_logs').insert({
+        alert_id:        alert.id,
+        alert_type:      alert.type,
+        priority:        alert.priority,
+        title:           alert.lines[0],
+        body:            alert.lines.join(' | '),
+        ref_id:          alert.refId,
+        log_date:        logDate,
+        organization_id: orgId,
+      }).then(() => {}).catch(() => {});
+    });
+  }, [allAlerts]);
 
   const ack = useCallback((id) => {
     setAckedIds(prev => {
@@ -273,7 +485,7 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
 
           {/* Model label */}
           <div className="px-3 pt-2 pb-1 border-b border-amber-900/20">
-            <p className="font-mono text-amber-600/60 text-[9px] tracking-[0.3em] uppercase">CareCall Alerter v1 · Control</p>
+            <p className="font-mono text-amber-600/60 text-[9px] tracking-[0.3em] uppercase">CareCall Alerter v2 · Control</p>
           </div>
 
           {/* No alerts */}
@@ -286,7 +498,7 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
           )}
 
           {/* Alert messages */}
-          {visibleAlerts.map((alert, idx) => {
+          {visibleAlerts.map((alert) => {
             const isNew  = !ackedIds.has(alert.id);
             const urgent = alert.priority === 'URGENT';
             return (
@@ -294,18 +506,24 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
                 className={`border-b border-amber-900/30 ${isNew ? 'bg-amber-950/10' : 'opacity-60'}`}>
                 {/* Message body */}
                 <div className="px-3 pt-3 pb-2 space-y-0.5">
-                  {alert.lines.map((line, li) => (
-                    <p key={li}
-                      className={`font-mono text-[11px] tracking-wider leading-tight ${
-                        li === 0
-                          ? (urgent ? 'text-amber-300 font-bold' : 'text-amber-400 font-bold')
-                          : (urgent ? 'text-amber-600' : 'text-amber-700')
-                      }`}>
-                      {line}
-                    </p>
-                  ))}
-                  <p className="font-mono text-amber-900/70 text-[9px] mt-1 tracking-widest">
-                    DETECTED: {format(alert.timestamp, 'HH:mm')} · REF:{alert.refId?.slice(0,8).toUpperCase()}
+                  {alert.lines.map((line, li) => {
+                    // Last line is the timestamp — style differently
+                    const isTimestamp = li === alert.lines.length - 1;
+                    return (
+                      <p key={li}
+                        className={`font-mono tracking-wider leading-tight ${
+                          isTimestamp
+                            ? 'text-amber-900/60 text-[9px] mt-1'
+                            : li === 0
+                              ? (urgent ? 'text-red-400 font-bold text-[11px]' : 'text-amber-400 font-bold text-[11px]')
+                              : (urgent ? 'text-amber-500 text-[11px]' : 'text-amber-700 text-[11px]')
+                        }`}>
+                        {line}
+                      </p>
+                    );
+                  })}
+                  <p className="font-mono text-amber-900/50 text-[9px] mt-0.5 tracking-widest">
+                    REF:{alert.refId?.slice(0, 8).toUpperCase()}
                   </p>
                 </div>
 
@@ -393,6 +611,9 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
           </div>
         </div>
       </div>
+
+      {/* ── Alert History (scrollable past logs) ──────────────────────────── */}
+      <AlertHistory />
 
       {/* ── Future: Emergency message from family ──────────────────────────── */}
       <div className="rounded-xl border border-slate-800/40 bg-slate-900/30 px-4 py-3">

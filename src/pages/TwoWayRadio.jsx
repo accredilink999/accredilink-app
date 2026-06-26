@@ -522,7 +522,7 @@ export default function TwoWayRadio() {
     queryFn: async () => {
       const { data } = await withOrgFilter(
         supabase.from('shift_calls')
-          .select('id, shift_id, service_user_name, status, scheduled_time, log_required, care_log_id, shifts(id, staff_id, staff_name, rota_area_id)')
+          .select('id, shift_id, service_user_name, status, scheduled_time, clock_in_time, clock_out_time, log_required, care_log_id, shifts(id, staff_id, staff_name, rota_area_id, paired_shift_id, paired_staff_name, start_time, end_time, clock_in_time, clock_out_time)')
           .eq('call_date', todayStr)
           .order('scheduled_time')
       );

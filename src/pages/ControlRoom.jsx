@@ -12,7 +12,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Navigation, Search, Check, AlertCircle, ChevronDown, Edit, Loader2, Mail, Clock, Plus, Users, Radio } from 'lucide-react';
+import { MapPin, Navigation, Search, Check, AlertCircle, ChevronDown, Edit, Loader2, Mail, Clock, Plus, Users, Radio, BellRing } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -669,6 +669,12 @@ export default function ControlRoom() {
             <span>Radio</span>
           </button>
         )}
+        {user?.role === 'super_admin' && (
+          <button onClick={() => setActiveTab('alerter-log')} className={`flex items-center justify-center sm:justify-start gap-1 flex-1 text-xs sm:text-sm py-2 sm:py-3 rounded-lg font-medium transition-all shadow-md hover:shadow-lg ${activeTab === 'alerter-log' ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white' : 'bg-gradient-to-r from-amber-400 to-amber-500 text-white hover:from-amber-500 hover:to-amber-600'}`}>
+            <BellRing className="w-4 h-4 flex-shrink-0" />
+            <span>Alerter Log</span>
+          </button>
+        )}
       </div>
 
       {activeTab === 'tracking' && isAdmin && (
@@ -945,6 +951,10 @@ export default function ControlRoom() {
         <RadioSettingsPanel queryClient={queryClient} user={user} />
       )}
 
+      {activeTab === 'alerter-log' && user?.role === 'super_admin' && (
+        <AlerterLogPanel />
+      )}
+
       {/* Edit Announcement Dialog */}
       {editingAnnouncement && (
         <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
@@ -1008,6 +1018,148 @@ export default function ControlRoom() {
           </DialogContent>
         </Dialog>
       )}
+    </div>
+  );
+}
+
+// ── AlerterLogPanel ──────────────────────────────────────────────────────────
+const getOrgId = () =>
+  localStorage.getItem('organizationId') || sessionStorage.getItem('organizationId') || '';
+
+function AlerterLogPanel() {
+  const { useState: useLocalState, useMemo: useLocalMemo } = React;
+  const orgId = getOrgId();
+  const thirtyDaysAgo = format(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
+
+  const { data: logs = [], isLoading } = useQuery({
+    queryKey: ['alerter_logs_panel', orgId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('alerter_logs')
+        .select('*')
+        .eq('organization_id', orgId)
+        .gte('log_date', thirtyDaysAgo)
+        .order('triggered_at', { ascending: false })
+        .limit(500);
+      return data || [];
+    },
+    enabled: !!orgId,
+    refetchInterval: 60000,
+  });
+
+  const [openDays, setOpenDays] = React.useState(new Set());
+
+  const grouped = React.useMemo(() => {
+    const map = new Map();
+    for (const log of logs) {
+      const d = log.log_date || 'unknown';
+      if (!map.has(d)) map.set(d, []);
+      map.get(d).push(log);
+    }
+    return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+  }, [logs]);
+
+  const toggleDay = (d) => setOpenDays(prev => {
+    const next = new Set(prev);
+    if (next.has(d)) next.delete(d); else next.add(d);
+    return next;
+  });
+
+  const CREATE_SQL = `CREATE TABLE IF NOT EXISTS alerter_logs (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  organization_id TEXT,
+  alert_id TEXT NOT NULL,
+  alert_type TEXT NOT NULL,
+  priority TEXT DEFAULT 'HIGH',
+  title TEXT,
+  body TEXT,
+  ref_id TEXT,
+  log_date DATE DEFAULT CURRENT_DATE,
+  triggered_at TIMESTAMPTZ DEFAULT NOW()
+);`;
+
+  return (
+    <div className="space-y-4 max-w-3xl">
+      <Card className="p-4 bg-white border-0 shadow-sm">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+            <BellRing className="w-5 h-5 text-amber-600" />
+          </div>
+          <div>
+            <h3 className="font-bold text-slate-900">Alerter Log</h3>
+            <p className="text-sm text-slate-500">Last 30 days of alerter events for this organisation</p>
+          </div>
+        </div>
+
+        {/* SQL block */}
+        <details className="mb-4">
+          <summary className="text-xs text-slate-500 cursor-pointer hover:text-slate-700 font-medium">Show setup SQL</summary>
+          <pre className="mt-2 text-[10px] bg-slate-900 text-green-400 rounded-lg p-3 overflow-x-auto font-mono leading-relaxed whitespace-pre-wrap">{CREATE_SQL}</pre>
+        </details>
+
+        {isLoading && <p className="text-sm text-slate-500 py-4 text-center">Loading…</p>}
+        {!isLoading && grouped.length === 0 && (
+          <p className="text-sm text-slate-500 py-4 text-center">No alerter logs in the last 30 days.</p>
+        )}
+
+        <div className="space-y-2">
+          {grouped.map(([date, entries]) => {
+            let displayDate = date;
+            try { displayDate = format(new Date(date), 'EEEE dd MMMM yyyy'); } catch {}
+            const isOpen = openDays.has(date);
+            const urgentCount = entries.filter(e => e.priority === 'URGENT').length;
+
+            return (
+              <div key={date} className="border border-slate-200 rounded-xl overflow-hidden">
+                <button
+                  onClick={() => toggleDay(date)}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="font-semibold text-slate-800 text-sm">{displayDate}</span>
+                    <span className="text-xs text-slate-500">{entries.length} alert{entries.length !== 1 ? 's' : ''}</span>
+                    {urgentCount > 0 && (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700">{urgentCount} URGENT</span>
+                    )}
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isOpen && (
+                  <div className="divide-y divide-slate-100">
+                    {entries.map(log => {
+                      const isUrgent = log.priority === 'URGENT';
+                      let timeLabel = '';
+                      try { timeLabel = format(new Date(log.triggered_at), 'HH:mm'); } catch {}
+                      return (
+                        <div key={log.id} className="px-4 py-3 flex items-start gap-3">
+                          <div className="flex flex-col items-center gap-1 shrink-0 pt-0.5">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded font-mono ${
+                              isUrgent ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                            }`}>{isUrgent ? 'URGENT' : 'HIGH'}</span>
+                            <span className="text-[10px] text-slate-400 font-mono">{timeLabel}</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            {log.title && (
+                              <p className="font-mono text-xs text-slate-800 font-semibold leading-tight">{log.title}</p>
+                            )}
+                            {log.body && (
+                              <p className="font-mono text-[10px] text-slate-500 mt-0.5 leading-relaxed break-words">{log.body}</p>
+                            )}
+                            {log.alert_type && (
+                              <p className="text-[9px] text-slate-400 mt-1 uppercase tracking-wider">{log.alert_type}</p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </Card>
     </div>
   );
 }
