@@ -416,7 +416,6 @@ export default function TwoWayRadio() {
   // Tab navigation, theme, and per-device settings (all localStorage-backed for PWA/native)
   const [radioTheme, setRadioTheme]     = useState(() => localStorage.getItem('radio_theme') || 'blue');
   const [radioTab, setRadioTab]         = useState('radio'); // 'radio' | 'shift' | 'alerter' | 'settings'
-  const [alerterEnabled, setAlerterEnabled] = useState(() => localStorage.getItem('radio_alerter_enabled') !== 'false');
   const [silentMode, setSilentMode]     = useState(() => localStorage.getItem('radio_silent_mode') === 'true');
   const [toneVolume, setToneVolume]     = useState(() => { const v = parseFloat(localStorage.getItem('radio_tone_volume') || '1'); return isNaN(v) ? 1 : v; });
   const [callVolume, setCallVolume]     = useState(() => { const def = localStorage.getItem('carecall_radio_mode') === 'true' ? 100 : 300; const v = parseInt(localStorage.getItem('radio_call_volume') || String(def), 10); return isNaN(v) ? def : v; });
@@ -529,7 +528,7 @@ export default function TwoWayRadio() {
       );
       return data || [];
     },
-    enabled: !!user?.id && (user?.role === 'super_admin' || user?.role === 'admin'),
+    enabled: !!user?.id && (user?.role === 'super_admin' || user?.role === 'admin' || !!user?.is_control_device),
     refetchInterval: 60000,
   });
 
@@ -575,6 +574,8 @@ export default function TwoWayRadio() {
   const isControlDevice = !!user?.is_control_device || urlPreview === 'control';
   // Control devices get full admin-level radio access regardless of their assigned role
   const isSuperAdmin  = user?.role === 'super_admin' || user?.role === 'admin' || isControlDevice;
+  // Alerter: always on for control devices; for PWA admins, super admin grants it via alerter_enabled
+  const hasAlerter = isControlDevice || !!user?.alerter_enabled;
   const myUid         = user?.id ? toUid(user.id) : null;
   const otherStaff    = staff.filter(s => s.id !== user?.id);
   const staffByUid    = Object.fromEntries(staff.map(s => [toUid(s.id), s]));
@@ -2130,7 +2131,10 @@ export default function TwoWayRadio() {
 
         {/* ── TAB BAR ── */}
         <div className={`flex border-b backdrop-blur ${theme.tabBar}`}>
-          {(['radio', ...(isSuperAdmin ? ['shift', 'alerter'] : []), 'settings']).map(key => (
+          {(isRadioMode
+            ? ['radio', 'alerter', 'settings']
+            : ['radio', ...(isSuperAdmin ? ['shift'] : []), ...(hasAlerter ? ['alerter'] : []), 'settings']
+          ).map(key => (
             <button key={key} onClick={() => setRadioTab(key)}
               className={`flex-1 py-2.5 text-xs font-black uppercase tracking-wider transition-colors touch-manipulation ${
                 radioTab === key ? theme.tabActive : theme.tabInactive
@@ -2566,7 +2570,7 @@ export default function TwoWayRadio() {
             todayShifts={todayShifts}
             todayShiftCalls={todayShiftCalls}
             staff={staff}
-            alerterEnabled={alerterEnabled}
+            alerterEnabled={hasAlerter}
           />
         )}
 
@@ -2599,8 +2603,6 @@ export default function TwoWayRadio() {
             setToneVolume={v => { setToneVolume(v); localStorage.setItem('radio_tone_volume', String(v)); }}
             callVolume={callVolume}
             setCallVolume={v => { setCallVolume(v); callVolumeRef.current = v; localStorage.setItem('radio_call_volume', String(v)); }}
-            alerterEnabled={alerterEnabled}
-            setAlerterEnabled={v => { setAlerterEnabled(v); localStorage.setItem('radio_alerter_enabled', String(v)); }}
           />
         )}
 

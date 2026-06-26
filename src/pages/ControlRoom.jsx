@@ -1040,6 +1040,7 @@ function RadioSettingsPanel({ queryClient, user }) {
   const [creatingTest, setCreatingTest] = useState(false);
   const [testUser, setTestUser] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [alerterSaving, setAlerterSaving] = useState(null);
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ['radioSettings'],
@@ -1048,6 +1049,23 @@ function RadioSettingsPanel({ queryClient, user }) {
       return data;
     },
   });
+
+  const { data: allStaff = [] } = useQuery({
+    queryKey: ['staff'],
+    queryFn: async () => {
+      const { data } = await supabase.from('users').select('id, full_name, email, role, is_control_device, alerter_enabled').order('full_name');
+      return data || [];
+    },
+  });
+
+  const adminStaff = allStaff.filter(s => s.role === 'super_admin' || s.role === 'admin');
+
+  const toggleAlerter = async (staffId, enabled) => {
+    setAlerterSaving(staffId);
+    await supabase.from('users').update({ alerter_enabled: enabled }).eq('id', staffId);
+    queryClient.invalidateQueries({ queryKey: ['staff'] });
+    setAlerterSaving(null);
+  };
 
   const upsert = async (patch) => {
     setSaving(true);
@@ -1125,6 +1143,42 @@ function RadioSettingsPanel({ queryClient, user }) {
           </p>
         </div>
       )}
+
+      {/* Alerter Access */}
+      <div className="border border-slate-200 rounded-xl p-4 space-y-3">
+        <div>
+          <p className="font-medium text-slate-900 text-sm">Alerter Access</p>
+          <p className="text-xs text-slate-500 mt-0.5">Control handsets always have the Alerter. Grant it to individual admins below.</p>
+          <p className="text-[10px] text-amber-600 font-mono mt-1 select-all">ALTER TABLE users ADD COLUMN IF NOT EXISTS alerter_enabled BOOLEAN DEFAULT false;</p>
+        </div>
+        <div className="space-y-2">
+          {adminStaff.map(s => (
+            <div key={s.id} className="flex items-center justify-between gap-3 py-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 text-[10px] font-bold shrink-0">
+                  {s.full_name?.[0] || '?'}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm text-slate-800 font-medium truncate">{s.full_name}</p>
+                  {s.is_control_device && <p className="text-[10px] text-teal-600">Control handset — always on</p>}
+                </div>
+              </div>
+              {s.is_control_device ? (
+                <span className="text-[10px] text-teal-500 font-semibold shrink-0">AUTO</span>
+              ) : (
+                <button
+                  onClick={() => toggleAlerter(s.id, !s.alerter_enabled)}
+                  disabled={alerterSaving === s.id}
+                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${s.alerter_enabled ? 'bg-teal-500' : 'bg-slate-300'}`}
+                >
+                  <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${s.alerter_enabled ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                </button>
+              )}
+            </div>
+          ))}
+          {adminStaff.length === 0 && <p className="text-xs text-slate-400">No admin accounts found</p>}
+        </div>
+      </div>
 
       <div className="border border-slate-200 rounded-xl p-4 space-y-3">
         <div>
