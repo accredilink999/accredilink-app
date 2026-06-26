@@ -55,6 +55,10 @@ public class MainActivity extends BridgeActivity {
     // Wake lock — acquired on PTT press to bring screen on if it went dark
     private PowerManager.WakeLock pttWakeLock;
 
+    // Alerter CPU wake lock — keeps JS running in radio mode so GlobalAlerterMonitor
+    // continues polling even when the screen is off, allowing wakeForCall() to fire.
+    private PowerManager.WakeLock alerterWakeLock;
+
     // Long-press SOS: red button held for 800ms triggers emergency
     private final android.os.Handler sosHandler = new android.os.Handler(android.os.Looper.getMainLooper());
     private Runnable sosRunnable = null;
@@ -92,6 +96,12 @@ public class MainActivity extends BridgeActivity {
                 "carecallai:ptt_wake"
             );
             pttWakeLock.setReferenceCounted(false);
+
+            // Keep CPU alive permanently so JS timers keep firing for alert polling.
+            // This is a dedicated always-on radio handset so the battery cost is acceptable.
+            alerterWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "carecallai:alerter_cpu");
+            alerterWakeLock.setReferenceCounted(false);
+            alerterWakeLock.acquire();
         }
 
         webView = getBridge().getWebView();
@@ -387,6 +397,12 @@ public class MainActivity extends BridgeActivity {
         }
 
         return super.dispatchKeyEvent(event);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (alerterWakeLock != null && alerterWakeLock.isHeld()) alerterWakeLock.release();
     }
 
     // ── Back button ───────────────────────────────────────────────────────────
