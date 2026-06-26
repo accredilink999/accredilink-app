@@ -149,9 +149,14 @@ export default function GlobalAlerterMonitor() {
       unsilenceAlerter();
       startPagerLoop();
 
-      // Wake lock
+      // Wake lock — keeps screen on (PWA)
       if ('wakeLock' in navigator) {
         navigator.wakeLock.request('screen').catch(() => {});
+      }
+
+      // APK: wake screen from screensaver/sleep and bring app to front
+      if (window.AndroidApp?.wakeForCall) {
+        window.AndroidApp.wakeForCall();
       }
 
       // SW notification to wake APK from background
