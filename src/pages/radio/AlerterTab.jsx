@@ -7,6 +7,7 @@ import {
   AlertOctagon, CheckCircle, Radio, History,
 } from 'lucide-react';
 import { supabase } from '@/api/supabaseClient';
+import { getAudioCtx } from '@/utils/sharedAudio';
 
 // ── Pager tone — MP3-based ────────────────────────────────────────────────────
 export const ALERTER_TONES = [
@@ -27,6 +28,9 @@ export function getAlertToneFile() {
 function playPagerOnce() {
   try {
     if (_pagerAudio) { _pagerAudio.pause(); _pagerAudio = null; }
+    // Resume the shared AudioContext (same one Agora uses) — ensures audio is unlocked
+    const ctx = getAudioCtx();
+    if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
     const a = new Audio(getAlertToneFile());
     a.volume = 1.0;
     _pagerAudio = a;

@@ -57,26 +57,8 @@ const toUid    = (str = '') => { let h = 0; for (let i = 0; i < str.length; i++)
 const getOrgId = () => localStorage.getItem('organizationId') || sessionStorage.getItem('organizationId');
 const withOrgFilter = q => { const id = getOrgId(); return id ? q.eq('organization_id', id) : q; };
 
-// ── Audio helpers ─────────────────────────────────────────────────────────────
-// Shared AudioContext — created once, avoids 100-200ms cold-start latency on every tone
-let _sharedCtx = null;
-function getAudioCtx() {
-  try {
-    if (!_sharedCtx || _sharedCtx.state === 'closed') {
-      _sharedCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (_sharedCtx.state === 'suspended') _sharedCtx.resume().catch(() => {});
-    return _sharedCtx;
-  } catch { return null; }
-}
-// Run fn(ctx) only once the context is confirmed running — avoids scheduling
-// oscillators at a frozen currentTime when the context is mid-resume.
-function withRunningCtx(fn) {
-  const ctx = getAudioCtx();
-  if (!ctx) return;
-  if (ctx.state === 'running') { try { fn(ctx); } catch {} return; }
-  ctx.resume().then(() => { try { fn(ctx); } catch {} }).catch(() => {});
-}
+// ── Audio helpers — shared context so Agora's unlock benefits the alerter too ─
+import { getAudioCtx, withRunningCtx } from '@/utils/sharedAudio';
 
 // Preload bundled tones so they play instantly on PTT press (no network fetch delay)
 const _preloaded = {};
