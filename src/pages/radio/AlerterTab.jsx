@@ -2,52 +2,42 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { format, parseISO, differenceInMinutes } from 'date-fns';
 import { BellOff, CheckCheck, Trash2, BellRing, Wifi } from 'lucide-react';
 
-// ── Pager tone (UK Motorola-style: 4 beeps at 2400Hz then 2s silence) ─────────
-let _pagerCtx = null;
+// ── Pager tone — MP3-based ────────────────────────────────────────────────────
+export const ALERTER_TONES = [
+  { id: 'pager',      label: 'Pager',      file: '/pager.mp3' },
+  { id: 'rnli_pager', label: 'RNLI Pager', file: '/rnli_pager.mp3' },
+];
+
+let _pagerAudio = null;
 let _pagerTimer = null;
 let _pagerActive = false;
 
-function getPagerCtx() {
-  try {
-    if (!_pagerCtx || _pagerCtx.state === 'closed') {
-      _pagerCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (_pagerCtx.state === 'suspended') _pagerCtx.resume().catch(() => {});
-    return _pagerCtx;
-  } catch { return null; }
+function getAlertToneFile() {
+  const id = localStorage.getItem('alerter_tone') || 'pager';
+  return ALERTER_TONES.find(t => t.id === id)?.file || '/pager.mp3';
 }
 
-function playPagerBurst() {
-  const ctx = getPagerCtx();
-  if (!ctx) return;
+function playPagerOnce() {
   try {
-    let t = ctx.currentTime;
-    for (let i = 0; i < 4; i++) {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.type = 'sine';
-      osc.frequency.value = 2400;
-      gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.7, t + 0.01);
-      gain.gain.setValueAtTime(0.7, t + 0.07);
-      gain.gain.linearRampToValueAtTime(0, t + 0.09);
-      osc.start(t); osc.stop(t + 0.09);
-      t += 0.16;
-    }
+    if (_pagerAudio) { _pagerAudio.pause(); _pagerAudio = null; }
+    const a = new Audio(getAlertToneFile());
+    a.volume = 1.0;
+    _pagerAudio = a;
+    a.play().catch(() => {});
   } catch {}
 }
 
 function startPagerLoop() {
   if (_pagerActive) return;
   _pagerActive = true;
-  playPagerBurst();
-  _pagerTimer = setInterval(playPagerBurst, 3500);
+  playPagerOnce();
+  _pagerTimer = setInterval(playPagerOnce, 4000);
 }
 
 function stopPagerLoop() {
   _pagerActive = false;
   if (_pagerTimer) { clearInterval(_pagerTimer); _pagerTimer = null; }
+  if (_pagerAudio) { try { _pagerAudio.pause(); } catch {} _pagerAudio = null; }
 }
 
 // ── Alert generation ──────────────────────────────────────────────────────────

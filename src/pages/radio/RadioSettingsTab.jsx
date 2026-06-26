@@ -1,6 +1,7 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { Upload, Check, Trash2, Volume2, VolumeX, Cpu, Wifi, Monitor, Zap, Radio, Palette } from 'lucide-react';
 import { toast } from 'sonner';
+import { ALERTER_TONES } from './AlerterTab';
 import { RADIO_THEMES } from './radioThemes';
 
 // Sound slots wired to the module-level audio functions in TwoWayRadio.jsx
@@ -37,6 +38,53 @@ const TONE_PRESETS = [
     sounds: TETRA_SOUNDS,
   },
 ];
+
+function AlerterTonePicker() {
+  const [selected, setSelected] = useState(() => localStorage.getItem('alerter_tone') || 'pager');
+  const [playing, setPlaying] = useState(null);
+  const audioRef = useRef(null);
+
+  const pick = (id) => {
+    setSelected(id);
+    localStorage.setItem('alerter_tone', id);
+  };
+
+  const preview = (tone) => {
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+    if (playing === tone.id) { setPlaying(null); return; }
+    const a = new Audio(tone.file);
+    a.volume = 1.0;
+    audioRef.current = a;
+    a.play().catch(() => {});
+    setPlaying(tone.id);
+    a.addEventListener('ended', () => setPlaying(null));
+  };
+
+  return (
+    <div className="space-y-1 pt-1">
+      <p className="text-slate-400 text-xs font-semibold">Alert Tone</p>
+      <div className="flex gap-2">
+        {ALERTER_TONES.map(t => (
+          <div key={t.id} className="flex items-center gap-1.5">
+            <button
+              onClick={() => pick(t.id)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${selected === t.id ? 'bg-teal-600 border-teal-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400'}`}
+            >
+              {selected === t.id && <Check className="w-3 h-3" />}{t.label}
+            </button>
+            <button
+              onClick={() => preview(t)}
+              className="text-slate-600 hover:text-teal-400 transition-colors"
+              title="Preview"
+            >
+              {playing === t.id ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function Toggle({ value, onChange, label, desc }) {
   return (
@@ -446,6 +494,7 @@ export default function RadioSettingsTab({
             label="Enable Alerter"
             desc="Plays pager tone and shows alerts when staff are late or calls overrun"
           />
+          <AlerterTonePicker />
           <div className="text-slate-700 text-[10px] space-y-0.5 pt-1 border-t border-slate-800 mt-1">
             <p>Alert thresholds (fixed):</p>
             <p>· Late clock-in: 15 mins after shift start</p>
