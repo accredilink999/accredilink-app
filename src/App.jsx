@@ -192,6 +192,8 @@ const AppShell = () => {
     const unlock = () => {
       if (unlocked) return;
       unlocked = true;
+      // Play + immediately pause at near-zero volume — this "activates" the element
+      // so subsequent .play() calls on any Audio element succeed without a gesture
       try {
         const a = new Audio('/pager.mp3');
         a.volume = 0.001;

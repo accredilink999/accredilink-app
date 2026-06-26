@@ -104,15 +104,27 @@ let _alerterBuffer  = null;
 })();
 
 function playAlertPagerOnce() {
-  withRunningCtx(ctx => {
-    if (!_alerterBuffer) return;
+  const id  = localStorage.getItem('alerter_tone') || 'pager';
+  const url = id === 'rnli_pager' ? '/rnli_pager.mp3' : '/pager.mp3';
+
+  // Path A: Web Audio API — works when _sharedCtx is already running (after PTT or getUserMedia unlock)
+  if (_sharedCtx?.state === 'running' && _alerterBuffer) {
     try {
-      const src = ctx.createBufferSource();
+      const src = _sharedCtx.createBufferSource();
       src.buffer = _alerterBuffer;
-      src.connect(ctx.destination);
+      src.connect(_sharedCtx.destination);
       src.start(0);
+      return;
     } catch {}
-  });
+  }
+
+  // Path B: preloaded HTMLMediaElement — works after ANY tap on the page
+  // App.jsx unlocks this on first touch via the silent play/pause trick
+  const pre = _preloaded[url];
+  if (pre) { pre.currentTime = 0; pre.volume = 1.0; pre.play().catch(() => {}); return; }
+
+  // Path C: last resort new Audio element
+  try { new Audio(url).play().catch(() => {}); } catch {}
 }
 
 window.__alerterStartPager = () => {
@@ -123,7 +135,7 @@ window.__alerterStartPager = () => {
 window.__alerterStopPager = () => {
   if (_pagerLoopTimer) { clearInterval(_pagerLoopTimer); _pagerLoopTimer = null; }
 };
-// Unlock _sharedCtx via getUserMedia (already-granted mic — no gesture needed)
+// Called by setupPagerAudio — getUserMedia with already-granted permission unlocks _sharedCtx
 window.__alerterUnlock = async () => {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
