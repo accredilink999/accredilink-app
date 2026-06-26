@@ -328,11 +328,25 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
   const loggedIdsRef = useRef(new Set());
   const prevHasNewRef = useRef(false);
 
-  // Refresh alert detection every 60s
+  // Refresh alert detection every 30s (tighter polling for alerter)
   useEffect(() => {
-    clockRef.current = setInterval(() => setNow(new Date()), 60000);
+    clockRef.current = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(clockRef.current);
   }, []);
+
+  // Wake lock — keep screen on while there are new unacknowledged alerts (APK)
+  useEffect(() => {
+    if (!hasNew || !('wakeLock' in navigator)) return;
+    let lock = null;
+    const acquire = () => navigator.wakeLock?.request('screen').then(l => { lock = l; }).catch(() => {});
+    acquire();
+    const onVisible = () => { if (document.visibilityState === 'visible') acquire(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      lock?.release().catch(() => {});
+    };
+  }, [hasNew]);
 
   // Blink indicator at 1Hz while new alerts exist
   useEffect(() => {
