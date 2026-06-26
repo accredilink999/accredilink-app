@@ -107,6 +107,11 @@ function playAlertPagerOnce() {
   const id  = localStorage.getItem('alerter_tone') || 'pager';
   const url = id === 'rnli_pager' ? '/rnli_pager.mp3' : '/pager.mp3';
 
+  // DEBUG: vibrate so we know this function is actually being called
+  try { navigator.vibrate?.([300, 100, 300]); } catch {}
+  // DEBUG: log audio state so user can check console
+  console.log('[alerter] playPagerOnce — ctx:', _sharedCtx?.state, '| buffer:', !!_alerterBuffer, '| preloaded:', !!_preloaded[url]);
+
   // Path A: Web Audio API — works when _sharedCtx is already running (after PTT or getUserMedia unlock)
   if (_sharedCtx?.state === 'running' && _alerterBuffer) {
     try {
