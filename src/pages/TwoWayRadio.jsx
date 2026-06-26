@@ -90,27 +90,22 @@ const _preloaded = {};
 let _pagerLoopTimer = null;
 let _alerterBuffer  = null;
 
-// Decode pager MP3 into a buffer now (decodeAudioData works on suspended context)
+// Decode pager MP3 using a short-lived context — never touches _sharedCtx at load time
 (async () => {
   try {
     const id  = localStorage.getItem('alerter_tone') || 'pager';
     const url = id === 'rnli_pager' ? '/rnli_pager.mp3' : '/pager.mp3';
-    const ctx = getAudioCtx();
-    if (!ctx) return;
+    const tmp = new (window.AudioContext || window.webkitAudioContext)();
     const r   = await fetch(url);
     const raw = await r.arrayBuffer();
-    _alerterBuffer = await ctx.decodeAudioData(raw);
+    _alerterBuffer = await tmp.decodeAudioData(raw);
+    tmp.close();
   } catch {}
 })();
 
 function playAlertPagerOnce() {
   const id  = localStorage.getItem('alerter_tone') || 'pager';
   const url = id === 'rnli_pager' ? '/rnli_pager.mp3' : '/pager.mp3';
-
-  // DEBUG: vibrate so we know this function is actually being called
-  try { navigator.vibrate?.([300, 100, 300]); } catch {}
-  // DEBUG: log audio state so user can check console
-  console.log('[alerter] playPagerOnce — ctx:', _sharedCtx?.state, '| buffer:', !!_alerterBuffer, '| preloaded:', !!_preloaded[url]);
 
   // Path A: Web Audio API — works when _sharedCtx is already running (after PTT or getUserMedia unlock)
   if (_sharedCtx?.state === 'running' && _alerterBuffer) {
