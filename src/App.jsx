@@ -256,7 +256,12 @@ const AppShell = () => {
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
-    return <TwoWayRadio />;
+    return (
+      <>
+        <GlobalAlerterMonitor />
+        <TwoWayRadio />
+      </>
+    );
   }
   // ────────────────────────────────────────────────────────────────────────
 
