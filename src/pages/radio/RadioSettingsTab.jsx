@@ -21,6 +21,7 @@ const TETRA_SOUNDS = {
   incoming:         { name: 'Alert tone.aac', url: '/radio-tones/Alert tone.aac' },
   call_connected:   { name: 'Beep Bop.aac',  url: '/radio-tones/Beep Bop.aac' },
   callback_request: { name: 'Bop Beep.aac',  url: '/radio-tones/Bop Beep.aac' },
+  call_end:         { name: 'Bop Beep.aac',  url: '/radio-tones/Bop Beep.aac' },
 };
 
 // Built-in tone packs — files served from /radio-tones/
