@@ -16,6 +16,7 @@ export const ALERTER_TONES = [
 let _pagerTimer      = null;
 let _pagerActive     = false;
 let _alerterSilenced = false;
+let _pagerEl         = null;
 
 export function getAlertToneFile() {
   const id = localStorage.getItem('alerter_tone') || 'pager';
@@ -25,11 +26,23 @@ export function getAlertToneFile() {
 export async function setupPagerAudio() {}
 export async function preloadPagerBuffer() {}
 
+// Preload at module load so the file is buffered before first alert
+function _getEl() {
+  if (!_pagerEl || _pagerEl.src !== window.location.origin + getAlertToneFile()) {
+    _pagerEl = new Audio(getAlertToneFile());
+    _pagerEl.preload = 'auto';
+    _pagerEl.load();
+  }
+  return _pagerEl;
+}
+try { _getEl(); } catch {}
+
 function _playOnce() {
   try {
-    const audio = new Audio(getAlertToneFile());
-    audio.volume = 1.0;
-    audio.play().catch(() => {});
+    const el = _getEl();
+    el.currentTime = 0;
+    el.volume = 1.0;
+    el.play().catch(() => {});
   } catch {}
 }
 
@@ -43,6 +56,7 @@ export function startPagerLoop() {
 export function stopPagerLoop() {
   _pagerActive = false;
   if (_pagerTimer) { clearInterval(_pagerTimer); _pagerTimer = null; }
+  try { _pagerEl?.pause(); if (_pagerEl) _pagerEl.currentTime = 0; } catch {}
 }
 
 // Shared silence state — GlobalAlerterMonitor respects this before restarting
