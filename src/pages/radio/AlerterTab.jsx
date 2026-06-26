@@ -37,16 +37,24 @@ export function getAlertToneFile() {
   return ALERTER_TONES.find(t => t.id === id)?.file || '/pager.mp3';
 }
 
-// Pre-decode the MP3 into an AudioBuffer — call when alerter is enabled
+// Pre-decode the MP3 into an AudioBuffer — call when alerter is enabled.
+// Also briefly requests mic access (already granted for PTT) to unlock the
+// AudioContext the same way Agora does — no user gesture needed.
 export async function preloadPagerBuffer() {
   const file = getAlertToneFile();
-  const ctx  = getAlerterCtx();
-  if (!ctx) return;
-  if (_pagerBuffer && _loadedToneFile === file) return; // already loaded
+  // Unlock via mic access — permission already granted, resolves instantly, no prompt
   try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream.getTracks().forEach(t => t.stop());
+  } catch {}
+  const ctx = getAlerterCtx();
+  if (!ctx) return;
+  if (_pagerBuffer && _loadedToneFile === file) return;
+  try {
+    await ctx.resume();
     const resp = await fetch(file);
     const raw  = await resp.arrayBuffer();
-    _pagerBuffer   = await ctx.decodeAudioData(raw);
+    _pagerBuffer    = await ctx.decodeAudioData(raw);
     _loadedToneFile = file;
   } catch { _pagerBuffer = null; }
 }
