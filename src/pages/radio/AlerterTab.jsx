@@ -50,6 +50,9 @@ function playPagerOnce() {
 export function startPagerLoop() {
   if (_pagerActive) return;
   _pagerActive = true;
+  // Use TwoWayRadio's proven audio stack — same as call-end/PTT tones
+  if (window.__alerterStartPager) { window.__alerterStartPager(); return; }
+  // Fallback if TwoWayRadio not yet mounted
   playPagerOnce();
   _pagerTimer = setInterval(playPagerOnce, 3000);
 }
@@ -58,6 +61,7 @@ export function stopPagerLoop() {
   _pagerActive = false;
   if (_pagerTimer) { clearInterval(_pagerTimer); _pagerTimer = null; }
   try { if (_preloadedPager) { _preloadedPager.pause(); _preloadedPager.currentTime = 0; } } catch {}
+  window.__alerterStopPager?.();
 }
 
 // No-op kept for import compatibility

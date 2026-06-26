@@ -81,9 +81,28 @@ function withRunningCtx(fn) {
 
 // Preload bundled tones so they play instantly on PTT press (no network fetch delay)
 const _preloaded = {};
-['/radio-tones/Beep Bop.aac', '/radio-tones/Bop Beep.aac', '/radio-tones/Alert tone.aac'].forEach(url => {
+['/radio-tones/Beep Bop.aac', '/radio-tones/Bop Beep.aac', '/radio-tones/Alert tone.aac',
+ '/pager.mp3', '/rnli_pager.mp3'].forEach(url => {
   try { const a = new Audio(url); a.preload = 'auto'; _preloaded[url] = a; } catch {}
 });
+
+// Alerter pager loop — called by AlerterTab via window globals
+let _pagerTimer = null;
+window.__alerterStartPager = () => {
+  if (_pagerTimer) return;
+  const play = () => {
+    const id  = localStorage.getItem('alerter_tone') || 'pager';
+    const url = id === 'rnli_pager' ? '/rnli_pager.mp3' : '/pager.mp3';
+    const pre = _preloaded[url];
+    if (pre) { pre.currentTime = 0; pre.volume = 1.0; pre.play().catch(() => {}); }
+    else { try { new Audio(url).play().catch(() => {}); } catch {} }
+  };
+  play();
+  _pagerTimer = setInterval(play, 3000);
+};
+window.__alerterStopPager = () => {
+  if (_pagerTimer) { clearInterval(_pagerTimer); _pagerTimer = null; }
+};
 
 function playCustomSound(key) {
   try {
