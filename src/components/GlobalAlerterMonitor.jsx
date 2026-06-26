@@ -38,7 +38,8 @@ export default function GlobalAlerterMonitor() {
       return data;
     },
     enabled: !!user?.id && isAuthenticated,
-    staleTime: 300000,
+    staleTime: 0,
+    refetchInterval: 60000,
   });
 
   const urlPreview = new URLSearchParams(window.location.search).get('preview') || '';
