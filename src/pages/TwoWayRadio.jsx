@@ -86,22 +86,51 @@ const _preloaded = {};
   try { const a = new Audio(url); a.preload = 'auto'; _preloaded[url] = a; } catch {}
 });
 
-// Alerter pager loop — called by AlerterTab via window globals
-let _pagerTimer = null;
-window.__alerterStartPager = () => {
-  if (_pagerTimer) return;
-  const play = () => {
+// Alerter pager — uses withRunningCtx + AudioBuffer, same path as P2P call tones
+let _pagerLoopTimer = null;
+let _alerterBuffer  = null;
+
+// Decode pager MP3 into a buffer now (decodeAudioData works on suspended context)
+(async () => {
+  try {
     const id  = localStorage.getItem('alerter_tone') || 'pager';
     const url = id === 'rnli_pager' ? '/rnli_pager.mp3' : '/pager.mp3';
-    const pre = _preloaded[url];
-    if (pre) { pre.currentTime = 0; pre.volume = 1.0; pre.play().catch(() => {}); }
-    else { try { new Audio(url).play().catch(() => {}); } catch {} }
-  };
-  play();
-  _pagerTimer = setInterval(play, 3000);
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const r   = await fetch(url);
+    const raw = await r.arrayBuffer();
+    _alerterBuffer = await ctx.decodeAudioData(raw);
+  } catch {}
+})();
+
+function playAlertPagerOnce() {
+  withRunningCtx(ctx => {
+    if (!_alerterBuffer) return;
+    try {
+      const src = ctx.createBufferSource();
+      src.buffer = _alerterBuffer;
+      src.connect(ctx.destination);
+      src.start(0);
+    } catch {}
+  });
+}
+
+window.__alerterStartPager = () => {
+  if (_pagerLoopTimer) return;
+  playAlertPagerOnce();
+  _pagerLoopTimer = setInterval(playAlertPagerOnce, 3000);
 };
 window.__alerterStopPager = () => {
-  if (_pagerTimer) { clearInterval(_pagerTimer); _pagerTimer = null; }
+  if (_pagerLoopTimer) { clearInterval(_pagerLoopTimer); _pagerLoopTimer = null; }
+};
+// Unlock _sharedCtx via getUserMedia (already-granted mic — no gesture needed)
+window.__alerterUnlock = async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const ctx = getAudioCtx();
+    if (ctx) await ctx.resume();
+    stream.getTracks().forEach(t => t.stop());
+  } catch {}
 };
 
 function playCustomSound(key) {

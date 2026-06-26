@@ -14,69 +14,29 @@ export const ALERTER_TONES = [
   { id: 'rnli_pager', label: 'RNLI Pager', file: '/rnli_pager.mp3' },
 ];
 
-let _pagerTimer      = null;
 let _pagerActive     = false;
 let _alerterSilenced = false;
-let _pagerCtx        = null;
-let _pagerBuffer     = null;
 
 export function getAlertToneFile() {
   const id = localStorage.getItem('alerter_tone') || 'pager';
   return ALERTER_TONES.find(t => t.id === id)?.file || '/pager.mp3';
 }
 
-// Called by GlobalAlerterMonitor when alerter is enabled.
-// getUserMedia with already-granted permission resolves WITHOUT a user gesture
-// and unlocks the AudioContext — same mechanism Agora uses for PTT tones.
+// Unlock TwoWayRadio's shared AudioContext via getUserMedia (mic already granted — no gesture needed)
 export async function setupPagerAudio() {
-  if (_pagerCtx?.state === 'running' && _pagerBuffer) return;
-  let stream = null;
-  try {
-    // Keep stream alive until AFTER ctx.resume() — Chrome checks media capture state at resume time
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    if (!_pagerCtx || _pagerCtx.state === 'closed') {
-      _pagerCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    await _pagerCtx.resume(); // succeeds because stream is still active
-    stream.getTracks().forEach(t => t.stop()); // stop mic now that context is running
-    if (_pagerBuffer) return;
-    const resp = await fetch(getAlertToneFile());
-    const raw  = await resp.arrayBuffer();
-    _pagerBuffer = await _pagerCtx.decodeAudioData(raw);
-  } catch {
-    try { stream?.getTracks().forEach(t => t.stop()); } catch {}
-    _pagerCtx = null; _pagerBuffer = null;
-  }
+  await window.__alerterUnlock?.();
 }
 
-// No-op kept for import compatibility
 export async function preloadPagerBuffer() {}
-
-function playPagerOnce() {
-  // Web Audio API path — works on unlocked context (no gesture needed after getUserMedia)
-  if (_pagerCtx?.state === 'running' && _pagerBuffer) {
-    try {
-      const src = _pagerCtx.createBufferSource();
-      src.buffer = _pagerBuffer;
-      src.connect(_pagerCtx.destination);
-      src.start(0);
-      return;
-    } catch {}
-  }
-  // Fallback to TwoWayRadio's preloaded elements (works when gesture already happened)
-  window.__alerterStartPager?.();
-}
 
 export function startPagerLoop() {
   if (_pagerActive) return;
   _pagerActive = true;
-  playPagerOnce();
-  _pagerTimer = setInterval(playPagerOnce, 3000);
+  window.__alerterStartPager?.();
 }
 
 export function stopPagerLoop() {
   _pagerActive = false;
-  if (_pagerTimer) { clearInterval(_pagerTimer); _pagerTimer = null; }
   window.__alerterStopPager?.();
 }
 
