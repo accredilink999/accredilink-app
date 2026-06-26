@@ -431,7 +431,7 @@ export default function TwoWayRadio() {
   }); // 'radio' | 'shift' | 'alerter' | 'settings'
   const [silentMode, setSilentMode]     = useState(() => localStorage.getItem('radio_silent_mode') === 'true');
   const [toneVolume, setToneVolume]     = useState(() => { const v = parseFloat(localStorage.getItem('radio_tone_volume') || '1'); return isNaN(v) ? 1 : v; });
-  const [callVolume, setCallVolume]     = useState(() => { const def = localStorage.getItem('carecall_radio_mode') === 'true' ? 100 : 300; const v = parseInt(localStorage.getItem('radio_call_volume') || String(def), 10); return isNaN(v) ? def : v; });
+  const [callVolume, setCallVolume]     = useState(() => { const def = localStorage.getItem('carecall_radio_mode') === 'true' ? 100 : 600; const v = parseInt(localStorage.getItem('radio_call_volume') || String(def), 10); return isNaN(v) ? def : v; });
   const callVolumeRef = useRef(callVolume);
   const [showAllAreas, setShowAllAreas] = useState(() => localStorage.getItem('radio_show_all_areas') !== 'false');
   const [areaToggles, setAreaToggles]   = useState(() => { try { return JSON.parse(localStorage.getItem('radio_area_toggles') || '{}'); } catch { return {}; } });
