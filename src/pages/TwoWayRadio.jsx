@@ -473,6 +473,16 @@ export default function TwoWayRadio() {
   const { data: user }         = useQuery({ queryKey: ['currentUser'], queryFn: () => base44.auth.me() });
   const { data: staff = [] }   = useQuery({ queryKey: ['staff'],       queryFn: () => base44.entities.User.list() });
 
+  // Fetch custom DB flags not returned by base44.auth.me()
+  const { data: userFlags } = useQuery({
+    queryKey: ['userFlags', user?.id],
+    queryFn: async () => {
+      const { data } = await supabase.from('users').select('is_control_device, alerter_enabled, alerter_area_ids').eq('id', user.id).single();
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+
   // Callback requests — queried from DB so they survive page loads
   // (placed here, after `user`, to avoid TDZ — user?.id needed in queryKey + enabled)
   const { data: callbackRequestRecords = [] } = useQuery({
@@ -528,7 +538,7 @@ export default function TwoWayRadio() {
       );
       return data || [];
     },
-    enabled: !!user?.id && (user?.role === 'super_admin' || user?.role === 'admin' || !!user?.is_control_device),
+    enabled: !!user?.id && (user?.role === 'super_admin' || user?.role === 'admin' || !!userFlags?.is_control_device),
     refetchInterval: 60000,
   });
 
@@ -571,11 +581,11 @@ export default function TwoWayRadio() {
   };
 
   const urlPreview = new URLSearchParams(window.location.search).get('preview');
-  const isControlDevice = !!user?.is_control_device || urlPreview === 'control';
+  const isControlDevice = !!userFlags?.is_control_device || urlPreview === 'control';
   // Control devices get full admin-level radio access regardless of their assigned role
   const isSuperAdmin  = user?.role === 'super_admin' || user?.role === 'admin' || isControlDevice;
   // Alerter: always on for control devices; for PWA admins, super admin grants it via alerter_enabled
-  const hasAlerter = isControlDevice || !!user?.alerter_enabled;
+  const hasAlerter = isControlDevice || !!userFlags?.alerter_enabled;
   const myUid         = user?.id ? toUid(user.id) : null;
   const otherStaff    = staff.filter(s => s.id !== user?.id);
   const staffByUid    = Object.fromEntries(staff.map(s => [toUid(s.id), s]));
@@ -2567,7 +2577,7 @@ export default function TwoWayRadio() {
 
         {radioTab === 'alerter' && (() => {
           // Control device sees everything; other admins filtered to their assigned areas
-          const areaIds = isControlDevice ? null : (user?.alerter_area_ids || null);
+          const areaIds = isControlDevice ? null : (userFlags?.alerter_area_ids || null);
           const alerterShifts = areaIds?.length
             ? todayShifts.filter(s => areaIds.includes(s.rota_area_id || s.area_id))
             : todayShifts;
