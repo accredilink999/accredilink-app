@@ -517,25 +517,11 @@ export default function RadioSettingsTab({
         </div>
       </Section>
 
-      {/* Alerter settings */}
-      {alerterEnabled && (
-        <Section title="Alerter" subtitle="Motorola-style pager alerts for control operators">
-          <Toggle
-            value={alerterEnabled}
-            onChange={setAlerterEnabled}
-            label="Enable Alerter"
-            desc="Plays pager tone and shows alerts when staff are late or calls overrun"
-          />
-          <AlerterTonePicker />
-          <AlerterVolumePicker />
-          <div className="text-slate-700 text-[10px] space-y-0.5 pt-1 border-t border-slate-800 mt-1">
-            <p>Alert thresholds (fixed):</p>
-            <p>· Late clock-in: 15 mins after shift start</p>
-            <p>· Late client check-in: 15 mins after scheduled time</p>
-            <p>· Call overrun: 45 mins after scheduled start</p>
-          </div>
-        </Section>
-      )}
+      {/* Alerter settings — always shown so tone/volume are accessible */}
+      <Section title="Alerter" subtitle="Pager tone and volume for alert notifications">
+        <AlerterTonePicker />
+        <AlerterVolumePicker />
+      </Section>
 
       {/* Device info */}
       {isControlDevice && (
