@@ -8,25 +8,26 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/api/supabaseClient';
 
-// ── Pager tone — MP3-based ────────────────────────────────────────────────────
+// ── Pager tone — Web Audio API (bypasses HTMLMediaElement autoplay restriction) ─
 export const ALERTER_TONES = [
   { id: 'pager',      label: 'Pager',      file: '/pager.mp3' },
   { id: 'rnli_pager', label: 'RNLI Pager', file: '/rnli_pager.mp3' },
 ];
 
-let _pagerAudio = null;
-let _pagerTimer = null;
+let _pagerTimer  = null;
 let _pagerActive = false;
 let _alerterSilenced = false;
 
-// Alerter's own AudioContext — completely independent from the radio
-let _alerterCtx = null;
+// Alerter's own AudioContext — independent from radio
+let _alerterCtx    = null;
+let _pagerBuffer   = null; // decoded AudioBuffer for the current tone file
+let _loadedToneFile = null; // which file is currently decoded
+
 function getAlerterCtx() {
   try {
     if (!_alerterCtx || _alerterCtx.state === 'closed') {
       _alerterCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
-    if (_alerterCtx.state === 'suspended') _alerterCtx.resume().catch(() => {});
     return _alerterCtx;
   } catch { return null; }
 }
@@ -36,14 +37,39 @@ export function getAlertToneFile() {
   return ALERTER_TONES.find(t => t.id === id)?.file || '/pager.mp3';
 }
 
-function playPagerOnce() {
+// Pre-decode the MP3 into an AudioBuffer — call when alerter is enabled
+export async function preloadPagerBuffer() {
+  const file = getAlertToneFile();
+  const ctx  = getAlerterCtx();
+  if (!ctx) return;
+  if (_pagerBuffer && _loadedToneFile === file) return; // already loaded
   try {
-    if (_pagerAudio) { _pagerAudio.pause(); _pagerAudio = null; }
-    // Resume the alerter's own AudioContext to unblock audio
-    getAlerterCtx();
+    const resp = await fetch(file);
+    const raw  = await resp.arrayBuffer();
+    _pagerBuffer   = await ctx.decodeAudioData(raw);
+    _loadedToneFile = file;
+  } catch { _pagerBuffer = null; }
+}
+
+function playPagerOnce() {
+  const ctx = getAlerterCtx();
+  if (!ctx) return;
+  // Web Audio API buffer source — works without gesture once AudioContext is running
+  if (_pagerBuffer) {
+    ctx.resume().then(() => {
+      try {
+        const src  = ctx.createBufferSource();
+        src.buffer = _pagerBuffer;
+        src.connect(ctx.destination);
+        src.start(0);
+      } catch {}
+    }).catch(() => {});
+    return;
+  }
+  // Fallback: HTMLMediaElement (may be blocked on strict PWA but covers APK/installed PWA)
+  try {
     const a = new Audio(getAlertToneFile());
     a.volume = 1.0;
-    _pagerAudio = a;
     a.play().catch(() => {});
   } catch {}
 }
@@ -51,14 +77,15 @@ function playPagerOnce() {
 export function startPagerLoop() {
   if (_pagerActive) return;
   _pagerActive = true;
-  playPagerOnce();
-  _pagerTimer = setInterval(playPagerOnce, 3000);
+  const ctx = getAlerterCtx();
+  const go  = () => { playPagerOnce(); _pagerTimer = setInterval(playPagerOnce, 3000); };
+  // Resume context first — succeeds without gesture when mic permission already granted
+  if (ctx) { ctx.resume().then(go).catch(go); } else { go(); }
 }
 
 export function stopPagerLoop() {
   _pagerActive = false;
   if (_pagerTimer) { clearInterval(_pagerTimer); _pagerTimer = null; }
-  if (_pagerAudio) { try { _pagerAudio.pause(); } catch {} _pagerAudio = null; }
 }
 
 // Shared silence state — GlobalAlerterMonitor respects this before restarting

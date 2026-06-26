@@ -6,7 +6,7 @@ import { supabase } from '@/api/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import {
   buildAlerts, startPagerLoop, stopPagerLoop,
-  isAlerterSilenced, unsilenceAlerter,
+  isAlerterSilenced, unsilenceAlerter, preloadPagerBuffer,
 } from '@/pages/radio/AlerterTab';
 
 const getOrgId = () =>
@@ -25,6 +25,11 @@ export default function GlobalAlerterMonitor() {
     const t = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(t);
   }, []);
+
+  // Pre-decode pager audio as soon as alerter is enabled — bypasses autoplay on play
+  useEffect(() => {
+    if (alerterEnabled) preloadPagerBuffer();
+  }, [alerterEnabled]);
 
   // User flags — shared cache key with TwoWayRadio
   const { data: userFlags } = useQuery({
