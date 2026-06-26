@@ -908,9 +908,10 @@ export default function TwoWayRadio() {
   };
 
   const stopTalking = async () => {
+    const wasTalking = shouldTalkRef.current || isTalking;
     shouldTalkRef.current = false;
     if (isHandsFree) return;
-    if (isTalking) playPTTTone('down');
+    if (wasTalking) playPTTTone('down');
     // 250ms hold-open: transmit the last syllable before closing mic
     await new Promise(r => setTimeout(r, 250));
     try {
@@ -1002,6 +1003,7 @@ export default function TwoWayRadio() {
         if (call.status === 'ended' && call.id === activeCallIdRef.current) {
           activeCallIdRef.current = null;
           stopTone();
+          playCallEndTone();
           leaveChannel().then(() => { setActiveChannel(null); setView('main'); setSelectedPerson(null); });
           return;
         }
@@ -1045,6 +1047,7 @@ export default function TwoWayRadio() {
         if (call.status === 'ended' && call.id === activeCallIdRef.current) {
           activeCallIdRef.current = null;
           stopTone();
+          playCallEndTone();
           leaveChannel().then(() => { setActiveChannel(null); setView('main'); setSelectedPerson(null); });
           return;
         }
@@ -1900,7 +1903,7 @@ export default function TwoWayRadio() {
       <div className={`h-screen overflow-y-auto bg-slate-900 flex flex-col pb-28 ${emergencyActive ? 'pt-10' : ''} ${!isHandsFree && !isRadioMode ? (pttHandedness === 'right' ? 'pr-[72px]' : 'pl-[72px]') : ''}`}>
         {/* Header */}
         <div className="bg-slate-800 px-4 pt-4 pb-3 flex items-center gap-3">
-          <button onClick={() => { if (!emergencyActive) { leaveChannel().then(() => setActiveChannel(null)); } setView('main'); }}
+          <button onClick={() => { if (!emergencyActive) { playCallEndTone(); leaveChannel().then(() => setActiveChannel(null)); } setView('main'); }}
             className="text-slate-400 hover:text-white p-1">
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -1909,7 +1912,7 @@ export default function TwoWayRadio() {
             <p className="text-xs text-green-400 flex items-center gap-1"><Signal className="w-3 h-3" />Live{isHandsFree && <span className="text-red-400 ml-1">· Hands-free</span>}</p>
           </div>
           {!emergencyActive && (
-            <button onClick={() => leaveChannel().then(() => { setActiveChannel(null); setView('main'); })}
+            <button onClick={() => { playCallEndTone(); leaveChannel().then(() => { setActiveChannel(null); setView('main'); }); }}
               className="text-red-400 text-xs font-semibold px-3 py-1.5 rounded-full border border-red-800 hover:bg-red-900/30 transition-colors shrink-0">
               Leave
             </button>
