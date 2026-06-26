@@ -14,86 +14,54 @@ export const ALERTER_TONES = [
   { id: 'rnli_pager', label: 'RNLI Pager', file: '/rnli_pager.mp3' },
 ];
 
-let _pagerTimer  = null;
-let _pagerActive = false;
+let _pagerTimer   = null;
+let _pagerActive  = false;
 let _alerterSilenced = false;
-
-// Alerter's own AudioContext — independent from radio
-let _alerterCtx    = null;
-let _pagerBuffer   = null; // decoded AudioBuffer for the current tone file
-let _loadedToneFile = null; // which file is currently decoded
-
-function getAlerterCtx() {
-  try {
-    if (!_alerterCtx || _alerterCtx.state === 'closed') {
-      _alerterCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    return _alerterCtx;
-  } catch { return null; }
-}
 
 export function getAlertToneFile() {
   const id = localStorage.getItem('alerter_tone') || 'pager';
   return ALERTER_TONES.find(t => t.id === id)?.file || '/pager.mp3';
 }
 
-// Pre-decode the MP3 into an AudioBuffer — call when alerter is enabled.
-// Also briefly requests mic access (already granted for PTT) to unlock the
-// AudioContext the same way Agora does — no user gesture needed.
-export async function preloadPagerBuffer() {
+// Preload at module load — same pattern as radio call-end tone, works without gesture
+let _preloadedPager = null;
+function getPreloadedPager() {
   const file = getAlertToneFile();
-  // Unlock via mic access — permission already granted, resolves instantly, no prompt
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    stream.getTracks().forEach(t => t.stop());
-  } catch {}
-  const ctx = window._tw_audioCtx || getAlerterCtx();
-  if (!ctx) return;
-  if (_pagerBuffer && _loadedToneFile === file) return;
-  try {
-    await ctx.resume();
-    const resp = await fetch(file);
-    const raw  = await resp.arrayBuffer();
-    _pagerBuffer    = await ctx.decodeAudioData(raw);
-    _loadedToneFile = file;
-  } catch { _pagerBuffer = null; }
+  if (!_preloadedPager || _preloadedPager._file !== file) {
+    try {
+      const a = new Audio(file);
+      a.preload = 'auto';
+      a._file = file;
+      _preloadedPager = a;
+    } catch {}
+  }
+  return _preloadedPager;
 }
+// Kick off preload immediately
+try { getPreloadedPager(); } catch {}
 
 function playPagerOnce() {
-  // Prefer TwoWayRadio's context — already unlocked by Agora/PTT usage
-  const ctx = window._tw_audioCtx || getAlerterCtx();
-  if (ctx && _pagerBuffer) {
-    ctx.resume().then(() => {
-      try {
-        const src  = ctx.createBufferSource();
-        src.buffer = _pagerBuffer;
-        src.connect(ctx.destination);
-        src.start(0);
-      } catch {}
-    }).catch(() => {});
-    return;
-  }
-  // Fallback: HTMLMediaElement
   try {
-    const a = new Audio(getAlertToneFile());
-    a.volume = 1.0;
-    a.play().catch(() => {});
+    const pre = getPreloadedPager();
+    if (pre) { pre.currentTime = 0; pre.volume = 1.0; pre.play().catch(() => {}); }
   } catch {}
 }
 
 export function startPagerLoop() {
   if (_pagerActive) return;
   _pagerActive = true;
-  const ctx = getAlerterCtx();
-  const go  = () => { playPagerOnce(); _pagerTimer = setInterval(playPagerOnce, 3000); };
-  // Resume context first — succeeds without gesture when mic permission already granted
-  if (ctx) { ctx.resume().then(go).catch(go); } else { go(); }
+  playPagerOnce();
+  _pagerTimer = setInterval(playPagerOnce, 3000);
 }
 
 export function stopPagerLoop() {
   _pagerActive = false;
   if (_pagerTimer) { clearInterval(_pagerTimer); _pagerTimer = null; }
+  try { if (_preloadedPager) { _preloadedPager.pause(); _preloadedPager.currentTime = 0; } } catch {}
 }
+
+// No-op kept for import compatibility
+export async function preloadPagerBuffer() {}
 
 // Shared silence state — GlobalAlerterMonitor respects this before restarting
 export function silenceAlerter()   { _alerterSilenced = true;  stopPagerLoop(); }
