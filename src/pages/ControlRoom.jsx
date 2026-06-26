@@ -1053,7 +1053,15 @@ function RadioSettingsPanel({ queryClient, user }) {
   const { data: allStaff = [] } = useQuery({
     queryKey: ['staff'],
     queryFn: async () => {
-      const { data } = await supabase.from('users').select('id, full_name, email, role, is_control_device, alerter_enabled').order('full_name');
+      const { data } = await supabase.from('users').select('id, full_name, email, role, is_control_device, alerter_enabled, alerter_area_ids').order('full_name');
+      return data || [];
+    },
+  });
+
+  const { data: areas = [] } = useQuery({
+    queryKey: ['rotaAreas'],
+    queryFn: async () => {
+      const { data } = await supabase.from('rota_areas').select('id, name').order('name');
       return data || [];
     },
   });
@@ -1062,9 +1070,16 @@ function RadioSettingsPanel({ queryClient, user }) {
 
   const toggleAlerter = async (staffId, enabled) => {
     setAlerterSaving(staffId);
-    await supabase.from('users').update({ alerter_enabled: enabled }).eq('id', staffId);
+    await supabase.from('users').update({ alerter_enabled: enabled, alerter_area_ids: null }).eq('id', staffId);
     queryClient.invalidateQueries({ queryKey: ['staff'] });
     setAlerterSaving(null);
+  };
+
+  const toggleAlerterArea = async (staffId, areaId, currentAreaIds) => {
+    const current = currentAreaIds || [];
+    const next = current.includes(areaId) ? current.filter(id => id !== areaId) : [...current, areaId];
+    await supabase.from('users').update({ alerter_area_ids: next.length ? next : null }).eq('id', staffId);
+    queryClient.invalidateQueries({ queryKey: ['staff'] });
   };
 
   const upsert = async (patch) => {
@@ -1151,31 +1166,59 @@ function RadioSettingsPanel({ queryClient, user }) {
           <p className="text-xs text-slate-500 mt-0.5">Control handsets always have the Alerter. Grant it to individual admins below.</p>
           <p className="text-[10px] text-amber-600 font-mono mt-1 select-all">ALTER TABLE users ADD COLUMN IF NOT EXISTS alerter_enabled BOOLEAN DEFAULT false;</p>
         </div>
-        <div className="space-y-2">
-          {adminStaff.map(s => (
-            <div key={s.id} className="flex items-center justify-between gap-3 py-1">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 text-[10px] font-bold shrink-0">
-                  {s.full_name?.[0] || '?'}
+        <div className="space-y-3">
+          {adminStaff.map(s => {
+            const areaIds = s.alerter_area_ids || [];
+            const allAreas = areaIds.length === 0;
+            return (
+              <div key={s.id} className="border border-slate-100 rounded-lg p-2.5 space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 text-[10px] font-bold shrink-0">
+                      {s.full_name?.[0] || '?'}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm text-slate-800 font-medium truncate">{s.full_name}</p>
+                      {s.is_control_device && <p className="text-[10px] text-teal-600">Control handset — all areas always</p>}
+                    </div>
+                  </div>
+                  {s.is_control_device ? (
+                    <span className="text-[10px] text-teal-500 font-semibold shrink-0">AUTO</span>
+                  ) : (
+                    <button
+                      onClick={() => toggleAlerter(s.id, !s.alerter_enabled)}
+                      disabled={alerterSaving === s.id}
+                      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${s.alerter_enabled ? 'bg-teal-500' : 'bg-slate-300'}`}
+                    >
+                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${s.alerter_enabled ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+                    </button>
+                  )}
                 </div>
-                <div className="min-w-0">
-                  <p className="text-sm text-slate-800 font-medium truncate">{s.full_name}</p>
-                  {s.is_control_device && <p className="text-[10px] text-teal-600">Control handset — always on</p>}
-                </div>
+                {s.alerter_enabled && !s.is_control_device && areas.length > 0 && (
+                  <div className="pl-8">
+                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-1.5">Monitoring areas</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {areas.map(a => {
+                        const on = areaIds.includes(a.id);
+                        return (
+                          <button
+                            key={a.id}
+                            onClick={() => toggleAlerterArea(s.id, a.id, areaIds)}
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors ${on ? 'bg-teal-100 border-teal-400 text-teal-700' : 'bg-slate-100 border-slate-300 text-slate-500'}`}
+                          >
+                            {a.name}
+                          </button>
+                        );
+                      })}
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${allAreas ? 'bg-amber-100 border border-amber-400 text-amber-700' : 'text-slate-400'}`}>
+                        {allAreas ? '★ All areas' : '(none = all areas)'}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
-              {s.is_control_device ? (
-                <span className="text-[10px] text-teal-500 font-semibold shrink-0">AUTO</span>
-              ) : (
-                <button
-                  onClick={() => toggleAlerter(s.id, !s.alerter_enabled)}
-                  disabled={alerterSaving === s.id}
-                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${s.alerter_enabled ? 'bg-teal-500' : 'bg-slate-300'}`}
-                >
-                  <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${s.alerter_enabled ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
-                </button>
-              )}
-            </div>
-          ))}
+            );
+          })}
           {adminStaff.length === 0 && <p className="text-xs text-slate-400">No admin accounts found</p>}
         </div>
       </div>

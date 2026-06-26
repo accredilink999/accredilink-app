@@ -2565,14 +2565,24 @@ export default function TwoWayRadio() {
           : <p className="text-slate-600 text-xs text-center mt-16 px-8">Shift overview is available to admins only.</p>
         )}
 
-        {radioTab === 'alerter' && (
-          <AlerterTab
-            todayShifts={todayShifts}
-            todayShiftCalls={todayShiftCalls}
-            staff={staff}
-            alerterEnabled={hasAlerter}
-          />
-        )}
+        {radioTab === 'alerter' && (() => {
+          // Control device sees everything; other admins filtered to their assigned areas
+          const areaIds = isControlDevice ? null : (user?.alerter_area_ids || null);
+          const alerterShifts = areaIds?.length
+            ? todayShifts.filter(s => areaIds.includes(s.rota_area_id || s.area_id))
+            : todayShifts;
+          const alerterCalls = areaIds?.length
+            ? todayShiftCalls.filter(c => areaIds.includes(c.shifts?.rota_area_id))
+            : todayShiftCalls;
+          return (
+            <AlerterTab
+              todayShifts={alerterShifts}
+              todayShiftCalls={alerterCalls}
+              staff={staff}
+              alerterEnabled={hasAlerter}
+            />
+          );
+        })()}
 
         {radioTab === 'settings' && (
           <RadioSettingsTab
