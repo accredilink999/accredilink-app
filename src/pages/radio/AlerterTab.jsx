@@ -318,7 +318,7 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
   const { data: testTriggers = [] } = useQuery({
     queryKey: ['alerter_test_triggers'],
     queryFn: async () => {
-      const since = new Date(Date.now() - 3 * 60 * 1000).toISOString(); // last 3 mins
+      const since = new Date(Date.now() - 10 * 60 * 1000).toISOString(); // last 10 mins
       const orgId = getOrgId();
       let q = supabase.from('alerter_test_triggers').select('*').gte('triggered_at', since).order('triggered_at', { ascending: false });
       // Only filter by org if one is set — handles empty-org single-tenant deployments
