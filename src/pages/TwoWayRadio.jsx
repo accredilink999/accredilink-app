@@ -158,8 +158,8 @@ function playTone(freqs, loop = false) {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.10);
     osc.start(t); osc.stop(t + 0.10);
   });
-  burst();
-  if (loop) timer = setInterval(burst, 2400);
+  const start = () => { burst(); if (loop) timer = setInterval(burst, 2400); };
+  if (ctx.state === 'running') { start(); } else { ctx.resume().then(start).catch(() => {}); }
   return () => { if (timer) clearInterval(timer); }; // never close shared ctx
 }
 
