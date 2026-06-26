@@ -604,8 +604,8 @@ export default function TwoWayRadio() {
   const isControlDevice = !!userFlags?.is_control_device || urlPreview === 'control';
   // Control devices get full admin-level radio access regardless of their assigned role
   const isSuperAdmin  = user?.role === 'super_admin' || user?.role === 'admin' || isControlDevice;
-  // Alerter: always on for control devices; for PWA admins, super admin grants it via alerter_enabled
-  const hasAlerter = isControlDevice || !!userFlags?.alerter_enabled;
+  // Alerter tab shown only when alerter_enabled — toggle in Control Room is the single gate
+  const hasAlerter = !!userFlags?.alerter_enabled;
   const myUid         = user?.id ? toUid(user.id) : null;
   const otherStaff    = staff.filter(s => s.id !== user?.id);
   const staffByUid    = Object.fromEntries(staff.map(s => [toUid(s.id), s]));

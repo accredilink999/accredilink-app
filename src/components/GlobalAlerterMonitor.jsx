@@ -44,7 +44,7 @@ export default function GlobalAlerterMonitor() {
 
   const urlPreview = new URLSearchParams(window.location.search).get('preview') || '';
   const isControlDevice = !!userFlags?.is_control_device || urlPreview === 'control';
-  const alerterEnabled = isControlDevice || !!userFlags?.alerter_enabled;
+  const alerterEnabled = !!userFlags?.alerter_enabled;
 
   // Unlock AudioContext early via getUserMedia (mic already granted) so pager fires without gesture
   useEffect(() => {
