@@ -297,11 +297,30 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
   const [silenced, setSilenced] = useState(false);
   const [blinkOn, setBlinkOn]   = useState(true);
 
-  const clockRef       = useRef(null);
-  const blinkRef       = useRef(null);
-  const loggedIdsRef   = useRef(new Set());
-  const prevHasNewRef  = useRef(false);
-  const firstSeenRef   = useRef({});
+  const clockRef        = useRef(null);
+  const blinkRef        = useRef(null);
+  const loggedIdsRef    = useRef(new Set());
+  const prevHasNewRef   = useRef(false);
+  const firstSeenRef    = useRef({});
+  const audioUnlockedRef = useRef(false);
+
+  // Unlock audio as soon as the tab is opened (mount = user tap on Alerter tab)
+  useEffect(() => {
+    if (audioUnlockedRef.current) return;
+    // Small delay keeps us within the browser's gesture window
+    const t = setTimeout(() => {
+      const a = new Audio(getAlertToneFile());
+      a.volume = 0.001;
+      a.play().then(() => {
+        a.pause();
+        audioUnlockedRef.current = true;
+        setSoundBlocked(false);
+      }).catch(() => {
+        // Couldn't unlock yet — will show banner when alert fires
+      });
+    }, 50);
+    return () => clearTimeout(t);
+  }, []);
 
   // 30s poll
   useEffect(() => {
@@ -376,7 +395,7 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
     };
   }, [hasNew]);
 
-  // Pager tone — detect browser autoplay block and show unmute button
+  // Pager tone — constant loop until ACK or SILENCE
   useEffect(() => {
     if (!alerterEnabled || !hasNew || silenced) { stopPagerLoop(); setSoundBlocked(false); return; }
     if (_pagerActive) return;
@@ -385,11 +404,13 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
     a.volume = 1.0;
     _pagerAudio = a;
     a.play().then(() => {
+      audioUnlockedRef.current = true;
       setSoundBlocked(false);
-      _pagerTimer = setInterval(playPagerOnce, 4000);
+      // Loop every 3s until stopped
+      _pagerTimer = setInterval(playPagerOnce, 3000);
     }).catch(() => {
       _pagerActive = false;
-      setSoundBlocked(true); // browser blocked autoplay — show tap button
+      setSoundBlocked(true);
     });
     return () => stopPagerLoop();
   }, [hasNew, silenced, alerterEnabled]);
