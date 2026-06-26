@@ -48,11 +48,16 @@ function playPagerOnce() {
 }
 
 export function startPagerLoop() {
+  if (window.__alerterStartPager) {
+    // TwoWayRadio is mounted — hand off, clearing any fallback timer first
+    if (_pagerTimer) { clearInterval(_pagerTimer); _pagerTimer = null; }
+    _pagerActive = true;
+    window.__alerterStartPager();
+    return;
+  }
   if (_pagerActive) return;
   _pagerActive = true;
-  // Use TwoWayRadio's proven audio stack — same as call-end/PTT tones
-  if (window.__alerterStartPager) { window.__alerterStartPager(); return; }
-  // Fallback if TwoWayRadio not yet mounted
+  // Fallback: TwoWayRadio not yet loaded (navigation in progress)
   playPagerOnce();
   _pagerTimer = setInterval(playPagerOnce, 3000);
 }
