@@ -422,10 +422,11 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
     };
   }, [hasNew]);
 
-  // Stop tone when all acked or silenced — GlobalAlerterMonitor owns start
+  // Tone — same approach as radio alerts: play from within TwoWayRadio where audio is unlocked
   useEffect(() => {
-    if (!hasNew || silenced) stopPagerLoop();
-  }, [hasNew, silenced]);
+    if (!alerterEnabled || !hasNew || silenced) { stopPagerLoop(); return; }
+    startPagerLoop();
+  }, [hasNew, silenced, alerterEnabled]);
 
   // Reset silence on new alert (GlobalAlerterMonitor will restart tone)
   const prevNewIdsRef = useRef(new Set());
