@@ -47,7 +47,7 @@ export async function preloadPagerBuffer() {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     stream.getTracks().forEach(t => t.stop());
   } catch {}
-  const ctx = getAlerterCtx();
+  const ctx = window._tw_audioCtx || getAlerterCtx();
   if (!ctx) return;
   if (_pagerBuffer && _loadedToneFile === file) return;
   try {
@@ -60,10 +60,9 @@ export async function preloadPagerBuffer() {
 }
 
 function playPagerOnce() {
-  const ctx = getAlerterCtx();
-  if (!ctx) return;
-  // Web Audio API buffer source — works without gesture once AudioContext is running
-  if (_pagerBuffer) {
+  // Prefer TwoWayRadio's context — already unlocked by Agora/PTT usage
+  const ctx = window._tw_audioCtx || getAlerterCtx();
+  if (ctx && _pagerBuffer) {
     ctx.resume().then(() => {
       try {
         const src  = ctx.createBufferSource();
@@ -74,7 +73,7 @@ function playPagerOnce() {
     }).catch(() => {});
     return;
   }
-  // Fallback: HTMLMediaElement (may be blocked on strict PWA but covers APK/installed PWA)
+  // Fallback: HTMLMediaElement
   try {
     const a = new Audio(getAlertToneFile());
     a.volume = 1.0;

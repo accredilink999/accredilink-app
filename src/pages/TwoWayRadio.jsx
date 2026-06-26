@@ -66,6 +66,7 @@ function getAudioCtx() {
       _sharedCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
     if (_sharedCtx.state === 'suspended') _sharedCtx.resume().catch(() => {});
+    window._tw_audioCtx = _sharedCtx; // expose for alerter tone
     return _sharedCtx;
   } catch { return null; }
 }
