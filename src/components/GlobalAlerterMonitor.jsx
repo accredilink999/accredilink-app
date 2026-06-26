@@ -26,11 +26,6 @@ export default function GlobalAlerterMonitor() {
     return () => clearInterval(t);
   }, []);
 
-  // Pre-decode pager audio as soon as alerter is enabled — bypasses autoplay on play
-  useEffect(() => {
-    if (alerterEnabled) preloadPagerBuffer();
-  }, [alerterEnabled]);
-
   // User flags — shared cache key with TwoWayRadio
   const { data: userFlags } = useQuery({
     queryKey: ['userFlags', user?.id],
@@ -114,6 +109,7 @@ export default function GlobalAlerterMonitor() {
   // Main alerter logic — runs whenever data or time changes
   useEffect(() => {
     if (!alerterEnabled) { stopPagerLoop(); return; }
+    preloadPagerBuffer(); // ensure buffer ready for Web Audio playback
 
     const areaIds = userFlags?.alerter_area_ids;
     const todayShifts = areaIds?.length ? rawShifts.filter(s => areaIds.includes(s.area)) : rawShifts;
