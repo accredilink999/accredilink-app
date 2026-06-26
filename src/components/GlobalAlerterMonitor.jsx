@@ -44,7 +44,10 @@ export default function GlobalAlerterMonitor() {
 
   const urlPreview = new URLSearchParams(window.location.search).get('preview') || '';
   const isControlDevice = !!userFlags?.is_control_device || urlPreview === 'control';
-  const alerterEnabled = !!userFlags?.alerter_enabled;
+  // Dedicated radio handset (isRadioMode + is_control_device) always monitors regardless
+  // of the alerter_enabled toggle — prevents accidental screen-tap disables on the T320.
+  // PWA users (including is_control_device accounts like Mike Bohanna) still respect the toggle.
+  const alerterEnabled = (isRadioMode && isControlDevice) || !!userFlags?.alerter_enabled;
 
   // Unlock AudioContext early via getUserMedia (mic already granted) so pager fires without gesture
   useEffect(() => {
