@@ -316,18 +316,17 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
 
   // Poll for test alerts fired from Control Room (every 15s)
   const { data: testTriggers = [] } = useQuery({
-    queryKey: ['alerter_test_triggers', getOrgId()],
+    queryKey: ['alerter_test_triggers'],
     queryFn: async () => {
       const since = new Date(Date.now() - 3 * 60 * 1000).toISOString(); // last 3 mins
-      const { data } = await supabase
-        .from('alerter_test_triggers')
-        .select('*')
-        .eq('organization_id', getOrgId())
-        .gte('triggered_at', since)
-        .order('triggered_at', { ascending: false });
+      const orgId = getOrgId();
+      let q = supabase.from('alerter_test_triggers').select('*').gte('triggered_at', since).order('triggered_at', { ascending: false });
+      // Only filter by org if one is set — handles empty-org single-tenant deployments
+      if (orgId) q = q.eq('organization_id', orgId);
+      const { data } = await q;
       return data || [];
     },
-    enabled: alerterEnabled && !!getOrgId(),
+    enabled: alerterEnabled,
     refetchInterval: 15000,
   });
 
