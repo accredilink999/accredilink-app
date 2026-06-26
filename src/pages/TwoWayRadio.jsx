@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import RadioShiftTab from './radio/RadioShiftTab';
 import RadioSettingsTab from './radio/RadioSettingsTab';
+import AlerterTab from './radio/AlerterTab';
 import { RADIO_THEMES } from './radio/radioThemes';
 
 const AGORA_APP_ID   = 'ff9f260da10245a5ab4855ea3ec59500';
@@ -414,7 +415,8 @@ export default function TwoWayRadio() {
 
   // Tab navigation, theme, and per-device settings (all localStorage-backed for PWA/native)
   const [radioTheme, setRadioTheme]     = useState(() => localStorage.getItem('radio_theme') || 'blue');
-  const [radioTab, setRadioTab]         = useState('radio'); // 'radio' | 'shift' | 'settings'
+  const [radioTab, setRadioTab]         = useState('radio'); // 'radio' | 'shift' | 'alerter' | 'settings'
+  const [alerterEnabled, setAlerterEnabled] = useState(() => localStorage.getItem('radio_alerter_enabled') !== 'false');
   const [silentMode, setSilentMode]     = useState(() => localStorage.getItem('radio_silent_mode') === 'true');
   const [toneVolume, setToneVolume]     = useState(() => { const v = parseFloat(localStorage.getItem('radio_tone_volume') || '1'); return isNaN(v) ? 1 : v; });
   const [callVolume, setCallVolume]     = useState(() => { const def = localStorage.getItem('carecall_radio_mode') === 'true' ? 100 : 300; const v = parseInt(localStorage.getItem('radio_call_volume') || String(def), 10); return isNaN(v) ? def : v; });
@@ -2128,12 +2130,12 @@ export default function TwoWayRadio() {
 
         {/* ── TAB BAR ── */}
         <div className={`flex border-b backdrop-blur ${theme.tabBar}`}>
-          {(['radio', ...(isSuperAdmin ? ['shift'] : []), 'settings']).map(key => (
+          {(['radio', ...(isSuperAdmin ? ['shift', 'alerter'] : []), 'settings']).map(key => (
             <button key={key} onClick={() => setRadioTab(key)}
               className={`flex-1 py-2.5 text-xs font-black uppercase tracking-wider transition-colors touch-manipulation ${
                 radioTab === key ? theme.tabActive : theme.tabInactive
               }`}>
-              {key === 'radio' ? 'Radio' : key === 'shift' ? 'Current Shift' : 'Settings'}
+              {key === 'radio' ? 'Radio' : key === 'shift' ? 'Shift' : key === 'alerter' ? 'Alerter' : 'Settings'}
             </button>
           ))}
         </div>
@@ -2559,6 +2561,15 @@ export default function TwoWayRadio() {
           : <p className="text-slate-600 text-xs text-center mt-16 px-8">Shift overview is available to admins only.</p>
         )}
 
+        {radioTab === 'alerter' && (
+          <AlerterTab
+            todayShifts={todayShifts}
+            todayShiftCalls={todayShiftCalls}
+            staff={staff}
+            alerterEnabled={alerterEnabled}
+          />
+        )}
+
         {radioTab === 'settings' && (
           <RadioSettingsTab
             channels={channels}
@@ -2588,6 +2599,8 @@ export default function TwoWayRadio() {
             setToneVolume={v => { setToneVolume(v); localStorage.setItem('radio_tone_volume', String(v)); }}
             callVolume={callVolume}
             setCallVolume={v => { setCallVolume(v); callVolumeRef.current = v; localStorage.setItem('radio_call_volume', String(v)); }}
+            alerterEnabled={alerterEnabled}
+            setAlerterEnabled={v => { setAlerterEnabled(v); localStorage.setItem('radio_alerter_enabled', String(v)); }}
           />
         )}
 
