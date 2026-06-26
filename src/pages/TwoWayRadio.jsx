@@ -2650,6 +2650,7 @@ export default function TwoWayRadio() {
             setToneVolume={v => { setToneVolume(v); localStorage.setItem('radio_tone_volume', String(v)); }}
             callVolume={callVolume}
             setCallVolume={v => { setCallVolume(v); callVolumeRef.current = v; localStorage.setItem('radio_call_volume', String(v)); }}
+            alerterEnabled={hasAlerter}
           />
         )}
 

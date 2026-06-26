@@ -518,7 +518,7 @@ export default function RadioSettingsTab({
       </Section>
 
       {/* Alerter settings */}
-      {setAlerterEnabled && (
+      {alerterEnabled && (
         <Section title="Alerter" subtitle="Motorola-style pager alerts for control operators">
           <Toggle
             value={alerterEnabled}
