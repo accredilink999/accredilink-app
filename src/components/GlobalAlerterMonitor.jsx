@@ -6,7 +6,7 @@ import { supabase } from '@/api/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import {
   buildAlerts, startPagerLoop, stopPagerLoop,
-  isAlerterSilenced, unsilenceAlerter, preloadPagerBuffer,
+  isAlerterSilenced, unsilenceAlerter, setupPagerAudio,
 } from '@/pages/radio/AlerterTab';
 
 const getOrgId = () =>
@@ -25,6 +25,12 @@ export default function GlobalAlerterMonitor() {
     const t = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(t);
   }, []);
+
+  // Pre-unlock audio as soon as alerter is enabled — getUserMedia with already-granted
+  // mic permission resolves without a gesture, unlocking AudioContext for pager tones
+  useEffect(() => {
+    if (alerterEnabled) setupPagerAudio();
+  }, [alerterEnabled]);
 
   // User flags — shared cache key with TwoWayRadio
   const { data: userFlags } = useQuery({
@@ -109,7 +115,7 @@ export default function GlobalAlerterMonitor() {
   // Main alerter logic — runs whenever data or time changes
   useEffect(() => {
     if (!alerterEnabled) { stopPagerLoop(); return; }
-    preloadPagerBuffer(); // ensure buffer ready for Web Audio playback
+    setupPagerAudio(); // unlock AudioContext via getUserMedia + decode pager buffer
 
     const areaIds = userFlags?.alerter_area_ids;
     const todayShifts = areaIds?.length ? rawShifts.filter(s => areaIds.includes(s.area)) : rawShifts;
