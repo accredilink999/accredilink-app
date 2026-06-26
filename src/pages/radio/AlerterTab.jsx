@@ -314,7 +314,38 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
     return () => clearInterval(blinkRef.current);
   }, []);
 
-  const allAlerts    = useMemo(() => buildAlerts(todayShifts, todayShiftCalls, staff, todayStr, now), [todayShifts, todayShiftCalls, staff, todayStr, now]);
+  // Poll for test alerts fired from Control Room (every 15s)
+  const { data: testTriggers = [] } = useQuery({
+    queryKey: ['alerter_test_triggers', getOrgId()],
+    queryFn: async () => {
+      const since = new Date(Date.now() - 3 * 60 * 1000).toISOString(); // last 3 mins
+      const { data } = await supabase
+        .from('alerter_test_triggers')
+        .select('*')
+        .eq('organization_id', getOrgId())
+        .gte('triggered_at', since)
+        .order('triggered_at', { ascending: false });
+      return data || [];
+    },
+    enabled: alerterEnabled && !!getOrgId(),
+    refetchInterval: 15000,
+  });
+
+  const testAlerts = useMemo(() => testTriggers.map(t => ({
+    id:       `test_${t.id}`,
+    type:     'TEST',
+    priority: 'HIGH',
+    title:    'Test Alert',
+    refId:    t.id,
+    fields: [
+      { icon: 'alert',   label: 'Type',        value: 'CONTROL ROOM TEST ALERT' },
+      { icon: 'user',    label: 'Fired By',    value: (t.triggered_by || 'Control Room').toUpperCase() },
+      { icon: 'clock',   label: 'Time',        value: format(new Date(t.triggered_at), 'HH:mm dd/MM/yyyy') },
+      { icon: 'message', label: 'Message',     value: t.message || 'Test alert — alerter is working correctly.' },
+    ],
+  })), [testTriggers]);
+
+  const allAlerts    = useMemo(() => [...buildAlerts(todayShifts, todayShiftCalls, staff, todayStr, now), ...testAlerts], [todayShifts, todayShiftCalls, staff, todayStr, now, testAlerts]);
   const visibleAlerts = allAlerts.filter(a => !deletedIds.has(a.id));
   const newAlerts    = visibleAlerts.filter(a => !ackedIds.has(a.id));
   const hasNew       = newAlerts.length > 0;

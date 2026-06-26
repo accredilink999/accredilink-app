@@ -670,9 +670,9 @@ export default function ControlRoom() {
           </button>
         )}
         {user?.role === 'super_admin' && (
-          <button onClick={() => setActiveTab('alerter-log')} className={`flex items-center justify-center sm:justify-start gap-1 flex-1 text-xs sm:text-sm py-2 sm:py-3 rounded-lg font-medium transition-all shadow-md hover:shadow-lg ${activeTab === 'alerter-log' ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white' : 'bg-gradient-to-r from-amber-400 to-amber-500 text-white hover:from-amber-500 hover:to-amber-600'}`}>
+          <button onClick={() => setActiveTab('alerter')} className={`flex items-center justify-center sm:justify-start gap-1 flex-1 text-xs sm:text-sm py-2 sm:py-3 rounded-lg font-medium transition-all shadow-md hover:shadow-lg ${activeTab === 'alerter' ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white' : 'bg-gradient-to-r from-amber-400 to-amber-500 text-white hover:from-amber-500 hover:to-amber-600'}`}>
             <BellRing className="w-4 h-4 flex-shrink-0" />
-            <span>Alerter Log</span>
+            <span>Alerter</span>
           </button>
         )}
       </div>
@@ -951,8 +951,8 @@ export default function ControlRoom() {
         <RadioSettingsPanel queryClient={queryClient} user={user} />
       )}
 
-      {activeTab === 'alerter-log' && user?.role === 'super_admin' && (
-        <AlerterLogPanel />
+      {activeTab === 'alerter' && user?.role === 'super_admin' && (
+        <AlerterSettingsPanel user={user} />
       )}
 
       {/* Edit Announcement Dialog */}
@@ -1187,20 +1187,11 @@ function ToggleRow({ label, description, checked, onChange, disabled, color = 't
   );
 }
 
-function RadioSettingsPanel({ queryClient, user }) {
-  const [saving, setSaving] = useState(false);
-  const [creatingTest, setCreatingTest] = useState(false);
-  const [testUser, setTestUser] = useState(null);
-  const [copied, setCopied] = useState(false);
+function AlerterSettingsPanel({ user }) {
+  const queryClient = useQueryClient();
   const [alerterSaving, setAlerterSaving] = useState(null);
-
-  const { data: settings, isLoading } = useQuery({
-    queryKey: ['radioSettings'],
-    queryFn: async () => {
-      const { data } = await supabase.from('radio_settings').select('*').limit(1).single();
-      return data;
-    },
-  });
+  const [testAlertFiring, setTestAlertFiring] = useState(false);
+  const [testAlertSent, setTestAlertSent] = useState(false);
 
   const { data: allStaff = [] } = useQuery({
     queryKey: ['staff'],
@@ -1233,6 +1224,131 @@ function RadioSettingsPanel({ queryClient, user }) {
     await supabase.from('users').update({ alerter_area_ids: next.length ? next : null }).eq('id', staffId);
     queryClient.invalidateQueries({ queryKey: ['staff'] });
   };
+
+  const fireTestAlert = async () => {
+    setTestAlertFiring(true);
+    const orgId = localStorage.getItem('organizationId') || sessionStorage.getItem('organizationId') || '';
+    await supabase.from('alerter_test_triggers').insert({
+      organization_id: orgId,
+      triggered_by: user?.full_name || user?.email || 'Control Room',
+      message: 'Test alert fired from Control Room',
+    });
+    setTestAlertFiring(false);
+    setTestAlertSent(true);
+    setTimeout(() => setTestAlertSent(false), 4000);
+  };
+
+  return (
+    <div className="space-y-4 max-w-lg">
+      <Card className="p-6 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+            <BellRing className="w-5 h-5 text-amber-600" />
+          </div>
+          <div>
+            <h3 className="font-bold text-slate-900">Alerter Settings</h3>
+            <p className="text-sm text-slate-500">Control who gets the alerter and test it</p>
+          </div>
+        </div>
+
+        {/* Alerter Access */}
+        <div className="border border-slate-200 rounded-xl p-4 space-y-3">
+          <div>
+            <p className="font-medium text-slate-900 text-sm">Alerter Access</p>
+            <p className="text-xs text-slate-500 mt-0.5">Control handsets always have the Alerter. Grant it to individual admins below.</p>
+          </div>
+          <div className="space-y-3">
+            {adminStaff.map(s => {
+              const areaIds = s.alerter_area_ids || [];
+              const allAreas = areaIds.length === 0;
+              return (
+                <div key={s.id} className="border border-slate-100 rounded-lg p-2.5 space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 text-[10px] font-bold shrink-0">
+                        {s.full_name?.[0] || '?'}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm text-slate-800 font-medium truncate">{s.full_name}</p>
+                        {s.is_control_device && <p className="text-[10px] text-teal-600">Control handset — all areas always</p>}
+                      </div>
+                    </div>
+                    {s.is_control_device ? (
+                      <span className="text-[10px] text-teal-500 font-semibold shrink-0">AUTO</span>
+                    ) : (
+                      <button
+                        onClick={() => toggleAlerter(s.id, !s.alerter_enabled)}
+                        disabled={alerterSaving === s.id}
+                        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${s.alerter_enabled ? 'bg-teal-500' : 'bg-slate-300'}`}
+                      >
+                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${s.alerter_enabled ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+                      </button>
+                    )}
+                  </div>
+                  {s.alerter_enabled && !s.is_control_device && areas.length > 0 && (
+                    <div className="pl-8">
+                      <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-1.5">Monitoring areas</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {areas.map(a => {
+                          const on = areaIds.includes(a.id);
+                          return (
+                            <button
+                              key={a.id}
+                              onClick={() => toggleAlerterArea(s.id, a.id, areaIds)}
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors ${on ? 'bg-teal-100 border-teal-400 text-teal-700' : 'bg-slate-100 border-slate-300 text-slate-500'}`}
+                            >
+                              {a.name}
+                            </button>
+                          );
+                        })}
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${allAreas ? 'bg-amber-100 border border-amber-400 text-amber-700' : 'text-slate-400'}`}>
+                          {allAreas ? '★ All areas' : '(none = all areas)'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {adminStaff.length === 0 && <p className="text-xs text-slate-400">No admin accounts found</p>}
+          </div>
+
+          {/* Fire Test Alert */}
+          <div className="pt-2 border-t border-slate-100">
+            <button
+              onClick={fireTestAlert}
+              disabled={testAlertFiring || testAlertSent}
+              className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
+                testAlertSent
+                  ? 'bg-green-100 text-green-700 border border-green-300'
+                  : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-300'
+              }`}
+            >
+              {testAlertSent ? '✓ Test alert sent — check alerter devices' : testAlertFiring ? 'Sending…' : '⚡ Fire Test Alert'}
+            </button>
+            <p className="text-[10px] text-slate-400 text-center mt-1">Triggers a live test on all active alerter devices</p>
+          </div>
+        </div>
+      </Card>
+
+      <AlerterLogPanel />
+    </div>
+  );
+}
+
+function RadioSettingsPanel({ queryClient, user }) {
+  const [saving, setSaving] = useState(false);
+  const [creatingTest, setCreatingTest] = useState(false);
+  const [testUser, setTestUser] = useState(null);
+  const [copied, setCopied] = useState(false);
+
+  const { data: settings, isLoading } = useQuery({
+    queryKey: ['radioSettings'],
+    queryFn: async () => {
+      const { data } = await supabase.from('radio_settings').select('*').limit(1).single();
+      return data;
+    },
+  });
 
   const upsert = async (patch) => {
     setSaving(true);
@@ -1310,69 +1426,6 @@ function RadioSettingsPanel({ queryClient, user }) {
           </p>
         </div>
       )}
-
-      {/* Alerter Access */}
-      <div className="border border-slate-200 rounded-xl p-4 space-y-3">
-        <div>
-          <p className="font-medium text-slate-900 text-sm">Alerter Access</p>
-          <p className="text-xs text-slate-500 mt-0.5">Control handsets always have the Alerter. Grant it to individual admins below.</p>
-        </div>
-        <div className="space-y-3">
-          {adminStaff.map(s => {
-            const areaIds = s.alerter_area_ids || [];
-            const allAreas = areaIds.length === 0;
-            return (
-              <div key={s.id} className="border border-slate-100 rounded-lg p-2.5 space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 text-[10px] font-bold shrink-0">
-                      {s.full_name?.[0] || '?'}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm text-slate-800 font-medium truncate">{s.full_name}</p>
-                      {s.is_control_device && <p className="text-[10px] text-teal-600">Control handset — all areas always</p>}
-                    </div>
-                  </div>
-                  {s.is_control_device ? (
-                    <span className="text-[10px] text-teal-500 font-semibold shrink-0">AUTO</span>
-                  ) : (
-                    <button
-                      onClick={() => toggleAlerter(s.id, !s.alerter_enabled)}
-                      disabled={alerterSaving === s.id}
-                      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${s.alerter_enabled ? 'bg-teal-500' : 'bg-slate-300'}`}
-                    >
-                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${s.alerter_enabled ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
-                    </button>
-                  )}
-                </div>
-                {s.alerter_enabled && !s.is_control_device && areas.length > 0 && (
-                  <div className="pl-8">
-                    <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-1.5">Monitoring areas</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {areas.map(a => {
-                        const on = areaIds.includes(a.id);
-                        return (
-                          <button
-                            key={a.id}
-                            onClick={() => toggleAlerterArea(s.id, a.id, areaIds)}
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors ${on ? 'bg-teal-100 border-teal-400 text-teal-700' : 'bg-slate-100 border-slate-300 text-slate-500'}`}
-                          >
-                            {a.name}
-                          </button>
-                        );
-                      })}
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${allAreas ? 'bg-amber-100 border border-amber-400 text-amber-700' : 'text-slate-400'}`}>
-                        {allAreas ? '★ All areas' : '(none = all areas)'}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          {adminStaff.length === 0 && <p className="text-xs text-slate-400">No admin accounts found</p>}
-        </div>
-      </div>
 
       <div className="border border-slate-200 rounded-xl p-4 space-y-3">
         <div>
