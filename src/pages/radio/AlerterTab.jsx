@@ -30,20 +30,23 @@ export function getAlertToneFile() {
 // and unlocks the AudioContext — same mechanism Agora uses for PTT tones.
 export async function setupPagerAudio() {
   if (_pagerCtx?.state === 'running' && _pagerBuffer) return;
+  let stream = null;
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    stream.getTracks().forEach(t => t.stop());
-  } catch {} // mic not granted — falls back to HTMLMediaElement path
-  try {
+    // Keep stream alive until AFTER ctx.resume() — Chrome checks media capture state at resume time
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     if (!_pagerCtx || _pagerCtx.state === 'closed') {
       _pagerCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
-    await _pagerCtx.resume();
+    await _pagerCtx.resume(); // succeeds because stream is still active
+    stream.getTracks().forEach(t => t.stop()); // stop mic now that context is running
     if (_pagerBuffer) return;
     const resp = await fetch(getAlertToneFile());
     const raw  = await resp.arrayBuffer();
     _pagerBuffer = await _pagerCtx.decodeAudioData(raw);
-  } catch { _pagerCtx = null; _pagerBuffer = null; }
+  } catch {
+    try { stream?.getTracks().forEach(t => t.stop()); } catch {}
+    _pagerCtx = null; _pagerBuffer = null;
+  }
 }
 
 // No-op kept for import compatibility
