@@ -1316,7 +1316,6 @@ function RadioSettingsPanel({ queryClient, user }) {
         <div>
           <p className="font-medium text-slate-900 text-sm">Alerter Access</p>
           <p className="text-xs text-slate-500 mt-0.5">Control handsets always have the Alerter. Grant it to individual admins below.</p>
-          <p className="text-[10px] text-amber-600 font-mono mt-1 select-all">ALTER TABLE users ADD COLUMN IF NOT EXISTS alerter_enabled BOOLEAN DEFAULT false;</p>
         </div>
         <div className="space-y-3">
           {adminStaff.map(s => {
