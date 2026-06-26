@@ -8,36 +8,82 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/api/supabaseClient';
 
-// ── Pager tone — Web Audio API (bypasses HTMLMediaElement autoplay restriction) ─
 export const ALERTER_TONES = [
   { id: 'pager',      label: 'Pager',      file: '/pager.mp3' },
   { id: 'rnli_pager', label: 'RNLI Pager', file: '/rnli_pager.mp3' },
 ];
 
+let _pagerTimer      = null;
 let _pagerActive     = false;
 let _alerterSilenced = false;
+let _alertCtx        = null;
+let _alertBuffer     = null;
+let _preloadedEl     = null;
 
 export function getAlertToneFile() {
   const id = localStorage.getItem('alerter_tone') || 'pager';
   return ALERTER_TONES.find(t => t.id === id)?.file || '/pager.mp3';
 }
 
-// Unlock TwoWayRadio's shared AudioContext via getUserMedia (mic already granted — no gesture needed)
+// Preload HTMLMediaElement at module load — plays after any user gesture
+function getPreloaded() {
+  if (!_preloadedEl) {
+    try { _preloadedEl = new Audio(getAlertToneFile()); _preloadedEl.preload = 'auto'; } catch {}
+  }
+  return _preloadedEl;
+}
+try { getPreloaded(); } catch {}
+
+// getUserMedia with already-granted mic permission resolves WITHOUT a gesture
+// and allows AudioContext.resume() to succeed — same mechanism as Agora/PTT
 export async function setupPagerAudio() {
-  await window.__alerterUnlock?.();
+  if (_alertCtx?.state === 'running' && _alertBuffer) return;
+  let stream = null;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (!_alertCtx || _alertCtx.state === 'closed') {
+      _alertCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    await _alertCtx.resume(); // succeeds because stream is active
+    if (!_alertBuffer) {
+      const r = await fetch(getAlertToneFile());
+      _alertBuffer = await _alertCtx.decodeAudioData(await r.arrayBuffer());
+    }
+  } catch { _alertCtx = null; _alertBuffer = null; }
+  finally { try { stream?.getTracks().forEach(t => t.stop()); } catch {} }
 }
 
 export async function preloadPagerBuffer() {}
 
+function _playOnce() {
+  // Web Audio: works when AudioContext is running (after getUserMedia unlock)
+  if (_alertCtx?.state === 'running' && _alertBuffer) {
+    try {
+      const src = _alertCtx.createBufferSource();
+      src.buffer = _alertBuffer;
+      src.connect(_alertCtx.destination);
+      src.start(0);
+      return;
+    } catch {}
+  }
+  // HTMLMediaElement fallback: works after any gesture on the page
+  try {
+    const el = getPreloaded();
+    if (el) { el.currentTime = 0; el.volume = 1.0; el.play().catch(() => {}); }
+  } catch {}
+}
+
 export function startPagerLoop() {
   if (_pagerActive) return;
   _pagerActive = true;
-  window.__alerterStartPager?.();
+  _playOnce();
+  _pagerTimer = setInterval(_playOnce, 3000);
 }
 
 export function stopPagerLoop() {
   _pagerActive = false;
-  window.__alerterStopPager?.();
+  if (_pagerTimer) { clearInterval(_pagerTimer); _pagerTimer = null; }
+  try { if (_preloadedEl) { _preloadedEl.pause(); _preloadedEl.currentTime = 0; } } catch {}
 }
 
 // Shared silence state — GlobalAlerterMonitor respects this before restarting
