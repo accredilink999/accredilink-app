@@ -287,6 +287,7 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
   const [now, setNow]           = useState(() => new Date());
   const [selectedId, setSelectedId] = useState(null); // null = list view
   const [showHistory, setShowHistory] = useState(false);
+  const [soundBlocked, setSoundBlocked] = useState(false);
   const [ackedIds, setAckedIds] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem('alerter_acked') || '[]')); } catch { return new Set(); }
   });
@@ -375,11 +376,21 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
     };
   }, [hasNew]);
 
-  // Pager tone
+  // Pager tone — detect browser autoplay block and show unmute button
   useEffect(() => {
-    if (!alerterEnabled) { stopPagerLoop(); return; }
-    if (hasNew && !silenced) startPagerLoop();
-    else stopPagerLoop();
+    if (!alerterEnabled || !hasNew || silenced) { stopPagerLoop(); setSoundBlocked(false); return; }
+    if (_pagerActive) return;
+    _pagerActive = true;
+    const a = new Audio(getAlertToneFile());
+    a.volume = 1.0;
+    _pagerAudio = a;
+    a.play().then(() => {
+      setSoundBlocked(false);
+      _pagerTimer = setInterval(playPagerOnce, 4000);
+    }).catch(() => {
+      _pagerActive = false;
+      setSoundBlocked(true); // browser blocked autoplay — show tap button
+    });
     return () => stopPagerLoop();
   }, [hasNew, silenced, alerterEnabled]);
 
@@ -483,7 +494,16 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
 
   // ── Teal header (shared) ──────────────────────────────────────────────────
   const Header = ({ onBack, title, subtitle }) => (
-    <div className="flex items-center justify-between px-4 py-3" style={{ background: '#0f766e' }}>
+    <div style={{ background: '#0f766e' }}>
+      {soundBlocked && (
+        <button
+          onClick={() => { setSoundBlocked(false); startPagerLoop(); }}
+          className="w-full py-2 px-4 bg-red-500 text-white text-sm font-bold tracking-wide animate-pulse touch-manipulation"
+        >
+          🔊 TAP HERE TO SOUND ALERT
+        </button>
+      )}
+    <div className="flex items-center justify-between px-4 py-3">
       <div className="flex items-center gap-2">
         {onBack ? (
           <button onClick={onBack} className="flex items-center gap-1 text-white/90 touch-manipulation mr-1">
@@ -506,6 +526,7 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 
