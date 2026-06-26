@@ -417,7 +417,11 @@ export default function TwoWayRadio() {
 
   // Tab navigation, theme, and per-device settings (all localStorage-backed for PWA/native)
   const [radioTheme, setRadioTheme]     = useState(() => localStorage.getItem('radio_theme') || 'blue');
-  const [radioTab, setRadioTab]         = useState('radio'); // 'radio' | 'shift' | 'alerter' | 'settings'
+  const [radioTab, setRadioTab]         = useState(() => {
+    // Activate alerter tab if launched via URL param or pending activation
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    return (tab === 'alerter') ? 'alerter' : 'radio';
+  }); // 'radio' | 'shift' | 'alerter' | 'settings'
   const [silentMode, setSilentMode]     = useState(() => localStorage.getItem('radio_silent_mode') === 'true');
   const [toneVolume, setToneVolume]     = useState(() => { const v = parseFloat(localStorage.getItem('radio_tone_volume') || '1'); return isNaN(v) ? 1 : v; });
   const [callVolume, setCallVolume]     = useState(() => { const def = localStorage.getItem('carecall_radio_mode') === 'true' ? 100 : 300; const v = parseInt(localStorage.getItem('radio_call_volume') || String(def), 10); return isNaN(v) ? def : v; });
@@ -447,6 +451,13 @@ export default function TwoWayRadio() {
       return sounds;
     } catch { return {}; }
   });
+
+  // Switch to alerter tab when GlobalAlerterMonitor fires an alert from any page
+  useEffect(() => {
+    const activate = () => setRadioTab('alerter');
+    window.addEventListener('alerter:new-alert', activate);
+    return () => window.removeEventListener('alerter:new-alert', activate);
+  }, []);
 
   // Handset hardware settings
   const [pttKeyCode, setPttKeyCode] = useState(() => {

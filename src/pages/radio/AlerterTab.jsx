@@ -17,8 +17,9 @@ export const ALERTER_TONES = [
 let _pagerAudio = null;
 let _pagerTimer = null;
 let _pagerActive = false;
+let _alerterSilenced = false;
 
-function getAlertToneFile() {
+export function getAlertToneFile() {
   const id = localStorage.getItem('alerter_tone') || 'pager';
   return ALERTER_TONES.find(t => t.id === id)?.file || '/pager.mp3';
 }
@@ -37,7 +38,7 @@ export function startPagerLoop() {
   if (_pagerActive) return;
   _pagerActive = true;
   playPagerOnce();
-  _pagerTimer = setInterval(playPagerOnce, 4000);
+  _pagerTimer = setInterval(playPagerOnce, 3000);
 }
 
 export function stopPagerLoop() {
@@ -45,6 +46,11 @@ export function stopPagerLoop() {
   if (_pagerTimer) { clearInterval(_pagerTimer); _pagerTimer = null; }
   if (_pagerAudio) { try { _pagerAudio.pause(); } catch {} _pagerAudio = null; }
 }
+
+// Shared silence state — GlobalAlerterMonitor respects this before restarting
+export function silenceAlerter()   { _alerterSilenced = true;  stopPagerLoop(); }
+export function unsilenceAlerter() { _alerterSilenced = false; }
+export function isAlerterSilenced() { return _alerterSilenced; }
 
 // ── Org helper ────────────────────────────────────────────────────────────────
 const getOrgId = () =>
@@ -67,7 +73,7 @@ const FIELD_ICONS = {
 };
 
 // ── Alert builder ─────────────────────────────────────────────────────────────
-function buildAlerts(todayShifts, todayShiftCalls, staff, todayStr, now) {
+export function buildAlerts(todayShifts, todayShiftCalls, staff, todayStr, now) {
   const alerts = [];
 
   // 1. LATE_SHIFT_CLOCK_IN
@@ -287,7 +293,6 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
   const [now, setNow]           = useState(() => new Date());
   const [selectedId, setSelectedId] = useState(null); // null = list view
   const [showHistory, setShowHistory] = useState(false);
-  const [soundBlocked, setSoundBlocked] = useState(false);
   const [ackedIds, setAckedIds] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem('alerter_acked') || '[]')); } catch { return new Set(); }
   });
@@ -302,25 +307,6 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
   const loggedIdsRef    = useRef(new Set());
   const prevHasNewRef   = useRef(false);
   const firstSeenRef    = useRef({});
-  const audioUnlockedRef = useRef(false);
-
-  // Unlock audio as soon as the tab is opened (mount = user tap on Alerter tab)
-  useEffect(() => {
-    if (audioUnlockedRef.current) return;
-    // Small delay keeps us within the browser's gesture window
-    const t = setTimeout(() => {
-      const a = new Audio(getAlertToneFile());
-      a.volume = 0.001;
-      a.play().then(() => {
-        a.pause();
-        audioUnlockedRef.current = true;
-        setSoundBlocked(false);
-      }).catch(() => {
-        // Couldn't unlock yet — will show banner when alert fires
-      });
-    }, 50);
-    return () => clearTimeout(t);
-  }, []);
 
   // 30s poll
   useEffect(() => {
@@ -395,31 +381,19 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
     };
   }, [hasNew]);
 
-  // Pager tone — constant loop until ACK or SILENCE
+  // Stop tone when all acked or silenced — GlobalAlerterMonitor owns start
   useEffect(() => {
-    if (!alerterEnabled || !hasNew || silenced) { stopPagerLoop(); setSoundBlocked(false); return; }
-    if (_pagerActive) return;
-    _pagerActive = true;
-    const a = new Audio(getAlertToneFile());
-    a.volume = 1.0;
-    _pagerAudio = a;
-    a.play().then(() => {
-      audioUnlockedRef.current = true;
-      setSoundBlocked(false);
-      // Loop every 3s until stopped
-      _pagerTimer = setInterval(playPagerOnce, 3000);
-    }).catch(() => {
-      _pagerActive = false;
-      setSoundBlocked(true);
-    });
-    return () => stopPagerLoop();
-  }, [hasNew, silenced, alerterEnabled]);
+    if (!hasNew || silenced) stopPagerLoop();
+  }, [hasNew, silenced]);
 
-  // Reset silenced on new alert
+  // Reset silence on new alert (GlobalAlerterMonitor will restart tone)
   const prevNewIdsRef = useRef(new Set());
   useEffect(() => {
     const currentIds = new Set(newAlerts.map(a => a.id));
-    if ([...currentIds].some(id => !prevNewIdsRef.current.has(id))) setSilenced(false);
+    if ([...currentIds].some(id => !prevNewIdsRef.current.has(id))) {
+      setSilenced(false);
+      unsilenceAlerter();
+    }
     prevNewIdsRef.current = currentIds;
   }, [newAlerts]);
 
@@ -515,16 +489,7 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
 
   // ── Teal header (shared) ──────────────────────────────────────────────────
   const Header = ({ onBack, title, subtitle }) => (
-    <div style={{ background: '#0f766e' }}>
-      {soundBlocked && (
-        <button
-          onClick={() => { setSoundBlocked(false); startPagerLoop(); }}
-          className="w-full py-2 px-4 bg-red-500 text-white text-sm font-bold tracking-wide animate-pulse touch-manipulation"
-        >
-          🔊 TAP HERE TO SOUND ALERT
-        </button>
-      )}
-    <div className="flex items-center justify-between px-4 py-3">
+    <div className="flex items-center justify-between px-4 py-3" style={{ background: '#0f766e' }}>
       <div className="flex items-center gap-2">
         {onBack ? (
           <button onClick={onBack} className="flex items-center gap-1 text-white/90 touch-manipulation mr-1">
@@ -547,7 +512,6 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
           </div>
         )}
       </div>
-    </div>
     </div>
   );
 
@@ -644,7 +608,7 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
           <div className="flex gap-2">
             {isNew && !silenced && (
               <button
-                onClick={() => { stopPagerLoop(); setSilenced(true); }}
+                onClick={() => { silenceAlerter(); setSilenced(true); }}
                 className="flex-1 border border-teal-700 text-teal-700 rounded-lg py-3 text-sm font-semibold active:bg-teal-50 touch-manipulation"
               >
                 SILENCE
@@ -733,7 +697,7 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
         {hasNew && visibleAlerts.length > 1 && (
           <div className="mx-3 flex gap-2">
             <button
-              onClick={() => { stopPagerLoop(); setSilenced(true); }}
+              onClick={() => { silenceAlerter(); setSilenced(true); }}
               className="flex-1 border border-teal-700 text-teal-700 rounded-lg py-3 text-sm font-semibold active:bg-teal-50 touch-manipulation"
             >
               SILENCE ALL

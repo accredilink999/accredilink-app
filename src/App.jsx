@@ -16,6 +16,7 @@ import ErrorCatcher from '@/components/ErrorCatcher';
 import HelpButton from '@/components/HelpButton';
 import AutoPushRegistration from '@/components/notifications/AutoPushRegistration';
 import AppUpdateChecker from '@/components/AppUpdateChecker';
+import GlobalAlerterMonitor from '@/components/GlobalAlerterMonitor';
 import HelpNudge from '@/components/HelpNudge';
 import { initOrg, resetOrg, checkOrgAccess } from '@/lib/orgContext';
 import SubscriptionGate from '@/components/billing/SubscriptionGate';
@@ -185,6 +186,28 @@ const AppShell = () => {
     initOrgContext();
   }, [isAuthenticated]);
 
+  // Unlock browser audio on first user gesture so alerter tones fire automatically
+  useEffect(() => {
+    let unlocked = false;
+    const unlock = () => {
+      if (unlocked) return;
+      unlocked = true;
+      try {
+        const a = new Audio('/pager.mp3');
+        a.volume = 0.001;
+        a.play().then(() => a.pause()).catch(() => {});
+      } catch {}
+    };
+    document.addEventListener('click',      unlock, { capture: true, passive: true });
+    document.addEventListener('touchstart', unlock, { capture: true, passive: true });
+    document.addEventListener('keydown',    unlock, { capture: true, passive: true });
+    return () => {
+      document.removeEventListener('click',      unlock, { capture: true });
+      document.removeEventListener('touchstart', unlock, { capture: true });
+      document.removeEventListener('keydown',    unlock, { capture: true });
+    };
+  }, []);
+
   // Check terms acceptance after auth — required by App Store & Google Play
   useEffect(() => {
     if (!isAuthenticated || !orgReady) return;
@@ -295,6 +318,7 @@ const AppShell = () => {
     <>
       <AutoPushRegistration />
       <AppUpdateChecker />
+      <GlobalAlerterMonitor />
       <Layout currentPageName={currentPageName} />
       {/* PIN setup prompt — shown once after first login if no PIN set */}
       {showPinSetup && user?.id && (
