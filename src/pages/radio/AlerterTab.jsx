@@ -435,6 +435,8 @@ export default function AlerterTab({ todayShifts = [], todayShiftCalls = [], sta
       try { localStorage.setItem('alerter_acked', JSON.stringify([...next])); } catch {}
       return next;
     });
+    silenceAlerter();
+    setSilenced(true);
   }, []);
 
   const del = useCallback((id) => {
