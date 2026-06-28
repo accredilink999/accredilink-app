@@ -69,6 +69,7 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
 
         requestMicPermission();
+        requestNotificationPermission();
         setupLedChannels();
 
         // ── Radio flavor: always-on, show-over-lock-screen ────────────────────
@@ -462,6 +463,17 @@ public class MainActivity extends BridgeActivity {
             ActivityCompat.requestPermissions(this,
                 new String[]{ Manifest.permission.RECORD_AUDIO },
                 MIC_PERMISSION_REQUEST);
+        }
+    }
+
+    private void requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this,
+                    new String[]{ Manifest.permission.POST_NOTIFICATIONS },
+                    1002);
+            }
         }
     }
 
