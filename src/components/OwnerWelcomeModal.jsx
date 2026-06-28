@@ -23,10 +23,10 @@ const SETUP_STEPS = [
       <div className="space-y-4">
         <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
           <p className="text-sm font-medium text-teal-800">
-            Your 30-day free trial is active — {trialDaysLeft} days remaining
+            Welcome to CareCall AI — £99/month, everything included
           </p>
           <p className="text-xs text-teal-600 mt-1">
-            All features unlocked. No credit card required. Cancel anytime from Settings.
+            Unlimited staff · All features · Price guaranteed never to increase
           </p>
         </div>
         <p className="text-sm text-slate-600">
@@ -351,7 +351,7 @@ const SETUP_STEPS = [
         <div className="border border-slate-200 rounded-lg divide-y divide-slate-200">
           <div className="p-3 flex items-start gap-2">
             <ChevronRight className="w-4 h-4 text-teal-600 mt-0.5 flex-shrink-0" />
-            <span className="text-sm text-slate-600">View your current plan and trial countdown</span>
+            <span className="text-sm text-slate-600">Subscribe for £99/month to unlock full access</span>
           </div>
           <div className="p-3 flex items-start gap-2">
             <ChevronRight className="w-4 h-4 text-teal-600 mt-0.5 flex-shrink-0" />
