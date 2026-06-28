@@ -41,28 +41,14 @@ export default function OrgSetup({ onComplete }) {
       const slug = generateSlug(name.trim())
       const inviteCodeVal = generateInviteCode()
 
-      const { data: org, error: orgErr } = await supabase
-        .from('organizations')
-        .insert({
-          name: name.trim(),
-          slug,
-          plan: 'trial',
-          invite_code: inviteCodeVal,
-          trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          is_active: true,
+      const { data: orgId, error: orgErr } = await supabase
+        .rpc('create_organization_for_user', {
+          org_name: name.trim(),
+          org_slug: slug,
+          org_invite_code: inviteCodeVal,
         })
-        .select()
-        .single()
 
       if (orgErr) throw orgErr
-
-      const { error: memErr } = await supabase
-        .from('organization_members')
-        .insert({ organization_id: org.id, user_id: user.id, role: 'owner' })
-
-      if (memErr) throw memErr
-
-      await supabase.from('users').update({ organization_id: org.id }).eq('id', user.id)
       await initOrg()
       onComplete?.()
     } catch (err) {
