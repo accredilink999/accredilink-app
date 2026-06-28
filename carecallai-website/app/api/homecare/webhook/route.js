@@ -91,7 +91,7 @@ export async function POST(request) {
             </div>
           ` : ''}
           <div style="margin-top: 20px; text-align: center;">
-            <a href="https://carecallai.co.uk/admin/homecare" style="display: inline-block; background: #ea580c; color: white; padding: 10px 24px; border-radius: 8px; text-decoration: none; font-size: 14px; font-weight: 600;">
+            <a href="https://www.carecallai.co.uk/admin/homecare" style="display: inline-block; background: #ea580c; color: white; padding: 10px 24px; border-radius: 8px; text-decoration: none; font-size: 14px; font-weight: 600;">
               View in Admin Panel
             </a>
           </div>

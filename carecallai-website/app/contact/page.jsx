@@ -7,7 +7,7 @@ export const metadata = {
   title: "Contact Us — Book a Demo or Get Support",
   description:
     "Get in touch with CareCallAI. Book a demo, ask about pricing, or get support. We're based in Wales and available Monday to Friday.",
-  alternates: { canonical: "https://carecallai.co.uk/contact" },
+  alternates: { canonical: "https://www.carecallai.co.uk/contact" },
   openGraph: {
     title: "Contact Us — CareCallAI",
     description: "Book a demo, ask about pricing, or get support. Based in Wales, available Monday to Friday.",

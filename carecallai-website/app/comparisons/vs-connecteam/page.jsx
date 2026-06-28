@@ -10,7 +10,7 @@ export const metadata = {
   description:
     "Compare CareCallAI and Connecteam for home care agencies. Purpose-built care features, 40% lower cost, CIW & CQC compliance included.",
   keywords: ["connecteam alternative care", "connecteam vs care software", "better than connecteam for home care"],
-  alternates: { canonical: "https://carecallai.co.uk/comparisons/vs-connecteam" },
+  alternates: { canonical: "https://www.carecallai.co.uk/comparisons/vs-connecteam" },
   openGraph: {
     title: "CareCallAI vs Connecteam — Feature Comparison",
     description: "Purpose-built for UK care. CIW & CQC compliance, MAR charts, care plans — everything Connecteam doesn't offer.",
@@ -127,7 +127,7 @@ export default function VsConnecteamPage() {
 
       <CTABanner
         title="Ready to switch from Connecteam?"
-        subtitle="Start your free 30-day trial and see the difference purpose-built care software makes."
+        subtitle="Get started today and see the difference purpose-built care software makes."
       />
     </>
   );

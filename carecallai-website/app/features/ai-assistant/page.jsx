@@ -6,7 +6,7 @@ export const metadata = {
   description:
     "AI-powered care assistant for drafting care plans, risk assessments, compliance documentation and communication logs.",
   keywords: ["AI care software", "AI care plan writer", "care management AI assistant"],
-  alternates: { canonical: "https://carecallai.co.uk/features/ai-assistant" },
+  alternates: { canonical: "https://www.carecallai.co.uk/features/ai-assistant" },
   openGraph: {
     title: "AI Assistant — CareCallAI",
     description: "AI-powered care assistant for drafting care plans, risk assessments and compliance documentation.",

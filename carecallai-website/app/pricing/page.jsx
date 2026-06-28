@@ -8,29 +8,29 @@ import { BreadcrumbJsonLd, FAQJsonLd } from "@/components/SEO/JsonLd";
 export const metadata = {
   title: "Care Management Software Pricing — Plans From £99/mo",
   description:
-    "CareCallAI pricing plans from £99/month. Up to 50% cheaper than competitors. 30-day free trial, no credit card required. Plans for care agencies of every size.",
+    "CareCallAI pricing plans from £99/month. Up to 50% cheaper than competitors. Everything included, no contract required. Plans for care agencies of every size.",
   keywords: [
     "care management software pricing",
     "home care software cost",
     "cheapest care software UK",
     "domiciliary care software pricing",
   ],
-  alternates: { canonical: "https://carecallai.co.uk/pricing" },
+  alternates: { canonical: "https://www.carecallai.co.uk/pricing" },
   openGraph: {
     title: "Pricing — From £99/mo | CareCallAI",
-    description: "Care management software from £99/mo. Up to 50% cheaper than competitors. 30-day free trial, no credit card required.",
+    description: "Care management software from £99/mo. Up to 50% cheaper than competitors. Everything included, no contract required.",
   },
   twitter: {
     card: "summary_large_image",
     title: "Pricing — From £99/mo | CareCallAI",
-    description: "Care management software from £99/mo. Up to 50% cheaper than competitors. 30-day free trial, no credit card required.",
+    description: "Care management software from £99/mo. Up to 50% cheaper than competitors. Everything included, no contract required.",
   },
 };
 
 const faqs = [
   {
-    question: "Is there a free trial?",
-    answer: "Yes. Every plan comes with a 30-day free trial. No credit card required — just sign up and start using CareCallAI with all features unlocked. After 30 days, choose a plan to continue.",
+    question: "Can I try before I subscribe?",
+    answer: "We offer a full interactive demo so you can see every feature before subscribing. Subscribe for £99/month — everything included, unlimited staff.",
   },
   {
     question: "What happens after the trial?",
@@ -73,7 +73,7 @@ export default function PricingPage() {
             name: "CareCallAI",
             description: "All-in-one home care management software for UK domiciliary care agencies.",
             brand: { "@type": "Brand", name: "CareCallAI" },
-            url: "https://carecallai.co.uk/pricing",
+            url: "https://www.carecallai.co.uk/pricing",
             offers: [
               {
                 "@type": "Offer",
@@ -82,7 +82,7 @@ export default function PricingPage() {
                 priceCurrency: "GBP",
                 priceValidUntil: "2026-12-31",
                 availability: "https://schema.org/InStock",
-                url: "https://carecallai.co.uk/pricing",
+                url: "https://www.carecallai.co.uk/pricing",
                 description: "Up to 15 staff members. All features included.",
               },
               {
@@ -92,7 +92,7 @@ export default function PricingPage() {
                 priceCurrency: "GBP",
                 priceValidUntil: "2026-12-31",
                 availability: "https://schema.org/InStock",
-                url: "https://carecallai.co.uk/pricing",
+                url: "https://www.carecallai.co.uk/pricing",
                 description: "Up to 50 staff members. All features included.",
               },
               {
@@ -102,7 +102,7 @@ export default function PricingPage() {
                 priceCurrency: "GBP",
                 priceValidUntil: "2026-12-31",
                 availability: "https://schema.org/InStock",
-                url: "https://carecallai.co.uk/pricing",
+                url: "https://www.carecallai.co.uk/pricing",
                 description: "Unlimited staff members. All features included. Priority support.",
               },
             ],
@@ -118,7 +118,7 @@ export default function PricingPage() {
                 Care Management Software Pricing
               </h1>
               <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-                Up to 50% cheaper than leading competitors. No hidden fees. Every plan includes a 30-day free trial — no credit card required.
+                Up to 50% cheaper than leading competitors. No hidden fees. £99/month, everything included — no contract required.
               </p>
             </div>
           </AnimateOnScroll>
@@ -143,7 +143,7 @@ export default function PricingPage() {
         subtitle="Book a demo and we'll help you choose the best plan for your agency."
         primaryText="Book a Demo"
         primaryHref="/contact"
-        secondaryText="Start Free Trial"
+        secondaryText="Get Started"
         secondaryHref="/signup"
       />
     </>

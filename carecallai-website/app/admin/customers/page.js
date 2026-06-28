@@ -88,7 +88,7 @@ const WELCOME_EMAIL_HTML = `<!DOCTYPE html>
   <!-- CTA Button -->
   <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 30px;">
     <tr><td align="center">
-      <a href="https://carecallai.co.uk/demo" style="display:inline-block;background:#0d9488;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:15px;font-weight:600;">
+      <a href="https://www.carecallai.co.uk/demo" style="display:inline-block;background:#0d9488;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:15px;font-weight:600;">
         Book Your Free Onboarding Call
       </a>
     </td></tr>
@@ -129,7 +129,7 @@ const WELCOME_EMAIL_HTML = `<!DOCTYPE html>
     CareCallAI — The Hummingbird, 27-29 High St, Denbigh LL16 3HY
   </p>
   <p style="margin:0;color:#94a3b8;font-size:11px;text-align:center;">
-    <a href="https://carecallai.co.uk" style="color:#0d9488;text-decoration:none;">carecallai.co.uk</a>&nbsp;&nbsp;|&nbsp;&nbsp;
+    <a href="https://www.carecallai.co.uk" style="color:#0d9488;text-decoration:none;">carecallai.co.uk</a>&nbsp;&nbsp;|&nbsp;&nbsp;
     <a href="mailto:support@carecallai.co.uk" style="color:#0d9488;text-decoration:none;">support@carecallai.co.uk</a>&nbsp;&nbsp;|&nbsp;&nbsp;
     <a href="https://wa.me/447762533406?text=Hi%2C%20I%27ve%20just%20signed%20up%20for%20CareCallAI%20and%20would%20like%20some%20help%20getting%20set%20up" style="color:#0d9488;text-decoration:none;">WhatsApp</a>
   </p>

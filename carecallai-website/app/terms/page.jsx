@@ -3,7 +3,7 @@ import { BreadcrumbJsonLd } from "@/components/SEO/JsonLd";
 export const metadata = {
   title: "Terms of Service",
   description: "CareCallAI terms of service. The terms and conditions governing your use of the platform.",
-  alternates: { canonical: "https://carecallai.co.uk/terms" },
+  alternates: { canonical: "https://www.carecallai.co.uk/terms" },
 };
 
 export default function TermsPage() {
@@ -49,11 +49,11 @@ export default function TermsPage() {
             <li>We may adjust pricing with 30 days&apos; written notice</li>
           </ul>
 
-          <h2>5. Free Trial</h2>
+          <h2>5. Subscription</h2>
           <p>
-            Free trial periods provide full access to the selected plan. No payment is taken during
-            the trial. At the end of the trial, you must select a paid plan to continue using the
-            service.
+            All plans are billed from the date of subscription. Your subscription gives you full
+            access to all features included in your selected plan. You may cancel at any time
+            from your account dashboard.
           </p>
 
           <h2>6. Your Data</h2>

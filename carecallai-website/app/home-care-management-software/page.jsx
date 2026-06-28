@@ -15,7 +15,7 @@ export const metadata = {
     "care management system",
     "home care agency management software",
   ],
-  alternates: { canonical: "https://carecallai.co.uk/home-care-management-software" },
+  alternates: { canonical: "https://www.carecallai.co.uk/home-care-management-software" },
   openGraph: {
     title: "Home Care Management Software — CareCallAI",
     description: "UK's all-in-one home care management software. Every feature your care agency needs from £99/month.",
@@ -37,7 +37,7 @@ const modules = [
 
 const faqs = [
   { question: "What is home care management software?", answer: "Home care management software is a digital platform that centralises all the operations of a domiciliary care agency — from scheduling staff rotas and logging care visits, to managing medications, tracking compliance, invoicing and communicating with families. It replaces paper records, spreadsheets and multiple disconnected systems with a single solution." },
-  { question: "How much does CareCallAI cost?", answer: "CareCallAI plans start from £99/month with no per-user fees. Every plan includes all features — scheduling, care logging, eMAR, compliance, mobile app, GPS tracking and more. There is a 30-day free trial with no card required." },
+  { question: "How much does CareCallAI cost?", answer: "CareCallAI plans start from £99/month with no per-user fees. Every plan includes all features — scheduling, care logging, eMAR, compliance, mobile app, GPS tracking and more. A full demo is available so you can see everything before subscribing." },
   { question: "Can I switch from another provider?", answer: "Yes. CareCallAI supports CSV data import for clients, staff and care plans. Our support team will help you migrate. Most agencies are fully switched over within a week." },
   { question: "Is it suitable for agencies of all sizes?", answer: "Yes. CareCallAI scales from single-person agencies to large multi-branch operations. The same platform works whether you have 5 carers or 500." },
   { question: "Does it include CIW and CQC compliance?", answer: "Yes. CareCallAI is the only platform with dedicated CIW (Wales) and CQC (England) compliance modules. Pre-populated regulation forms, automated inspection checks, RISCA Reg 36 supervision tracking and inspection-ready reports are all included." },
@@ -69,7 +69,7 @@ export default function HomeCareManagementSoftwarePage() {
             </div>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link href="/demo" className="px-8 py-3.5 bg-teal-600 text-white font-semibold rounded-lg hover:bg-teal-700 transition-colors">
-                Start Free Trial
+                Get Started
               </Link>
               <Link href="/pricing" className="px-8 py-3.5 border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors">
                 View Pricing — From £99/mo

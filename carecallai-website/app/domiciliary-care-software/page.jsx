@@ -17,7 +17,7 @@ export const metadata = {
     "domiciliary care management system",
     "dom care software",
   ],
-  alternates: { canonical: "https://carecallai.co.uk/domiciliary-care-software" },
+  alternates: { canonical: "https://www.carecallai.co.uk/domiciliary-care-software" },
   openGraph: {
     title: "Domiciliary Care Software — CareCallAI",
     description: "Purpose-built domiciliary care software for UK home care agencies. All features in one platform.",
@@ -63,7 +63,7 @@ export default function DomiciliaryCareSoftwarePage() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link href="/demo" className="px-8 py-3.5 bg-teal-600 text-white font-semibold rounded-lg hover:bg-teal-700 transition-colors">
-                Start Free Trial
+                Get Started
               </Link>
               <Link href="/pricing" className="px-8 py-3.5 border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors">
                 View Pricing

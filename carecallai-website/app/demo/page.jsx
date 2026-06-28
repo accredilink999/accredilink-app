@@ -5,24 +5,24 @@ import AnimateOnScroll from "@/components/AnimateOnScroll";
 import { BreadcrumbJsonLd } from "@/components/SEO/JsonLd";
 
 export const metadata = {
-  title: "Start Free Trial — 30 Days Free, No Card Required",
+  title: "Get Started with CareCallAI — £99/month, Everything Included",
   description:
-    "Start your free 30-day CareCallAI trial. No credit card required. Full access to scheduling, care logging, MAR charts and compliance features.",
-  alternates: { canonical: "https://carecallai.co.uk/demo" },
+    "Get started with CareCallAI today. £99/month, everything included. Full access to scheduling, care logging, MAR charts and compliance features. Cancel anytime.",
+  alternates: { canonical: "https://www.carecallai.co.uk/demo" },
   openGraph: {
-    title: "Start Free Trial — CareCallAI",
-    description: "Try CareCallAI free for 30 days. No credit card required. Full access to all care management features.",
+    title: "Get Started — CareCallAI",
+    description: "Get started with CareCallAI. £99/month, everything included. Full access to all care management features. Cancel anytime.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Start Free Trial — CareCallAI",
-    description: "Try CareCallAI free for 30 days. No credit card required. Full access to all care management features.",
+    title: "Get Started — CareCallAI",
+    description: "Get started with CareCallAI. £99/month, everything included. Full access to all care management features. Cancel anytime.",
   },
 };
 
 const trialBenefits = [
-  "Full access to all features for 30 days",
-  "No credit card required",
+  "Full access to all features from day one",
+  "Everything included — no hidden costs",
   "Import your existing staff and client data",
   "Mobile app access for your whole team",
   "Cancel anytime — no questions asked",
@@ -35,7 +35,7 @@ export default function DemoPage() {
       <BreadcrumbJsonLd
         items={[
           { name: "Home", href: "/" },
-          { name: "Start Free Trial" },
+          { name: "Get Started" },
         ]}
       />
 
@@ -46,11 +46,11 @@ export default function DemoPage() {
             <AnimateOnScroll>
               <div>
                 <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">
-                  Try CareCallAI free for 30 days
+                  Get started with CareCallAI
                 </h1>
                 <p className="text-lg text-slate-600 mb-8">
-                  See how CareCallAI can simplify your scheduling, care logging and compliance — with
-                  no commitment.
+                  See how CareCallAI can simplify your scheduling, care logging and compliance —
+                  £99/month, everything included.
                 </p>
                 <ul className="space-y-3 mb-8">
                   {trialBenefits.map((b, i) => (
@@ -73,7 +73,7 @@ export default function DemoPage() {
             <AnimateOnScroll delay={200}>
               <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-lg">
                 <h3 className="font-semibold text-slate-900 mb-2">
-                  Start your free trial
+                  Create your account
                 </h3>
                 <p className="text-sm text-slate-500 mb-6">
                   Fill in your details and we&apos;ll set up your account.

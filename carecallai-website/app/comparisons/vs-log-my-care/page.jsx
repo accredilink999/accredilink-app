@@ -10,7 +10,7 @@ export const metadata = {
   description:
     "Compare CareCallAI and Log my Care for home care agencies. More complete solution with scheduling, invoicing and AI features.",
   keywords: ["log my care alternative", "log my care vs carecallai", "free care software comparison UK"],
-  alternates: { canonical: "https://carecallai.co.uk/comparisons/vs-log-my-care" },
+  alternates: { canonical: "https://www.carecallai.co.uk/comparisons/vs-log-my-care" },
   openGraph: {
     title: "CareCallAI vs Log my Care — Feature Comparison",
     description: "More complete solution with scheduling, invoicing and AI. See how CareCallAI compares to Log my Care.",
@@ -39,7 +39,7 @@ const features = [
   { feature: "AI assistant", carecall: true, competitor: false },
   { feature: "Leave management", carecall: true, competitor: false },
   { feature: "Training tracking", carecall: true, competitor: "Basic" },
-  { feature: "Free tier", carecall: "30-day trial", competitor: "Up to 10 users" },
+  { feature: "Free tier", carecall: "Demo available", competitor: "Up to 10 users" },
   { feature: "Starting paid price", carecall: "£99/mo", competitor: "Contact sales" },
 ];
 

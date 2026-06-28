@@ -24,7 +24,7 @@ const EMAIL_TOPICS = {
     'Staff Retention in Domiciliary Care — Practical Tips',
   ],
   promotional: [
-    '14-Day Free Trial — See CareCallAI in Action',
+    'Get Started with CareCallAI — £99/month, Everything Included',
     'Switch from Paper to Digital — Free Migration Support',
     'CareCallAI vs. Multiple Systems — The Cost Comparison',
   ],

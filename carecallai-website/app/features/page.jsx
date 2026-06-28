@@ -26,7 +26,7 @@ export const metadata = {
     "home care management features",
     "domiciliary care software features",
   ],
-  alternates: { canonical: "https://carecallai.co.uk/features" },
+  alternates: { canonical: "https://www.carecallai.co.uk/features" },
   openGraph: {
     title: "Features — CareCallAI",
     description: "Scheduling, care logging, MAR charts, compliance, invoicing, mobile app & AI — all in one platform from £99/mo.",
@@ -110,7 +110,7 @@ const faqs = [
   { question: "Does CareCallAI include clinical assessments?", answer: "Yes. CareCallAI includes 7 clinical assessments: Waterlow (pressure ulcer risk), MUST (malnutrition), NEWS2 (early warning), Falls Risk, Abbey Pain Scale, Barthel Index (independence) and SALT (swallowing). Scores are calculated automatically." },
   { question: "Can I manage multiple care areas?", answer: "Yes. CareCallAI supports unlimited rota areas (e.g. Denbigh, Llangollen, North, South). Each area has its own shift types, call types, base templates and assigned staff." },
   { question: "Is CareCallAI compliant with CIW and CQC?", answer: "Yes. CareCallAI has dedicated CIW and CQC compliance modules with pre-populated regulation forms, 50+ automated inspection checks, RISCA Reg 36 supervision tracking, and inspection-ready reports." },
-  { question: "How much does CareCallAI cost?", answer: "Plans start from £99/month with no per-user fees. Every plan includes all features. There is a 30-day free trial with no card required." },
+  { question: "How much does CareCallAI cost?", answer: "Plans start from £99/month with no per-user fees. Every plan includes all features. A full demo is available so you can see everything before subscribing." },
 ];
 
 export default function FeaturesPage() {

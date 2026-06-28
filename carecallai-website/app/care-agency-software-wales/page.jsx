@@ -16,7 +16,7 @@ export const metadata = {
     "RISCA compliant care software",
     "Welsh care management software",
   ],
-  alternates: { canonical: "https://carecallai.co.uk/care-agency-software-wales" },
+  alternates: { canonical: "https://www.carecallai.co.uk/care-agency-software-wales" },
   openGraph: {
     title: "Care Agency Software Wales — CareCallAI",
     description: "Built in Wales, for Wales. CIW compliant care management software with Welsh language support.",
@@ -64,7 +64,7 @@ export default function CareAgencySoftwareWalesPage() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link href="/demo" className="px-8 py-3.5 bg-teal-600 text-white font-semibold rounded-lg hover:bg-teal-700 transition-colors">
-                Start Free Trial
+                Get Started
               </Link>
               <Link href="/compliance/ciw" className="px-8 py-3.5 border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors">
                 See CIW Compliance Features

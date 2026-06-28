@@ -277,7 +277,7 @@ export default function CustomerFAQPage() {
               Book a Demo
             </Link>
             <Link href="/signup" className="px-6 py-2.5 bg-white border border-slate-200 text-slate-700 font-medium rounded-xl hover:bg-slate-50 transition-colors">
-              Start Free Trial
+              Get Started
             </Link>
           </div>
         </div>

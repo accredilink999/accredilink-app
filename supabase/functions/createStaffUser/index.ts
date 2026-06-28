@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
 
     steps.push(`5-profile-lookup:${profileLookupError ? 'ERROR:' + profileLookupError.message : 'role=' + callerProfile?.role + ',job=' + callerProfile?.job_title}`);
 
-    const isAdmin = callerProfile?.role === 'admin' ||
+    const isAdmin = callerProfile?.role === 'admin' || callerProfile?.role === 'super_admin' ||
       ['admin', 'manager', 'supervisor'].includes(callerProfile?.job_title);
 
     if (!isAdmin) {

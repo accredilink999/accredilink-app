@@ -12,7 +12,7 @@ const inter = Inter({
 });
 
 export const metadata = {
-  metadataBase: new URL("https://carecallai.co.uk"),
+  metadataBase: new URL("https://www.carecallai.co.uk"),
   title: {
     default: "CareCallAI — Home Care Management Software UK",
     template: "%s | CareCallAI",

@@ -1,6 +1,6 @@
 import { getAllSlugs } from "@/lib/blog";
 
-const BASE_URL = "https://carecallai.co.uk";
+const BASE_URL = "https://www.carecallai.co.uk";
 const now = new Date().toISOString();
 
 export default async function sitemap() {

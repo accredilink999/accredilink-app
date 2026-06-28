@@ -18,7 +18,7 @@ export async function GET(request) {
     if (type === 'unsubscribe') {
       return new Response(unsubscribeHtml(), { headers: { 'Content-Type': 'text/html' } });
     }
-    return NextResponse.redirect(url || 'https://carecallai.co.uk');
+    return NextResponse.redirect(url || 'https://www.carecallai.co.uk');
   }
 
   if (type === 'open') {
@@ -49,7 +49,7 @@ export async function GET(request) {
       });
     }
 
-    return NextResponse.redirect(url || 'https://carecallai.co.uk');
+    return NextResponse.redirect(url || 'https://www.carecallai.co.uk');
   }
 
   if (type === 'unsubscribe') {
@@ -94,7 +94,7 @@ function unsubscribeHtml() {
       If this was a mistake, please contact us at
       <a href="mailto:hello@carecallai.co.uk" style="color:#0d9488;">hello@carecallai.co.uk</a>.
     </p>
-    <a href="https://carecallai.co.uk" style="display:inline-block;margin-top:20px;padding:10px 24px;background:#0d9488;color:white;text-decoration:none;border-radius:8px;font-size:14px;">Visit CareCallAI</a>
+    <a href="https://www.carecallai.co.uk" style="display:inline-block;margin-top:20px;padding:10px 24px;background:#0d9488;color:white;text-decoration:none;border-radius:8px;font-size:14px;">Visit CareCallAI</a>
   </div>
 </body>
 </html>`;

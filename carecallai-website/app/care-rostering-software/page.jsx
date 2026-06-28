@@ -16,7 +16,7 @@ export const metadata = {
     "care rota management software",
     "staff rostering software care",
   ],
-  alternates: { canonical: "https://carecallai.co.uk/care-rostering-software" },
+  alternates: { canonical: "https://www.carecallai.co.uk/care-rostering-software" },
   openGraph: {
     title: "Care Rostering Software — CareCallAI",
     description: "Multi-area care rostering and staff scheduling software. Shift patterns, templates, mobile access.",
@@ -60,7 +60,7 @@ export default function CareRosteringSoftwarePage() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link href="/demo" className="px-8 py-3.5 bg-teal-600 text-white font-semibold rounded-lg hover:bg-teal-700 transition-colors">
-                Start Free Trial
+                Get Started
               </Link>
               <Link href="/features/scheduling" className="px-8 py-3.5 border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors">
                 See Full Scheduling Features

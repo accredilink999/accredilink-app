@@ -77,7 +77,7 @@ export async function POST(request) {
     });
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://carecallai.co.uk';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.carecallai.co.uk';
 
   try {
     const res = await fetch(`${HEYGEN_API}/v2/video/generate`, {

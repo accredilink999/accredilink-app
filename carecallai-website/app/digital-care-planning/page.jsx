@@ -16,7 +16,7 @@ export const metadata = {
     "AI care plan software",
     "care plan management system",
   ],
-  alternates: { canonical: "https://carecallai.co.uk/digital-care-planning" },
+  alternates: { canonical: "https://www.carecallai.co.uk/digital-care-planning" },
   openGraph: {
     title: "Digital Care Planning Software — CareCallAI",
     description: "AI-powered digital care planning with clinical assessments. Built for UK care agencies.",
@@ -60,7 +60,7 @@ export default function DigitalCarePlanningPage() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link href="/demo" className="px-8 py-3.5 bg-teal-600 text-white font-semibold rounded-lg hover:bg-teal-700 transition-colors">
-                Start Free Trial
+                Get Started
               </Link>
               <Link href="/features/ai-assistant" className="px-8 py-3.5 border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors">
                 See AI Features

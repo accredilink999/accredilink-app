@@ -121,7 +121,7 @@ export default function Header() {
               href="/signup"
               className="px-5 py-2.5 bg-teal-600 text-white text-sm font-semibold rounded-lg hover:bg-teal-700 transition-colors shadow-sm"
             >
-              Start Free Trial
+              Get Started
             </Link>
           </div>
 
@@ -220,7 +220,7 @@ export default function Header() {
                 className="block px-3 py-2 text-sm font-semibold text-center text-white bg-teal-600 rounded-lg"
                 onClick={() => setMobileOpen(false)}
               >
-                Start Free Trial
+                Get Started
               </Link>
             </div>
           </div>

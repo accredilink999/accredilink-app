@@ -11,7 +11,7 @@ export const metadata = {
   description:
     "How CareCallAI meets CIW (Care Inspectorate Wales) requirements for domiciliary care agencies. Automated audit trails, care logging, medication records and incident reporting.",
   keywords: ["CIW compliant care software", "Care Inspectorate Wales software", "CIW domiciliary care requirements"],
-  alternates: { canonical: "https://carecallai.co.uk/compliance/ciw" },
+  alternates: { canonical: "https://www.carecallai.co.uk/compliance/ciw" },
   openGraph: {
     title: "CIW Compliance — CareCallAI",
     description: "Purpose-built for CIW compliance. Automated audit trails, care logging, MAR charts, incident reporting — inspection-ready from day one.",
@@ -123,7 +123,7 @@ export default function CIWCompliancePage() {
                 href="/signup"
                 className="px-8 py-3 bg-teal-600 text-white font-semibold rounded-lg hover:bg-teal-700 transition-colors"
               >
-                Start Free Trial
+                Get Started
               </Link>
               <Link
                 href="/compliance/cqc"
@@ -186,7 +186,7 @@ export default function CIWCompliancePage() {
       <BetaPromo />
       <CTABanner
         title="Ready for your next CIW inspection?"
-        subtitle="Start your free trial and see how CareCallAI makes compliance effortless."
+        subtitle="Get started today and see how CareCallAI makes compliance effortless."
       />
     </>
   );

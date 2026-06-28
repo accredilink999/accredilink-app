@@ -4,8 +4,8 @@ export function OrganizationJsonLd() {
     "@type": "Organization",
     name: "CareCallAI",
     description: "All-in-one home care management software for UK domiciliary care agencies.",
-    url: "https://carecallai.co.uk",
-    logo: "https://carecallai.co.uk/logo.png",
+    url: "https://www.carecallai.co.uk",
+    logo: "https://www.carecallai.co.uk/logo.png",
     contactPoint: {
       "@type": "ContactPoint",
       telephone: "+44-1824-538688",
@@ -28,12 +28,12 @@ export function WebSiteJsonLd() {
   const data = {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    "@id": "https://carecallai.co.uk/#website",
+    "@id": "https://www.carecallai.co.uk/#website",
     name: "CareCallAI",
-    url: "https://carecallai.co.uk",
+    url: "https://www.carecallai.co.uk",
     potentialAction: {
       "@type": "SearchAction",
-      target: "https://carecallai.co.uk/blog?q={search_term_string}",
+      target: "https://www.carecallai.co.uk/blog?q={search_term_string}",
       "query-input": "required name=search_term_string",
     },
   };
@@ -48,7 +48,7 @@ export function SoftwareApplicationJsonLd() {
     applicationCategory: "BusinessApplication",
     operatingSystem: "Web, iOS, Android",
     description: "Home care management software with scheduling, care logging, MAR charts, compliance tracking and mobile app.",
-    url: "https://carecallai.co.uk",
+    url: "https://www.carecallai.co.uk",
     offers: {
       "@type": "AggregateOffer",
       priceCurrency: "GBP",
@@ -92,11 +92,11 @@ export function BreadcrumbJsonLd({ items }) {
     itemListElement: items.map((item, i) => {
       let url;
       if (item.href) {
-        url = `https://carecallai.co.uk${item.href}`;
+        url = `https://www.carecallai.co.uk${item.href}`;
         cumulativePath = item.href;
       } else {
         cumulativePath = cumulativePath + "/" + slugPart(item.name);
-        url = `https://carecallai.co.uk${cumulativePath}`;
+        url = `https://www.carecallai.co.uk${cumulativePath}`;
       }
       return {
         "@type": "ListItem",
@@ -119,15 +119,15 @@ export function BlogPostJsonLd({ title, description, date, slug }) {
     dateModified: date,
     mainEntityOfPage: {
       "@type": "WebPage",
-      "@id": `https://carecallai.co.uk/blog/${slug}`,
+      "@id": `https://www.carecallai.co.uk/blog/${slug}`,
     },
     author: { "@type": "Organization", name: "CareCallAI" },
     publisher: {
       "@type": "Organization",
       name: "CareCallAI",
-      logo: { "@type": "ImageObject", url: "https://carecallai.co.uk/logo.png" },
+      logo: { "@type": "ImageObject", url: "https://www.carecallai.co.uk/logo.png" },
     },
-    url: `https://carecallai.co.uk/blog/${slug}`,
+    url: `https://www.carecallai.co.uk/blog/${slug}`,
   };
   return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }} />;
 }

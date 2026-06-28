@@ -10,7 +10,7 @@ export const metadata = {
     "CIW training requirements",
     "care staff online learning",
   ],
-  alternates: { canonical: "https://carecallai.co.uk/training" },
+  alternates: { canonical: "https://www.carecallai.co.uk/training" },
   openGraph: {
     title: "Free Care Staff Training — CareCallAI",
     description:

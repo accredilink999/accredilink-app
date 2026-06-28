@@ -1,7 +1,7 @@
 export const metadata = {
-  title: "Sign Up — Start Your Free 30-Day Trial",
-  description: "Create your CareCallAI account and start your free 30-day trial. No credit card required. Full access to scheduling, care logging, MAR charts, compliance and more. From £99/mo.",
-  keywords: ["care software free trial", "carecallai signup", "home care software trial", "domiciliary care software free"],
+  title: "Sign Up — Get Started with CareCallAI",
+  description: "Create your CareCallAI account and get started today. Everything included from £99/month — scheduling, care logging, MAR charts, compliance and more. Cancel anytime.",
+  keywords: ["care management software", "carecallai signup", "home care software", "domiciliary care software"],
   robots: { index: true, follow: true },
 };
 

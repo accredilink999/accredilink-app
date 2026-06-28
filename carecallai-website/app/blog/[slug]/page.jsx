@@ -47,7 +47,7 @@ export async function generateMetadata({ params }) {
     title: post.metaTitle || post.title,
     description: post.metaDescription || post.description,
     keywords: [post.category.toLowerCase(), "care software", "home care UK", ...(post.seoKeywords || [])],
-    alternates: { canonical: `https://carecallai.co.uk/blog/${slug}` },
+    alternates: { canonical: `https://www.carecallai.co.uk/blog/${slug}` },
     openGraph: {
       type: "article",
       title: post.title,
@@ -234,13 +234,13 @@ export default async function BlogPostPage({ params }) {
           <div className="mt-12 p-6 bg-teal-50 rounded-2xl border border-teal-200">
             <h3 className="font-semibold text-slate-900 mb-2">Try CareCallAI for your agency</h3>
             <p className="text-sm text-slate-600 mb-4">
-              Start your free 30-day trial today. No credit card required.
+              £99/month, everything included. No contract — cancel anytime.
             </p>
             <Link
               href="/signup"
               className="inline-block px-6 py-2.5 bg-teal-600 text-white font-semibold rounded-lg hover:bg-teal-700 transition-colors text-sm"
             >
-              Start Free Trial
+              Get Started
             </Link>
           </div>
 

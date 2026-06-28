@@ -111,7 +111,7 @@ export default async function Image() {
           <span style={{ color: '#334155' }}>|</span>
           <span>CIW &amp; CQC Compliant</span>
           <span style={{ color: '#334155' }}>|</span>
-          <span>7-Day Free Trial</span>
+          <span>£99/month, everything included</span>
         </div>
 
         {/* URL */}

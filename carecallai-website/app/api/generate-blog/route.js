@@ -125,7 +125,7 @@ Guidelines:
 - Write in a professional but accessible tone
 - Include practical advice, not just product promotion
 - Naturally mention CareCallAI features where relevant
-- End with a clear CTA encouraging a free trial at carecallai.co.uk/signup
+- End with a clear CTA encouraging readers to get started at carecallai.co.uk/signup
 - Target UK English spelling (organisation, optimise, etc.)
 - Reference CIW (Wales) and CQC (England) regulations where appropriate
 - Include specific, actionable tips that demonstrate expertise

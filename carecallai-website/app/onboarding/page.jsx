@@ -47,7 +47,7 @@ export default function OnboardingPage() {
         setUser(sessionData.user);
         setAuthTokens({ at, rt });
 
-        // Call edge function to set up organization (30-day trial, no card needed)
+        // Call edge function to set up organization
         const setupRes = await fetch(`${SUPABASE_URL}/functions/v1/setup-organization`, {
           method: 'POST',
           headers: {
@@ -136,14 +136,14 @@ export default function OnboardingPage() {
         </div>
 
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">
-          Your 30-Day Free Trial is Active!
+          You&apos;re all set!
         </h1>
 
         <p className="text-slate-500 mb-2">
           {companyName
             ? `Welcome, ${companyName}! `
             : 'Welcome! '}
-          All features are unlocked for 30 days. No credit card required.
+          All features are unlocked. £99/month — everything included.
         </p>
 
         <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 mb-6 mt-4">

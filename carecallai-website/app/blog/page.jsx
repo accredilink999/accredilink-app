@@ -10,7 +10,7 @@ export const metadata = {
   title: "Care Agency Blog — CIW Compliance, Rostering & Software Guides",
   description:
     "Expert guides, tips and news for UK domiciliary care agencies. Scheduling, compliance, MAR charts, staff management and more.",
-  alternates: { canonical: "https://carecallai.co.uk/blog" },
+  alternates: { canonical: "https://www.carecallai.co.uk/blog" },
   keywords: ["care management blog", "home care tips UK", "domiciliary care guides"],
   openGraph: {
     title: "Care Agency Blog — CareCallAI",
@@ -60,7 +60,7 @@ export default async function BlogPage() {
 
       <CTABanner
         title="Ready to simplify your care agency?"
-        subtitle="Start your free 30-day trial today."
+        subtitle="No contract · Cancel anytime · Everything included"
       />
     </>
   );

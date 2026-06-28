@@ -1,9 +1,9 @@
 // Built-in marketing email template for CareCallAI campaigns
-// Professional HTML email with screenshots, full features, and 30-day free trial CTA
+// Professional HTML email with screenshots, full features, and £99/month CTA
 
-export const MARKETING_TEMPLATE_NAME = 'CareCallAI — 30-Day Free Trial Launch';
+export const MARKETING_TEMPLATE_NAME = 'CareCallAI — Everything Included, £99/month';
 
-export const MARKETING_TEMPLATE_SUBJECT = 'The only care management app built for CIW & CQC compliance — 30 days free';
+export const MARKETING_TEMPLATE_SUBJECT = 'The only care management app built for CIW & CQC compliance — £99/month, everything included';
 
 export const MARKETING_TEMPLATE_PREVIEW = 'Replace spreadsheets, paper MAR charts and manual rotas with one powerful app. No credit card needed.';
 
@@ -30,7 +30,7 @@ export const MARKETING_TEMPLATE_HTML = `<!DOCTYPE html>
         <!-- HEADER -->
         <tr>
           <td style="background:linear-gradient(135deg,#0d9488 0%,#0f766e 100%);padding:36px 40px;text-align:center;">
-            <img src="https://carecallai.co.uk/logo.png" alt="CareCallAI" width="80" height="80" style="display:block;margin:0 auto 14px;border-radius:18px;" />
+            <img src="https://www.carecallai.co.uk/logo.png" alt="CareCallAI" width="80" height="80" style="display:block;margin:0 auto 14px;border-radius:18px;" />
             <h1 style="color:#ffffff;font-size:26px;margin:0;font-weight:800;letter-spacing:-0.5px;">CareCallAI</h1>
             <p style="color:#99f6e4;font-size:14px;margin:8px 0 0;font-weight:500;">All-in-one care management for domiciliary &amp; residential providers</p>
           </td>
@@ -54,8 +54,8 @@ export const MARKETING_TEMPLATE_HTML = `<!DOCTYPE html>
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0fdfa;border:2px solid #99f6e4;border-radius:12px;">
               <tr>
                 <td style="padding:20px;text-align:center;">
-                  <p style="color:#0d9488;font-size:26px;font-weight:800;margin:0;letter-spacing:0.5px;">30-DAY FREE TRIAL</p>
-                  <p style="color:#115e59;font-size:14px;margin:8px 0 0;">No credit card required &bull; Every feature unlocked &bull; Cancel anytime</p>
+                  <p style="color:#0d9488;font-size:26px;font-weight:800;margin:0;letter-spacing:0.5px;">£99/MONTH — EVERYTHING INCLUDED</p>
+                  <p style="color:#115e59;font-size:14px;margin:8px 0 0;">No contract &bull; Every feature unlocked &bull; Cancel anytime</p>
                 </td>
               </tr>
             </table>
@@ -66,14 +66,14 @@ export const MARKETING_TEMPLATE_HTML = `<!DOCTYPE html>
         <tr>
           <td style="padding:0 40px 36px;text-align:center;">
             <!--[if mso]>
-            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="https://carecallai.co.uk" style="height:52px;v-text-anchor:middle;width:300px;" arcsize="15%" fillcolor="#0d9488">
+            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="https://www.carecallai.co.uk" style="height:52px;v-text-anchor:middle;width:300px;" arcsize="15%" fillcolor="#0d9488">
               <w:anchorlock/>
-              <center style="color:#ffffff;font-family:Arial;font-size:17px;font-weight:bold;">Learn More &amp; Start Free Trial</center>
+              <center style="color:#ffffff;font-family:Arial;font-size:17px;font-weight:bold;">Learn More &amp; Get Started</center>
             </v:roundrect>
             <![endif]-->
             <!--[if !mso]><!-->
-            <a href="https://carecallai.co.uk" style="display:inline-block;background-color:#0d9488;color:#ffffff;font-size:17px;font-weight:700;padding:15px 44px;border-radius:8px;text-decoration:none;mso-hide:all;">
-              Learn More &amp; Start Free Trial &rarr;
+            <a href="https://www.carecallai.co.uk" style="display:inline-block;background-color:#0d9488;color:#ffffff;font-size:17px;font-weight:700;padding:15px 44px;border-radius:8px;text-decoration:none;mso-hide:all;">
+              Learn More &amp; Get Started &rarr;
             </a>
             <!--<![endif]-->
           </td>
@@ -100,7 +100,7 @@ export const MARKETING_TEMPLATE_HTML = `<!DOCTYPE html>
         </tr>
         <tr>
           <td style="padding:16px 50px 28px;text-align:center;">
-            <img src="https://carecallai.co.uk/email/dashboard.jpg" alt="CareCallAI Dashboard" width="240" style="max-width:240px;width:100%;height:auto;border-radius:16px;border:3px solid #e2e8f0;box-shadow:0 4px 16px rgba(0,0,0,0.08);" />
+            <img src="https://www.carecallai.co.uk/email/dashboard.jpg" alt="CareCallAI Dashboard" width="240" style="max-width:240px;width:100%;height:auto;border-radius:16px;border:3px solid #e2e8f0;box-shadow:0 4px 16px rgba(0,0,0,0.08);" />
           </td>
         </tr>
 
@@ -118,7 +118,7 @@ export const MARKETING_TEMPLATE_HTML = `<!DOCTYPE html>
         </tr>
         <tr>
           <td style="padding:16px 50px 28px;text-align:center;">
-            <img src="https://carecallai.co.uk/email/rota.jpg" alt="CareCallAI Rota Management" width="240" style="max-width:240px;width:100%;height:auto;border-radius:16px;border:3px solid #e2e8f0;box-shadow:0 4px 16px rgba(0,0,0,0.08);" />
+            <img src="https://www.carecallai.co.uk/email/rota.jpg" alt="CareCallAI Rota Management" width="240" style="max-width:240px;width:100%;height:auto;border-radius:16px;border:3px solid #e2e8f0;box-shadow:0 4px 16px rgba(0,0,0,0.08);" />
           </td>
         </tr>
 
@@ -136,7 +136,7 @@ export const MARKETING_TEMPLATE_HTML = `<!DOCTYPE html>
         </tr>
         <tr>
           <td style="padding:16px 50px 28px;text-align:center;">
-            <img src="https://carecallai.co.uk/email/client.jpg" alt="CareCallAI Client Management" width="240" style="max-width:240px;width:100%;height:auto;border-radius:16px;border:3px solid #e2e8f0;box-shadow:0 4px 16px rgba(0,0,0,0.08);" />
+            <img src="https://www.carecallai.co.uk/email/client.jpg" alt="CareCallAI Client Management" width="240" style="max-width:240px;width:100%;height:auto;border-radius:16px;border:3px solid #e2e8f0;box-shadow:0 4px 16px rgba(0,0,0,0.08);" />
           </td>
         </tr>
 
@@ -154,7 +154,7 @@ export const MARKETING_TEMPLATE_HTML = `<!DOCTYPE html>
         </tr>
         <tr>
           <td style="padding:16px 50px 28px;text-align:center;">
-            <img src="https://carecallai.co.uk/email/clinical.jpg" alt="CareCallAI Clinical Assessments" width="240" style="max-width:240px;width:100%;height:auto;border-radius:16px;border:3px solid #e2e8f0;box-shadow:0 4px 16px rgba(0,0,0,0.08);" />
+            <img src="https://www.carecallai.co.uk/email/clinical.jpg" alt="CareCallAI Clinical Assessments" width="240" style="max-width:240px;width:100%;height:auto;border-radius:16px;border:3px solid #e2e8f0;box-shadow:0 4px 16px rgba(0,0,0,0.08);" />
           </td>
         </tr>
 
@@ -172,7 +172,7 @@ export const MARKETING_TEMPLATE_HTML = `<!DOCTYPE html>
         </tr>
         <tr>
           <td style="padding:16px 50px 28px;text-align:center;">
-            <img src="https://carecallai.co.uk/email/carelog.jpg" alt="CareCallAI Care Logging" width="240" style="max-width:240px;width:100%;height:auto;border-radius:16px;border:3px solid #e2e8f0;box-shadow:0 4px 16px rgba(0,0,0,0.08);" />
+            <img src="https://www.carecallai.co.uk/email/carelog.jpg" alt="CareCallAI Care Logging" width="240" style="max-width:240px;width:100%;height:auto;border-radius:16px;border:3px solid #e2e8f0;box-shadow:0 4px 16px rgba(0,0,0,0.08);" />
           </td>
         </tr>
 
@@ -190,7 +190,7 @@ export const MARKETING_TEMPLATE_HTML = `<!DOCTYPE html>
         </tr>
         <tr>
           <td style="padding:16px 50px 28px;text-align:center;">
-            <img src="https://carecallai.co.uk/email/expenses.jpg" alt="CareCallAI Expenses & Mileage" width="240" style="max-width:240px;width:100%;height:auto;border-radius:16px;border:3px solid #e2e8f0;box-shadow:0 4px 16px rgba(0,0,0,0.08);" />
+            <img src="https://www.carecallai.co.uk/email/expenses.jpg" alt="CareCallAI Expenses & Mileage" width="240" style="max-width:240px;width:100%;height:auto;border-radius:16px;border:3px solid #e2e8f0;box-shadow:0 4px 16px rgba(0,0,0,0.08);" />
           </td>
         </tr>
 
@@ -375,15 +375,15 @@ export const MARKETING_TEMPLATE_HTML = `<!DOCTYPE html>
               <tr>
                 <td style="padding:36px 28px;text-align:center;">
                   <h3 style="color:#ffffff;font-size:22px;margin:0 0 10px;font-weight:700;">Ready to see it in action?</h3>
-                  <p style="color:#ccfbf1;font-size:14px;margin:0 0 24px;line-height:1.5;">Visit our website to explore every feature, watch demos, and start your 30-day free trial. No credit card, no obligation.</p>
+                  <p style="color:#ccfbf1;font-size:14px;margin:0 0 24px;line-height:1.5;">Visit our website to explore every feature, watch demos, and get started today. £99/month — everything included, cancel anytime.</p>
                   <!--[if mso]>
-                  <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="https://carecallai.co.uk" style="height:52px;v-text-anchor:middle;width:300px;" arcsize="15%" fillcolor="#ffffff">
+                  <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="https://www.carecallai.co.uk" style="height:52px;v-text-anchor:middle;width:300px;" arcsize="15%" fillcolor="#ffffff">
                     <w:anchorlock/>
                     <center style="color:#0d9488;font-family:Arial;font-size:17px;font-weight:bold;">Visit CareCallAI.co.uk</center>
                   </v:roundrect>
                   <![endif]-->
                   <!--[if !mso]><!-->
-                  <a href="https://carecallai.co.uk" style="display:inline-block;background-color:#ffffff;color:#0d9488;font-size:17px;font-weight:700;padding:15px 44px;border-radius:8px;text-decoration:none;mso-hide:all;">
+                  <a href="https://www.carecallai.co.uk" style="display:inline-block;background-color:#ffffff;color:#0d9488;font-size:17px;font-weight:700;padding:15px 44px;border-radius:8px;text-decoration:none;mso-hide:all;">
                     Visit CareCallAI.co.uk &rarr;
                   </a>
                   <!--<![endif]-->
@@ -444,13 +444,13 @@ export const MARKETING_TEMPLATE_HTML = `<!DOCTYPE html>
                     &#x1F4DE; 01745 535100 &nbsp;|&nbsp; &#x2709;&#xFE0F; hello@carecallai.co.uk
                   </p>
                   <p style="color:#94a3b8;font-size:11px;margin:14px 0 0;">
-                    <a href="https://carecallai.co.uk" style="color:#0d9488;text-decoration:none;font-weight:600;">Visit our website</a>
+                    <a href="https://www.carecallai.co.uk" style="color:#0d9488;text-decoration:none;font-weight:600;">Visit our website</a>
                     &nbsp;&bull;&nbsp;
-                    <a href="https://carecallai.co.uk/features" style="color:#0d9488;text-decoration:none;">Features</a>
+                    <a href="https://www.carecallai.co.uk/features" style="color:#0d9488;text-decoration:none;">Features</a>
                     &nbsp;&bull;&nbsp;
-                    <a href="https://carecallai.co.uk/pricing" style="color:#0d9488;text-decoration:none;">Pricing</a>
+                    <a href="https://www.carecallai.co.uk/pricing" style="color:#0d9488;text-decoration:none;">Pricing</a>
                     &nbsp;&bull;&nbsp;
-                    <a href="https://carecallai.co.uk/demo" style="color:#0d9488;text-decoration:none;">Book a Demo</a>
+                    <a href="https://www.carecallai.co.uk/demo" style="color:#0d9488;text-decoration:none;">Book a Demo</a>
                   </p>
                   <p style="color:#94a3b8;font-size:11px;margin:10px 0 0;">
                     <a href="{{SUBSCRIBE_LINK}}" style="color:#64748b;text-decoration:none;">Subscribe</a>

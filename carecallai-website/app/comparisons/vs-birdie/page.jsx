@@ -10,7 +10,7 @@ export const metadata = {
   description:
     "Compare CareCallAI and Birdie for home care agencies. Similar features, significantly lower pricing, Welsh-built with CIW expertise.",
   keywords: ["birdie care software alternative", "birdie vs carecallai", "cheaper alternative to birdie care"],
-  alternates: { canonical: "https://carecallai.co.uk/comparisons/vs-birdie" },
+  alternates: { canonical: "https://www.carecallai.co.uk/comparisons/vs-birdie" },
   openGraph: {
     title: "CareCallAI vs Birdie — Feature Comparison",
     description: "Same features, significantly lower pricing. See how CareCallAI compares to Birdie for UK home care agencies.",

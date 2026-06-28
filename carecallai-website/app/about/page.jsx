@@ -9,7 +9,7 @@ export const metadata = {
   description:
     "CareCallAI is built by care professionals, for care professionals. Our mission is to make home care management simple, compliant and affordable for every UK agency.",
   keywords: ["CareCallAI", "care software company Wales", "Welsh care technology", "care management software UK"],
-  alternates: { canonical: "https://carecallai.co.uk/about" },
+  alternates: { canonical: "https://www.carecallai.co.uk/about" },
   openGraph: {
     title: "About Us — CareCallAI",
     description: "Built by care professionals, for care professionals. Making home care management simple, compliant and affordable.",
@@ -136,7 +136,7 @@ export default function AboutPage() {
       <BetaPromo />
       <CTABanner
         title="Want to learn more?"
-        subtitle="Book a demo or start your free trial today."
+        subtitle="Book a demo or get started today — £99/month, everything included."
       />
     </>
   );

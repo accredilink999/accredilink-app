@@ -38,7 +38,7 @@ export default function FeaturePageLayout({
                 href="/demo"
                 className="px-8 py-3 bg-teal-600 text-white font-semibold rounded-lg hover:bg-teal-700 transition-colors"
               >
-                Start Free Trial
+                Get Started
               </Link>
               <Link
                 href="/pricing"

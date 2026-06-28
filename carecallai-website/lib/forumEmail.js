@@ -6,7 +6,7 @@
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 const FROM_EMAIL = 'CareCall AI Forum <support@carecallai.co.uk>'
-const FORUM_URL = 'https://carecallai.co.uk/forum'
+const FORUM_URL = 'https://www.carecallai.co.uk/forum'
 
 async function sendEmail({ to, subject, html }) {
   if (!to || !SUPABASE_URL || !SUPABASE_ANON_KEY) return
@@ -243,7 +243,7 @@ export function forumInviteHtml(name) {
       <p style="color:#1e293b;font-size:13px;font-weight:600;margin:0 0 6px;">Two ways to access the forum:</p>
       <table style="width:100%;border-collapse:collapse;">
         <tr><td style="padding:4px 0;color:#475569;font-size:13px;">1. Open the <strong>CareCallAI app</strong> &rarr; Quick Links menu &rarr; tap <strong>"Forum"</strong></td></tr>
-        <tr><td style="padding:4px 0;color:#475569;font-size:13px;">2. Visit directly: <a href="https://carecallai.co.uk/forum" style="color:#0d9488;font-weight:600;text-decoration:none;">carecallai.co.uk/forum</a></td></tr>
+        <tr><td style="padding:4px 0;color:#475569;font-size:13px;">2. Visit directly: <a href="https://www.carecallai.co.uk/forum" style="color:#0d9488;font-weight:600;text-decoration:none;">carecallai.co.uk/forum</a></td></tr>
       </table>
     </div>
     <div style="background:#fffbeb;border:1px solid #fef3c7;border-radius:12px;padding:20px;margin:0 0 24px;">
@@ -257,18 +257,18 @@ export function forumInviteHtml(name) {
         <tr><td style="padding:3px 0;color:#78350f;font-size:12px;">&#128187; Via Microsoft Teams (link sent after booking)</td></tr>
       </table>
       <div style="text-align:center;margin-top:14px;">
-        <a href="https://carecallai.co.uk/forum/booking" style="background:#d97706;color:white;text-decoration:none;padding:10px 24px;border-radius:8px;font-weight:600;font-size:13px;display:inline-block;">Book a Session</a>
+        <a href="https://www.carecallai.co.uk/forum/booking" style="background:#d97706;color:white;text-decoration:none;padding:10px 24px;border-radius:8px;font-weight:600;font-size:13px;display:inline-block;">Book a Session</a>
       </div>
     </div>
     <div style="text-align:center;margin:0 0 20px;">
-      <a href="https://carecallai.co.uk/forum" style="background:linear-gradient(135deg,#14b8a6,#0d9488);color:white;text-decoration:none;padding:14px 36px;border-radius:12px;font-weight:700;font-size:15px;display:inline-block;box-shadow:0 2px 8px rgba(13,148,136,0.3);">Visit the Forum</a>
+      <a href="https://www.carecallai.co.uk/forum" style="background:linear-gradient(135deg,#14b8a6,#0d9488);color:white;text-decoration:none;padding:14px 36px;border-radius:12px;font-weight:700;font-size:15px;display:inline-block;box-shadow:0 2px 8px rgba(13,148,136,0.3);">Visit the Forum</a>
     </div>
     <p style="color:#94a3b8;font-size:12px;text-align:center;margin:0;">Log in with your existing CareCallAI email and password</p>
   </div>
   <div style="text-align:center;padding:20px 0 0;">
     <p style="color:#94a3b8;font-size:12px;margin:0 0 4px;">CareCallAI &mdash; Smart Care Management Software</p>
     <p style="color:#94a3b8;font-size:11px;margin:0;">
-      <a href="https://carecallai.co.uk" style="color:#64748b;text-decoration:none;">carecallai.co.uk</a> &bull;
+      <a href="https://www.carecallai.co.uk" style="color:#64748b;text-decoration:none;">carecallai.co.uk</a> &bull;
       <a href="mailto:hello@carecallai.co.uk" style="color:#64748b;text-decoration:none;">hello@carecallai.co.uk</a> &bull;
       WhatsApp: +44 7762 533406
     </p>

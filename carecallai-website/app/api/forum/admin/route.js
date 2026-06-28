@@ -619,7 +619,7 @@ Need hands-on help? You can book a **free Microsoft Teams session** with the Car
 - Training for your team
 - Setup and configuration help
 
-Look for the **Book a Session** thread pinned in this category, or visit [carecallai.co.uk/booking](https://carecallai.co.uk/booking).
+Look for the **Book a Session** thread pinned in this category, or visit [carecallai.co.uk/booking](https://www.carecallai.co.uk/booking).
 
 We're here to help!`
           },

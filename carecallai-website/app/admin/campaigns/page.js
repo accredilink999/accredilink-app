@@ -43,7 +43,7 @@ const TOPIC_SUGGESTIONS = {
     'Staff Retention Tips',
   ],
   promotional: [
-    '14-Day Free Trial',
+    'Get Started — £99/month',
     'Switch from Paper \u2014 Free Migration',
     'CareCallAI vs. Multiple Systems',
   ],

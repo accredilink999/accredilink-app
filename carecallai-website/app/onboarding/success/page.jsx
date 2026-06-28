@@ -23,10 +23,10 @@ export default function PaymentSuccessPage() {
         </div>
         <h1 className="text-2xl font-bold text-slate-900 mb-2">You&apos;re all set!</h1>
         <p className="text-slate-500 mb-2">
-          Your payment has been processed and your 30-day free trial has started.
+          Your payment has been processed and your subscription is now active.
         </p>
         <p className="text-slate-500 mb-8 text-sm">
-          You won&apos;t be charged until your trial ends. Cancel anytime from your dashboard.
+          £99/month — everything included. Cancel anytime from your dashboard.
         </p>
 
         <div className="space-y-3">

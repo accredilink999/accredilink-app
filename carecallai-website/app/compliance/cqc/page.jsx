@@ -11,7 +11,7 @@ export const metadata = {
   description:
     "How CareCallAI meets CQC requirements across all five key lines of enquiry. Safe, Effective, Caring, Responsive, Well-led.",
   keywords: ["CQC compliant care software", "Care Quality Commission software", "CQC key lines of enquiry software"],
-  alternates: { canonical: "https://carecallai.co.uk/compliance/cqc" },
+  alternates: { canonical: "https://www.carecallai.co.uk/compliance/cqc" },
   openGraph: {
     title: "CQC Compliance — CareCallAI",
     description: "Covers all five CQC key lines of enquiry: Safe, Effective, Caring, Responsive, Well-led. Built-in compliance from £99/mo.",
@@ -142,7 +142,7 @@ export default function CQCCompliancePage() {
                 href="/signup"
                 className="px-8 py-3 bg-teal-600 text-white font-semibold rounded-lg hover:bg-teal-700 transition-colors"
               >
-                Start Free Trial
+                Get Started
               </Link>
               <Link
                 href="/compliance/ciw"
@@ -208,7 +208,7 @@ export default function CQCCompliancePage() {
       <BetaPromo />
       <CTABanner
         title="Prepare for your next CQC inspection with confidence"
-        subtitle="Start your free trial and see how CareCallAI makes compliance effortless."
+        subtitle="Get started today and see how CareCallAI makes compliance effortless."
       />
     </>
   );
