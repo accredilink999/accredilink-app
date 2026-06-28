@@ -6,6 +6,7 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.media.AudioFormat;
@@ -102,6 +103,19 @@ public class MainActivity extends BridgeActivity {
             alerterWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "carecallai:alerter_cpu");
             alerterWakeLock.setReferenceCounted(false);
             alerterWakeLock.acquire();
+
+            // Request Doze mode exemption so network stays alive indefinitely.
+            // Without this Android cuts network access after ~10 min idle, dropping
+            // the radio WebRTC connection and alerter Supabase polling.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (!pm.isIgnoringBatteryOptimizations(getPackageName())) {
+                    Intent intent = new Intent(
+                        android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                        Uri.parse("package:" + getPackageName())
+                    );
+                    startActivity(intent);
+                }
+            }
         }
 
         webView = getBridge().getWebView();
