@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/api/supabaseClient';
-import { Smartphone, Monitor, Apple, Download, CheckCircle, Radio } from 'lucide-react';
+import { Smartphone, Monitor, Apple, Download as DownloadIcon, CheckCircle, Radio } from 'lucide-react';
 
 function useSystemSetting(key) {
   const [info, setInfo] = useState(null);
@@ -84,7 +84,7 @@ export default function Download() {
               download={apk.filename || 'CareCallAI.apk'}
               style={btnStyle('#16a34a', '#fff')}
             >
-              <Download size={16} />
+              <DownloadIcon size={16} />
               Download APK{formatBytes(apk.filesize)}
             </a>
           ) : (
@@ -114,7 +114,7 @@ export default function Download() {
               download="CareCallAI-Radio.apk"
               style={btnStyle('#7c3aed', '#fff')}
             >
-              <Download size={16} />
+              <DownloadIcon size={16} />
               Download Radio APK{formatBytes(radioApk.filesize)}
             </a>
           ) : (
