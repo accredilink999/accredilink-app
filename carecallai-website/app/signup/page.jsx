@@ -136,6 +136,17 @@ export default function SignupPage() {
           </p>
         </div>
 
+        {mode === 'owner' && (
+          <div className="flex flex-col gap-3 mb-5">
+            <Link href="/download" className="flex items-center justify-center gap-3 w-full py-3 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-colors font-semibold text-sm">
+              📲 Download the App to get started
+            </Link>
+            <Link href="/demo" className="flex items-center justify-center gap-3 w-full py-2.5 bg-slate-900 border border-slate-700 text-white rounded-xl hover:bg-slate-800 transition-colors font-semibold text-sm">
+              ▶ Watch the full demo first
+            </Link>
+          </div>
+        )}
+
         {/* Mode toggle */}
         <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-1 mb-6">
           <button
@@ -288,7 +299,7 @@ export default function SignupPage() {
               </span>
               <span className="flex items-center gap-1">
                 <svg className="w-3.5 h-3.5 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                No credit card
+                Cancel anytime
               </span>
               <span className="flex items-center gap-1">
                 <svg className="w-3.5 h-3.5 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>

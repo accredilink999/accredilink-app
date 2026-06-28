@@ -156,12 +156,17 @@ export default function HomePage() {
                 </p>
               </AnimateOnScroll>
               <AnimateOnScroll animation="fade-up" delay={300}>
-                <div className="flex flex-col sm:flex-row gap-4 mb-6">
-                  <Link href="/signup" className="px-8 py-3.5 bg-teal-500 text-white font-semibold rounded-xl hover:bg-teal-400 transition-all shadow-lg shadow-teal-500/30 text-lg animate-pulse-glow">
-                    Get Started — £99/month
+                <div className="flex flex-col sm:flex-row gap-4 mb-4">
+                  <Link href="/demo" className="px-8 py-3.5 bg-teal-500 text-white font-semibold rounded-xl hover:bg-teal-400 transition-all shadow-lg shadow-teal-500/30 text-lg animate-pulse-glow flex items-center gap-2">
+                    ▶ Watch Full Demo
                   </Link>
-                  <Link href="/features" className="px-8 py-3.5 border border-white/20 text-white font-semibold rounded-xl hover:bg-white/10 transition-all flex items-center gap-2 text-lg backdrop-blur">
-                    See All Features <ArrowRight className="w-5 h-5" />
+                  <Link href="/download" className="px-8 py-3.5 bg-white/10 border border-white/30 text-white font-semibold rounded-xl hover:bg-white/20 transition-all flex items-center gap-2 text-lg backdrop-blur shadow-lg">
+                    📲 Download the App
+                  </Link>
+                </div>
+                <div className="flex flex-wrap gap-3 mb-3">
+                  <Link href="/login" className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 border border-white/20 text-white text-sm font-medium rounded-lg hover:bg-white/20 transition-all backdrop-blur">
+                    Already have an account? Sign In →
                   </Link>
                 </div>
                 <p className="text-sm text-slate-500">No contract &middot; Cancel anytime &middot; Everything included</p>
@@ -701,39 +706,30 @@ export default function HomePage() {
         <div className="max-w-5xl mx-auto px-4">
           <AnimateOnScroll>
             <div className="text-center mb-12">
-              <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">Simple, transparent pricing</h2>
-              <p className="text-slate-600">Plans that grow with your agency. Save 20% with annual billing.</p>
+              <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">One plan. Everything included.</h2>
+              <p className="text-slate-600">No tiers, no hidden fees, no price increases — ever.</p>
             </div>
           </AnimateOnScroll>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              { name: "Starter", price: "99", users: "Up to 15 staff", highlight: false, features: ["Scheduling & Rota", "Care Logging", "Staff Management", "GPS Check-In", "Mobile App"] },
-              { name: "Professional", price: "199", users: "Up to 30 staff", highlight: true, features: ["Everything in Starter", "eMAR Charts", "Invoicing & Payroll", "Training Matrix", "AI Assistant"] },
-              { name: "Enterprise", price: "349", users: "Unlimited staff", highlight: false, features: ["Everything in Professional", "Virtual Care Inspector", "Clinical Suite (NEWS2, SALT, Waterlow)", "CIW/CQC Compliance Suite", "Priority Support"] },
-            ].map((tier, i) => (
-              <AnimateOnScroll key={tier.name} delay={i * 120} animation="scale">
-                <div className={`bg-white rounded-2xl p-6 border text-center card-hover ${tier.highlight ? "border-teal-500 shadow-xl ring-2 ring-teal-500" : "border-slate-200 shadow-sm"}`}>
-                  {tier.highlight && <span className="inline-block px-3 py-1 bg-teal-100 text-teal-700 text-xs font-semibold rounded-full mb-3">Most Popular</span>}
-                  <h3 className="text-xl font-bold text-slate-900">{tier.name}</h3>
-                  <p className="mt-3"><span className="text-4xl font-bold text-slate-900">£{tier.price}</span><span className="text-slate-500">/mo</span></p>
-                  <p className="text-sm text-slate-500 mt-1 mb-4">{tier.users}</p>
-                  <div className="text-left space-y-2 mb-6">
-                    {tier.features.map((f) => (
-                      <div key={f} className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-teal-500 flex-shrink-0" />
-                        <span className="text-sm text-slate-600">{f}</span>
-                      </div>
-                    ))}
+          <AnimateOnScroll animation="scale">
+            <div className="max-w-md mx-auto bg-white rounded-2xl p-8 border-2 border-teal-500 shadow-xl ring-2 ring-teal-500 text-center">
+              <span className="inline-block px-3 py-1 bg-teal-100 text-teal-700 text-xs font-semibold rounded-full mb-4">Everything Included</span>
+              <h3 className="text-2xl font-bold text-slate-900 mb-2">CareCall AI</h3>
+              <p className="mt-2 mb-1"><span className="text-5xl font-bold text-slate-900">£99</span><span className="text-slate-500">/month</span></p>
+              <p className="text-sm text-slate-500 mb-6">Unlimited staff · No contracts · Cancel anytime</p>
+              <div className="text-left space-y-2 mb-8">
+                {["Scheduling & Rota", "GPS Clock-In & Out", "Care Logging & Daily Notes", "Medication Recording (eMAR)", "Incident Reporting", "Staff Training & Certificates", "Built-in Two-Way Radio & PTT", "Real-Time Pager Alerter", "CQC / CIW Compliance Suite", "Management Reports & AI Assistant", "Mobile App (Android, iOS, Desktop)", "Every new feature we build — free"].map((f) => (
+                  <div key={f} className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-teal-500 flex-shrink-0" />
+                    <span className="text-sm text-slate-600">{f}</span>
                   </div>
-                  <Link href="/pricing" className="block text-center py-2.5 rounded-xl font-semibold text-sm bg-teal-600 text-white hover:bg-teal-700 transition-colors">See Plan Details</Link>
-                </div>
-              </AnimateOnScroll>
-            ))}
-          </div>
-          <AnimateOnScroll delay={400}>
-            <div className="text-center mt-8">
-              <Link href="/pricing" className="inline-flex items-center gap-2 text-teal-600 font-semibold hover:text-teal-700">See full pricing & compare plans <ArrowRight className="w-4 h-4" /></Link>
+                ))}
+              </div>
+              <Link href="/signup" className="block text-center py-3 rounded-xl font-semibold text-base bg-teal-600 text-white hover:bg-teal-700 transition-colors mb-3">Get Started — £99/month</Link>
+              <Link href="/demo" className="block text-center py-2.5 rounded-xl font-semibold text-sm border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors">Watch the Demo First</Link>
             </div>
+          </AnimateOnScroll>
+          <AnimateOnScroll delay={200}>
+            <p className="text-center text-sm text-slate-400 mt-6">Price guaranteed never to increase for existing subscribers.</p>
           </AnimateOnScroll>
         </div>
       </section>
