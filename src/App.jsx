@@ -20,7 +20,7 @@ import AutoPushRegistration from '@/components/notifications/AutoPushRegistratio
 import AppUpdateChecker from '@/components/AppUpdateChecker';
 import GlobalAlerterMonitor from '@/components/GlobalAlerterMonitor';
 import HelpNudge from '@/components/HelpNudge';
-import { initOrg, resetOrg, checkOrgAccess } from '@/lib/orgContext';
+import { initOrg, resetOrg } from '@/lib/orgContext';
 import SubscriptionGate from '@/components/billing/SubscriptionGate';
 import OrgSetup from '@/pages/OrgSetup';
 import TermsConsentGate from '@/components/TermsConsentGate';
@@ -314,13 +314,8 @@ const AppShell = () => {
     return <TermsConsentGate onAccepted={() => setNeedsTermsConsent(false)} />;
   }
 
-  // Subscription gating — block access if trial expired or subscription cancelled
-  // Settings page is always accessible so users can reach billing
-  const orgAccess = checkOrgAccess();
-  const isSettingsPage = location.pathname.toLowerCase().includes('settings');
-  if (!orgAccess.active && !isSettingsPage) {
-    return <SubscriptionGate />;
-  }
+  // Subscription gating — SubscriptionGate renders as a fixed overlay and
+  // handles its own visibility reactively via useQuery (always mounted)
 
   // Extract page name from URL — always fall back to Dashboard
   const pageName = location.pathname.replace(/^\//, '') || mainPageKey;
@@ -332,6 +327,7 @@ const AppShell = () => {
       <AutoPushRegistration />
       <AppUpdateChecker />
       <GlobalAlerterMonitor />
+      <SubscriptionGate />
       <Layout currentPageName={currentPageName} />
       {/* PIN setup prompt — shown once after first login if no PIN set */}
       {showPinSetup && user?.id && (
