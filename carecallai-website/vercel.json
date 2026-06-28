@@ -4,13 +4,5 @@
       "path": "/api/generate-blog",
       "schedule": "0 9 * * 1"
     }
-  ],
-  "redirects": [
-    {
-      "source": "/(.*)",
-      "has": [{ "type": "host", "value": "carecallai.co.uk" }],
-      "destination": "https://www.carecallai.co.uk/$1",
-      "permanent": true
-    }
   ]
 }
