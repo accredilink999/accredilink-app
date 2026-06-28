@@ -182,18 +182,17 @@ export default function Login() {
 
       // If email confirmation is required, show success message
       if (data?.user && !data?.session) {
-        setSuccessMsg('Account created! Check your email to confirm your address — then return here to sign in.')
+        setSuccessMsg('Account created! Check your email to confirm, then sign in.')
         setStatus('')
         setMode('signin')
         setPassword('')
         return
       }
 
-      // If auto-confirmed, send to website payment gateway with tokens
+      // If auto-confirmed (email_confirm disabled), sign in directly
       if (data?.session) {
-        setStatus('Redirecting to payment...')
-        const { access_token, refresh_token } = data.session
-        window.location.href = `https://www.carecallai.co.uk/onboarding#access_token=${access_token}&refresh_token=${refresh_token}`
+        setStatus('Redirecting...')
+        window.location.replace('/')
         return
       }
 
