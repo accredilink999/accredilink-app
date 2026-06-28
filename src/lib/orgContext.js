@@ -126,6 +126,11 @@ export function checkOrgAccess() {
     return { active: true, trial: true }
   }
 
+  // New signup — org created but not yet subscribed
+  if (plan === 'pending') {
+    return { active: false, reason: 'pending' }
+  }
+
   // Cancelled or inactive
   if (!is_active || plan === 'cancelled') {
     return { active: false, reason: 'cancelled' }

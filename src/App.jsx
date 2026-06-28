@@ -121,10 +121,9 @@ const AppShell = () => {
             .insert({
               name: companyName,
               slug,
-              plan: 'trial',
+              plan: 'pending',
               invite_code: invCode,
-              trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-              is_active: true,
+              is_active: false,
             })
             .select()
             .single();
@@ -153,7 +152,7 @@ const AppShell = () => {
                   orgName: companyName,
                   userEmail: user.email,
                   userName: user.user_metadata?.full_name || '',
-                  plan: 'trial',
+                  plan: 'pending',
                 }),
               }).catch(e => console.warn('[notifyNewSignup] failed:', e));
             }

@@ -26,7 +26,20 @@ export default function SubscriptionGate() {
 
   const org = getCurrentOrg();
   const role = getCurrentOrgRole();
+  const isPending = access.reason === 'pending';
   const isExpiredTrial = access.reason === 'trial_expired';
+
+  const heading = isPending
+    ? 'One last step — subscribe to get started'
+    : isExpiredTrial
+      ? 'Your trial has ended'
+      : 'Subscription inactive';
+
+  const subtext = isPending
+    ? `${org?.name ? `${org.name} is` : 'Your organisation is'} set up and ready. Subscribe below to unlock full access — everything included, unlimited staff.`
+    : isExpiredTrial
+      ? 'Your trial period has ended. Subscribe to continue — everything included, unlimited staff, one flat price.'
+      : 'Your subscription is inactive or payment failed. Reactivate to regain full access.';
 
   return (
     <div className="fixed inset-0 z-[99999] overflow-auto" style={{ background: 'linear-gradient(160deg,#0f172a 0%,#1e293b 60%,#0c2a1e 100%)' }}>
@@ -34,21 +47,18 @@ export default function SubscriptionGate() {
         <img src="/logo.png" alt="CareCall AI" className="h-14 mb-6 object-contain" onError={e => e.target.style.display='none'} />
 
         <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center">
-          <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-5 ${isExpiredTrial ? 'bg-amber-100' : 'bg-red-100'}`}>
-            {isExpiredTrial ? <Clock className="w-8 h-8 text-amber-600" /> : <AlertTriangle className="w-8 h-8 text-red-600" />}
+          <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-5 ${isPending ? 'bg-teal-100' : isExpiredTrial ? 'bg-amber-100' : 'bg-red-100'}`}>
+            {isPending
+              ? <CreditCard className="w-8 h-8 text-teal-600" />
+              : isExpiredTrial
+                ? <Clock className="w-8 h-8 text-amber-600" />
+                : <AlertTriangle className="w-8 h-8 text-red-600" />}
           </div>
 
-          <h2 className="text-2xl font-bold text-slate-900 mb-2">
-            {isExpiredTrial ? 'Your Free Trial Has Ended' : 'Subscription Inactive'}
-          </h2>
-          <p className="text-slate-600 mb-6 text-sm leading-relaxed">
-            {isExpiredTrial
-              ? 'Your trial period has ended. Subscribe to continue — everything included, unlimited staff, one flat price.'
-              : 'Your subscription is inactive or payment failed. Reactivate to regain full access.'
-            }
-          </p>
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">{heading}</h2>
+          <p className="text-slate-600 mb-6 text-sm leading-relaxed">{subtext}</p>
 
-          {org?.name && (
+          {org?.name && isPending && (
             <p className="text-xs text-slate-400 mb-5">Organisation: <span className="font-semibold text-slate-600">{org.name}</span></p>
           )}
 
@@ -68,14 +78,21 @@ export default function SubscriptionGate() {
 
           <a
             href="/demo"
-            className="w-full py-2.5 border border-slate-200 text-slate-600 font-medium rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 text-sm mb-4"
+            className="w-full py-2.5 border border-slate-200 text-slate-600 font-medium rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 text-sm mb-3"
           >
             <Sparkles className="w-4 h-4" />
             Watch the full demo first
           </a>
 
+          <a
+            href="mailto:hello@carecallai.co.uk?subject=CareCall AI enquiry"
+            className="w-full py-2.5 text-slate-400 font-medium rounded-lg hover:text-slate-600 transition-colors flex items-center justify-center gap-2 text-sm mb-2"
+          >
+            Not sure yet? Send us a message →
+          </a>
+
           <p className="text-xs text-slate-400">
-            Questions? Email <a href="mailto:hello@carecallai.co.uk" className="text-teal-600 underline">hello@carecallai.co.uk</a>
+            Questions? <a href="mailto:hello@carecallai.co.uk" className="text-teal-600 underline">hello@carecallai.co.uk</a>
           </p>
         </div>
       </div>
