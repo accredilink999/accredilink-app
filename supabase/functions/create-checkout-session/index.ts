@@ -166,9 +166,9 @@ Deno.serve(async (req) => {
       customer: customerId,
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
-      payment_method_collection: 'if_required',
-      success_url: `${appUrl}/Settings?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/Settings?checkout=cancelled`,
+      payment_method_collection: 'always',
+      success_url: `${siteUrl}/onboarding/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${siteUrl}/pricing`,
       metadata: {
         organization_id: organizationId,
         plan,
@@ -180,8 +180,7 @@ Deno.serve(async (req) => {
           plan,
           billing: billingPeriod,
         },
-        // 30-day free trial for new customers only
-        ...(hadPreviousSubscription ? {} : { trial_period_days: 30 }),
+        // No trial — payment required immediately
       },
     });
 

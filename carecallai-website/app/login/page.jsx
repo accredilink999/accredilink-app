@@ -66,7 +66,7 @@ export default function LoginPage() {
               .eq('id', membership.organization_id)
               .single();
 
-            needsOnboarding = !org?.stripe_subscription_id && (org?.plan === 'trial' || !org?.plan);
+            needsOnboarding = !org?.stripe_subscription_id && ['trial', 'pending', null, undefined].includes(org?.plan);
           }
 
           if (needsOnboarding) {

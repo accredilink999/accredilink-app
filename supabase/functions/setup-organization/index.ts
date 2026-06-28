@@ -88,9 +88,8 @@ Deno.serve(async (req) => {
         name: companyName,
         slug,
         invite_code: inviteCode,
-        plan: 'trial',
-        trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        is_active: true,
+        plan: 'pending',
+        is_active: false,
       })
       .select()
       .single();
