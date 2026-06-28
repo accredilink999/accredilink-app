@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/api/supabaseClient';
-import { Smartphone, Monitor, Apple, Download, CheckCircle } from 'lucide-react';
+import { Smartphone, Monitor, Apple, Download, CheckCircle, Radio } from 'lucide-react';
 
-function useLatestApk() {
+function useSystemSetting(key) {
   const [info, setInfo] = useState(null);
   useEffect(() => {
     supabase
       .from('system_settings')
       .select('setting_value')
-      .eq('setting_key', 'app_download_android')
+      .eq('setting_key', key)
       .single()
       .then(({ data }) => {
         if (!data?.setting_value) return;
@@ -19,7 +19,7 @@ function useLatestApk() {
           setInfo(val);
         } catch {}
       });
-  }, []);
+  }, [key]);
   return info;
 }
 
@@ -30,7 +30,8 @@ function formatBytes(bytes) {
 }
 
 export default function Download() {
-  const apk = useLatestApk();
+  const apk = useSystemSetting('app_download_android');
+  const radioApk = useSystemSetting('app_download_android_radio');
   const [iosSteps, setIosSteps] = useState(false);
   const [desktopSteps, setDesktopSteps] = useState(false);
 
@@ -94,6 +95,35 @@ export default function Download() {
           <p style={hintText}>
             After downloading, open the file and tap <strong>Install</strong>. You may need to allow
             installs from unknown sources in Settings → Security.
+          </p>
+        </div>
+
+        {/* Radio Handset APK */}
+        <div style={cardStyle('#7c3aed22', '#7c3aed')}>
+          <div style={cardHeader}>
+            <Radio size={22} color="#a78bfa" />
+            <span style={{ fontWeight: 700, fontSize: 17 }}>Radio Handset (T320)</span>
+            <span style={{ marginLeft: 'auto', fontSize: 12, color: '#c4b5fd', background: '#2e1065', padding: '2px 8px', borderRadius: 99 }}>
+              APK
+            </span>
+          </div>
+          <p style={cardDesc}>Dedicated radio-mode build for the T320 handset. Auto-launches on boot and stays on the radio screen.</p>
+          {radioApk?.file_url ? (
+            <a
+              href={radioApk.file_url}
+              download="CareCallAI-Radio.apk"
+              style={btnStyle('#7c3aed', '#fff')}
+            >
+              <Download size={16} />
+              Download Radio APK{formatBytes(radioApk.filesize)}
+            </a>
+          ) : (
+            <div style={{ ...btnStyle('#334155', '#64748b'), cursor: 'default' }}>
+              Loading download link…
+            </div>
+          )}
+          <p style={hintText}>
+            Install this instead of the standard APK on dedicated T320 radio handsets only.
           </p>
         </div>
 
