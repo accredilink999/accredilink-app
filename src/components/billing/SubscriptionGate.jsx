@@ -1,15 +1,64 @@
-import { checkOrgAccess, getCurrentOrg, getCurrentOrgRole } from '@/lib/orgContext';
+import { getCurrentOrgRole } from '@/lib/orgContext';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, CreditCard, Clock, Sparkles } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/api/supabaseClient';
+import { useAuth } from '@/lib/AuthContext';
 import PlanSelector from './PlanSelector';
+
+function useOrgAccess() {
+  const { user, isAuthenticated } = useAuth();
+  const { data, isLoading } = useQuery({
+    queryKey: ['subscriptionGate', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data: member } = await supabase
+        .from('organization_members')
+        .select('organization_id, role')
+        .eq('user_id', user.id)
+        .limit(1)
+        .single();
+      if (!member) return null;
+      const { data: org } = await supabase
+        .from('organizations')
+        .select('id, name, plan, is_active, trial_ends_at, stripe_subscription_id')
+        .eq('id', member.organization_id)
+        .single();
+      return { org, role: member.role };
+    },
+    enabled: !!user?.id && isAuthenticated,
+    staleTime: 0,
+    refetchInterval: 60000,
+  });
+
+  if (isLoading || !data) return { active: true, loading: true, org: null, role: null };
+
+  const { org, role } = data;
+  if (!org) return { active: true, loading: false, org: null, role };
+
+  const { plan, is_active, trial_ends_at } = org;
+
+  if (is_active && plan && !['trial', 'cancelled'].includes(plan)) {
+    return { active: true, loading: false, org, role };
+  }
+  if (plan === 'trial') {
+    if (trial_ends_at && new Date(trial_ends_at) > new Date()) {
+      return { active: true, loading: false, org, role };
+    }
+    return { active: false, reason: 'trial_expired', loading: false, org, role };
+  }
+  if (!is_active || plan === 'cancelled') {
+    return { active: false, reason: 'cancelled', loading: false, org, role };
+  }
+  return { active: true, loading: false, org, role };
+}
 
 export default function SubscriptionGate() {
   const navigate = useNavigate();
-  const access = checkOrgAccess();
-  const org = getCurrentOrg();
-  const role = getCurrentOrgRole();
+  const { active, loading, org, role, reason } = useOrgAccess();
+  const access = { active, reason };
 
-  if (access.active) return null;
+  if (loading || access.active) return null;
 
   const isNewUser = access.reason === 'no_subscription';
   const isExpiredTrial = access.reason === 'trial_expired';
