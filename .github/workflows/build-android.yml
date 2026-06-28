@@ -9,11 +9,15 @@ on:
         required: false
         default: ''
 
-  # Auto-trigger when appVersion.js is changed on master
+  # Auto-trigger on any meaningful change to master
   push:
     branches: [master]
     paths:
-      - 'src/lib/appVersion.js'
+      - 'android/**'
+      - 'src/**'
+      - 'public/**'
+      - 'package.json'
+      - '.github/workflows/build-android.yml'
 
 jobs:
   build:
