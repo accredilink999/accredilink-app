@@ -11,6 +11,7 @@ import { LanguageProvider } from '@/lib/LanguageContext';
 import { HelpModeProvider } from '@/lib/HelpModeContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import Login from './pages/Login';
+import Download from './pages/Download';
 import DevicePreview from '@/components/DevicePreview';
 import ErrorCatcher from '@/components/ErrorCatcher';
 import HelpButton from '@/components/HelpButton';
@@ -264,6 +265,9 @@ const AppShell = () => {
     );
   }
   // ────────────────────────────────────────────────────────────────────────
+
+  // Download / install page (no auth required)
+  if (location.pathname === '/download') return <Download />;
 
   // Login page
   if (location.pathname === '/login') return <Login />;

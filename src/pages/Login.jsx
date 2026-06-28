@@ -721,8 +721,18 @@ export default function Login() {
           </form>
         )}
 
+        {/* Download app link */}
+        <div style={{ textAlign: 'center', marginTop: 20 }}>
+          <a
+            href="/download"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#34d399', fontWeight: 600, textDecoration: 'none' }}
+          >
+            📲 Get the App — Android · Desktop · iOS
+          </a>
+        </div>
+
         {/* Privacy & Terms footer — required by App Store & Google Play */}
-        <div style={{ textAlign: 'center', marginTop: 20, paddingTop: 16, borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
+        <div style={{ textAlign: 'center', marginTop: 14, paddingTop: 14, borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` }}>
           <p style={{ fontSize: 12, color: '#94a3b8' }}>
             <a href="https://carecallai.co.uk/privacy" target="_blank" rel="noopener noreferrer" style={{ color: '#64748b', textDecoration: 'underline' }}>Privacy Policy</a>
             {' · '}
