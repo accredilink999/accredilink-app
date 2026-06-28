@@ -253,7 +253,7 @@ export default function OrgSetup({ onComplete }) {
           </button>
 
           <p className={`text-xs text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            30-day free trial. No credit card required.
+            £99/month — everything included, unlimited staff.
           </p>
 
           <p className={`text-xs text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>

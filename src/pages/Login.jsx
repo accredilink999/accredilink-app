@@ -374,7 +374,7 @@ export default function Login() {
                 color: mode === 'signup' ? '#fff' : '#0d9488',
               }}
             >
-              Sign Up
+              Get Started
             </button>
           </div>
         )}
@@ -738,13 +738,19 @@ export default function Login() {
           </form>
         )}
 
-        {/* Download app link */}
-        <div style={{ textAlign: 'center', marginTop: 20 }}>
+        {/* Download + Demo links */}
+        <div style={{ textAlign: 'center', marginTop: 20, display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
           <a
             href="/download"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#34d399', fontWeight: 600, textDecoration: 'none' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#34d399', fontWeight: 600, textDecoration: 'none', background: '#0d948820', border: '1px solid #0d948840', padding: '7px 14px', borderRadius: 8 }}
           >
-            📲 Get the App — Android · Desktop · iOS
+            📲 Get the App
+          </a>
+          <a
+            href="/demo"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#94a3b8', fontWeight: 600, textDecoration: 'none', background: '#1e293b', border: '1px solid #334155', padding: '7px 14px', borderRadius: 8 }}
+          >
+            ▶ Watch Demo
           </a>
         </div>
 
