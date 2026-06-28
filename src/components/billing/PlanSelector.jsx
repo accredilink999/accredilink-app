@@ -68,11 +68,10 @@ export default function PlanSelector() {
             <span className="text-white font-bold text-xl">CC</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">
-            Choose your plan
+            Subscribe to CareCall AI
           </h1>
           <p className="text-slate-500 max-w-lg mx-auto">
-            30-day free trial. No credit card required. All features unlocked.
-            Choose a plan to continue after your trial ends.
+            £99/month — everything included, unlimited staff. Price never increases for existing subscribers.
           </p>
         </div>
 
@@ -167,7 +166,7 @@ export default function PlanSelector() {
                       Redirecting...
                     </span>
                   ) : (
-                    'Start 30-Day Free Trial'
+                    'Subscribe — £99/month'
                   )}
                 </button>
               </div>
@@ -176,10 +175,7 @@ export default function PlanSelector() {
         </div>
 
         <p className="text-center text-xs text-slate-400 mt-6">
-          30-day free trial. No credit card required. Cancel anytime.
-          {annual
-            ? ' After the trial, you\'ll be billed annually. Save 2 months compared to monthly.'
-            : ' After the trial, your chosen plan auto-renews monthly.'}
+          Cancel anytime. Price guaranteed never to increase for existing subscribers.
         </p>
       </div>
     </div>

@@ -271,8 +271,8 @@ const AppShell = () => {
   if (location.pathname === '/download') return <Download />;
   if (location.pathname === '/demo') return <Demo />;
 
-  // Login page
-  if (location.pathname === '/login') return <Login />;
+  // Login / Signup pages
+  if (location.pathname === '/login' || location.pathname === '/signup') return <Login />;
 
   // PIN lock screen — shown when user has a PIN and this session hasn't been unlocked yet
   if (pinLocked && user?.id) {

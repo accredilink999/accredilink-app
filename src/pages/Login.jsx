@@ -4,7 +4,9 @@ import PWAInstallPrompt from '@/components/PWAInstallPrompt'
 import { isBiometricEnabled, authenticateBiometric, getStoredCredential, getBiometricRefreshToken, storeBiometricRefreshToken } from '@/utils/biometric'
 
 export default function Login() {
-  const [mode, setMode] = useState('signin') // 'signin' | 'signup' | 'forgot-password'
+  const [mode, setMode] = useState(
+    typeof window !== 'undefined' && window.location.pathname === '/signup' ? 'signup' : 'signin'
+  ) // 'signin' | 'signup' | 'forgot-password'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
