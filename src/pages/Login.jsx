@@ -309,7 +309,24 @@ export default function Login() {
       overflowY: 'auto',
       WebkitOverflowScrolling: 'touch',
     }}>
-      <div style={{ flex: '0 0 auto' }} />
+      {/* Marketing hero — shown above login card */}
+      <div style={{ textAlign: 'center', marginBottom: 24, maxWidth: 400, width: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 8 }}>
+          <span style={{ fontSize: 22, fontWeight: 800, color: '#f1f5f9' }}>CareCall AI</span>
+        </div>
+        <p style={{ fontSize: 13, color: '#94a3b8', margin: '0 0 14px' }}>
+          Complete care management · Built-in radio · Real-time alerting
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ background: '#0d948820', border: '1px solid #0d948850', color: '#34d399', fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 99 }}>
+            £99/month — everything included
+          </span>
+          <a href="/demo" style={{ background: '#1e293b', border: '1px solid #334155', color: '#94a3b8', fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 99, textDecoration: 'none' }}>
+            ▶ Watch demo
+          </a>
+        </div>
+      </div>
+
       <div style={{
         width: '100%',
         maxWidth: 400,

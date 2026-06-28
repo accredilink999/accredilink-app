@@ -28,27 +28,11 @@ const PLAN_COLORS = {
 const PLANS = [
   {
     key: 'starter',
-    name: 'Starter',
-    price: { monthly: 99, annual: 79 },
-    staff: 'Up to 15 staff',
-    features: 'Rota, care logging, HR, mobile app, bilingual',
-    recommended: false,
-  },
-  {
-    key: 'professional',
-    name: 'Professional',
-    price: { monthly: 199, annual: 159 },
-    staff: 'Up to 30 staff',
-    features: 'Everything in Starter + eMAR, training, AI, family portal',
-    recommended: true,
-  },
-  {
-    key: 'enterprise',
-    name: 'Enterprise',
-    price: { monthly: 349, annual: 279 },
+    name: 'CareCall AI',
+    price: { monthly: 99, annual: 99 },
     staff: 'Unlimited staff',
-    features: 'Everything + CIW/CQC compliance, payroll, multi-area',
-    recommended: false,
+    features: 'Everything included — scheduling, GPS, eMAR, radio, alerter, compliance, reports and every new feature we build',
+    recommended: true,
   },
 ];
 
