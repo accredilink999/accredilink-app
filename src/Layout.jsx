@@ -67,6 +67,7 @@ import {
                                 Phone,
                                 PhoneOff,
                                 Mic,
+                                Radio,
                               } from 'lucide-react';
 
 
@@ -89,6 +90,16 @@ export default function Layout({ children, currentPageName }) {
   const [showAdminPointer, setShowAdminPointer] = useState(false);
   const [showNotifBanner, setShowNotifBanner] = useState(false);
   const { helpMode, setHelpMode } = useHelpMode();
+
+  // Track previous page so logo tap returns user to where they were
+  const prevPageRef = useRef(null);
+  const trackedPageRef = useRef(currentPageName);
+  useEffect(() => {
+    if (currentPageName !== trackedPageRef.current) {
+      prevPageRef.current = trackedPageRef.current;
+      trackedPageRef.current = currentPageName;
+    }
+  }, [currentPageName]);
 
 
   
@@ -125,6 +136,18 @@ export default function Layout({ children, currentPageName }) {
   const queryClient = useQueryClient();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.job_title === 'admin' || user?.job_title === 'manager' || user?.job_title === 'supervisor';
   const isSuperAdmin = user?.role === 'super_admin';
+
+  const { data: radioEnabled } = useQuery({
+    queryKey: ['radioSettings'],
+    queryFn: async () => {
+      try {
+        const { data } = await supabase.from('radio_settings').select('is_enabled').limit(1).single();
+        return data?.is_enabled || false;
+      } catch { return false; }
+    },
+    staleTime: 0,
+    refetchInterval: 30000,
+  });
 
   // Auto-promote first admin to super_admin if none exists
   React.useEffect(() => {
@@ -1054,7 +1077,13 @@ export default function Layout({ children, currentPageName }) {
               <span className="text-red-600 font-bold text-4xl flash-red flex-shrink-0">!</span>
             )}
             {!hasWeatherWarning && companySettings?.company_logo && (
-              <img src={companySettings.company_logo} alt="Company logo" className="h-[83px] max-w-full w-auto object-contain" />
+              <button
+                onClick={() => navigate(createPageUrl(prevPageRef.current || 'Dashboard'))}
+                className="touch-manipulation focus:outline-none"
+                aria-label="Go back"
+              >
+                <img src={companySettings.company_logo} alt="Company logo" className="h-[83px] max-w-full w-auto object-contain" />
+              </button>
             )}
             {hasWeatherWarning && (
               <Link to={createPageUrl('Messages')} className="font-semibold truncate text-red-600 flash-red">
@@ -1287,6 +1316,17 @@ export default function Layout({ children, currentPageName }) {
                         unreadAssetsCount={openIncidents.length}
                         isControlDevice={!!user?.is_control_device}
                       />
+
+                      {/* Floating Radio button — visible on all pages when radio is enabled */}
+                      {radioEnabled && !user?.is_control_device && currentPageName !== 'TwoWayRadio' && (
+                        <button
+                          onClick={() => navigate(createPageUrl('TwoWayRadio'))}
+                          className="fixed bottom-20 right-4 z-[9998] w-12 h-12 rounded-full bg-slate-900 text-green-400 shadow-lg flex items-center justify-center hover:bg-slate-700 active:scale-95 transition-all touch-manipulation"
+                          aria-label="Open Radio"
+                        >
+                          <Radio className="w-5 h-5" />
+                        </button>
+                      )}
 
                       {user?.id && <ActiveShiftAutoOpen userId={user.id} />}
                       <OfflineManager />
