@@ -107,11 +107,20 @@ export default function Download() {
             </span>
           </div>
           <p style={cardDesc}>Install as a desktop app via Chrome or Edge.</p>
-          <button
-            onClick={() => setDesktopSteps(v => !v)}
+          <a
+            href="https://app.carecallai.co.uk"
+            target="_blank"
+            rel="noopener noreferrer"
             style={btnStyle('#1d4ed8', '#fff')}
           >
-            {desktopSteps ? 'Hide steps' : 'How to install'}
+            <Monitor size={16} />
+            Open in Browser
+          </a>
+          <button
+            onClick={() => setDesktopSteps(v => !v)}
+            style={{ ...btnStyle('transparent', '#60a5fa'), border: '1px solid #1d4ed844', marginTop: 8 }}
+          >
+            {desktopSteps ? 'Hide install steps' : 'How to install as an app'}
           </button>
           {desktopSteps && (
             <ol style={stepsList}>
@@ -133,11 +142,20 @@ export default function Download() {
             </span>
           </div>
           <p style={cardDesc}>Add to your home screen via Safari.</p>
-          <button
-            onClick={() => setIosSteps(v => !v)}
+          <a
+            href="https://app.carecallai.co.uk"
+            target="_blank"
+            rel="noopener noreferrer"
             style={btnStyle('#3f3f46', '#fff')}
           >
-            {iosSteps ? 'Hide steps' : 'How to install'}
+            <Apple size={16} />
+            Open in Safari
+          </a>
+          <button
+            onClick={() => setIosSteps(v => !v)}
+            style={{ ...btnStyle('transparent', '#a1a1aa'), border: '1px solid #71717a44', marginTop: 8 }}
+          >
+            {iosSteps ? 'Hide install steps' : 'How to add to Home Screen'}
           </button>
           {iosSteps && (
             <ol style={stepsList}>
