@@ -952,7 +952,8 @@ export default function Layout({ children, currentPageName }) {
   const currentOrg = getCurrentOrg();
   const showOwnerWelcome = orgRole === 'owner' && currentOrg && !currentOrg.owner_onboarded && !ownerWelcomeDismissed;
   if (showOwnerWelcome) {
-    return <OwnerWelcomeModal onComplete={() => { setOwnerWelcomeDismissed(true); setShowAdminPointer(true); }} />;
+    const dismissWizard = () => { setOwnerWelcomeDismissed(true); setShowAdminPointer(true); };
+    return <OwnerWelcomeModal onComplete={dismissWizard} onSkip={dismissWizard} />;
   }
 
   // Show unacknowledged announcement modal (non-admin staff only — admins must not be locked out)

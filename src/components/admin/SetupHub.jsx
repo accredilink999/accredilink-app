@@ -4,12 +4,13 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/api/supabaseClient';
 import { getCurrentOrgId, getCurrentOrg } from '@/lib/orgContext';
 import { createPageUrl } from '@/utils';
+import OwnerWelcomeModal from '@/components/OwnerWelcomeModal';
 import {
   CheckCircle2, Circle, ChevronDown, ChevronRight,
   Building2, Users, Calendar, Radio, Bell,
   Briefcase, PoundSterling, GraduationCap,
   Shield, FileText, Database, Cpu,
-  ExternalLink, AlertCircle, SquareCheck,
+  ExternalLink, AlertCircle, Wand2,
 } from 'lucide-react';
 
 // ─── Manual checkbox persistence ─────────────────────────────────────────────
@@ -333,8 +334,9 @@ export default function SetupHub() {
   const orgId   = getCurrentOrgId();
   const navigate = useNavigate();
 
-  const [manual, setManual] = useState(() => getManual(orgId));
+  const [manual, setManual]       = useState(() => getManual(orgId));
   const [collapsed, setCollapsed] = useState({});
+  const [showWizard, setShowWizard] = useState(false);
 
   const toggleManual = (id) => {
     const next = { ...manual, [id]: !manual[id] };
@@ -382,6 +384,14 @@ export default function SetupHub() {
   return (
     <div className="space-y-4 max-w-3xl mx-auto pb-8">
 
+      {/* ── Wizard modal ── */}
+      {showWizard && (
+        <OwnerWelcomeModal
+          onComplete={() => setShowWizard(false)}
+          onSkip={() => setShowWizard(false)}
+        />
+      )}
+
       {/* ── Header ── */}
       <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-5 text-white">
         <div className="flex items-start justify-between gap-4 mb-4">
@@ -397,12 +407,20 @@ export default function SetupHub() {
             <p className="text-slate-400 text-xs">core complete</p>
           </div>
         </div>
-        <div className="h-2.5 rounded-full bg-slate-700 overflow-hidden">
+        <div className="h-2.5 rounded-full bg-slate-700 overflow-hidden mb-4">
           <div
             className="h-full rounded-full bg-gradient-to-r from-teal-400 to-teal-500 transition-all duration-700"
             style={{ width: `${pct}%` }}
           />
         </div>
+        <button
+          onClick={() => setShowWizard(true)}
+          className="flex items-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors text-white border border-white/20 w-full justify-center"
+        >
+          <Wand2 className="w-4 h-4 text-teal-400" />
+          Launch Setup Wizard
+          <span className="text-slate-400 text-xs ml-1">— guided walkthrough, skip any step</span>
+        </button>
         {pct === 100 && (
           <p className="mt-3 text-teal-400 text-sm font-medium flex items-center gap-1.5">
             <CheckCircle2 className="w-4 h-4" /> Core setup complete — explore optional features below to go further!
