@@ -35,7 +35,7 @@ export default function HeaderIcons({ user, isAdmin, totalAdminTasks, unreadNoti
       )}
 
       {/* Notifications */}
-      <Link to={createPageUrl('Messages')} className="relative cursor-pointer hover:opacity-75">
+      <Link to={createPageUrl('NotificationCenter')} className="relative cursor-pointer hover:opacity-75">
         <Bell className={cn("w-6 h-6 text-red-600 fill-red-600", unreadNotificationCount > 0 && "animate-pulse")} />
         {unreadNotificationCount > 0 && (
           <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">

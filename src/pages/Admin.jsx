@@ -6,12 +6,13 @@ import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { toast } from 'sonner';
 import {
-  Heart, UserCog, ClipboardCheck, Calendar, MessageCircle,
+  Heart, UserCog, ClipboardCheck, Calendar,
   Briefcase, PoundSterling,
   CalendarClock, GraduationCap, Shield, Users, Grid3x3,
   Archive, CheckSquare,
   Activity, Building2, Star, Trophy,
   ChevronDown, ChevronUp, SlidersHorizontal, ListChecks, Smartphone, Send, Loader2,
+
 } from 'lucide-react';
 
 // ─── PRIMARY tiles — shown always ────────────────────────────────────────────
@@ -87,7 +88,6 @@ const PRIMARY = [
 const MORE = [
   { to: 'ClinicalDashboard',label: 'Clinical',     icon: Activity,        bg: 'from-rose-500 to-rose-700',    desc: 'Clinical dashboard' },
   { to: 'WorkCalendar',     label: 'Calendar',     icon: CalendarClock,   bg: 'from-indigo-300 to-indigo-500', desc: 'Work calendar' },
-  { to: 'Messages',         label: 'Messages',     icon: MessageCircle,   bg: 'from-pink-400 to-pink-600',    desc: 'Staff communications' },
   { to: 'Archive',          label: 'Archive',      icon: Archive,         bg: 'from-slate-400 to-slate-600',  desc: 'Archived records' },
   { to: 'StaffAwards',      label: 'Awards',       icon: Trophy,          bg: 'from-amber-400 to-yellow-500', desc: 'Recognise staff' },
   { to: 'Feedback',         label: 'Feedback',     icon: Star,            bg: 'from-yellow-400 to-amber-500', desc: 'Client feedback' },

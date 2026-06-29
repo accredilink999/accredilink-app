@@ -1088,9 +1088,9 @@ export default function Layout({ children, currentPageName }) {
               </button>
             )}
             {hasWeatherWarning && (
-              <Link to={createPageUrl('Messages')} className="font-semibold truncate text-red-600 flash-red">
+              <span className="font-semibold truncate text-red-600 flash-red">
                 ⚠ Weather Alert
-              </Link>
+              </span>
             )}
             {unreadNotificationCount > 0 && (
               <span className="text-blue-600 font-bold text-5xl flash-blue flex-shrink-0">!</span>
@@ -1099,7 +1099,7 @@ export default function Layout({ children, currentPageName }) {
 
           {/* Right: Bell, Admin, Help */}
           <div className="flex items-center gap-1.5 relative z-10">
-            <Link to={createPageUrl('Messages')} className="relative touch-manipulation p-1">
+            <Link to={createPageUrl('NotificationCenter')} className="relative touch-manipulation p-1">
               <Bell className={cn("w-5 h-5 text-red-600 fill-red-600", unreadNotificationCount > 0 && "animate-pulse")} />
               {unreadNotificationCount > 0 && (
                 <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
