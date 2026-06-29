@@ -89,13 +89,25 @@ const PRIMARY = [
     bg: 'from-rose-500 to-rose-700',
     desc: 'Clinical dashboard',
   },
+  {
+    to: 'WorkCalendar',
+    label: 'Calendar',
+    icon: CalendarClock,
+    bg: 'from-indigo-300 to-indigo-500',
+    desc: 'Work calendar',
+  },
+  {
+    to: 'Archive',
+    label: 'Archive',
+    icon: Archive,
+    bg: 'from-slate-400 to-slate-600',
+    desc: 'Archived records',
+  },
 ];
 
 // ─── MORE tiles — collapsed by default ───────────────────────────────────────
 const MORE = [
-  { to: 'WorkCalendar',     label: 'Calendar',     icon: CalendarClock,   bg: 'from-indigo-300 to-indigo-500', desc: 'Work calendar' },
-  { to: 'Archive',          label: 'Archive',      icon: Archive,         bg: 'from-slate-400 to-slate-600',  desc: 'Archived records' },
-  { to: 'StaffAwards',      label: 'Awards',       icon: Trophy,          bg: 'from-amber-400 to-yellow-500', desc: 'Recognise staff' },
+  { to: 'StaffAwards', label: 'Awards', icon: Trophy, bg: 'from-amber-400 to-yellow-500', desc: 'Recognise staff' },
 ];
 
 // ─── Tile component ───────────────────────────────────────────────────────────
