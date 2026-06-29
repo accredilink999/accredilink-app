@@ -11,7 +11,7 @@ import {
   CalendarClock, GraduationCap, Shield, Users, Grid3x3,
   Archive, CheckSquare,
   Activity, Building2, Trophy,
-  ChevronDown, ChevronUp, SlidersHorizontal, ListChecks, Smartphone, Send, Loader2,
+  SlidersHorizontal, ListChecks, Smartphone, Send, Loader2,
 
 } from 'lucide-react';
 
@@ -103,11 +103,13 @@ const PRIMARY = [
     bg: 'from-slate-400 to-slate-600',
     desc: 'Archived records',
   },
-];
-
-// ─── MORE tiles — collapsed by default ───────────────────────────────────────
-const MORE = [
-  { to: 'StaffAwards', label: 'Awards', icon: Trophy, bg: 'from-amber-400 to-yellow-500', desc: 'Recognise staff' },
+  {
+    to: 'StaffAwards',
+    label: 'Awards',
+    icon: Trophy,
+    bg: 'from-amber-400 to-yellow-500',
+    desc: 'Recognise staff',
+  },
 ];
 
 // ─── Tile component ───────────────────────────────────────────────────────────
@@ -133,8 +135,6 @@ function Tile({ to, label, icon: Icon, bg, desc, badge }) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function AdminDashboard() {
-  const [showMore, setShowMore] = useState(false);
-
   const { data: user } = useQuery({
     queryKey: ['currentUser'],
     queryFn: () => base44.auth.me(),
@@ -151,7 +151,6 @@ export default function AdminDashboard() {
 
   const isSuperAdmin = user?.role === 'super_admin';
   const pendingCount = pendingSwaps.length + pendingLeave.length;
-  const moreTiles = MORE.filter(t => !t.superAdminOnly || isSuperAdmin);
 
   const { data: allStaff = [] } = useQuery({
     queryKey: ['allStaff'],
@@ -237,23 +236,6 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      {/* More toggle */}
-      <button
-        onClick={() => setShowMore(v => !v)}
-        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-500 font-medium hover:bg-slate-50 transition-colors mb-2"
-      >
-        {showMore ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-        {showMore ? 'Show less' : `More tools (${moreTiles.length})`}
-      </button>
-
-      {/* More grid */}
-      {showMore && (
-        <div className="grid grid-cols-3 gap-2.5">
-          {moreTiles.map(t => (
-            <Tile key={t.to} {...t} />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
