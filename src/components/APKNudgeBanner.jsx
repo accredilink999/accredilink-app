@@ -14,7 +14,7 @@ function isAndroidBrowser() {
   if (/iPad|iPhone|iPod/.test(ua)) return false;                   // never iOS
   if (document.referrer?.startsWith('android-app://')) return false; // TWA/APK launch
   if (window.__CARECALL_NATIVE__) return false;                    // native wrapper flag
-  if (window.matchMedia('(display-mode: standalone)').matches) return false; // already installed as PWA
+  // PWA standalone users DO see the banner — they're the upgrade target
   // Exclude desktop browsers — Android UA won't be on desktop but belt-and-braces
   if (!/Mobi|Mobile/i.test(ua)) return false;
   return true;
