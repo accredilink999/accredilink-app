@@ -7,9 +7,9 @@ import { supabase } from '@/api/supabaseClient';
 import { toast } from 'sonner';
 import {
   Heart, UserCog, ClipboardCheck, Calendar, MessageCircle,
-  FolderOpen, Briefcase, PoundSterling, BarChart3, FileEdit,
+  Briefcase, PoundSterling, BarChart3,
   CalendarClock, GraduationCap, Receipt, Shield, Users, Grid3x3,
-  Archive, Bot, CheckSquare,
+  Archive, CheckSquare,
   Activity, Building2, Star, Scale, ImagePlus, Trophy,
   ChevronDown, ChevronUp, SlidersHorizontal, ListChecks, Smartphone, Send, Loader2,
 } from 'lucide-react';
@@ -87,10 +87,7 @@ const PRIMARY = [
 const MORE = [
   { to: 'Invoicing',        label: 'Invoicing',    icon: Receipt,         bg: 'from-teal-400 to-teal-600',    desc: 'Client invoices' },
   { to: 'Payroll',          label: 'Payroll',      icon: PoundSterling,   bg: 'from-emerald-400 to-emerald-600', desc: 'Pay & payslips', superAdminOnly: true },
-  { to: 'DocumentManagement', label: 'Documents',  icon: FolderOpen,      bg: 'from-indigo-400 to-indigo-600', desc: 'Policies & HR docs' },
   { to: 'ClinicalDashboard',label: 'Clinical',     icon: Activity,        bg: 'from-rose-500 to-rose-700',    desc: 'Clinical dashboard' },
-  { to: 'AIAssistant',      label: 'AI Assistant', icon: Bot,             bg: 'from-purple-400 to-purple-600', desc: 'AI admin helper' },
-  { to: 'FormBuilder',      label: 'Forms',        icon: FileEdit,        bg: 'from-fuchsia-400 to-fuchsia-600', desc: 'Custom form builder' },
   { to: 'WorkCalendar',     label: 'Calendar',     icon: CalendarClock,   bg: 'from-indigo-300 to-indigo-500', desc: 'Work calendar' },
   { to: 'Messages',         label: 'Messages',     icon: MessageCircle,   bg: 'from-pink-400 to-pink-600',    desc: 'Staff communications' },
   { to: 'Archive',          label: 'Archive',      icon: Archive,         bg: 'from-slate-400 to-slate-600',  desc: 'Archived records' },
