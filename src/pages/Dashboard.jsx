@@ -466,8 +466,11 @@ export default function Dashboard() {
       )}
 
       {/* Admin Notifications Centre — collapsed by default, expandable */}
-      {(unreadNotifications.length > 0 || unacknowledgedAnnouncements.length > 0) && (() => {
-        const totalCount = unreadNotifications.length + unacknowledgedAnnouncements.length;
+      {(() => {
+        const pendingSwapsMe = mySwapRequests.filter(r => !['approved', 'rejected', 'declined'].includes(r.status));
+        const pendingClaimsMe = myClaimRequests.filter(r => r.status === 'pending');
+        const totalCount = unreadNotifications.length + unacknowledgedAnnouncements.length + totalAdminTasks + incomingSwapRequests.length + pendingSwapsMe.length + pendingClaimsMe.length;
+        if (totalCount === 0) return null;
         return (
           <div className="rounded-xl overflow-hidden shadow-sm border border-teal-200">
             <button
@@ -487,9 +490,7 @@ export default function Dashboard() {
                   <Link to={createPageUrl('NotificationCenter')}>
                     <div className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-teal-50 transition-colors border border-teal-100">
                       <Bell className="w-5 h-5 text-teal-500 flex-shrink-0" />
-                      <span className="text-sm font-medium flex-1">
-                        {unreadNotifications.length} unread notification{unreadNotifications.length > 1 ? 's' : ''}
-                      </span>
+                      <span className="text-sm font-medium flex-1">{unreadNotifications.length} unread notification{unreadNotifications.length > 1 ? 's' : ''}</span>
                       <Badge className="bg-teal-600 text-white text-xs flex-shrink-0">View</Badge>
                     </div>
                   </Link>
@@ -498,13 +499,82 @@ export default function Dashboard() {
                   <Link to={createPageUrl('NotificationCenter')}>
                     <div className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-amber-50 transition-colors border border-amber-100">
                       <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0" />
-                      <span className="text-sm font-medium flex-1">
-                        {unacknowledgedAnnouncements.length} announcement{unacknowledgedAnnouncements.length > 1 ? 's' : ''} to acknowledge
-                      </span>
+                      <span className="text-sm font-medium flex-1">{unacknowledgedAnnouncements.length} announcement{unacknowledgedAnnouncements.length > 1 ? 's' : ''} to acknowledge</span>
                       <Badge className="bg-amber-500 text-white text-xs flex-shrink-0">Action</Badge>
                     </div>
                   </Link>
                 )}
+                {openIncidents.length > 0 && (
+                  <Link to={createPageUrl('Incidents')}>
+                    <div className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-red-50 transition-colors border border-red-100">
+                      <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                      <span className="text-sm font-medium flex-1">{openIncidents.length} open incident{openIncidents.length > 1 ? 's' : ''}</span>
+                      <Badge className="bg-red-500 text-white text-xs flex-shrink-0">{openIncidents.length}</Badge>
+                    </div>
+                  </Link>
+                )}
+                {pendingLeave.length > 0 && isAdmin && (
+                  <Link to={createPageUrl('LeaveRequests')}>
+                    <div className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-amber-50 transition-colors border border-amber-100">
+                      <FileText className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                      <span className="text-sm font-medium flex-1">{pendingLeave.length} pending leave request{pendingLeave.length > 1 ? 's' : ''}</span>
+                      <Badge className="bg-amber-500 text-white text-xs flex-shrink-0">{pendingLeave.length}</Badge>
+                    </div>
+                  </Link>
+                )}
+                {pendingClaimsAdmin.length > 0 && isAdmin && (
+                  <Link to={createPageUrl('RequestsManagement')}>
+                    <div className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-purple-50 transition-colors border border-purple-100">
+                      <Hand className="w-5 h-5 text-purple-500 flex-shrink-0" />
+                      <span className="text-sm font-medium flex-1">{pendingClaimsAdmin.length} pending shift claim{pendingClaimsAdmin.length > 1 ? 's' : ''}</span>
+                      <Badge className="bg-purple-500 text-white text-xs flex-shrink-0">{pendingClaimsAdmin.length}</Badge>
+                    </div>
+                  </Link>
+                )}
+                {pendingSwapsAdmin.length > 0 && isAdmin && (
+                  <Link to={createPageUrl('RequestsManagement')}>
+                    <div className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-blue-50 transition-colors border border-blue-100">
+                      <ArrowRightLeft className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                      <span className="text-sm font-medium flex-1">{pendingSwapsAdmin.length} shift swap{pendingSwapsAdmin.length > 1 ? 's' : ''} awaiting approval</span>
+                      <Badge className="bg-blue-500 text-white text-xs flex-shrink-0">{pendingSwapsAdmin.length}</Badge>
+                    </div>
+                  </Link>
+                )}
+                {incomingSwapRequests.map(swap => (
+                  <div key={swap.id} onClick={() => setSelectedSwapRequest(swap)}
+                    className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-yellow-50 transition-colors border border-yellow-100 cursor-pointer">
+                    <ArrowRightLeft className="w-5 h-5 text-yellow-500 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-900 truncate">{swap.requester_name} wants to swap shifts with you</p>
+                      <p className="text-xs text-slate-500">{swap.shift_date} &bull; {swap.shift_time}</p>
+                    </div>
+                    <Badge className="bg-yellow-500 text-white text-xs flex-shrink-0">Respond</Badge>
+                  </div>
+                ))}
+                {pendingSwapsMe.map(swap => (
+                  <div key={swap.id} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-100">
+                    <ArrowRightLeft className="w-5 h-5 text-blue-400 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-900 truncate">Swap with {swap.swap_with_name} — {swap.shift_date}</p>
+                      <p className="text-xs text-slate-500">
+                        {swap.status === 'pending_target' ? `Awaiting ${swap.swap_with_name}'s response` : 'Accepted — awaiting admin approval'}
+                      </p>
+                    </div>
+                    <Badge className={`text-xs flex-shrink-0 ${swap.status === 'pending_target' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
+                      {swap.status === 'pending_target' ? 'Pending' : 'With Admin'}
+                    </Badge>
+                  </div>
+                ))}
+                {pendingClaimsMe.map(claim => (
+                  <div key={claim.id} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-100">
+                    <Hand className="w-5 h-5 text-purple-400 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-900 truncate">{claim.shift_name || 'Shift'} — {claim.shift_date}</p>
+                      <p className="text-xs text-slate-500">{claim.shift_time} &bull; Awaiting admin approval</p>
+                    </div>
+                    <Badge className="bg-purple-100 text-purple-700 text-xs flex-shrink-0">Pending</Badge>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -531,12 +601,8 @@ export default function Dashboard() {
                 <div className="flex items-center gap-3 p-3 bg-white/80 rounded-lg hover:bg-white transition-colors">
                   <Calendar className="w-5 h-5 text-green-500" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-900">
-                      {format(parseISO(date), 'EEE d MMM')}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {shifts.length} shift{shifts.length > 1 ? 's' : ''} available
-                    </p>
+                    <p className="text-sm font-medium text-slate-900">{format(parseISO(date), 'EEE d MMM')}</p>
+                    <p className="text-xs text-slate-500">{shifts.length} shift{shifts.length > 1 ? 's' : ''} available</p>
                   </div>
                   <Badge variant="secondary" className="bg-green-100 text-green-700 text-xs flex-shrink-0">Claim</Badge>
                 </div>
@@ -544,149 +610,9 @@ export default function Dashboard() {
             ))}
             {Object.keys(availableShifts.reduce((acc, s) => { acc[s.date] = true; return acc; }, {})).length > 5 && (
               <Link to={createPageUrl('Rota')}>
-                <div className="text-center text-sm text-green-600 font-medium py-1">
-                  View all available shifts
-                </div>
+                <div className="text-center text-sm text-green-600 font-medium py-1">View all available shifts</div>
               </Link>
             )}
-          </div>
-        </Card>
-      )}
-
-      {/* Alerts Banner */}
-      {totalAdminTasks > 0 &&
-      <Card className="bg-gradient-to-br text-card-foreground p-4 rounded-md sm:p-5 from-amber-50 to-orange-50 border-0 shadow-sm">
-          <HelpTip tip="Important alerts and announcements that need your attention.">
-            <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2 text-sm sm:text-base">
-              <Bell className="w-4 h-4 text-amber-600 flex-shrink-0" />
-              Attention Required
-              <Badge variant="secondary" className="bg-red-500 text-white text-xs ml-auto">{totalAdminTasks}</Badge>
-            </h3>
-          </HelpTip>
-          <div className="space-y-2">
-            {openIncidents.length > 0 &&
-          <Link to={createPageUrl('Incidents')}>
-                <div className="flex items-center gap-3 p-3 bg-white/80 rounded-lg hover:bg-white transition-colors">
-                  <AlertTriangle className="w-5 h-5 text-red-500" />
-                  <span className="text-sm font-medium flex-1">{openIncidents.length} open incident{openIncidents.length > 1 ? 's' : ''}</span>
-                  <Badge variant="secondary" className="bg-red-100 text-red-700 text-xs flex-shrink-0">{openIncidents.length}</Badge>
-                </div>
-              </Link>
-          }
-            {pendingLeave.length > 0 && isAdmin &&
-          <Link to={createPageUrl('LeaveRequests')}>
-                <div className="flex items-center gap-3 p-3 bg-white/80 rounded-lg hover:bg-white transition-colors">
-                  <FileText className="w-5 h-5 text-amber-500" />
-                  <span className="text-sm font-medium flex-1">{pendingLeave.length} pending leave request{pendingLeave.length > 1 ? 's' : ''}</span>
-                  <Badge variant="secondary" className="bg-amber-100 text-amber-700 text-xs flex-shrink-0">{pendingLeave.length}</Badge>
-                </div>
-              </Link>
-          }
-            {pendingClaimsAdmin.length > 0 && isAdmin &&
-          <Link to={createPageUrl('RequestsManagement')}>
-                <div className="flex items-center gap-3 p-3 bg-white/80 rounded-lg hover:bg-white transition-colors">
-                  <Hand className="w-5 h-5 text-purple-500" />
-                  <span className="text-sm font-medium flex-1">{pendingClaimsAdmin.length} pending shift claim{pendingClaimsAdmin.length > 1 ? 's' : ''}</span>
-                  <Badge variant="secondary" className="bg-purple-100 text-purple-700 text-xs flex-shrink-0">{pendingClaimsAdmin.length}</Badge>
-                </div>
-              </Link>
-          }
-            {pendingSwapsAdmin.length > 0 && isAdmin &&
-          <Link to={createPageUrl('RequestsManagement')}>
-                <div className="flex items-center gap-3 p-3 bg-white/80 rounded-lg hover:bg-white transition-colors">
-                  <ArrowRightLeft className="w-5 h-5 text-blue-500" />
-                  <span className="text-sm font-medium flex-1">{pendingSwapsAdmin.length} shift swap{pendingSwapsAdmin.length > 1 ? 's' : ''} awaiting approval</span>
-                  <Badge variant="secondary" className="bg-blue-100 text-blue-700 text-xs flex-shrink-0">{pendingSwapsAdmin.length}</Badge>
-                </div>
-              </Link>
-          }
-          </div>
-        </Card>
-      }
-
-      {/* Incoming Shift Swap Requests — target staff needs to respond */}
-      {incomingSwapRequests.length > 0 && (
-        <Card className="p-4 sm:p-5 bg-gradient-to-br from-yellow-50 to-amber-50 border-0 shadow-sm">
-          <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2 text-sm sm:text-base">
-            <ArrowRightLeft className="w-4 h-4 text-yellow-600 flex-shrink-0" />
-            Shift Swap Request{incomingSwapRequests.length > 1 ? 's' : ''}
-          </h3>
-          <div className="space-y-2">
-            {incomingSwapRequests.map(swap => (
-              <div
-                key={swap.id}
-                onClick={() => setSelectedSwapRequest(swap)}
-                className="flex items-center gap-3 p-3 bg-white/80 rounded-lg hover:bg-white transition-colors cursor-pointer"
-              >
-                <ArrowRightLeft className="w-5 h-5 text-yellow-500" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900 truncate">
-                    {swap.requester_name} wants to swap shifts with you
-                  </p>
-                  <p className="text-xs text-slate-500">{swap.shift_date} &bull; {swap.shift_time}</p>
-                </div>
-                <Badge className="bg-yellow-100 text-yellow-700 text-xs flex-shrink-0">Action Needed</Badge>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      {/* My outgoing swap request status updates */}
-      {mySwapRequests.filter(r => !['approved', 'rejected', 'declined'].includes(r.status)).length > 0 && (
-        <Card className="p-4 sm:p-5 bg-gradient-to-br from-blue-50 to-indigo-50 border-0 shadow-sm">
-          <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2 text-sm sm:text-base">
-            <ArrowRightLeft className="w-4 h-4 text-blue-600 flex-shrink-0" />
-            Your Swap Requests
-          </h3>
-          <div className="space-y-2">
-            {mySwapRequests.filter(r => !['approved', 'rejected', 'declined'].includes(r.status)).map(swap => (
-              <div key={swap.id} className="flex items-center gap-3 p-3 bg-white/80 rounded-lg">
-                <ArrowRightLeft className="w-5 h-5 text-blue-500" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900 truncate">
-                    Swap with {swap.swap_with_name} — {swap.shift_date}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {swap.status === 'pending_target' && `Awaiting ${swap.swap_with_name}'s response`}
-                    {swap.status === 'pending_admin' && 'Accepted — awaiting admin approval'}
-                    {swap.status === 'accepted' && 'Accepted — awaiting admin approval'}
-                  </p>
-                </div>
-                <Badge className={`text-xs flex-shrink-0 ${
-                  swap.status === 'pending_target' ? 'bg-orange-100 text-orange-700' :
-                  'bg-blue-100 text-blue-700'
-                }`}>
-                  {swap.status === 'pending_target' ? 'Pending' : 'With Admin'}
-                </Badge>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      {/* My shift claim request status updates */}
-      {myClaimRequests.filter(r => r.status === 'pending').length > 0 && (
-        <Card className="p-4 sm:p-5 bg-gradient-to-br from-purple-50 to-indigo-50 border-0 shadow-sm">
-          <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2 text-sm sm:text-base">
-            <Hand className="w-4 h-4 text-purple-600 flex-shrink-0" />
-            Your Shift Claims
-          </h3>
-          <div className="space-y-2">
-            {myClaimRequests.filter(r => r.status === 'pending').map(claim => (
-              <div key={claim.id} className="flex items-center gap-3 p-3 bg-white/80 rounded-lg">
-                <Hand className="w-5 h-5 text-purple-500" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900 truncate">
-                    {claim.shift_name || 'Shift'} — {claim.shift_date}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {claim.shift_time} &bull; Awaiting admin approval
-                  </p>
-                </div>
-                <Badge className="bg-purple-100 text-purple-700 text-xs flex-shrink-0">Pending</Badge>
-              </div>
-            ))}
           </div>
         </Card>
       )}
