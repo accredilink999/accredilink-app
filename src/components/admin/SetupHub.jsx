@@ -133,13 +133,15 @@ async function fetchHubData(orgId) {
 }
 
 // ─── Group definitions ────────────────────────────────────────────────────────
+// optional: true  →  not counted in the core % score; shown with "Optional" tag
 function buildGroups(d, manual, toggle) {
   if (!d) return [];
 
-  const m = (id) => ({
+  const m = (id, extra = {}) => ({
     done: !!manual[id],
     manual: true,
     onToggle: () => toggle(id),
+    ...extra,
   });
 
   return [
@@ -149,9 +151,9 @@ function buildGroups(d, manual, toggle) {
       icon: Building2,
       color: 'teal',
       items: [
-        { id: 'org_name',   label: 'Company name set',      done: !!d.org?.name,      action: 'Settings',  note: 'Used on reports, invoices and staff comms' },
-        { id: 'org_logo',   label: 'Logo uploaded',          done: !!d.org?.logo_url,   action: 'Settings',  note: 'Appears on PDFs and the app header' },
-        { id: 'billing',    label: 'Subscription active',    done: d.org?.is_active && d.org?.plan !== 'pending', action: 'Settings', note: '£99/month · unlimited staff · all features' },
+        { id: 'org_name', label: 'Company name set',   done: !!d.org?.name,                                        action: 'Settings' },
+        { id: 'org_logo', label: 'Logo uploaded',       done: !!d.org?.logo_url,                                    action: 'Settings',  optional: true, note: 'Appears on PDFs and the app header' },
+        { id: 'billing',  label: 'Subscription active', done: !!(d.org?.is_active && d.org?.plan !== 'pending'),    action: 'Settings',  note: '£99/month · unlimited staff · all features' },
       ],
     },
     {
@@ -160,16 +162,16 @@ function buildGroups(d, manual, toggle) {
       icon: Users,
       color: 'blue',
       items: [
-        { id: 'areas',       label: `Rota areas created (${d.areasCount})`,         done: d.areasCount > 0,           action: 'RotaManagement', note: 'Geographic or service areas staff are assigned to' },
-        { id: 'shift_types', label: `Shift types configured (${d.shiftTypesCount})`, done: d.shiftTypesCount > 0,      action: 'ShiftTypesManagement' },
-        { id: 'call_types',  label: `Call types defined (${d.callTypesCount})`,      done: d.callTypesCount > 0,       action: 'CallTypesManagement' },
-        { id: 'staff',       label: `Staff added (${d.staffCount} member${d.staffCount !== 1 ? 's' : ''})`, done: d.staffCount > 1, action: 'StaffManagement', note: 'Invite staff via email or share the invite link' },
-        { id: 'roles',       label: 'Staff roles & job titles assigned',             done: d.staffWithJobTitle >= Math.max(1, d.staffCount - 1), action: 'StaffManagement' },
-        { id: 'rota_perms',  label: 'Rota area permissions set per staff',           done: d.rotaPermsCount > 0,       action: 'StaffManagement', note: 'Controls which areas each staff member can work in' },
-        { id: 'clients',     label: `Clients / service users added (${d.serviceUsersCount})`, done: d.serviceUsersCount > 0, action: 'ClientManagement' },
-        { id: 'clients_area',label: 'Clients assigned to rota areas',               done: d.serviceUsersWithArea >= d.serviceUsersCount && d.serviceUsersCount > 0, action: 'ClientManagement' },
-        { id: 'client_calls',label: `Client call schedules configured (${d.clientCallsCount})`, done: d.clientCallsCount > 0, action: 'ClientManagement', note: 'Scheduled care times per client that drive the rota' },
-        { id: 'care_teams',  label: `Care teams created (${d.careTeamsCount})`,     done: d.careTeamsCount > 0,       action: 'CareTeamManagement', note: 'Optional — groups staff into teams per client or area' },
+        { id: 'areas',        label: `Rota areas created (${d.areasCount})`,                          done: d.areasCount > 0,              action: 'RotaManagement' },
+        { id: 'shift_types',  label: `Shift types configured (${d.shiftTypesCount})`,                 done: d.shiftTypesCount > 0,         action: 'ShiftTypesManagement' },
+        { id: 'call_types',   label: `Call types defined (${d.callTypesCount})`,                      done: d.callTypesCount > 0,          action: 'CallTypesManagement' },
+        { id: 'staff',        label: `Staff added (${d.staffCount} member${d.staffCount !== 1 ? 's' : ''})`, done: d.staffCount > 1,       action: 'StaffManagement' },
+        { id: 'roles',        label: 'Staff roles & job titles assigned',                              done: d.staffWithJobTitle > 0,       action: 'StaffManagement', optional: true },
+        { id: 'rota_perms',   label: 'Rota area permissions set per staff',                           done: d.rotaPermsCount > 0,          action: 'StaffManagement', optional: true, note: 'Controls which areas each staff member can work in' },
+        { id: 'clients',      label: `Clients / service users added (${d.serviceUsersCount})`,        done: d.serviceUsersCount > 0,       action: 'ClientManagement' },
+        { id: 'clients_area', label: `Clients assigned to rota areas (${d.serviceUsersWithArea}/${d.serviceUsersCount})`, done: d.serviceUsersWithArea > 0, action: 'ClientManagement' },
+        { id: 'client_calls', label: `Client call schedules configured (${d.clientCallsCount})`,      done: d.clientCallsCount > 0,        action: 'ClientManagement', note: 'Scheduled care times per client that drive the rota' },
+        { id: 'care_teams',   label: `Care teams created (${d.careTeamsCount})`,                      done: d.careTeamsCount > 0,          action: 'CareTeamManagement', optional: true, note: 'Groups staff into teams per client or area' },
       ],
     },
     {
@@ -178,11 +180,11 @@ function buildGroups(d, manual, toggle) {
       icon: Calendar,
       color: 'indigo',
       items: [
-        { id: 'shifts',      label: `First rota published (${d.shiftsCount} shifts)`, done: d.shiftsCount > 0,        action: 'Rota' },
-        { id: 'templates',   label: `Base shift templates created (${d.shiftTemplatesCount})`, done: d.shiftTemplatesCount > 0, action: 'RotaManagement', note: 'Recurring care needs per client — used for auto-rota' },
-        { id: 'patterns',    label: `Shift patterns set up (${d.shiftPatternsCount})`, done: d.shiftPatternsCount > 0, action: 'RotaManagement' },
-        { id: 'care_log',    label: 'Care log form fields reviewed',                 done: d.careLogConfigsCount > 0, action: 'CareLogFormBuilder', note: 'Defaults work out of the box — customise if needed' },
-        { id: 'meds',        label: `eMAR / medication records added (${d.medRecordsCount})`, done: d.medRecordsCount > 0, action: 'MedicationManagement', note: 'Required for clients who receive medication support' },
+        { id: 'shifts',     label: `Rota published (${d.shiftsCount} shifts)`,                        done: d.shiftsCount > 0,             action: 'Rota' },
+        { id: 'templates',  label: `Base shift templates created (${d.shiftTemplatesCount})`,         done: d.shiftTemplatesCount > 0,     action: 'RotaManagement', optional: true, note: 'Recurring care needs per client — used for auto-rota generation' },
+        { id: 'patterns',   label: `Shift patterns set up (${d.shiftPatternsCount})`,                 done: d.shiftPatternsCount > 0,      action: 'RotaManagement', optional: true },
+        { id: 'care_log',   label: 'Care log form customised',                                        done: d.careLogConfigsCount > 0,     action: 'CareLogFormBuilder', optional: true, note: 'Default fields work out of the box — customise only if needed' },
+        { id: 'meds',       label: `eMAR / medication records added (${d.medRecordsCount})`,          done: d.medRecordsCount > 0,         action: 'MedicationManagement', optional: true, note: 'Only needed for clients who receive medication support' },
       ],
     },
     {
@@ -191,15 +193,15 @@ function buildGroups(d, manual, toggle) {
       icon: Radio,
       color: 'violet',
       items: [
-        { id: 'radio_channels', label: `Radio channels created (${d.radioChannelsCount})`, done: d.radioChannelsCount > 0, action: 'TwoWayRadio' },
-        { id: 'radio_staff',    label: `Staff assigned to radio channels (${d.usersWithRadio})`, done: d.usersWithRadio > 0, action: 'TwoWayRadio' },
-        { id: 'control_device', label: 'Control device designated',                  done: d.hasControlDevice,         action: 'TwoWayRadio', note: 'The handset that receives alerter notifications' },
-        { id: 'alerter_areas',  label: 'Alerter areas assigned to control device',  done: d.hasAlerterAreas,           action: 'TwoWayRadio' },
-        { id: 'radio_apk',      label: 'Radio APK installed on handset(s)',         ...m('radio_apk'),                 action: 'download', note: 'Download from carecallai.co.uk/download' },
-        { id: 'battery_opt',    label: 'Battery optimisation exemption accepted',   ...m('battery_opt'),               note: 'Required for alerter to wake screen when app is idle' },
-        { id: 'radio_test_p2p', label: 'P2P call tested (handset → handset)',       ...m('radio_test_p2p') },
-        { id: 'radio_test_miss',label: 'Missed call & callback tested',             ...m('radio_test_miss') },
-        { id: 'radio_test_5h',  label: 'Call tested after 5+ hours idle',          ...m('radio_test_5h'),              note: 'Confirms foreground service is keeping the process alive' },
+        { id: 'radio_channels', label: `Radio channels created (${d.radioChannelsCount})`,            done: d.radioChannelsCount > 0,      action: 'TwoWayRadio' },
+        { id: 'radio_staff',    label: `Staff assigned to channels (${d.usersWithRadio})`,            done: d.usersWithRadio > 0,          action: 'TwoWayRadio' },
+        { id: 'control_device', label: 'Control device designated',                                   done: d.hasControlDevice,            action: 'TwoWayRadio', note: 'The handset that receives alerter notifications' },
+        { id: 'alerter_areas',  label: 'Alerter areas assigned to control device',                   done: d.hasAlerterAreas,             action: 'TwoWayRadio' },
+        { id: 'radio_apk',      label: 'Radio APK installed on handset(s)',                          ...m('radio_apk', { action: 'download', note: 'Download from carecallai.co.uk/download' }) },
+        { id: 'battery_opt',    label: 'Battery optimisation exemption accepted',                    ...m('battery_opt', { note: 'Required for alerter to wake screen when app is idle' }) },
+        { id: 'radio_test_p2p', label: 'P2P call tested (handset ↔ handset)',                       ...m('radio_test_p2p', { optional: true }) },
+        { id: 'radio_test_miss',label: 'Missed call & callback tested',                             ...m('radio_test_miss', { optional: true }) },
+        { id: 'radio_test_5h',  label: 'Call received after 5+ hours idle',                        ...m('radio_test_5h',  { optional: true, note: 'Confirms foreground service keeps process alive' }) },
       ],
     },
     {
@@ -208,12 +210,12 @@ function buildGroups(d, manual, toggle) {
       icon: Bell,
       color: 'amber',
       items: [
-        { id: 'notif_creds',    label: 'Push notification credentials configured', done: d.hasNotifCreds,              action: 'PushNotificationDashboard', note: 'FCM credentials in Admin → Push Notifications' },
-        { id: 'notif_global',   label: 'Notifications enabled globally',           done: d.notifEnabledGlobally,       action: 'NotificationSettings' },
-        { id: 'push_token',     label: 'Push token registered on admin device',   done: d.hasPushToken,               note: 'Open the app on your phone — token registers automatically' },
-        { id: 'notif_test_in',  label: 'TEST: Staff clock-in triggers notification', ...m('notif_test_in'),           note: 'Ask a staff member to clock in — you should get a push within 5 seconds' },
-        { id: 'notif_test_out', label: 'TEST: Staff clock-out triggers notification', ...m('notif_test_out') },
-        { id: 'notif_test_book','label': 'TEST: Shift booking triggers notification', ...m('notif_test_book') },
+        { id: 'notif_creds',    label: 'Push notification credentials configured',                   done: d.hasNotifCreds,               action: 'PushNotificationDashboard', note: 'FCM credentials — Admin → Push Notifications' },
+        { id: 'notif_global',   label: 'Notifications enabled globally',                             done: d.notifEnabledGlobally,        action: 'NotificationSettings' },
+        { id: 'push_token',     label: 'Push token registered on admin device',                     done: d.hasPushToken,                note: 'Open the app on your phone — registers automatically' },
+        { id: 'notif_test_in',  label: 'TEST: Clock-in triggers admin notification',               ...m('notif_test_in',  { optional: true, note: 'Ask a staff member to clock in and confirm you receive a push' }) },
+        { id: 'notif_test_out', label: 'TEST: Clock-out triggers admin notification',              ...m('notif_test_out', { optional: true }) },
+        { id: 'notif_test_book',label: 'TEST: Shift booking triggers admin notification',          ...m('notif_test_book',{ optional: true }) },
       ],
     },
     {
@@ -221,12 +223,13 @@ function buildGroups(d, manual, toggle) {
       label: 'Leave, HR & Workforce',
       icon: Briefcase,
       color: 'rose',
+      allOptional: true,
       items: [
-        { id: 'holiday',        label: `Holiday allowances set (${d.holidayAllowancesCount} records)`, done: d.holidayAllowancesCount > 0, action: 'LeaveManagement' },
-        { id: 'doc_reqs',       label: `Document requirements defined (${d.docReqsCount})`, done: d.docReqsCount > 0, action: 'DocumentManagement', note: 'DBS, references, ID, right to work, contract per role' },
-        { id: 'hr_docs',        label: `HR documents uploaded (${d.hrDocsCount})`,         done: d.hrDocsCount > 0,   action: 'DocumentManagement', note: 'Contracts, handbooks, policies' },
-        { id: 'supervisions',   label: `Supervision records started (${d.supervisionCount})`, done: d.supervisionCount > 0, action: 'StaffSupervisions', note: 'CQC requires formal 1-to-1 every 12 weeks' },
-        { id: 'onboarding',     label: 'Bulk staff onboarding completed',            ...m('onboarding'),               action: 'Admin', note: 'For migrating an existing team — Admin → Bulk Onboard' },
+        { id: 'holiday',      label: `Holiday allowances set (${d.holidayAllowancesCount} records)`, done: d.holidayAllowancesCount > 0, action: 'LeaveManagement',    optional: true },
+        { id: 'doc_reqs',     label: `Staff document requirements defined (${d.docReqsCount})`,      done: d.docReqsCount > 0,          action: 'DocumentManagement', optional: true, note: 'DBS, references, ID, right to work, contract per role' },
+        { id: 'hr_docs',      label: `HR documents uploaded (${d.hrDocsCount})`,                     done: d.hrDocsCount > 0,           action: 'DocumentManagement', optional: true, note: 'Contracts, handbooks, policies' },
+        { id: 'supervisions', label: `Supervision records started (${d.supervisionCount})`,          done: d.supervisionCount > 0,      action: 'StaffSupervisions',  optional: true, note: 'CQC requires formal 1-to-1 every 12 weeks' },
+        { id: 'onboarding',   label: 'Bulk staff onboarding completed',                             ...m('onboarding', { action: 'Admin', optional: true, note: 'Admin → Bulk Onboard — for migrating an existing team' }) },
       ],
     },
     {
@@ -234,11 +237,12 @@ function buildGroups(d, manual, toggle) {
       label: 'Finance & Payroll',
       icon: PoundSterling,
       color: 'emerald',
+      allOptional: true,
       items: [
-        { id: 'invoicing',   label: 'Invoicing configured',                        done: d.invoicingConfigured,        action: 'Invoicing', note: 'Company details, payment terms, tax, billing rates' },
-        { id: 'pay_periods', label: `Payroll pay periods set up (${d.payPeriodsCount})`, done: d.payPeriodsCount > 0, action: 'Payroll' },
-        { id: 'pay_rates',   label: 'Staff pay rates entered',                     ...m('pay_rates'),                  action: 'Payroll' },
-        { id: 'mileage',     label: 'Mileage / HMRC rate confirmed',               ...m('mileage'),                    action: 'Expenses', note: 'Current HMRC rate: 45p/mile first 10,000 miles' },
+        { id: 'invoicing',   label: 'Invoicing configured',                                           done: d.invoicingConfigured,        action: 'Invoicing',  optional: true, note: 'Company details, payment terms, tax, billing rates' },
+        { id: 'pay_periods', label: `Payroll pay periods set up (${d.payPeriodsCount})`,              done: d.payPeriodsCount > 0,        action: 'Payroll',    optional: true },
+        { id: 'pay_rates',   label: 'Staff pay rates entered',                                       ...m('pay_rates',  { action: 'Payroll',   optional: true }) },
+        { id: 'mileage',     label: 'Mileage / HMRC rate confirmed',                                 ...m('mileage',    { action: 'Expenses',  optional: true, note: 'Current HMRC rate: 45p/mile first 10,000 miles' }) },
       ],
     },
     {
@@ -246,12 +250,13 @@ function buildGroups(d, manual, toggle) {
       label: 'Training & LMS',
       icon: GraduationCap,
       color: 'sky',
+      allOptional: true,
       items: [
-        { id: 'courses',        label: `Courses created (${d.coursesCount})`,      done: d.coursesCount > 0,           action: 'Training' },
-        { id: 'assignments',    label: `Courses assigned to staff (${d.courseAssignmentsCount})`, done: d.courseAssignmentsCount > 0, action: 'Training' },
-        { id: 'matrix',         label: `Training matrix items active (${d.matrixItemsCount})`, done: d.matrixItemsCount > 0, action: 'TrainingMatrix' },
-        { id: 'competency',     label: 'Competency framework active',              done: d.hasActiveFramework,         action: 'CompetencyHub' },
-        { id: 'certs',          label: 'Auto-certificate generation confirmed',    ...m('certs'),                      note: 'Test by completing a course and checking for certificate' },
+        { id: 'courses',      label: `Courses created (${d.coursesCount})`,                          done: d.coursesCount > 0,           action: 'Training',      optional: true },
+        { id: 'assignments',  label: `Courses assigned to staff (${d.courseAssignmentsCount})`,      done: d.courseAssignmentsCount > 0, action: 'Training',      optional: true },
+        { id: 'matrix',       label: `Training matrix items active (${d.matrixItemsCount})`,         done: d.matrixItemsCount > 0,       action: 'TrainingMatrix',optional: true },
+        { id: 'competency',   label: 'Competency framework active',                                   done: d.hasActiveFramework,         action: 'CompetencyHub', optional: true },
+        { id: 'certs',        label: 'Auto-certificate generation confirmed',                        ...m('certs', { optional: true, note: 'Complete a course and check a certificate is generated' }) },
       ],
     },
     {
@@ -259,11 +264,12 @@ function buildGroups(d, manual, toggle) {
       label: 'Compliance & Incidents',
       icon: Shield,
       color: 'orange',
+      allOptional: true,
       items: [
-        { id: 'compliance_setup', label: `Compliance regulations enabled (${d.complianceCount})`, done: d.complianceCount > 0, action: 'ComplianceManagement', note: 'CQC, GDPR, Health & Safety etc.' },
-        { id: 'incident_types',   label: 'Incident types & severity levels defined', ...m('incident_types'),           action: 'IncidentManagement' },
-        { id: 'safeguarding',     label: 'Safeguarding protocols configured',        ...m('safeguarding'),              action: 'SafeguardingManagement' },
-        { id: 'virtual_inspect',  label: 'Virtual inspection tool reviewed',         ...m('virtual_inspect'),           action: 'Admin', note: 'Checks CQC readiness across all areas' },
+        { id: 'compliance_setup', label: `Compliance regulations enabled (${d.complianceCount})`,    done: d.complianceCount > 0,        action: 'ComplianceManagement', optional: true, note: 'CQC, GDPR, Health & Safety etc.' },
+        { id: 'incident_types',   label: 'Incident types & severity levels defined',               ...m('incident_types', { action: 'IncidentManagement',  optional: true }) },
+        { id: 'safeguarding',     label: 'Safeguarding protocols configured',                      ...m('safeguarding',   { action: 'SafeguardingManagement', optional: true }) },
+        { id: 'virtual_inspect',  label: 'Virtual inspection tool reviewed',                       ...m('virtual_inspect',{ action: 'Admin',                optional: true, note: 'Checks CQC readiness across all areas' }) },
       ],
     },
     {
@@ -271,10 +277,11 @@ function buildGroups(d, manual, toggle) {
       label: 'Documents & Forms',
       icon: FileText,
       color: 'cyan',
+      allOptional: true,
       items: [
-        { id: 'forms',    label: `Custom forms created (${d.formsCount})`,          done: d.formsCount > 0,             action: 'FormBuilder' },
-        { id: 'policies', label: 'Policies & procedures uploaded',                  ...m('policies'),                   action: 'DocumentManagement' },
-        { id: 'policy_assign', label: 'Policies assigned to staff roles',           ...m('policy_assign'),              action: 'StaffMatrix', note: 'Who must read and sign what' },
+        { id: 'policies',     label: 'Policies & procedures uploaded',                              ...m('policies',      { action: 'DocumentManagement', optional: true }) },
+        { id: 'policy_assign',label: 'Policies assigned to staff roles',                           ...m('policy_assign', { action: 'StaffMatrix',         optional: true, note: 'Who must read and sign what' }) },
+        { id: 'forms',        label: `Custom forms created (${d.formsCount})`,                      done: d.formsCount > 0,             action: 'FormBuilder', optional: true },
       ],
     },
     {
@@ -282,10 +289,11 @@ function buildGroups(d, manual, toggle) {
       label: 'Assets & Data',
       icon: Database,
       color: 'slate',
+      allOptional: true,
       items: [
-        { id: 'assets_rec',  label: `Assets recorded (${d.assetsCount})`,          done: d.assetsCount > 0,            action: 'AssetManagement', note: 'Equipment, vehicles, property' },
-        { id: 'data_import', label: 'Data import completed (if migrating)',         ...m('data_import'),                action: 'Admin', note: 'Admin → Data Import — for migrating from another system' },
-        { id: 'retention',   label: 'Archive & data retention policies set',        ...m('retention'),                  action: 'Archives' },
+        { id: 'assets_rec',  label: `Assets recorded (${d.assetsCount})`,                           done: d.assetsCount > 0,            action: 'AssetManagement', optional: true, note: 'Equipment, vehicles, property' },
+        { id: 'data_import', label: 'Data import completed (if migrating)',                         ...m('data_import', { action: 'Admin',     optional: true, note: 'Admin → Data Import — for migrating from another system' }) },
+        { id: 'retention',   label: 'Archive & data retention policies set',                       ...m('retention',   { action: 'Archives',  optional: true }) },
       ],
     },
     {
@@ -293,11 +301,12 @@ function buildGroups(d, manual, toggle) {
       label: 'Advanced & APK',
       icon: Cpu,
       color: 'purple',
+      allOptional: true,
       items: [
-        { id: 'apk_staff',   label: 'Android staff switched to native APK',         ...m('apk_staff'),                  action: 'download', note: 'carecallai.co.uk/download — full alerter, radio, GPS, biometrics' },
-        { id: 'biometrics',  label: 'Biometric login enabled (optional)',            ...m('biometrics'),                 action: 'Settings' },
-        { id: 'control_room',label: 'Control Room GPS tracking confirmed live',      ...m('control_room'),               action: 'ControlRoom' },
-        { id: 'ai_enabled',  label: 'AI Assistant enabled',                          ...m('ai_enabled'),                 action: 'Settings', note: 'Admin → Settings → AI features' },
+        { id: 'apk_staff',   label: 'Android staff switched to native APK',        ...m('apk_staff',    { action: 'download',    optional: true, note: 'carecallai.co.uk/download — full alerter, radio, GPS, biometrics' }) },
+        { id: 'biometrics',  label: 'Biometric login enabled',                     ...m('biometrics',   { action: 'Settings',    optional: true }) },
+        { id: 'control_room',label: 'Control Room GPS tracking confirmed live',    ...m('control_room', { action: 'ControlRoom', optional: true }) },
+        { id: 'ai_enabled',  label: 'AI Assistant enabled',                        ...m('ai_enabled',   { action: 'Settings',    optional: true, note: 'Admin → Settings → AI features' }) },
       ],
     },
   ];
@@ -342,11 +351,16 @@ export default function SetupHub() {
     staleTime: 30_000,
   });
 
-  const groups  = buildGroups(data, manual, toggleManual);
-  const doneGroups = groups.filter(g => g.items.every(i => i.done));
-  const totalItems = groups.reduce((a, g) => a + g.items.length, 0);
-  const doneItems  = groups.reduce((a, g) => a + g.items.filter(i => i.done).length, 0);
-  const pct = totalItems > 0 ? Math.round((doneItems / totalItems) * 100) : 0;
+  const groups = buildGroups(data, manual, toggleManual);
+
+  // Core score: only required (non-optional) items
+  const allItems     = groups.flatMap(g => g.items);
+  const coreItems    = allItems.filter(i => !i.optional);
+  const optItems     = allItems.filter(i => i.optional);
+  const coreDone     = coreItems.filter(i => i.done).length;
+  const optDone      = optItems.filter(i => i.done).length;
+  const pct          = coreItems.length > 0 ? Math.round((coreDone / coreItems.length) * 100) : 0;
+  const optRemaining = optItems.length - optDone;
 
   const handleAction = (action) => {
     if (!action) return;
@@ -374,15 +388,15 @@ export default function SetupHub() {
           <div>
             <h2 className="text-lg font-bold">Setup Hub</h2>
             <p className="text-slate-400 text-sm mt-0.5">
-              {doneGroups.length} of {groups.length} sections complete · {doneItems}/{totalItems} tasks done
+              Core setup: {coreDone} of {coreItems.length} tasks done
+              {optRemaining > 0 && <span className="text-slate-500"> · {optRemaining} optional tasks available</span>}
             </p>
           </div>
           <div className="text-right shrink-0">
             <span className="text-3xl font-extrabold text-white">{pct}%</span>
-            <p className="text-slate-400 text-xs">complete</p>
+            <p className="text-slate-400 text-xs">core complete</p>
           </div>
         </div>
-        {/* Progress bar */}
         <div className="h-2.5 rounded-full bg-slate-700 overflow-hidden">
           <div
             className="h-full rounded-full bg-gradient-to-r from-teal-400 to-teal-500 transition-all duration-700"
@@ -391,21 +405,24 @@ export default function SetupHub() {
         </div>
         {pct === 100 && (
           <p className="mt-3 text-teal-400 text-sm font-medium flex items-center gap-1.5">
-            <CheckCircle2 className="w-4 h-4" /> All done — your organisation is fully configured!
+            <CheckCircle2 className="w-4 h-4" /> Core setup complete — explore optional features below to go further!
           </p>
         )}
       </div>
 
       {/* ── Groups ── */}
       {groups.map((group) => {
-        const c       = COLORS[group.color];
-        const Icon    = group.icon;
-        const done    = group.items.filter(i => i.done).length;
-        const total   = group.items.length;
-        const allDone = done === total;
-        const isOpen  = collapsed[group.id] !== undefined
+        const c          = COLORS[group.color];
+        const Icon       = group.icon;
+        const reqItems   = group.items.filter(i => !i.optional);
+        const reqDone    = reqItems.filter(i => i.done).length;
+        const allDone    = group.items.every(i => i.done);
+        const coreDone_g = reqItems.length > 0 && reqItems.every(i => i.done);
+        const isAllOpt   = group.allOptional || reqItems.length === 0;
+        // Auto-collapse when all required items are done; optional sections start collapsed
+        const isOpen     = collapsed[group.id] !== undefined
           ? !collapsed[group.id]
-          : !allDone; // auto-collapse complete groups
+          : !(isAllOpt ? true : coreDone_g);
 
         return (
           <div
@@ -435,16 +452,17 @@ export default function SetupHub() {
                   <span className={`font-semibold text-sm ${allDone ? 'text-green-700' : 'text-slate-800'}`}>
                     {group.label}
                   </span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                    allDone ? 'bg-green-100 text-green-700' : c.badge
-                  }`}>
-                    {done}/{total}
-                  </span>
+                  {isAllOpt
+                    ? <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-slate-100 text-slate-500">Optional</span>
+                    : <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${coreDone_g ? 'bg-green-100 text-green-700' : c.badge}`}>
+                        {reqDone}/{reqItems.length} required
+                      </span>
+                  }
                 </div>
-                {/* Mini progress bar */}
-                {!allDone && (
+                {/* Mini progress bar — required items only */}
+                {!coreDone_g && reqItems.length > 0 && (
                   <div className="h-1 rounded-full bg-slate-100 overflow-hidden mt-1.5 w-full max-w-xs">
-                    <div className={`h-full rounded-full ${c.bar} transition-all`} style={{ width: `${(done / total) * 100}%` }} />
+                    <div className={`h-full rounded-full ${c.bar} transition-all`} style={{ width: `${(reqDone / reqItems.length) * 100}%` }} />
                   </div>
                 )}
               </div>
@@ -488,11 +506,16 @@ export default function SetupHub() {
 
                     {/* Label + note */}
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-medium leading-snug ${
-                        item.done ? 'text-slate-400 line-through' : 'text-slate-700'
-                      }`}>
-                        {item.label}
-                      </p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className={`text-sm font-medium leading-snug ${
+                          item.done ? 'text-slate-400 line-through' : 'text-slate-700'
+                        }`}>
+                          {item.label}
+                        </p>
+                        {item.optional && !item.done && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-400 font-medium shrink-0">optional</span>
+                        )}
+                      </div>
                       {item.note && !item.done && (
                         <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">{item.note}</p>
                       )}
