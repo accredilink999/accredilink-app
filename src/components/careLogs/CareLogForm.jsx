@@ -309,6 +309,7 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
       });
 
       setSubmittedCareLog(careLog);
+      setShowFeedbackPrompt(true);
 
       // Clear log_required flag and notify partner on paired shifts
       if (callId && shift?.paired_shift_id) {
@@ -1278,17 +1279,17 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
     };
     return (
       <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) { skipFeedback(); } }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
-              Client Feedback
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-1">
-            <p className="text-sm text-slate-500">
-              Would <span className="font-medium text-slate-700">{serviceUser?.full_name}</span> like to leave feedback?
-            </p>
+        <DialogContent className="max-w-sm p-0 overflow-hidden">
+          <div className="bg-teal-600 px-5 py-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+              <Star className="w-6 h-6 text-white fill-white" />
+            </div>
+            <div>
+              <p className="font-bold text-white text-base">Would {serviceUser?.full_name} like to give feedback?</p>
+              <p className="text-teal-100 text-xs">Takes 5 seconds — tap a mood below</p>
+            </div>
+          </div>
+          <div className="space-y-4 p-5">
             <div className="grid grid-cols-3 gap-2">
               {[
                 { key: 'positive', label: 'Positive', Icon: ThumbsUp,  active: 'bg-green-500 text-white border-green-500', inactive: 'border-slate-200 text-slate-400 hover:border-green-300 hover:text-green-500' },
@@ -1316,13 +1317,13 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
               />
             </div>
           </div>
-          <DialogFooter className="gap-2">
-            <Button variant="ghost" size="sm" onClick={skipFeedback}>Skip</Button>
-            <Button size="sm" onClick={submitFeedback} disabled={savingFeedback} className="bg-amber-500 hover:bg-amber-600 text-white">
+          <div className="flex justify-between items-center px-5 pb-5 gap-2">
+            <Button variant="ghost" size="sm" onClick={skipFeedback} className="text-slate-400">Skip</Button>
+            <Button size="sm" onClick={submitFeedback} disabled={savingFeedback} className="bg-teal-600 hover:bg-teal-700 text-white">
               {savingFeedback ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Star className="w-4 h-4 mr-1" />}
               Save Feedback
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     );
@@ -1388,14 +1389,6 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
             Cancel
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setShowFeedbackPrompt(true)}
-            className="border-amber-200 text-amber-700 hover:bg-amber-50 gap-1.5"
-          >
-            <Star className="w-4 h-4" />
-            Feedback
           </Button>
           <Button
             onClick={handleSubmit}
