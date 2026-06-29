@@ -17,6 +17,7 @@ export default function ClaimShiftModal({ shift, open, onClose, isAdmin = false 
   const queryClient = useQueryClient();
   const [reason, setReason] = useState('');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [claimApproveConfirmOpen, setClaimApproveConfirmOpen] = useState(false);
   const [allocateStaffId, setAllocateStaffId] = useState('');
   const [staffSearch, setStaffSearch] = useState('');
 
@@ -162,6 +163,51 @@ export default function ClaimShiftModal({ shift, open, onClose, isAdmin = false 
       status: 'pending',
     });
   };
+
+  const adminClaimMutation = useMutation({
+    mutationFn: async () => {
+      await ShiftApi.update(shift.id, {
+        staff_id: user.id,
+        staff_name: user.staff_full_name || user.full_name,
+        status: 'scheduled',
+      });
+      if (!SIT_IN_NAMES.has(shift.shift_name)) {
+        const areaId = shift.rota_area_id || shift.area_id;
+        const serviceUsers = await base44.entities.ServiceUser.filter({ status: 'active' });
+        const matchingCalls = getMatchingCallsForShift(serviceUsers, areaId, shift.start_time, shift.end_time);
+        const callTypesData = await base44.entities.CallType.filter({ is_active: true });
+        for (const call of matchingCalls) {
+          const ct = callTypesData.find(c => c.name === call.call_type);
+          const tasks = ct?.default_tasks?.length ? ct.default_tasks.map(t => ({ text: t, completed: false })) : [];
+          try {
+            await ShiftCallApi.create({
+              shift_id: shift.id,
+              service_user_id: call.service_user_id,
+              service_user_name: call.service_user_name,
+              service_user_address: call.service_user_address,
+              scheduled_time: call.scheduled_time,
+              call_time: call.scheduled_time,
+              duration_minutes: call.duration_minutes,
+              call_type: call.call_type,
+              call_types: call.call_types || [call.call_type],
+              tasks,
+              call_date: shift.date,
+              status: 'pending',
+              notes: call.notes || '',
+            });
+          } catch (callErr) {
+            console.error('[AdminClaim] Failed to create call:', callErr);
+          }
+        }
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      toast.success('Shift claimed and approved');
+      onClose();
+    },
+    onError: (e) => toast.error(e.message || 'Failed to claim shift'),
+  });
 
   const areaName = shift?.rota_area_name || shift?.area_name || '';
 
@@ -310,14 +356,14 @@ export default function ClaimShiftModal({ shift, open, onClose, isAdmin = false 
           </Button>
           {!hasPendingClaim && (
             <Button
-              onClick={handleSubmit}
-              disabled={claimMutation.isPending}
+              onClick={isAdmin ? () => setClaimApproveConfirmOpen(true) : handleSubmit}
+              disabled={claimMutation.isPending || adminClaimMutation.isPending}
               className="bg-teal-600 hover:bg-teal-700"
             >
-              {claimMutation.isPending ? (
+              {(claimMutation.isPending || adminClaimMutation.isPending) ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : null}
-              Claim Shift
+              {isAdmin ? 'Claim & Approve' : 'Claim Shift'}
             </Button>
           )}
         </DialogFooter>
@@ -330,6 +376,14 @@ export default function ClaimShiftModal({ shift, open, onClose, isAdmin = false 
           confirmLabel="Clear Shift"
           variant="destructive"
           onConfirm={() => deleteShiftMutation.mutate()}
+        />
+        <ConfirmDialog
+          open={claimApproveConfirmOpen}
+          onOpenChange={setClaimApproveConfirmOpen}
+          title="Claim & Approve Shift?"
+          description="This will assign this shift to you and approve it immediately — no approval request raised."
+          confirmLabel="Yes, Claim & Approve"
+          onConfirm={() => adminClaimMutation.mutate()}
         />
       </DialogContent>
     </Dialog>
