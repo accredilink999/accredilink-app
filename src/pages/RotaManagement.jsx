@@ -16,7 +16,8 @@ import ClaimShiftModal from '@/components/rota/ClaimShiftModal';
 import RotaAreaSelector from '@/components/rota/RotaAreaSelector';
 import ClientCallManager from '@/components/rota/ClientCallManager';
 import ShiftTypeManager from '@/components/rota/ShiftTypeManager';
-import { ChevronLeft, ChevronRight, Plus, Settings, Phone, Tag, CalendarDays, MapPin, LayoutTemplate } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ChevronLeft, ChevronRight, Plus, Settings, Phone, Tag, CalendarDays, MapPin, LayoutTemplate, ChevronDown } from 'lucide-react';
 
 export default function RotaManagement() {
   const [view, setView] = useState('week');
@@ -131,9 +132,9 @@ export default function RotaManagement() {
       />
 
       {/* Controls Bar */}
-      <div className="space-y-3 -mt-2">
-        {/* Row 1: Area dropdown + navigation */}
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="space-y-2 -mt-2">
+        {/* Row 1 (everyone): Area selector + date navigation */}
+        <div className="flex items-center gap-2">
           <RotaAreaSelector
             selectedAreaId={selectedAreaId}
             onAreaChange={setSelectedAreaId}
@@ -144,11 +145,11 @@ export default function RotaManagement() {
             manageOpen={isManageAreasOpen}
             onManageOpenChange={setIsManageAreasOpen}
           />
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 ml-auto">
             <Button variant="outline" size="icon" onClick={handlePrevious} className="h-9 w-9">
               <ChevronLeft className="w-4 h-4" />
             </Button>
-            <Button variant="outline" onClick={handleToday} className="text-xs sm:text-sm px-2 sm:px-3 h-9">
+            <Button variant="outline" onClick={handleToday} className="text-xs px-2 h-9">
               Today
             </Button>
             <Button variant="outline" size="icon" onClick={handleNext} className="h-9 w-9">
@@ -157,80 +158,78 @@ export default function RotaManagement() {
           </div>
         </div>
 
-        {/* Row 2: Add Shift + Manage Areas side by side */}
+        {/* Row 2 (admin only): Add Shift + Tools dropdown */}
         {isAdmin && (
           <div className="flex gap-2">
             <Button
               onClick={() => handleCreateShift(currentDate)}
-              className="bg-teal-600 hover:bg-teal-700 gap-1.5 text-xs sm:text-sm h-9 flex-1 sm:flex-none"
+              className="bg-teal-600 hover:bg-teal-700 gap-1.5 text-sm h-9 flex-1 sm:flex-none"
             >
               <Plus className="w-4 h-4" />
               Add Shift
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => setIsManageAreasOpen(true)}
-              className="gap-1.5 text-xs sm:text-sm h-9 flex-1 sm:flex-none"
-            >
-              <Settings className="w-4 h-4" />
-              Manage Areas
-            </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-1.5 text-sm h-9">
+                  <Settings className="w-4 h-4" />
+                  Tools
+                  <ChevronDown className="w-3 h-3 ml-0.5 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-52">
+                <DropdownMenuItem onClick={() => setIsManageAreasOpen(true)}>
+                  <MapPin className="w-4 h-4 mr-2 text-orange-500" />
+                  Manage areas
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsCreateAreaOpen(true)}>
+                  <Plus className="w-4 h-4 mr-2 text-teal-500" />
+                  Create new area
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setIsPatternManagerOpen(true)}>
+                  <Settings className="w-4 h-4 mr-2 text-slate-500" />
+                  Shift patterns
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsTemplateManagerOpen(true)}>
+                  <LayoutTemplate className="w-4 h-4 mr-2 text-indigo-500" />
+                  Base templates
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsShiftTypeManagerOpen(true)}>
+                  <Tag className="w-4 h-4 mr-2 text-violet-500" />
+                  Shift types
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setIsCallManagerOpen(true)}>
+                  <Phone className="w-4 h-4 mr-2 text-blue-500" />
+                  Client calls
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         )}
 
-        {/* Row 3: Create Area + Patterns + Base Templates */}
-        <div className="flex gap-2 flex-wrap">
-          {isAdmin && (
+        {/* Non-admin: still show Patterns + Client Calls */}
+        {!isAdmin && (
+          <div className="flex gap-2">
             <Button
               variant="outline"
-              onClick={() => setIsCreateAreaOpen(true)}
-              className="gap-1.5 text-xs sm:text-sm h-9 flex-1 md:flex-none"
+              onClick={() => setIsPatternManagerOpen(true)}
+              className="gap-1.5 text-sm h-9 flex-1 sm:flex-none"
             >
-              <Plus className="w-4 h-4" />
-              Create Area
+              <Settings className="w-4 h-4" />
+              My Patterns
             </Button>
-          )}
-          <Button
-            variant="outline"
-            onClick={() => setIsPatternManagerOpen(true)}
-            className="gap-1.5 text-xs sm:text-sm h-9 flex-1 md:flex-none"
-          >
-            <Settings className="w-4 h-4" />
-            Patterns
-          </Button>
-          {isAdmin && (
             <Button
               variant="outline"
-              onClick={() => setIsTemplateManagerOpen(true)}
-              className="gap-1.5 text-xs sm:text-sm h-9 flex-1 md:flex-none"
+              onClick={() => setIsCallManagerOpen(true)}
+              className="gap-1.5 text-sm h-9 flex-1 sm:flex-none"
             >
-              <LayoutTemplate className="w-4 h-4" />
-              Base Templates
+              <Phone className="w-4 h-4" />
+              Client Calls
             </Button>
-          )}
-        </div>
-
-        {/* Row 4: Client Calls + Shift Types side by side */}
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setIsCallManagerOpen(true)}
-            className="gap-1.5 text-xs sm:text-sm h-9 flex-1 md:flex-none"
-          >
-            <Phone className="w-4 h-4" />
-            Client Calls
-          </Button>
-          {isAdmin && (
-            <Button
-              variant="outline"
-              onClick={() => setIsShiftTypeManagerOpen(true)}
-              className="gap-1.5 text-xs sm:text-sm h-9 flex-1 md:flex-none"
-            >
-              <Tag className="w-4 h-4" />
-              Shift Types
-            </Button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <div className="text-center mb-4">
