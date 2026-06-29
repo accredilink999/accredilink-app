@@ -4,6 +4,8 @@
 import AIAdminAssistant from './pages/AIAdminAssistant';
 import AIAssistant from './pages/AIAssistant';
 import Admin from './pages/Admin';
+import AdminApprovalsFinancials from './pages/AdminApprovalsFinancials';
+import ApprovalsAndFinancials from './pages/ApprovalsAndFinancials';
 import AppDownloads from './pages/AppDownloads';
 import Assets from './pages/Assets';
 import CareLogs from './pages/CareLogs';
@@ -50,6 +52,8 @@ export const PAGES = {
     "AIAdminAssistant": AIAdminAssistant,
     "AIAssistant": AIAssistant,
     "Admin": Admin,
+    "AdminApprovalsFinancials": AdminApprovalsFinancials,
+    "ApprovalsAndFinancials": ApprovalsAndFinancials,
     "AppDownloads": AppDownloads,
     "Assets": Assets,
     "CareLogs": CareLogs,
