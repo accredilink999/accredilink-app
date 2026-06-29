@@ -1015,24 +1015,22 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
 
             {!isSitIn && (
             <TabsContent value="calls" className="space-y-4 mt-4">
-               {isAdmin && (
-                 <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                   <div className="min-w-0">
-                     <p className="text-sm font-medium text-slate-700">Regenerate Calls</p>
-                     <p className="text-xs text-slate-500">Re-match service users from this area &amp; time window</p>
-                   </div>
-                   <Button
-                     size="sm"
-                     onClick={() => regenerateCallsMutation.mutate()}
-                     disabled={regenerateCallsMutation.isPending}
-                     className="shrink-0 ml-3 bg-slate-600 hover:bg-slate-700 text-white"
-                   >
-                     {regenerateCallsMutation.isPending
-                       ? <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />Matching…</>
-                       : <><RefreshCw className="w-3.5 h-3.5 mr-1.5" />Regenerate</>}
-                   </Button>
+               <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                 <div className="min-w-0">
+                   <p className="text-sm font-medium text-slate-700">Calls not looking right?</p>
+                   <p className="text-xs text-slate-500">Recalculate from your area &amp; shift time</p>
                  </div>
-               )}
+                 <Button
+                   size="sm"
+                   onClick={() => regenerateCallsMutation.mutate()}
+                   disabled={regenerateCallsMutation.isPending}
+                   className="shrink-0 ml-3 bg-slate-600 hover:bg-slate-700 text-white"
+                 >
+                   {regenerateCallsMutation.isPending
+                     ? <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />Recalculating…</>
+                     : <><RefreshCw className="w-3.5 h-3.5 mr-1.5" />Recalculate</>}
+                 </Button>
+               </div>
                <CallManager
                  shift={shift}
                  calls={calls}
