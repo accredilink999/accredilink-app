@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Plus, Trash2, X, Star, ThumbsUp, ThumbsDown, Minus } from 'lucide-react';
+import { Loader2, Plus, Trash2, X, Star, ThumbsUp, ThumbsDown, Minus, Camera, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import MARChart from '@/components/medications/MARChart';
 import { createPageUrl } from '@/utils';
@@ -29,6 +29,11 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
   const queryClient = useQueryClient();
   const [submittedCareLog, setSubmittedCareLog] = useState(null);
   const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const [photoNotes, setPhotoNotes] = useState('');
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoInputRef = React.useRef(null);
   const [feedbackSentiment, setFeedbackSentiment] = useState('positive');
   const [feedbackComment, setFeedbackComment] = useState('');
   const [savingFeedback, setSavingFeedback] = useState(false);
@@ -157,6 +162,7 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
     'healthcare_visit_required', 'healthcare_visit_type',
     'staff_grade', 'double_handed_call', 'staff_1', 'staff_2',
     'extended_notes', 'further_concerns', 'further_concerns_details',
+    'photo_url', 'photo_notes',
     'duration_minutes', 'log_timestamp', 'shift_end_time', 'branch',
     'custom_fields',
     'body_map_markers',
@@ -347,7 +353,7 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
 
 
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     // Build required fields from enabled sections only
     const requiredFields = {};
     for (const section of enabledSections) {
@@ -391,7 +397,23 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
       toast.error('Please provide medication concerns details');
       return;
     }
-    mutation.mutate(formData);
+    let photoUrl = null;
+    if (photoFile) {
+      setUploadingPhoto(true);
+      try {
+        const { file_url } = await base44.integrations.Core.UploadFile({ file: photoFile });
+        photoUrl = file_url;
+      } catch (err) {
+        toast.error('Photo upload failed — submitting log without photo');
+      } finally {
+        setUploadingPhoto(false);
+      }
+    }
+    mutation.mutate({
+      ...formData,
+      ...(photoUrl ? { photo_url: photoUrl } : {}),
+      ...(photoNotes.trim() ? { photo_notes: photoNotes.trim() } : {}),
+    });
   };
 
   const renderBuiltinSection = (sectionId) => {
@@ -1413,6 +1435,78 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
               />
             </div>
 
+          {/* Photo capture section */}
+          <div className="space-y-3 border border-slate-200 rounded-xl p-4 bg-slate-50">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+                <Camera className="w-4 h-4" /> Add Photo (optional)
+              </Label>
+              {!photoPreview && (
+                <span className="text-[11px] text-slate-400">Uploaded securely — not saved to device</span>
+              )}
+            </div>
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                setPhotoFile(file);
+                setPhotoPreview(URL.createObjectURL(file));
+                e.target.value = '';
+              }}
+            />
+            {!photoPreview ? (
+              <button
+                type="button"
+                onClick={() => photoInputRef.current?.click()}
+                className="w-full flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-300 rounded-lg p-6 text-slate-400 hover:border-teal-400 hover:text-teal-600 transition-colors bg-white"
+              >
+                <Camera className="w-8 h-8" />
+                <span className="text-sm font-medium">Tap to take a photo</span>
+                <span className="text-[11px]">Photo uploads directly to the care record — not stored on your device</span>
+              </button>
+            ) : (
+              <div className="space-y-3">
+                <div className="relative rounded-lg overflow-hidden border border-slate-200">
+                  <img src={photoPreview} alt="Care log photo" className="w-full max-h-64 object-cover" />
+                  <div className="absolute top-2 right-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => photoInputRef.current?.click()}
+                      className="bg-white/90 backdrop-blur-sm rounded-full p-1.5 shadow text-slate-600 hover:text-teal-600"
+                      title="Retake photo"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setPhotoFile(null); setPhotoPreview(null); }}
+                      className="bg-white/90 backdrop-blur-sm rounded-full p-1.5 shadow text-slate-600 hover:text-red-500"
+                      title="Remove photo"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-400 text-center">✓ Uploaded to care record on submit — not saved to your device</p>
+                <div>
+                  <Label className="text-xs text-slate-600 mb-1 block">Extra explanation (optional)</Label>
+                  <Textarea
+                    value={photoNotes}
+                    onChange={(e) => setPhotoNotes(e.target.value)}
+                    placeholder="Describe what the photo shows..."
+                    rows={2}
+                    className="text-sm"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
         </div>
 
         <DialogFooter>
@@ -1421,11 +1515,11 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={mutation.isPending}
+            disabled={mutation.isPending || uploadingPhoto}
             className="bg-teal-600 hover:bg-teal-700"
           >
-            {mutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            Submit Care Log
+            {(mutation.isPending || uploadingPhoto) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            {uploadingPhoto ? 'Uploading photo…' : 'Submit Care Log'}
           </Button>
         </DialogFooter>
         </DialogContent>

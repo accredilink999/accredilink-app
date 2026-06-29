@@ -10,6 +10,7 @@
   "background_color": "#ffffff",
   "theme_color": "#0f766e",
   "categories": ["business", "health", "productivity"],
+  "permissions": ["camera"],
   "icons": [
     {
       "src": "/pwa-64x64.png",

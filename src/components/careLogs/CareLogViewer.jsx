@@ -477,6 +477,21 @@ export default function CareLogViewer({ careLog, open, onOpenChange, isAdmin = f
             <CustomFieldsViewer customFields={careLog.custom_fields} formConfig={formConfigData} allConfigs={allConfigs} />
           )}
 
+          {/* Photo attachment */}
+          {careLog.photo_url && (
+            <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+              <div className="px-4 py-2 bg-slate-100 border-b border-slate-200">
+                <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Photo Attachment</p>
+              </div>
+              <div className="p-3 space-y-2">
+                <img src={careLog.photo_url} alt="Care log photo" className="w-full rounded-lg object-contain max-h-72 bg-white border border-slate-100" />
+                {careLog.photo_notes && (
+                  <p className="text-sm text-slate-700 leading-relaxed">{careLog.photo_notes}</p>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Footer */}
           <div className="pt-4 border-t border-slate-200">
             <div className="text-xs text-slate-500 space-y-1">

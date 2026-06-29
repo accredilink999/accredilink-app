@@ -213,6 +213,8 @@ function buildGroups(d, manual, toggle) {
         { id: 'patterns',   label: `Shift patterns set up (${d.shiftPatternsCount})`,                 done: d.shiftPatternsCount > 0,      action: 'RotaManagement', optional: true },
         { id: 'care_log',   label: 'Care log form customised',                                        done: d.careLogConfigsCount > 0,     action: 'CareLogFormBuilder', optional: true, note: 'Default fields work out of the box — customise only if needed' },
         { id: 'meds',       label: `eMAR / medication records added (${d.medRecordsCount})`,          done: d.medRecordsCount > 0,         action: 'MedicationManagement', optional: true, note: 'Only needed for clients who receive medication support' },
+        { id: 'photo_log',  label: 'Care log photo capture tested',                                  ...m('photo_log', { optional: true, note: 'Staff can take a photo directly on checkout — uploaded to care record, not saved to device' }) },
+        { id: 'dash_tasks', label: 'Dashboard task approvals confirmed',                             ...m('dash_tasks', { action: 'Dashboard', optional: true, note: 'Admins can approve/reject leave, claims & swaps directly from the Tasks bar on Dashboard' }) },
       ],
     },
     {
@@ -308,6 +310,18 @@ function buildGroups(d, manual, toggle) {
         { id: 'assets_rec',  label: `Assets recorded (${d.assetsCount})`,                           done: d.assetsCount > 0,            action: 'AssetManagement', optional: true, note: 'Equipment, vehicles, property' },
         { id: 'data_import', label: 'Data import completed (if migrating)',                         ...m('data_import', { action: 'Admin',     optional: true, note: 'Admin → Data Import — for migrating from another system' }) },
         { id: 'retention',   label: 'Archive & data retention policies set',                       ...m('retention',   { action: 'Archives',  optional: true }) },
+      ],
+    },
+    {
+      id: 'engagement',
+      label: 'Staff Engagement',
+      icon: Shield,
+      color: 'amber',
+      allOptional: true,
+      items: [
+        { id: 'leaderboard',  label: 'Star leaderboard reviewed by staff',           ...m('leaderboard',  { action: 'StaffLeaderboard', optional: true, note: 'All staff earn stars: feedback submitted, awards received, full-attendance months, no late check-ins' }) },
+        { id: 'awards_live',  label: 'Staff awards given to team',                   ...m('awards_live',  { action: 'StaffAwards',      optional: true, note: '1 star per award — staff profiles and leaderboard update automatically' }) },
+        { id: 'feedback_live',label: 'Client feedback prompt active on care logs',   ...m('feedback_live',{ action: 'Feedback',          optional: true, note: 'Feedback prompt auto-appears after care log save — visible in Feedback page' }) },
       ],
     },
     {
