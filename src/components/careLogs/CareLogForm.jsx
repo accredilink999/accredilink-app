@@ -1261,8 +1261,11 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
       setSavingFeedback(true);
       try {
         const sentimentScore = { positive: 5, neutral: 3, negative: 1 }[feedbackSentiment] ?? 5;
+        const sentimentLabel = { positive: 'Positive', neutral: 'Neutral', negative: 'Negative' }[feedbackSentiment] ?? 'Positive';
+        const clientName = serviceUser?.full_name || 'Client';
+        const staffName = user?.staff_full_name || user?.full_name || 'Staff';
         await supabase.from('client_feedback').insert({
-          client_name: serviceUser?.full_name || '',
+          client_name: clientName,
           service_user_id: serviceUser?.id || null,
           reviewer_name: 'Client (via care call)',
           reviewer_relationship: 'client',
@@ -1272,6 +1275,32 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
           status: 'published',
           created_by: user?.id || null,
         });
+        // Notify admins
+        notifyAdminsOfActivity({
+          title: `Client feedback: ${clientName}`,
+          message: `${staffName} recorded ${sentimentLabel.toLowerCase()} feedback from ${clientName}.${feedbackComment.trim() ? ` "${feedbackComment.trim()}"` : ''}`,
+          excludeUserId: user?.id,
+          actionUrl: '/Feedback',
+        });
+        // Notify paired shift partner
+        if (shift?.paired_shift_id) {
+          try {
+            const pairedShift = await base44.entities.Shift.read(shift.paired_shift_id);
+            if (pairedShift?.staff_id && pairedShift.staff_id !== user?.id) {
+              base44.functions.invoke('createNotification', {
+                recipient_ids: [pairedShift.staff_id],
+                type: 'care_log',
+                title: `Client feedback: ${clientName}`,
+                message: `${staffName} recorded ${sentimentLabel.toLowerCase()} feedback from ${clientName}.`,
+                priority: 'normal',
+                action_url: '/Feedback',
+                send_push: true,
+              }).catch(e => console.warn('Partner feedback notification failed:', e));
+            }
+          } catch (e) {
+            console.warn('Could not notify partner of feedback:', e);
+          }
+        }
         toast.success('Feedback recorded');
       } catch { toast.error('Could not save feedback'); }
       setSavingFeedback(false);

@@ -1459,13 +1459,13 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                   return null;
                 })()}
 
-                {/* Feedback button — always available on every call */}
+                {/* Feedback bar — always available on every call */}
                 <button
                   onClick={() => { setFeedbackCall(call); setFeedbackSentiment('positive'); setFeedbackComment(''); }}
-                  className="mt-2 w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors touch-manipulation"
+                  className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white text-xs font-semibold rounded-xl transition-all touch-manipulation active:scale-[0.99] shadow-sm"
                 >
-                  <Star className="w-3.5 h-3.5" />
-                  Feedback
+                  <Star className="w-3.5 h-3.5 fill-white" />
+                  Would {call.service_user_name} like to give feedback?
                 </button>
               </Card>
             );
@@ -1476,17 +1476,17 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
       {/* Feedback dialog */}
       {feedbackCall && (
         <Dialog open={!!feedbackCall} onOpenChange={(open) => { if (!open) setFeedbackCall(null); }}>
-          <DialogContent className="max-w-sm">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
-                Client Feedback
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-1">
-              <p className="text-sm text-slate-500">
-                Would <span className="font-medium text-slate-700">{feedbackCall.service_user_name}</span> like to leave feedback?
-              </p>
+          <DialogContent className="max-w-sm p-0 overflow-hidden">
+            <div className="bg-teal-600 px-5 py-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                <Star className="w-6 h-6 text-white fill-white" />
+              </div>
+              <div>
+                <p className="font-bold text-white text-base">Would {feedbackCall.service_user_name} like to give feedback?</p>
+                <p className="text-teal-100 text-xs">Takes 5 seconds — tap a mood below</p>
+              </div>
+            </div>
+            <div className="space-y-4 p-5">
               <div className="grid grid-cols-3 gap-2">
                 {[
                   { key: 'positive', label: 'Positive', Icon: ThumbsUp,   active: 'bg-green-500 text-white border-green-500', inactive: 'border-slate-200 text-slate-400 hover:border-green-300 hover:text-green-500' },
@@ -1514,8 +1514,8 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                 />
               </div>
             </div>
-            <DialogFooter className="gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setFeedbackCall(null)}>Cancel</Button>
+            <div className="flex justify-between items-center px-5 pb-5 gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setFeedbackCall(null)} className="text-slate-400">Cancel</Button>
               <Button
                 size="sm"
                 disabled={savingFeedback}
@@ -1523,6 +1523,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                   setSavingFeedback(true);
                   try {
                     const sentimentScore = { positive: 5, neutral: 3, negative: 1 }[feedbackSentiment] ?? 5;
+                    const sentimentLabel = { positive: 'Positive', neutral: 'Neutral', negative: 'Negative' }[feedbackSentiment] ?? 'Positive';
                     await supabase.from('client_feedback').insert({
                       client_name: feedbackCall.service_user_name || '',
                       service_user_id: feedbackCall.service_user_id || null,
@@ -1535,17 +1536,43 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                       status: 'published',
                       created_by: userId || null,
                     });
+                    // Notify admins
+                    notifyAdminsOfActivity({
+                      title: `Client feedback: ${feedbackCall.service_user_name}`,
+                      message: `${shift?.staff_name || 'Staff'} recorded ${sentimentLabel.toLowerCase()} feedback from ${feedbackCall.service_user_name}.${feedbackComment.trim() ? ` "${feedbackComment.trim()}"` : ''}`,
+                      excludeUserId: userId,
+                      areaId: shift?.rota_area_id || shift?.area_id,
+                    });
+                    // Notify paired shift partner
+                    if (shift?.paired_shift_id) {
+                      try {
+                        const pairedShift = await base44.entities.Shift.read(shift.paired_shift_id);
+                        if (pairedShift?.staff_id && pairedShift.staff_id !== userId) {
+                          base44.functions.invoke('createNotification', {
+                            recipient_ids: [pairedShift.staff_id],
+                            type: 'care_log',
+                            title: `Client feedback: ${feedbackCall.service_user_name}`,
+                            message: `${shift?.staff_name || 'Your partner'} recorded ${sentimentLabel.toLowerCase()} feedback from ${feedbackCall.service_user_name}.`,
+                            priority: 'normal',
+                            action_url: '/Feedback',
+                            send_push: true,
+                          }).catch(e => console.warn('Partner feedback notification failed:', e));
+                        }
+                      } catch (e) {
+                        console.warn('Could not notify partner of feedback:', e);
+                      }
+                    }
                     toast.success('Feedback recorded');
                     setFeedbackCall(null);
                   } catch { toast.error('Could not save feedback'); }
                   setSavingFeedback(false);
                 }}
-                className="bg-amber-500 hover:bg-amber-600 text-white gap-1.5"
+                className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5"
               >
                 {savingFeedback ? <Loader2 className="w-4 h-4 animate-spin" /> : <Star className="w-4 h-4" />}
                 Save Feedback
               </Button>
-            </DialogFooter>
+            </div>
           </DialogContent>
         </Dialog>
       )}

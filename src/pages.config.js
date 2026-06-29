@@ -41,6 +41,7 @@ import StaffAwards from './pages/StaffAwards';
 import MyMentoring from './pages/MyMentoring';
 import TwoWayRadio from './pages/TwoWayRadio';
 import CompetencyHub from './pages/CompetencyHub';
+import Feedback from './pages/Feedback';
 import __Layout from './Layout.jsx';
 
 
@@ -53,6 +54,7 @@ export const PAGES = {
     "CareLogs": CareLogs,
     "Competencies": Competencies,
     "ClientManagement": ClientManagement,
+    "Feedback": Feedback,
     "ClockInOut": ClockInOut,
     "ComplianceManagement": ComplianceManagement,
     "DataImport": DataImport,
