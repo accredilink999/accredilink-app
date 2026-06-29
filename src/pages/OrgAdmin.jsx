@@ -10,11 +10,12 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import OwnerWelcomeModal from '@/components/OwnerWelcomeModal';
+import SetupHub from '@/components/admin/SetupHub';
 import {
   Building2, Users, CreditCard, Settings, Shield, Crown, Copy, Check,
   KeyRound, Loader2, ExternalLink, Calendar, ChevronRight, Download,
   UserPlus, Trash2, ChevronDown, MapPin, Clock, LayoutGrid, Sparkles,
-  AlertTriangle, RefreshCw, XCircle, CheckCircle2, Receipt
+  AlertTriangle, RefreshCw, XCircle, CheckCircle2, Receipt, ListChecks
 } from 'lucide-react';
 
 const PLAN_LABELS = {
@@ -44,6 +45,7 @@ const CARD_BRANDS = {
 };
 
 const TABS = [
+  { id: 'setup', label: 'Setup', icon: ListChecks },
   { id: 'overview', label: 'Overview', icon: Building2 },
   { id: 'staff', label: 'Staff', icon: Users },
   { id: 'billing', label: 'Billing', icon: CreditCard },
@@ -320,6 +322,9 @@ export default function OrgAdmin() {
           );
         })}
       </div>
+
+      {/* ── SETUP HUB TAB ────────────────────────────────────────── */}
+      {tab === 'setup' && <SetupHub />}
 
       {/* ── OVERVIEW TAB ─────────────────────────────────────────── */}
       {tab === 'overview' && (
