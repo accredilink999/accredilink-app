@@ -6,7 +6,7 @@ import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { toast } from 'sonner';
 import {
-  Heart, UserCog, ClipboardCheck,
+  UserCog, ClipboardCheck,
   Briefcase, PoundSterling,
   CalendarClock, GraduationCap, Shield, Users, Grid3x3,
   Archive, CheckSquare,
@@ -38,13 +38,6 @@ const PRIMARY = [
     icon: Users,
     bg: 'from-blue-500 to-blue-700',
     desc: 'Manage your team',
-  },
-  {
-    to: 'ClientManagement',
-    label: 'Clients',
-    icon: Heart,
-    bg: 'from-rose-400 to-rose-600',
-    desc: 'Service users & care',
   },
   {
     to: 'AdminApprovalsFinancials',
