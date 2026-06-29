@@ -128,9 +128,16 @@ public class MainActivity extends BridgeActivity {
         // Needed on T320 which has no visible software navigation bar.
         webView.addJavascriptInterface(new AndroidAppBridge(), "AndroidApp");
 
-        // Radio flavor: inject localStorage flags so React app boots to radio page
-        // and the PTT key is pre-bound to T320's hardware keycode (280) on first run.
+        // Radio flavor: start foreground service to keep process alive permanently,
+        // then inject localStorage flags so React boots to the radio page.
         if (BuildConfig.FLAVOR.equals("radio")) {
+            Intent svc = new Intent(this, RadioMonitorService.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(svc);
+            } else {
+                startService(svc);
+            }
+
             webView.post(() -> webView.evaluateJavascript(
                 "localStorage.setItem('carecall_radio_mode','true');" +
                 "localStorage.setItem('radio_keep_awake','true');" +

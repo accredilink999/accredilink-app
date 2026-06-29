@@ -45,6 +45,12 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!-- Foreground service — keeps process alive for alerter polling and radio calls -->
+        <service
+            android:name=".RadioMonitorService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false" />
     </application>
 
     <!-- Permissions -->
@@ -74,6 +80,10 @@
 
     <!-- Exempt from Doze mode so radio calls and alerter polling survive deep sleep -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <!-- Foreground service — keeps process alive permanently on dedicated handsets -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <!-- Biometrics (fingerprint / face recognition for secure login) -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
