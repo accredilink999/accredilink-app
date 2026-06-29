@@ -22,6 +22,7 @@ import DocumentManagement from './pages/DocumentManagement';
 import Documents from './pages/Documents';
 import Feedback from './pages/Feedback';
 import Expenses from './pages/Expenses';
+import Finance from './pages/Finance';
 import FormBuilder from './pages/FormBuilder';
 import HowToUseApp from './pages/HowToUseApp';
 import Incidents from './pages/Incidents';
@@ -78,6 +79,7 @@ export const PAGES = {
     "Documents": Documents,
     "Expenses": Expenses,
     "Feedback": Feedback,
+    "Finance": Finance,
     "FormBuilder": FormBuilder,
     "HowToUseApp": HowToUseApp,
     "Incidents": Incidents,

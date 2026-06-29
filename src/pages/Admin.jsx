@@ -8,8 +8,8 @@ import { toast } from 'sonner';
 import {
   Heart, UserCog, ClipboardCheck, Calendar, MessageCircle,
   Briefcase, PoundSterling, BarChart3,
-  CalendarClock, GraduationCap, Receipt, Shield, Users, Grid3x3,
-  Archive, CheckSquare,
+  CalendarClock, GraduationCap, Shield, Users, Grid3x3,
+  Archive,
   Activity, Building2, Star, Trophy,
   ChevronDown, ChevronUp, SlidersHorizontal, ListChecks, Smartphone, Send, Loader2,
 } from 'lucide-react';
@@ -53,11 +53,11 @@ const PRIMARY = [
     desc: 'Scheduling & patterns',
   },
   {
-    to: 'AdminApprovalsFinancials',
-    label: 'Approvals',
-    icon: CheckSquare,
-    bg: 'from-indigo-400 to-indigo-600',
-    desc: 'Leave, swaps & expenses',
+    to: 'Finance',
+    label: 'Finance',
+    icon: PoundSterling,
+    bg: 'from-indigo-500 to-indigo-700',
+    desc: 'Approvals, invoicing & payroll',
     badgeKey: 'pending',
   },
   {
@@ -85,8 +85,6 @@ const PRIMARY = [
 
 // ─── MORE tiles — collapsed by default ───────────────────────────────────────
 const MORE = [
-  { to: 'Invoicing',        label: 'Invoicing',    icon: Receipt,         bg: 'from-teal-400 to-teal-600',    desc: 'Client invoices' },
-  { to: 'Payroll',          label: 'Payroll',      icon: PoundSterling,   bg: 'from-emerald-400 to-emerald-600', desc: 'Pay & payslips', superAdminOnly: true },
   { to: 'ClinicalDashboard',label: 'Clinical',     icon: Activity,        bg: 'from-rose-500 to-rose-700',    desc: 'Clinical dashboard' },
   { to: 'WorkCalendar',     label: 'Calendar',     icon: CalendarClock,   bg: 'from-indigo-300 to-indigo-500', desc: 'Work calendar' },
   { to: 'Messages',         label: 'Messages',     icon: MessageCircle,   bg: 'from-pink-400 to-pink-600',    desc: 'Staff communications' },
