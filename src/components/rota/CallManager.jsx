@@ -1034,11 +1034,17 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
              const serviceUser = serviceUsers.find(su => su.id === call.service_user_id);
              const isOnHold = serviceUser?.status === 'on_hold';
              // Block check-in if any other call is open (not checked out) or checked out but no care log
-             const hasBlockingCall = !isAdmin && callsToDisplay.some(c => {
+             const blockingCall = !isAdmin ? callsToDisplay.find(c => {
                if (c.id === call.id || !c.clock_in_time) return false;
-               if (!c.clock_out_time) return true; // still in progress
-               return !careLogs.some(log => log.id === c.care_log_id || log.shift_call_id === c.id); // checked out but no log
-             });
+               if (!c.clock_out_time) return true;
+               return !careLogs.some(log => log.id === c.care_log_id || log.shift_call_id === c.id);
+             }) : null;
+             const hasBlockingCall = !!blockingCall;
+             const blockingReason = blockingCall
+               ? !blockingCall.clock_out_time
+                 ? `Check out of ${blockingCall.service_user_name || 'current call'} first`
+                 : `Complete care log for ${blockingCall.service_user_name || 'previous call'} first`
+               : null;
              const canClockIn = (isMyShift || isAdmin) && !call.clock_in_time && (call.status === 'pending' || call.status === 'in_progress') && !isOnHold && !hasBlockingCall;
              const canClockOut = (isMyShift || isAdmin) && call.clock_in_time && !call.clock_out_time && call.status === 'in_progress' && !isOnHold;
              const hasCarLog = careLogs.some(log => log.id === call.care_log_id || (log.shift_call_id === call.id));
@@ -1332,7 +1338,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                                 className="w-full py-3.5 px-4 bg-green-50 border border-green-200 text-green-700 font-semibold rounded-xl flex items-center gap-3 active:scale-[0.99] touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                               >
                                 <Play className="w-4 h-4 flex-shrink-0" />
-                                {hasBlockingCall ? 'Complete current call & log first' : 'Check In to Call'}
+                                {hasBlockingCall ? blockingReason : 'Check In to Call'}
                               </button>
                             </div>
                           )}
@@ -1366,7 +1372,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                               className="w-full py-3.5 px-4 bg-green-50 border border-green-200 text-green-700 font-semibold rounded-xl flex items-center gap-3 active:scale-[0.99] touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                             >
                               <Play className="w-4 h-4 flex-shrink-0" />
-                              {hasBlockingCall ? 'Complete current call & log first' : 'Check In to Call'}
+                              {hasBlockingCall ? blockingReason : 'Check In to Call'}
                             </button>
                             {isOverdue && (
                               <button
