@@ -49,7 +49,8 @@ import {
   ListChecks,
   Share2,
   ClipboardCheck,
-  Radio } from
+  Radio,
+  ChevronDown } from
 'lucide-react';
 import ShiftSwapResponseModal from '@/components/rota/ShiftSwapResponseModal';
 import HelpTip from '@/components/ui/HelpTip';
@@ -63,6 +64,8 @@ export default function Dashboard() {
   const [showAwardBanner, setShowAwardBanner] = useState(false);
   const [dismissedAwardIds, setDismissedAwardIds] = useState([]);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [notificationsExpanded, setNotificationsExpanded] = useState(false);
+  const [lastSeenNotifCount, setLastSeenNotifCount] = useState(0);
   const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
   const [careLogData, setCareLogData] = useState({
     service_user_id: '',
@@ -462,41 +465,51 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Unread Notifications & Announcements Banner */}
-      {(unreadNotifications.length > 0 || unacknowledgedAnnouncements.length > 0) && (
-        <Card className="p-4 sm:p-5 bg-gradient-to-br from-teal-50 to-cyan-50 border-0 shadow-sm">
-          <HelpTip tip="Important alerts and announcements that need your attention.">
-            <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2 text-sm sm:text-base">
-              <Bell className="w-4 h-4 text-teal-600 flex-shrink-0" />
-              You Have Updates
-            </h3>
-          </HelpTip>
-          <div className="space-y-2">
-            {unreadNotifications.length > 0 && (
-              <Link to={createPageUrl('NotificationCenter')}>
-                <div className="flex items-center gap-3 p-3 bg-white/80 rounded-lg hover:bg-white transition-colors">
-                  <Bell className="w-5 h-5 text-teal-500" />
-                  <span className="text-sm font-medium flex-1">
-                    {unreadNotifications.length} unread notification{unreadNotifications.length > 1 ? 's' : ''}
-                  </span>
-                  <Badge variant="secondary" className="bg-teal-100 text-teal-700 text-xs flex-shrink-0">View</Badge>
-                </div>
-              </Link>
-            )}
-            {unacknowledgedAnnouncements.length > 0 && (
-              <Link to={createPageUrl('NotificationCenter')}>
-                <div className="flex items-center gap-3 p-3 bg-white/80 rounded-lg hover:bg-white transition-colors">
-                  <AlertTriangle className="w-5 h-5 text-amber-500" />
-                  <span className="text-sm font-medium flex-1">
-                    {unacknowledgedAnnouncements.length} announcement{unacknowledgedAnnouncements.length > 1 ? 's' : ''} to acknowledge
-                  </span>
-                  <Badge variant="secondary" className="bg-amber-100 text-amber-700 text-xs flex-shrink-0">Action Needed</Badge>
-                </div>
-              </Link>
+      {/* Admin Notifications Centre — collapsed by default, expandable */}
+      {(unreadNotifications.length > 0 || unacknowledgedAnnouncements.length > 0) && (() => {
+        const totalCount = unreadNotifications.length + unacknowledgedAnnouncements.length;
+        return (
+          <div className="rounded-xl overflow-hidden shadow-sm border border-teal-200">
+            <button
+              onClick={() => { setNotificationsExpanded(v => !v); setLastSeenNotifCount(totalCount); }}
+              className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-teal-600 to-cyan-600 text-white touch-manipulation active:scale-[0.99] transition-all"
+            >
+              <Bell className={`w-4 h-4 flex-shrink-0 ${totalCount > lastSeenNotifCount ? 'animate-pulse' : ''}`} />
+              <span className="font-semibold text-sm flex-1 text-left">Admin Notifications Centre</span>
+              <span className="bg-white text-teal-700 font-bold text-xs px-2 py-0.5 rounded-full min-w-[22px] text-center">
+                {totalCount}
+              </span>
+              <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 ${notificationsExpanded ? 'rotate-180' : ''}`} />
+            </button>
+            {notificationsExpanded && (
+              <div className="bg-teal-50 p-3 space-y-2">
+                {unreadNotifications.length > 0 && (
+                  <Link to={createPageUrl('NotificationCenter')}>
+                    <div className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-teal-50 transition-colors border border-teal-100">
+                      <Bell className="w-5 h-5 text-teal-500 flex-shrink-0" />
+                      <span className="text-sm font-medium flex-1">
+                        {unreadNotifications.length} unread notification{unreadNotifications.length > 1 ? 's' : ''}
+                      </span>
+                      <Badge className="bg-teal-600 text-white text-xs flex-shrink-0">View</Badge>
+                    </div>
+                  </Link>
+                )}
+                {unacknowledgedAnnouncements.length > 0 && (
+                  <Link to={createPageUrl('NotificationCenter')}>
+                    <div className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-amber-50 transition-colors border border-amber-100">
+                      <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                      <span className="text-sm font-medium flex-1">
+                        {unacknowledgedAnnouncements.length} announcement{unacknowledgedAnnouncements.length > 1 ? 's' : ''} to acknowledge
+                      </span>
+                      <Badge className="bg-amber-500 text-white text-xs flex-shrink-0">Action</Badge>
+                    </div>
+                  </Link>
+                )}
+              </div>
             )}
           </div>
-        </Card>
-      )}
+        );
+      })()}
 
       {/* Available Shifts to Claim */}
       {availableShifts.length > 0 && (
