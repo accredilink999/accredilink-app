@@ -261,7 +261,7 @@ function PermissionManager({ open, onClose, rotaArea }) {
 
   const { data: permissions = [] } = useQuery({
     queryKey: ['rotaPermissions', rotaArea.id],
-    queryFn: () => base44.entities.RotaPermission.filter({ area_id: rotaArea.id }),
+    queryFn: () => base44.entities.RotaPermission.filter({ rota_area_id: rotaArea.id }),
   });
 
   const createMutation = useMutation({
@@ -304,7 +304,7 @@ function PermissionManager({ open, onClose, rotaArea }) {
   const handleAdd = () => {
     const selectedStaff = staff.find(s => s.id === selectedStaffId);
     createMutation.mutate({
-      area_id: rotaArea.id,
+      rota_area_id: rotaArea.id,
       staff_id: selectedStaffId,
       permission_level: permissionLevel
     });

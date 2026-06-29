@@ -42,11 +42,6 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
     },
   });
 
-  const { data: rotaAreas = [] } = useQuery({
-    queryKey: ['rotaAreas'],
-    queryFn: () => base44.entities.RotaArea.filter({ is_active: true }, 'name'),
-  });
-
   const { data: currentUser } = useQuery({
     queryKey: ['currentUser'],
     queryFn: () => base44.auth.me(),
@@ -67,16 +62,6 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
       queryClient.invalidateQueries({ queryKey: ['staff', staffId] });
       queryClient.invalidateQueries({ queryKey: ['currentUser'] });
       setShowRoleDialog(false);
-    },
-  });
-
-  const updateAreaMutation = useMutation({
-    mutationFn: async (areaId) => {
-      return base44.entities.User.update(staffId, { area_id: areaId || null });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['staff', staffId] });
-      queryClient.invalidateQueries({ queryKey: ['allStaff'] });
     },
   });
 
@@ -372,8 +357,6 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
     setShowRoleDialog(true);
   };
 
-  const staffArea = rotaAreas.find(a => a.id === staff?.area_id);
-
   const isOwnProfile = staffId === currentUserId;
 
   return (
@@ -403,42 +386,12 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
                 <Badge className={staff?.role === 'super_admin' ? 'bg-amber-100 text-amber-800 border border-amber-300' : staff?.role === 'admin' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-800'}>
                   {staff?.role === 'super_admin' ? 'super admin' : staff?.role}
                 </Badge>
-                {staffArea && (
-                  <Badge className="bg-orange-100 text-orange-800">
-                    <MapPin className="w-3 h-3 mr-1" />
-                    {staffArea.name}
-                  </Badge>
-                )}
               </div>
             </div>
           </div>
           {isAdmin && !isOwnProfile && (
             <div className="flex items-center gap-2 shrink-0 mt-1 sm:mt-0">
-              {/* Area quick-assign */}
-              <Select
-                value={staff?.area_id || 'none'}
-                onValueChange={(v) => updateAreaMutation.mutate(v === 'none' ? null : v)}
-              >
-                <SelectTrigger className="h-8 w-36 text-xs border-slate-200">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                    <SelectValue placeholder="Area…" />
-                  </div>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No area</SelectItem>
-                  {rotaAreas.map((area) => (
-                    <SelectItem key={area.id} value={area.id}>
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: area.color }} />
-                        {area.name}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {/* All other admin actions in one dropdown */}
+              {/* Admin actions dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="icon" className="h-8 w-8 shrink-0">
