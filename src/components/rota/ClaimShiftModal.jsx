@@ -6,7 +6,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Trash2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, Trash2, UserCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { notifyClaimCreated } from '@/utils/shiftClaimNotifications';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -15,6 +16,7 @@ export default function ClaimShiftModal({ shift, open, onClose, isAdmin = false 
   const queryClient = useQueryClient();
   const [reason, setReason] = useState('');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [allocateStaffId, setAllocateStaffId] = useState('');
 
   const { data: user } = useQuery({
     queryKey: ['currentUser'],
@@ -33,6 +35,31 @@ export default function ClaimShiftModal({ shift, open, onClose, isAdmin = false 
   });
 
   const hasPendingClaim = existingClaims.length > 0;
+
+  const { data: allStaff = [] } = useQuery({
+    queryKey: ['allStaffForAllocation'],
+    queryFn: () => base44.entities.User.filter({ role__ne: 'super_admin' }),
+    enabled: isAdmin,
+  });
+
+  const allocateMutation = useMutation({
+    mutationFn: async (staffId) => {
+      const staffMember = allStaff.find(s => s.id === staffId);
+      return ShiftApi.update(shift.id, {
+        staff_id: staffId,
+        staff_name: staffMember?.staff_full_name || staffMember?.full_name || '',
+        status: 'confirmed',
+      });
+    },
+    onSuccess: (_, staffId) => {
+      const staffMember = allStaff.find(s => s.id === staffId);
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      queryClient.invalidateQueries({ queryKey: ['shiftClaimRequests'] });
+      toast.success(`Shift allocated to ${staffMember?.staff_full_name || staffMember?.full_name}`);
+      onClose();
+    },
+    onError: (e) => toast.error(e.message || 'Failed to allocate shift'),
+  });
 
   const claimMutation = useMutation({
     mutationFn: async (data) => {
@@ -120,6 +147,39 @@ export default function ClaimShiftModal({ shift, open, onClose, isAdmin = false 
               <p className="text-xs text-slate-500 mt-1">{areaName}</p>
             )}
           </div>
+
+          {isAdmin && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+                <UserCheck className="w-4 h-4 text-teal-600" /> Allocate to Staff
+              </Label>
+              <div className="flex gap-2">
+                <Select value={allocateStaffId} onValueChange={setAllocateStaffId}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Select staff member…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allStaff.map(s => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.staff_full_name || s.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  onClick={() => allocateMutation.mutate(allocateStaffId)}
+                  disabled={!allocateStaffId || allocateMutation.isPending}
+                  className="bg-teal-600 hover:bg-teal-700 shrink-0"
+                >
+                  {allocateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Allocate'}
+                </Button>
+              </div>
+              <p className="text-xs text-slate-400">Auto-approved — no claim request raised.</p>
+              <div className="border-t border-slate-100 pt-3 mt-1">
+                <p className="text-xs font-medium text-slate-500 mb-2">Or claim for yourself</p>
+              </div>
+            </div>
+          )}
 
           {hasPendingClaim ? (
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
