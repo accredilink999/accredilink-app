@@ -7,9 +7,9 @@ import { supabase } from '@/api/supabaseClient';
 import { toast } from 'sonner';
 import {
   Heart, UserCog, ClipboardCheck, Calendar, MessageCircle,
-  Briefcase, PoundSterling, BarChart3,
+  Briefcase, PoundSterling,
   CalendarClock, GraduationCap, Shield, Users, Grid3x3,
-  Archive,
+  Archive, CheckSquare,
   Activity, Building2, Star, Trophy,
   ChevronDown, ChevronUp, SlidersHorizontal, ListChecks, Smartphone, Send, Loader2,
 } from 'lucide-react';
@@ -53,19 +53,19 @@ const PRIMARY = [
     desc: 'Scheduling & patterns',
   },
   {
-    to: 'Finance',
-    label: 'Finance',
-    icon: PoundSterling,
-    bg: 'from-indigo-500 to-indigo-700',
-    desc: 'Approvals, invoicing & payroll',
+    to: 'AdminApprovalsFinancials',
+    label: 'Approvals',
+    icon: CheckSquare,
+    bg: 'from-indigo-400 to-indigo-600',
+    desc: 'Leave, swaps & expenses',
     badgeKey: 'pending',
   },
   {
-    to: 'Reports',
-    label: 'Reports',
-    icon: BarChart3,
-    bg: 'from-sky-400 to-sky-600',
-    desc: 'Analytics & exports',
+    to: 'Finance',
+    label: 'Finance',
+    icon: PoundSterling,
+    bg: 'from-emerald-500 to-emerald-700',
+    desc: 'Invoicing & payroll',
   },
   {
     to: 'ComplianceManagement',

@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { createPageUrl } from '@/utils';
-import { CheckSquare, Receipt, PoundSterling, Clock, AlertCircle } from 'lucide-react';
+import { Receipt, PoundSterling } from 'lucide-react';
 
 export default function Finance() {
   const { data: user } = useQuery({
@@ -10,31 +10,9 @@ export default function Finance() {
     queryFn: () => base44.auth.me(),
   });
 
-  const { data: pendingLeave = [] } = useQuery({
-    queryKey: ['pendingLeaveAdmin'],
-    queryFn: () => base44.entities.LeaveRequest.filter({ status: 'pending' }),
-  });
-  const { data: pendingSwaps = [] } = useQuery({
-    queryKey: ['pendingSwapsAdmin'],
-    queryFn: () => base44.entities.ShiftSwapRequest.filter({ status: 'pending_admin' }),
-  });
-  const { data: pendingExpenses = [] } = useQuery({
-    queryKey: ['pendingExpenses'],
-    queryFn: () => base44.entities.Expense.filter({ status: 'pending' }),
-  });
-
   const isSuperAdmin = user?.role === 'super_admin';
-  const pendingCount = pendingLeave.length + pendingSwaps.length + pendingExpenses.length;
 
   const cards = [
-    {
-      to: 'AdminApprovalsFinancials',
-      label: 'Approvals',
-      icon: CheckSquare,
-      bg: 'from-indigo-500 to-indigo-700',
-      desc: 'Leave, shift swaps & expenses',
-      badge: pendingCount,
-    },
     {
       to: 'Invoicing',
       label: 'Invoicing',
@@ -55,11 +33,7 @@ export default function Finance() {
     <div className="space-y-5">
       <div>
         <h1 className="text-xl font-bold text-slate-900">Finance</h1>
-        <p className="text-sm text-slate-400 mt-0.5">
-          {pendingCount > 0
-            ? <span className="text-amber-600 font-medium">{pendingCount} approval{pendingCount !== 1 ? 's' : ''} waiting</span>
-            : 'Approvals, invoicing and payroll'}
-        </p>
+        <p className="text-sm text-slate-400 mt-0.5">Invoicing and payroll</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
