@@ -10,7 +10,7 @@ import {
   Briefcase, PoundSterling, BarChart3,
   CalendarClock, GraduationCap, Receipt, Shield, Users, Grid3x3,
   Archive, CheckSquare,
-  Activity, Building2, Star, Scale, ImagePlus, Trophy,
+  Activity, Building2, Star, Trophy,
   ChevronDown, ChevronUp, SlidersHorizontal, ListChecks, Smartphone, Send, Loader2,
 } from 'lucide-react';
 
@@ -91,10 +91,8 @@ const MORE = [
   { to: 'WorkCalendar',     label: 'Calendar',     icon: CalendarClock,   bg: 'from-indigo-300 to-indigo-500', desc: 'Work calendar' },
   { to: 'Messages',         label: 'Messages',     icon: MessageCircle,   bg: 'from-pink-400 to-pink-600',    desc: 'Staff communications' },
   { to: 'Archive',          label: 'Archive',      icon: Archive,         bg: 'from-slate-400 to-slate-600',  desc: 'Archived records' },
-  { to: 'PhotoGallery',     label: 'Photos',       icon: ImagePlus,       bg: 'from-violet-400 to-violet-600', desc: 'Org photo gallery' },
   { to: 'StaffAwards',      label: 'Awards',       icon: Trophy,          bg: 'from-amber-400 to-yellow-500', desc: 'Recognise staff' },
   { to: 'Feedback',         label: 'Feedback',     icon: Star,            bg: 'from-yellow-400 to-amber-500', desc: 'Client feedback' },
-  { to: 'LegalPages',       label: 'Legal',        icon: Scale,           bg: 'from-gray-400 to-gray-600',    desc: 'Terms & policies' },
 ];
 
 // ─── Tile component ───────────────────────────────────────────────────────────

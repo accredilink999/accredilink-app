@@ -198,7 +198,7 @@ function IPContent() {
   );
 }
 
-export default function LegalPages({ initialTab }) {
+export default function LegalPages({ initialTab, embedded = false }) {
   const [searchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
   const [activeTab, setActiveTab] = useState(tabFromUrl || initialTab || 'terms');
@@ -207,16 +207,18 @@ export default function LegalPages({ initialTab }) {
 
   return (
     <div className="max-w-3xl mx-auto pb-8">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-5">
-        <button
-          onClick={() => navigate(-1)}
-          className={`p-2 rounded-lg ${isDark ? 'hover:bg-slate-700' : 'hover:bg-slate-100'} transition-colors`}
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-        <h1 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Legal</h1>
-      </div>
+      {/* Header — hidden when embedded inside OrgAdmin */}
+      {!embedded && (
+        <div className="flex items-center gap-3 mb-5">
+          <button
+            onClick={() => navigate(-1)}
+            className={`p-2 rounded-lg ${isDark ? 'hover:bg-slate-700' : 'hover:bg-slate-100'} transition-colors`}
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <h1 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Legal</h1>
+        </div>
+      )}
 
       {/* Tab bar */}
       <div className={`flex gap-1 p-1 rounded-xl mb-5 ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
