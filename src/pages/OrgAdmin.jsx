@@ -15,12 +15,13 @@ import FeaturePermissions from '@/components/admin/FeaturePermissions';
 import DataImport from '@/pages/DataImport';
 import LegalPages from '@/pages/LegalPages';
 import Archive from '@/pages/Archive';
+import Feedback from '@/pages/Feedback';
 import {
   Building2, Users, CreditCard, Settings, Shield, Crown, Copy, Check,
   KeyRound, Loader2, ExternalLink, Calendar, ChevronRight, Download,
   UserPlus, Trash2, ChevronDown, MapPin, Clock, LayoutGrid, Sparkles,
   AlertTriangle, RefreshCw, XCircle, CheckCircle2, Receipt, ListChecks,
-  SlidersHorizontal, FileSpreadsheet, Scale, ArchiveIcon,
+  SlidersHorizontal, FileSpreadsheet, Scale, ArchiveIcon, Star,
 } from 'lucide-react';
 
 const PLAN_LABELS = {
@@ -50,15 +51,16 @@ const CARD_BRANDS = {
 };
 
 const TABS = [
-  { id: 'setup',       label: 'Setup',       icon: ListChecks },
-  { id: 'overview',    label: 'Overview',    icon: Building2 },
-  { id: 'staff',       label: 'Staff',       icon: Users },
-  { id: 'permissions', label: 'Permissions', icon: SlidersHorizontal },
-  { id: 'import',      label: 'Import',      icon: FileSpreadsheet },
-  { id: 'legal',       label: 'Legal',       icon: Scale },
-  { id: 'archive',     label: 'Archive',     icon: ArchiveIcon },
-  { id: 'billing',     label: 'Billing',     icon: CreditCard },
-  { id: 'settings',    label: 'Settings',    icon: Settings },
+  { id: 'setup',       label: 'Setup',       icon: ListChecks,      bg: 'from-teal-500 to-teal-700' },
+  { id: 'overview',    label: 'Overview',    icon: Building2,       bg: 'from-blue-500 to-blue-700' },
+  { id: 'staff',       label: 'Staff',       icon: Users,           bg: 'from-indigo-500 to-indigo-700' },
+  { id: 'permissions', label: 'Permissions', icon: SlidersHorizontal, bg: 'from-violet-500 to-violet-700' },
+  { id: 'import',      label: 'Import',      icon: FileSpreadsheet, bg: 'from-emerald-500 to-emerald-700' },
+  { id: 'legal',       label: 'Legal',       icon: Scale,           bg: 'from-slate-500 to-slate-700' },
+  { id: 'archive',     label: 'Archive',     icon: ArchiveIcon,     bg: 'from-stone-500 to-stone-700' },
+  { id: 'feedback',    label: 'Feedback',    icon: Star,            bg: 'from-amber-400 to-amber-600' },
+  { id: 'billing',     label: 'Billing',     icon: CreditCard,      bg: 'from-green-500 to-green-700' },
+  { id: 'settings',    label: 'Settings',    icon: Settings,        bg: 'from-rose-500 to-rose-700' },
 ];
 
 export default function OrgAdmin() {
@@ -322,13 +324,15 @@ export default function OrgAdmin() {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border-2 text-xs font-medium transition-all touch-manipulation ${
+              className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border-2 text-xs font-semibold transition-all touch-manipulation active:scale-95 ${
                 isActive
-                  ? 'bg-teal-600 text-white border-teal-600 shadow-sm'
-                  : 'bg-white text-slate-500 border-slate-200 hover:border-teal-300 hover:text-teal-600'
+                  ? `bg-gradient-to-br ${t.bg} text-white border-transparent shadow-md`
+                  : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:shadow-sm'
               }`}
             >
-              <Icon className="w-4 h-4" />
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${isActive ? 'bg-white/20' : `bg-gradient-to-br ${t.bg}`}`}>
+                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-white'}`} />
+              </div>
               {t.label}
             </button>
           );
@@ -349,6 +353,9 @@ export default function OrgAdmin() {
 
       {/* ── ARCHIVE TAB ──────────────────────────────────────────── */}
       {tab === 'archive' && <Archive />}
+
+      {/* ── FEEDBACK TAB ─────────────────────────────────────────── */}
+      {tab === 'feedback' && <Feedback />}
 
       {/* ── OVERVIEW TAB ─────────────────────────────────────────── */}
       {tab === 'overview' && (
