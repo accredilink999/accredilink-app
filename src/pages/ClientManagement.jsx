@@ -24,6 +24,9 @@ import {
   MoreVertical,
   FileEdit,
   Star,
+  ThumbsUp,
+  ThumbsDown,
+  Minus,
 } from 'lucide-react';
 import CareLogFormBuilder from '@/components/admin/CareLogFormBuilder';
 import HelpTip from '@/components/ui/HelpTip';
@@ -253,36 +256,41 @@ export default function ClientManagement() {
       </div>
 
       {/* Client Feedback — admin only */}
-      {isAdmin && recentFeedback.length > 0 && (
-        <Card className="p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-            <h3 className="text-sm font-semibold text-slate-800">Recent Feedback</h3>
-            <Badge variant="secondary" className="text-xs ml-auto">
-              {recentFeedback.length > 0 && (() => {
-                const avg = (recentFeedback.reduce((s, f) => s + (f.rating || 0), 0) / recentFeedback.length).toFixed(1);
-                return `${avg} avg`;
-              })()}
-            </Badge>
-          </div>
-          <div className="space-y-2">
-            {recentFeedback.slice(0, 5).map((fb) => (
-              <div key={fb.id} className="flex items-start gap-3 py-2 border-b border-slate-100 last:border-0">
-                <div className="flex gap-0.5 shrink-0 mt-0.5">
-                  {[1,2,3,4,5].map(s => (
-                    <Star key={s} className={`w-3 h-3 ${s <= (fb.rating || 0) ? 'text-amber-400 fill-amber-400' : 'text-slate-200'}`} />
-                  ))}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-slate-700 truncate">{fb.client_name || 'Unknown client'}</p>
-                  {fb.comment && <p className="text-xs text-slate-400 truncate italic">"{fb.comment}"</p>}
-                </div>
-                <p className="text-[10px] text-slate-300 shrink-0">{new Date(fb.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
+      {isAdmin && recentFeedback.length > 0 && (() => {
+        const pos = recentFeedback.filter(f => f.source === 'positive' || f.rating >= 4).length;
+        const neu = recentFeedback.filter(f => f.source === 'neutral' || (f.rating >= 2 && f.rating < 4)).length;
+        const neg = recentFeedback.filter(f => f.source === 'negative' || f.rating < 2).length;
+        const sentimentIcon = (fb) => {
+          if (fb.source === 'positive' || fb.rating >= 4) return <ThumbsUp className="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" />;
+          if (fb.source === 'negative' || fb.rating < 2) return <ThumbsDown className="w-3.5 h-3.5 text-red-500 shrink-0 mt-0.5" />;
+          return <Minus className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />;
+        };
+        return (
+          <Card className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+              <h3 className="text-sm font-semibold text-slate-800">Recent Feedback</h3>
+              <div className="ml-auto flex items-center gap-2 text-xs">
+                <span className="flex items-center gap-1 text-green-600"><ThumbsUp className="w-3 h-3" />{pos}</span>
+                <span className="flex items-center gap-1 text-amber-500"><Minus className="w-3 h-3" />{neu}</span>
+                <span className="flex items-center gap-1 text-red-500"><ThumbsDown className="w-3 h-3" />{neg}</span>
               </div>
-            ))}
-          </div>
-        </Card>
-      )}
+            </div>
+            <div className="space-y-2">
+              {recentFeedback.slice(0, 5).map((fb) => (
+                <div key={fb.id} className="flex items-start gap-3 py-2 border-b border-slate-100 last:border-0">
+                  {sentimentIcon(fb)}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-slate-700 truncate">{fb.client_name || 'Unknown client'}</p>
+                    {fb.comment && <p className="text-xs text-slate-400 truncate italic">"{fb.comment}"</p>}
+                  </div>
+                  <p className="text-[10px] text-slate-300 shrink-0">{new Date(fb.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
+                </div>
+              ))}
+            </div>
+          </Card>
+        );
+      })()}
 
       {/* Filters */}
        <div className="flex flex-col gap-3 sm:gap-4">

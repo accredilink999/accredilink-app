@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import SpeechButton from '@/components/ui/SpeechButton';
-import { Clock, MapPin, CheckCircle, AlertCircle, Play, Square, Plus, Edit, Trash2, FileText, Car, ListChecks, ClipboardList, User, Users, Home, XCircle, SkipForward, ChevronDown, Timer, Star } from 'lucide-react';
+import { Clock, MapPin, CheckCircle, AlertCircle, Play, Square, Plus, Edit, Trash2, FileText, Car, ListChecks, ClipboardList, User, Users, Home, XCircle, SkipForward, ChevronDown, Timer, Star, ThumbsUp, ThumbsDown, Minus } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from 'lucide-react';
@@ -62,7 +62,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
   const [delayCall, setDelayCall] = useState(null);
   const [delayMinutes, setDelayMinutes] = useState('');
   const [feedbackCall, setFeedbackCall] = useState(null);
-  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackSentiment, setFeedbackSentiment] = useState('positive');
   const [feedbackComment, setFeedbackComment] = useState('');
   const [savingFeedback, setSavingFeedback] = useState(false);
 
@@ -1439,7 +1439,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
 
                 {/* Feedback button — always available on every call */}
                 <button
-                  onClick={() => { setFeedbackCall(call); setFeedbackRating(5); setFeedbackComment(''); }}
+                  onClick={() => { setFeedbackCall(call); setFeedbackSentiment('positive'); setFeedbackComment(''); }}
                   className="mt-2 w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors touch-manipulation"
                 >
                   <Star className="w-3.5 h-3.5" />
@@ -1465,18 +1465,25 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
               <p className="text-sm text-slate-500">
                 Would <span className="font-medium text-slate-700">{feedbackCall.service_user_name}</span> like to leave feedback?
               </p>
-              <div>
-                <Label className="text-xs font-medium text-slate-600 mb-2 block">Rating</Label>
-                <div className="flex gap-1">
-                  {[1,2,3,4,5].map(s => (
-                    <button key={s} type="button" onClick={() => setFeedbackRating(s)}>
-                      <Star className={`w-8 h-8 transition-colors ${s <= feedbackRating ? 'text-amber-400 fill-amber-400' : 'text-slate-200 hover:text-amber-300'}`} />
-                    </button>
-                  ))}
-                </div>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { key: 'positive', label: 'Positive', Icon: ThumbsUp,   active: 'bg-green-500 text-white border-green-500', inactive: 'border-slate-200 text-slate-400 hover:border-green-300 hover:text-green-500' },
+                  { key: 'neutral',  label: 'Neutral',  Icon: Minus,       active: 'bg-amber-400 text-white border-amber-400', inactive: 'border-slate-200 text-slate-400 hover:border-amber-300 hover:text-amber-500' },
+                  { key: 'negative', label: 'Negative', Icon: ThumbsDown,  active: 'bg-red-500 text-white border-red-500',   inactive: 'border-slate-200 text-slate-400 hover:border-red-300 hover:text-red-500' },
+                ].map(({ key, label, Icon, active, inactive }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setFeedbackSentiment(key)}
+                    className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 transition-all touch-manipulation font-medium text-xs ${feedbackSentiment === key ? active : inactive}`}
+                  >
+                    <Icon className="w-6 h-6" />
+                    {label}
+                  </button>
+                ))}
               </div>
               <div>
-                <Label className="text-xs font-medium text-slate-600 mb-1 block">Comments <span className="font-normal text-slate-400">(optional)</span></Label>
+                <Label className="text-xs font-medium text-slate-600 mb-1 block">Note <span className="font-normal text-slate-400">(optional)</span></Label>
                 <Textarea
                   value={feedbackComment}
                   onChange={e => setFeedbackComment(e.target.value)}
@@ -1493,15 +1500,16 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                 onClick={async () => {
                   setSavingFeedback(true);
                   try {
+                    const sentimentScore = { positive: 5, neutral: 3, negative: 1 }[feedbackSentiment] ?? 5;
                     await supabase.from('client_feedback').insert({
                       client_name: feedbackCall.service_user_name || '',
                       service_user_id: feedbackCall.service_user_id || null,
                       shift_id: shift?.id || null,
                       reviewer_name: 'Client (via care call)',
                       reviewer_relationship: 'client',
-                      rating: feedbackRating,
+                      rating: sentimentScore,
                       comment: feedbackComment.trim(),
-                      source: 'care_call',
+                      source: feedbackSentiment,
                       status: 'published',
                       created_by: userId || null,
                     });

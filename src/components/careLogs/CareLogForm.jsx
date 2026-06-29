@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Plus, Trash2, X, Star } from 'lucide-react';
+import { Loader2, Plus, Trash2, X, Star, ThumbsUp, ThumbsDown, Minus } from 'lucide-react';
 import { toast } from 'sonner';
 import MARChart from '@/components/medications/MARChart';
 import { createPageUrl } from '@/utils';
@@ -29,7 +29,7 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
   const queryClient = useQueryClient();
   const [submittedCareLog, setSubmittedCareLog] = useState(null);
   const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
-  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackSentiment, setFeedbackSentiment] = useState('positive');
   const [feedbackComment, setFeedbackComment] = useState('');
   const [savingFeedback, setSavingFeedback] = useState(false);
 
@@ -1236,17 +1236,17 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
   if (submittedCareLog && showFeedbackPrompt) {
     const skipFeedback = () => setShowFeedbackPrompt(false);
     const submitFeedback = async () => {
-      if (!feedbackComment.trim()) { skipFeedback(); return; }
       setSavingFeedback(true);
       try {
+        const sentimentScore = { positive: 5, neutral: 3, negative: 1 }[feedbackSentiment] ?? 5;
         await supabase.from('client_feedback').insert({
           client_name: serviceUser?.full_name || '',
           service_user_id: serviceUser?.id || null,
           reviewer_name: 'Client (via care call)',
           reviewer_relationship: 'client',
-          rating: feedbackRating,
+          rating: sentimentScore,
           comment: feedbackComment.trim(),
-          source: 'care_call',
+          source: feedbackSentiment,
           status: 'published',
           created_by: user?.id || null,
         });
@@ -1268,18 +1268,25 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
             <p className="text-sm text-slate-500">
               Would <span className="font-medium text-slate-700">{serviceUser?.full_name}</span> like to leave feedback?
             </p>
-            <div>
-              <Label className="text-xs font-medium text-slate-600 mb-2 block">Rating</Label>
-              <div className="flex gap-1">
-                {[1,2,3,4,5].map(s => (
-                  <button key={s} type="button" onClick={() => setFeedbackRating(s)}>
-                    <Star className={`w-8 h-8 transition-colors ${s <= feedbackRating ? 'text-amber-400 fill-amber-400' : 'text-slate-200 hover:text-amber-300'}`} />
-                  </button>
-                ))}
-              </div>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { key: 'positive', label: 'Positive', Icon: ThumbsUp,  active: 'bg-green-500 text-white border-green-500', inactive: 'border-slate-200 text-slate-400 hover:border-green-300 hover:text-green-500' },
+                { key: 'neutral',  label: 'Neutral',  Icon: Minus,      active: 'bg-amber-400 text-white border-amber-400', inactive: 'border-slate-200 text-slate-400 hover:border-amber-300 hover:text-amber-500' },
+                { key: 'negative', label: 'Negative', Icon: ThumbsDown, active: 'bg-red-500 text-white border-red-500',   inactive: 'border-slate-200 text-slate-400 hover:border-red-300 hover:text-red-500' },
+              ].map(({ key, label, Icon, active, inactive }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setFeedbackSentiment(key)}
+                  className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 transition-all touch-manipulation font-medium text-xs ${feedbackSentiment === key ? active : inactive}`}
+                >
+                  <Icon className="w-6 h-6" />
+                  {label}
+                </button>
+              ))}
             </div>
             <div>
-              <Label className="text-xs font-medium text-slate-600 mb-1 block">Comments <span className="font-normal text-slate-400">(optional — leave blank to skip)</span></Label>
+              <Label className="text-xs font-medium text-slate-600 mb-1 block">Note <span className="font-normal text-slate-400">(optional)</span></Label>
               <Textarea
                 value={feedbackComment}
                 onChange={e => setFeedbackComment(e.target.value)}
