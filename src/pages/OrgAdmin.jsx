@@ -810,48 +810,6 @@ export default function OrgAdmin() {
             </Card>
           )}
 
-          {/* Areas */}
-          <Card className="p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-green-600" /> Areas ({areas.length})
-              </h3>
-              <Link to={createPageUrl('Settings')}>
-                <Button variant="outline" size="sm">Manage in Settings</Button>
-              </Link>
-            </div>
-            {areas.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {areas.map(a => (
-                  <span key={a.id} className="px-3 py-1.5 bg-green-50 text-green-800 rounded-lg text-sm font-medium">
-                    {a.name}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-slate-400">No areas created yet. Go to Settings → Rota Settings → Areas.</p>
-            )}
-          </Card>
-
-          {/* Quick links */}
-          <Card className="p-5">
-            <h3 className="font-semibold text-slate-900 mb-3">Quick Links</h3>
-            <div className="grid sm:grid-cols-2 gap-2">
-              {[
-                { label: 'Full Settings', page: 'Settings', icon: Settings },
-                { label: 'Staff HR', page: 'StaffManagement', icon: Users },
-                { label: 'Rota Management', page: 'RotaManagement', icon: Calendar },
-                { label: 'Compliance', page: 'ComplianceManagement', icon: Shield },
-              ].map(link => (
-                <Link key={link.page} to={createPageUrl(link.page)}
-                  className="flex items-center gap-2 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">
-                  <link.icon className="w-4 h-4 text-slate-400" />
-                  <span className="text-sm font-medium text-slate-700">{link.label}</span>
-                  <ChevronRight className="w-4 h-4 text-slate-300 ml-auto" />
-                </Link>
-              ))}
-            </div>
-          </Card>
         </div>
       )}
     </div>
