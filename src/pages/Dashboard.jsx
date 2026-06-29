@@ -203,46 +203,11 @@ export default function Dashboard() {
 
   const totalAdminTasks = (isAdmin ? pendingLeave.length + pendingClaimsAdmin.length + pendingSwapsAdmin.length : 0) + openIncidents.length;
 
-  const { data: conversations = [] } = useQuery({
-    queryKey: ['conversations', user?.id],
-    queryFn: async () => {
-      const convs = await base44.entities.Conversation.list();
-      return convs;
-    },
-    enabled: !!user?.id,
-    staleTime: 0
-  });
-
-  const unreadConversations = conversations.filter((conv) => {
-    // Handle both object and number formats for unread_count
-    let unreadCount = 0;
-    if (typeof conv.unread_count === 'object' && conv.unread_count) {
-      unreadCount = conv.unread_count[user?.id] || 0;
-    } else if (typeof conv.unread_count === 'number') {
-      unreadCount = conv.unread_count;
-    }
-    return unreadCount > 0;
-  });
-
-  // Subscribe to conversation and chat message updates
+  // Subscribe to real-time updates
   useEffect(() => {
     if (!user?.id) return;
 
-    const unsubscribeMessages = base44.entities.ChatMessage.subscribe((event) => {
-      queryClient.invalidateQueries({
-        queryKey: ['conversations', user?.id]
-      });
-    });
-
-    const unsubscribeConvs = base44.entities.Conversation.subscribe(() => {
-      queryClient.invalidateQueries({
-        queryKey: ['conversations', user?.id]
-      });
-    });
-
     return () => {
-      unsubscribeMessages();
-      unsubscribeConvs();
     };
   }, [user?.id, queryClient]);
 
@@ -508,7 +473,7 @@ export default function Dashboard() {
           </HelpTip>
           <div className="space-y-2">
             {unreadNotifications.length > 0 && (
-              <Link to={createPageUrl('Messages')}>
+              <Link to={createPageUrl('NotificationCenter')}>
                 <div className="flex items-center gap-3 p-3 bg-white/80 rounded-lg hover:bg-white transition-colors">
                   <Bell className="w-5 h-5 text-teal-500" />
                   <span className="text-sm font-medium flex-1">
@@ -519,7 +484,7 @@ export default function Dashboard() {
               </Link>
             )}
             {unacknowledgedAnnouncements.length > 0 && (
-              <Link to={createPageUrl('Messages')}>
+              <Link to={createPageUrl('NotificationCenter')}>
                 <div className="flex items-center gap-3 p-3 bg-white/80 rounded-lg hover:bg-white transition-colors">
                   <AlertTriangle className="w-5 h-5 text-amber-500" />
                   <span className="text-sm font-medium flex-1">
@@ -723,30 +688,6 @@ export default function Dashboard() {
         />
       )}
 
-      {/* Chat Banner */}
-      {unreadConversations.length > 0 &&
-      <Card className="p-4 sm:p-5 bg-gradient-to-br from-blue-50 to-cyan-50 border-0 shadow-sm">
-          <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2 text-sm sm:text-base">
-            <MessageSquare className="w-4 h-4 text-blue-600 flex-shrink-0" />
-            Unread Messages
-          </h3>
-          <div className="space-y-2">
-            {unreadConversations.slice(0, 2).map((conversation) =>
-          <Link key={conversation.id} to={createPageUrl('Chat')}>
-                <div className="flex items-center gap-3 p-3 bg-white/80 rounded-lg hover:bg-white transition-colors">
-                  <Avatar name={conversation.participant_names?.[0]} size="xs" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-900 truncate">
-                      {conversation.name || conversation.participant_names?.join(', ')}
-                    </p>
-                    <p className="text-xs text-slate-600 truncate">{conversation.unread_count?.[user?.id] || 0} unread message{conversation.unread_count?.[user?.id] > 1 ? 's' : ''}</p>
-                  </div>
-                </div>
-              </Link>
-          )}
-          </div>
-        </Card>
-      }
 
 
       {/* Quick Actions */}
@@ -1010,11 +951,6 @@ export default function Dashboard() {
                     >
                       <Share2 className="w-3 h-3 mr-1" /> Share
                     </Button>
-                    <Link to={createPageUrl('Chat')}>
-                      <Button size="sm" variant="ghost" className="text-xs text-teal-600 hover:bg-teal-50">
-                        <MessageSquare className="w-3 h-3 mr-1" /> Send Message
-                      </Button>
-                    </Link>
                   </div>
                 </Card>
               ))

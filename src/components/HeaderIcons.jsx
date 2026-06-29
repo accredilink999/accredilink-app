@@ -61,9 +61,6 @@ export default function HeaderIcons({ user, isAdmin, totalAdminTasks, unreadNoti
             <Link to={createPageUrl('Settings')}>Settings</Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link to={createPageUrl('ApprovalsAndFinancials')}>Approvals & Financials</Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
             <Link to={createPageUrl('HowToUseApp')} className="flex items-center gap-2">
               <HelpCircle className="w-4 h-4" />
               How To Use The App

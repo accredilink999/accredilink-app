@@ -7,8 +7,8 @@ import { supabase } from '@/api/supabaseClient';
 import { toast } from 'sonner';
 import {
   UserCog, ClipboardCheck,
-  Briefcase, PoundSterling,
-  CalendarClock, GraduationCap, Shield, Users, Grid3x3,
+  PoundSterling,
+  CalendarClock, GraduationCap, Shield, Users,
   CheckSquare,
   Activity, Building2,
   SlidersHorizontal, ListChecks, Smartphone, Send, Loader2,

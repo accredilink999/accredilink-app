@@ -6,7 +6,7 @@ import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import {
   ArrowRight, ArrowLeft, Sparkles, X,
-  Building2, Users, Calendar, Radio, Bell,
+  Building2, Users, Calendar, Radio,
   Briefcase, PoundSterling, GraduationCap, Shield, FileText,
   MapPin, Clock, Heart, CheckCircle2, ChevronRight,
   Copy, Check, ExternalLink, ListChecks, SlidersHorizontal,
@@ -246,44 +246,6 @@ const STEPS = [
             </div>
           ))}
         </ol>
-      </div>
-    ),
-  },
-  {
-    id: 'notifications',
-    icon: Bell,
-    iconBg: 'bg-amber-100',
-    iconColor: 'text-amber-600',
-    title: 'Notifications',
-    subtitle: 'Push alerts for clock-in, clock-out, shift bookings and more',
-    actions: [
-      { label: 'Push Notification Dashboard', page: 'PushNotificationDashboard' },
-      { label: 'Notification Settings', page: 'NotificationSettings' },
-    ],
-    content: () => (
-      <div className="space-y-3">
-        <p className="text-sm text-slate-600">
-          Admins receive a push notification every time a staff member clocks in, clocks out, books onto a shift, or submits a care log.
-          This requires FCM credentials to be configured once.
-        </p>
-        <ol className="space-y-2">
-          {[
-            { n: 1, label: 'Configure FCM credentials', where: 'Admin → Push Notification Dashboard', desc: 'Firebase Cloud Messaging — one-time setup, credentials provided by CareCall support if needed' },
-            { n: 2, label: 'Confirm notifications are enabled globally', where: 'Admin → Notification Settings', desc: 'enabled_globally must be ON' },
-            { n: 3, label: 'Open the app on your phone', where: 'app.carecallai.co.uk or APK', desc: 'Push token registers automatically when you open the app on a mobile device' },
-            { n: 4, label: 'Test: ask a staff member to clock in', where: 'Live test', desc: 'You should receive a push notification within 5 seconds — tick this off in the Setup Hub' },
-          ].map(({ n, label, where, desc }) => (
-            <div key={n} className="flex items-start gap-3 p-2.5 rounded-lg border border-slate-100 bg-slate-50">
-              <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-700 text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">{n}</span>
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-slate-800">{label}</p>
-                <p className="text-[11px] text-slate-400">{where}</p>
-                <p className="text-xs text-slate-500 mt-0.5">{desc}</p>
-              </div>
-            </div>
-          ))}
-        </ol>
-        <Tip>Care log submissions notify the shift partner only, not admins — this is by design.</Tip>
       </div>
     ),
   },
