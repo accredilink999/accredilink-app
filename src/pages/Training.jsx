@@ -23,6 +23,7 @@ import CoursePlayer from '@/components/training/CoursePlayer';
 import AssignCourses from '@/components/training/AssignCourses';
 import MyMentoring from '@/pages/MyMentoring';
 import StaffMatrix from '@/components/staff/StaffMatrix';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   Plus,
   Search,
@@ -39,7 +40,8 @@ import {
   Sparkles,
   Loader2,
   Users,
-  ClipboardCheck
+  ClipboardCheck,
+  MoreVertical,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import HelpTip from '@/components/ui/HelpTip';
@@ -353,33 +355,34 @@ Return ONLY valid JSON (no markdown) with this COMPLETE structure:
         className="[&_h1]:text-slate-900 [&_svg]:text-cyan-600 [&_svg]:fill-cyan-600"
       >
         {isAdmin && (
-          <div className="flex gap-2 flex-wrap">
-            <Button onClick={() => setIsAIBuilderOpen(true)} className="bg-amber-600 hover:bg-amber-700">
-              <Sparkles className="w-4 h-4 mr-2" />
-              AI Course Builder
+          <div className="flex items-center gap-2">
+            <Button onClick={() => setIsAIBuilderOpen(true)} className="bg-amber-500 hover:bg-amber-600 gap-1.5">
+              <Sparkles className="w-4 h-4" />
+              AI Builder
             </Button>
-            <Button
-              onClick={() => setEnhanceConfirmOpen(true)}
-              disabled={enhancingAllCourses}
-              variant="outline"
-              className="border-amber-300 text-amber-700 hover:bg-amber-50"
-            >
-              {enhancingAllCourses ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Enhancing...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  Enhance All with AI
-                </>
-              )}
-            </Button>
-            <Button onClick={() => setIsDialogOpen(true)} className="bg-teal-600 hover:bg-teal-700">
-              <Plus className="w-4 h-4 mr-2" />
+            <Button onClick={() => setIsDialogOpen(true)} className="bg-teal-600 hover:bg-teal-700 gap-1.5">
+              <Plus className="w-4 h-4" />
               Add Training
             </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuItem
+                  onClick={() => setEnhanceConfirmOpen(true)}
+                  disabled={enhancingAllCourses}
+                  className="text-amber-700 focus:text-amber-700 focus:bg-amber-50"
+                >
+                  {enhancingAllCourses
+                    ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    : <Sparkles className="w-4 h-4 mr-2" />}
+                  {enhancingAllCourses ? 'Enhancing…' : 'Enhance all courses with AI'}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         )}
       </PageHeader>
