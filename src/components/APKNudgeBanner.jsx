@@ -5,16 +5,18 @@ import { createPageUrl } from '@/utils';
 import { useNavigate } from 'react-router-dom';
 
 const DISMISSED_KEY = 'apk_nudge_dismissed';
-const SESSION_KEY  = 'apk_nudge_snoozed';
+const SESSION_KEY   = 'apk_nudge_snoozed';
 
 function isAndroidBrowser() {
   if (typeof navigator === 'undefined') return false;
   const ua = navigator.userAgent;
-  if (!/Android/i.test(ua)) return false;
-  // TWA (native APK wrapper) sets this referrer on launch
-  if (typeof document !== 'undefined' && document.referrer?.startsWith('android-app://')) return false;
-  // Custom flag the APK can inject via WebView.addJavascriptInterface or index.html
-  if (typeof window !== 'undefined' && window.__CARECALL_NATIVE__) return false;
+  if (!/Android/i.test(ua)) return false;                          // not Android (rules out iOS + desktop)
+  if (/iPad|iPhone|iPod/.test(ua)) return false;                   // never iOS
+  if (document.referrer?.startsWith('android-app://')) return false; // TWA/APK launch
+  if (window.__CARECALL_NATIVE__) return false;                    // native wrapper flag
+  if (window.matchMedia('(display-mode: standalone)').matches) return false; // already installed as PWA
+  // Exclude desktop browsers — Android UA won't be on desktop but belt-and-braces
+  if (!/Mobi|Mobile/i.test(ua)) return false;
   return true;
 }
 
@@ -29,7 +31,6 @@ export default function APKNudgeBanner() {
     if (localStorage.getItem(DISMISSED_KEY)) return;
     if (sessionStorage.getItem(SESSION_KEY)) return;
 
-    // Load APK URL from system_settings (org-agnostic public row)
     supabase
       .from('system_settings')
       .select('setting_value')
@@ -37,27 +38,21 @@ export default function APKNudgeBanner() {
       .limit(1)
       .single()
       .then(({ data }) => {
-        if (!data?.setting_value) return;
         try {
-          const val = typeof data.setting_value === 'string'
-            ? JSON.parse(data.setting_value)
-            : data.setting_value;
-          if (val?.file_url) {
-            setApkUrl(val.file_url);
-            setApkVersion(val.version || null);
-          }
+          const val = data?.setting_value
+            ? (typeof data.setting_value === 'string' ? JSON.parse(data.setting_value) : data.setting_value)
+            : null;
+          if (val?.file_url) setApkUrl(val.file_url);
+          if (val?.version)  setApkVersion(val.version);
         } catch {}
         setVisible(true);
       })
-      .catch(() => setVisible(true)); // still show even if setting missing — link to /download
+      .catch(() => setVisible(true));
   }, []);
 
   const dismiss = (permanent) => {
-    if (permanent) {
-      localStorage.setItem(DISMISSED_KEY, '1');
-    } else {
-      sessionStorage.setItem(SESSION_KEY, '1');
-    }
+    if (permanent) localStorage.setItem(DISMISSED_KEY, '1');
+    else           sessionStorage.setItem(SESSION_KEY, '1');
     setVisible(false);
   };
 
@@ -99,7 +94,6 @@ export default function APKNudgeBanner() {
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         )}
-
         <button
           onClick={() => dismiss(false)}
           title="Remind me later"
@@ -112,7 +106,6 @@ export default function APKNudgeBanner() {
   );
 }
 
-// Re-exported for admin use — resets the banner for testing
 export function resetAPKNudge() {
   localStorage.removeItem(DISMISSED_KEY);
   sessionStorage.removeItem(SESSION_KEY);
