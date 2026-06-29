@@ -9,7 +9,7 @@ import {
   Building2, Users, Calendar, Radio, Bell,
   Briefcase, PoundSterling, GraduationCap, Shield, FileText,
   MapPin, Clock, Heart, CheckCircle2, ChevronRight,
-  Copy, Check, ExternalLink, ListChecks,
+  Copy, Check, ExternalLink, ListChecks, SlidersHorizontal,
 } from 'lucide-react';
 
 // Each step maps to a Setup Hub group.
@@ -125,6 +125,50 @@ const STEPS = [
             <p className="text-[11px] text-slate-400 mt-1.5 text-center">carecallai.co.uk/signup → Join Existing Team</p>
           </div>
         )}
+      </div>
+    ),
+  },
+  {
+    id: 'permissions',
+    icon: SlidersHorizontal,
+    iconBg: 'bg-teal-100',
+    iconColor: 'text-teal-600',
+    title: 'Feature Permissions',
+    subtitle: 'Control who can access radio, alerter, LMA, training, AI and more',
+    actions: [
+      { label: 'Open Permissions', page: 'OrgAdmin', query: '?tab=permissions' },
+    ],
+    content: () => (
+      <div className="space-y-3">
+        <p className="text-sm text-slate-600">
+          After adding your staff, decide which features are live and which roles can access them.
+          <strong> Defaults are safe</strong> — if you skip this step, all features stay fully active for all roles.
+        </p>
+        <ol className="space-y-2">
+          {[
+            { n: 1, label: 'Turn Radio live',              where: 'Permissions → Radio & Alerter',   desc: 'Master switch — enables the radio system for your org' },
+            { n: 2, label: 'Enable Alerter monitoring',    where: 'Permissions → Radio & Alerter',   desc: 'Choose which roles (admin, super admin, control device) monitor alerter' },
+            { n: 3, label: 'Configure LMA access',         where: 'Permissions → Radio & Alerter',   desc: 'Lone Mobile Alerter — which staff roles can trigger and receive LMA alerts' },
+            { n: 4, label: 'Set training access',          where: 'Permissions → Training & LMS',    desc: 'Which roles can see training — usually all staff' },
+            { n: 5, label: 'Lock down payroll & invoicing',where: 'Permissions → Admin Tools',       desc: 'Typically super admin only' },
+            { n: 6, label: 'Enable AI Assistant for roles',where: 'Permissions → Admin Tools',       desc: 'Choose if staff get AI access or admin only' },
+          ].map(({ n, label, where, desc }) => (
+            <div key={n} className="flex items-start gap-3 p-2.5 rounded-lg border border-slate-100 bg-slate-50">
+              <span className="w-5 h-5 rounded-full bg-teal-100 text-teal-700 text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">{n}</span>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-slate-800">{label}</p>
+                <p className="text-[11px] text-slate-400">{where}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{desc}</p>
+              </div>
+            </div>
+          ))}
+        </ol>
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+          <p className="text-xs text-amber-700">
+            Changes only take effect when you press <strong>Save changes</strong> on the Permissions page.
+            Skipping leaves all features on for all roles.
+          </p>
+        </div>
       </div>
     ),
   },
@@ -377,7 +421,7 @@ export default function OwnerWelcomeModal({ onComplete, onSkip }) {
     if (action.href) {
       window.open(action.href, '_blank');
     } else if (action.page) {
-      navigate(createPageUrl(action.page));
+      navigate(createPageUrl(action.page) + (action.query || ''));
       handleSkip();
     }
   };

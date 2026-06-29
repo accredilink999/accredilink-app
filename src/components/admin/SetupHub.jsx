@@ -10,7 +10,7 @@ import {
   Building2, Users, Calendar, Radio, Bell,
   Briefcase, PoundSterling, GraduationCap,
   Shield, FileText, Database, Cpu,
-  ExternalLink, AlertCircle, Wand2,
+  ExternalLink, AlertCircle, Wand2, SlidersHorizontal,
 } from 'lucide-react';
 
 // ─── Manual checkbox persistence ─────────────────────────────────────────────
@@ -90,11 +90,34 @@ async function fetchHubData(orgId) {
     cnt('hr_documents'),
   ]);
 
+  // Feature permissions row
+  const { data: permRow } = await supabase
+    .from('system_settings')
+    .select('setting_value')
+    .eq('organization_id', orgId)
+    .eq('setting_key', 'feature_permissions')
+    .maybeSingle();
+
+  let hasPermissionsRow = false;
+  let radioLive = false;
+  let alerterLive = false;
+  if (permRow?.setting_value) {
+    try {
+      const p = JSON.parse(permRow.setting_value);
+      hasPermissionsRow = true;
+      radioLive   = p.radio_live?.enabled  !== false;
+      alerterLive = p.alerter?.enabled     !== false;
+    } catch {}
+  }
+
   const allUsers  = users || [];
   const staffOnly = allUsers.filter(u => !['admin', 'super_admin'].includes(u.role));
 
   return {
     org: getCurrentOrg(),
+    hasPermissionsRow,
+    radioLive,
+    alerterLive,
     areasCount:          areasCount  || 0,
     shiftTypesCount:     shiftTypesCount || 0,
     callTypesCount:      callTypesCount  || 0,
@@ -173,6 +196,17 @@ function buildGroups(d, manual, toggle) {
         { id: 'clients_area', label: `Clients assigned to rota areas (${d.serviceUsersWithArea}/${d.serviceUsersCount})`, done: d.serviceUsersWithArea > 0, action: 'ClientManagement' },
         { id: 'client_calls', label: `Client call schedules configured (${d.clientCallsCount})`,      done: d.clientCallsCount > 0,        action: 'ClientManagement', note: 'Scheduled care times per client that drive the rota' },
         { id: 'care_teams',   label: `Care teams created (${d.careTeamsCount})`,                      done: d.careTeamsCount > 0,          action: 'CareTeamManagement', optional: true, note: 'Groups staff into teams per client or area' },
+      ],
+    },
+    {
+      id: 'permissions',
+      label: 'Feature Permissions',
+      icon: SlidersHorizontal,
+      color: 'teal',
+      items: [
+        { id: 'perms_saved',   label: 'Feature permissions configured',   done: d.hasPermissionsRow,  action: 'permissions', note: 'Admin → Organisation → Permissions tab — control radio, alerter, LMA, training, AI and more per role' },
+        { id: 'radio_live',    label: 'Radio system marked live',          done: d.radioLive,          action: 'permissions' },
+        { id: 'alerter_live',  label: 'Alerter monitoring enabled',        done: d.alerterLive,        action: 'permissions' },
       ],
     },
     {
@@ -368,6 +402,9 @@ export default function SetupHub() {
     if (!action) return;
     if (action === 'download') {
       window.open('https://carecallai.co.uk/download', '_blank');
+    } else if (action === 'permissions') {
+      // Navigate to OrgAdmin and open the Permissions tab
+      navigate(createPageUrl('OrgAdmin') + '?tab=permissions');
     } else {
       navigate(createPageUrl(action));
     }

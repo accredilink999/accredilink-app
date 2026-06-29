@@ -11,11 +11,13 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import OwnerWelcomeModal from '@/components/OwnerWelcomeModal';
 import SetupHub from '@/components/admin/SetupHub';
+import FeaturePermissions from '@/components/admin/FeaturePermissions';
 import {
   Building2, Users, CreditCard, Settings, Shield, Crown, Copy, Check,
   KeyRound, Loader2, ExternalLink, Calendar, ChevronRight, Download,
   UserPlus, Trash2, ChevronDown, MapPin, Clock, LayoutGrid, Sparkles,
-  AlertTriangle, RefreshCw, XCircle, CheckCircle2, Receipt, ListChecks
+  AlertTriangle, RefreshCw, XCircle, CheckCircle2, Receipt, ListChecks,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 const PLAN_LABELS = {
@@ -45,11 +47,12 @@ const CARD_BRANDS = {
 };
 
 const TABS = [
-  { id: 'setup', label: 'Setup', icon: ListChecks },
-  { id: 'overview', label: 'Overview', icon: Building2 },
-  { id: 'staff', label: 'Staff', icon: Users },
-  { id: 'billing', label: 'Billing', icon: CreditCard },
-  { id: 'settings', label: 'Settings', icon: Settings },
+  { id: 'setup',       label: 'Setup',       icon: ListChecks },
+  { id: 'overview',    label: 'Overview',    icon: Building2 },
+  { id: 'staff',       label: 'Staff',       icon: Users },
+  { id: 'permissions', label: 'Permissions', icon: SlidersHorizontal },
+  { id: 'billing',     label: 'Billing',     icon: CreditCard },
+  { id: 'settings',    label: 'Settings',    icon: Settings },
 ];
 
 export default function OrgAdmin() {
@@ -57,7 +60,9 @@ export default function OrgAdmin() {
   const orgId = getCurrentOrgId();
   const orgRole = getCurrentOrgRole();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState('overview');
+  // Support ?tab= deep-link from Setup Hub
+  const initialTab = new URLSearchParams(window.location.search).get('tab') || 'setup';
+  const [tab, setTab] = useState(initialTab);
   const [copied, setCopied] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
   const [annual, setAnnual] = useState(false);
@@ -325,6 +330,9 @@ export default function OrgAdmin() {
 
       {/* ── SETUP HUB TAB ────────────────────────────────────────── */}
       {tab === 'setup' && <SetupHub />}
+
+      {/* ── PERMISSIONS TAB ──────────────────────────────────────── */}
+      {tab === 'permissions' && <FeaturePermissions />}
 
       {/* ── OVERVIEW TAB ─────────────────────────────────────────── */}
       {tab === 'overview' && (
