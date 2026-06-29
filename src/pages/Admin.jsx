@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
+import { toast } from 'sonner';
 import {
   Heart, UserCog, ClipboardCheck, Calendar, MessageCircle,
   FolderOpen, Briefcase, PoundSterling, BarChart3, FileEdit,
   CalendarClock, GraduationCap, Receipt, Shield, Users, Grid3x3,
   Archive, Bot, CheckSquare, Download, FileSpreadsheet, Video,
   Activity, Building2, Star, FileText, Scale, ImagePlus, Trophy,
-  ChevronDown, ChevronUp, SlidersHorizontal, ListChecks,
+  ChevronDown, ChevronUp, SlidersHorizontal, ListChecks, Smartphone, Send, Loader2,
 } from 'lucide-react';
 
 // ─── PRIMARY tiles — shown always ────────────────────────────────────────────
@@ -143,18 +145,60 @@ export default function AdminDashboard() {
 
   const isSuperAdmin = user?.role === 'super_admin';
   const pendingCount = pendingSwaps.length + pendingLeave.length;
-
   const moreTiles = MORE.filter(t => !t.superAdminOnly || isSuperAdmin);
+
+  const { data: allStaff = [] } = useQuery({
+    queryKey: ['allStaff'],
+    queryFn: () => base44.entities.User.filter({ is_active: true }),
+  });
+
+  const notifyApkMutation = useMutation({
+    mutationFn: async () => {
+      // Get APK URL from system_settings
+      const { data: setting } = await supabase
+        .from('system_settings')
+        .select('setting_value')
+        .eq('setting_key', 'app_download_android')
+        .limit(1)
+        .single();
+      let apkUrl = null;
+      try {
+        const val = setting?.setting_value
+          ? (typeof setting.setting_value === 'string' ? JSON.parse(setting.setting_value) : setting.setting_value)
+          : null;
+        apkUrl = val?.file_url || null;
+      } catch {}
+
+      const downloadPage = window.location.origin + '/download';
+      const link = apkUrl || downloadPage;
+
+      const staffToNotify = allStaff.filter(s => s.id !== user?.id);
+      for (const s of staffToNotify) {
+        await base44.entities.Notification.create({
+          recipient_id: s.id,
+          type: 'system',
+          title: '📱 Download the CareCall AI App',
+          message: `Your organisation has shared the app download link. Install the APK for the best experience.`,
+          link,
+          is_read: false,
+          send_push: true,
+        });
+      }
+      return staffToNotify.length;
+    },
+    onSuccess: (count) => toast.success(`APK link sent to ${count} staff member${count !== 1 ? 's' : ''}`),
+    onError: () => toast.error('Failed to send notifications'),
+  });
 
   return (
     <div className="max-w-2xl mx-auto pb-8 px-1">
 
       {/* Header */}
       <div className="flex items-center gap-3 mb-5 pt-1">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center shadow-sm">
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center shadow-sm shrink-0">
           <Shield className="w-5 h-5 text-white" strokeWidth={1.8} />
         </div>
-        <div>
+        <div className="flex-1 min-w-0">
           <h1 className="text-xl font-bold text-slate-900 leading-tight">Admin Panel</h1>
           <p className="text-xs text-slate-400">
             {pendingCount > 0
@@ -162,6 +206,18 @@ export default function AdminDashboard() {
               : 'All clear — no pending actions'}
           </p>
         </div>
+        <button
+          onClick={() => notifyApkMutation.mutate()}
+          disabled={notifyApkMutation.isPending || allStaff.length === 0}
+          title="Send APK download link to all staff"
+          className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100 disabled:opacity-50 transition-colors shrink-0"
+        >
+          {notifyApkMutation.isPending
+            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            : <Smartphone className="w-3.5 h-3.5" />}
+          <span className="hidden sm:inline">Share app</span>
+          <Send className="w-3 h-3" />
+        </button>
       </div>
 
       {/* Primary grid */}

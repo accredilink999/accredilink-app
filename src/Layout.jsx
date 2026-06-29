@@ -15,6 +15,7 @@ import { useHelpMode } from '@/lib/HelpModeContext';
 import AppDownloadPrompt from '@/components/AppDownloadPrompt';
 import PWAInstallButton from '@/components/PWAInstallButton';
 import PWAInstallPrompt from '@/components/PWAInstallPrompt';
+import APKNudgeBanner from '@/components/APKNudgeBanner';
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -1225,6 +1226,8 @@ export default function Layout({ children, currentPageName }) {
                                          </div>
                                        </div>
                                      )}
+                                     {/* APK migration nudge for Android browser/PWA users */}
+                                     <APKNudgeBanner />
                                      {/* App Update Banner */}
                                      <AppUpdateBanner />
                                      <GpsWarningBanner />
