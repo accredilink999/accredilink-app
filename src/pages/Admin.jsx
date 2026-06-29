@@ -82,11 +82,17 @@ const PRIMARY = [
     bg: 'from-cyan-400 to-cyan-600',
     desc: 'Courses & certificates',
   },
+  {
+    to: 'ClinicalDashboard',
+    label: 'Clinical Tools',
+    icon: Activity,
+    bg: 'from-rose-500 to-rose-700',
+    desc: 'Clinical dashboard',
+  },
 ];
 
 // ─── MORE tiles — collapsed by default ───────────────────────────────────────
 const MORE = [
-  { to: 'ClinicalDashboard',label: 'Clinical',     icon: Activity,        bg: 'from-rose-500 to-rose-700',    desc: 'Clinical dashboard' },
   { to: 'WorkCalendar',     label: 'Calendar',     icon: CalendarClock,   bg: 'from-indigo-300 to-indigo-500', desc: 'Work calendar' },
   { to: 'Archive',          label: 'Archive',      icon: Archive,         bg: 'from-slate-400 to-slate-600',  desc: 'Archived records' },
   { to: 'StaffAwards',      label: 'Awards',       icon: Trophy,          bg: 'from-amber-400 to-yellow-500', desc: 'Recognise staff' },
