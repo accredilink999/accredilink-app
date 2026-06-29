@@ -14,12 +14,13 @@ import SetupHub from '@/components/admin/SetupHub';
 import FeaturePermissions from '@/components/admin/FeaturePermissions';
 import DataImport from '@/pages/DataImport';
 import LegalPages from '@/pages/LegalPages';
+import Archive from '@/pages/Archive';
 import {
   Building2, Users, CreditCard, Settings, Shield, Crown, Copy, Check,
   KeyRound, Loader2, ExternalLink, Calendar, ChevronRight, Download,
   UserPlus, Trash2, ChevronDown, MapPin, Clock, LayoutGrid, Sparkles,
   AlertTriangle, RefreshCw, XCircle, CheckCircle2, Receipt, ListChecks,
-  SlidersHorizontal, FileSpreadsheet, Scale,
+  SlidersHorizontal, FileSpreadsheet, Scale, ArchiveIcon,
 } from 'lucide-react';
 
 const PLAN_LABELS = {
@@ -55,6 +56,7 @@ const TABS = [
   { id: 'permissions', label: 'Permissions', icon: SlidersHorizontal },
   { id: 'import',      label: 'Import',      icon: FileSpreadsheet },
   { id: 'legal',       label: 'Legal',       icon: Scale },
+  { id: 'archive',     label: 'Archive',     icon: ArchiveIcon },
   { id: 'billing',     label: 'Billing',     icon: CreditCard },
   { id: 'settings',    label: 'Settings',    icon: Settings },
 ];
@@ -311,18 +313,19 @@ export default function OrgAdmin() {
         <p className="text-sm text-slate-500 ml-10">{org?.name || 'Your Organisation'}</p>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-slate-100 p-1 rounded-lg overflow-x-auto">
+      {/* Tabs — 4-column tile grid */}
+      <div className="grid grid-cols-4 gap-2 mb-6">
         {TABS.map(t => {
           const Icon = t.icon;
+          const isActive = tab === t.id;
           return (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
-                tab === t.id
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
+              className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border-2 text-xs font-medium transition-all touch-manipulation ${
+                isActive
+                  ? 'bg-teal-600 text-white border-teal-600 shadow-sm'
+                  : 'bg-white text-slate-500 border-slate-200 hover:border-teal-300 hover:text-teal-600'
               }`}
             >
               <Icon className="w-4 h-4" />
@@ -343,6 +346,9 @@ export default function OrgAdmin() {
 
       {/* ── LEGAL TAB ────────────────────────────────────────────── */}
       {tab === 'legal' && <LegalPages embedded />}
+
+      {/* ── ARCHIVE TAB ──────────────────────────────────────────── */}
+      {tab === 'archive' && <Archive />}
 
       {/* ── OVERVIEW TAB ─────────────────────────────────────────── */}
       {tab === 'overview' && (
