@@ -16,12 +16,13 @@ import DataImport from '@/pages/DataImport';
 import LegalPages from '@/pages/LegalPages';
 import Archive from '@/pages/Archive';
 import Feedback from '@/pages/Feedback';
+import StaffAwards from '@/pages/StaffAwards';
 import {
   Building2, Users, CreditCard, Settings, Shield, Crown, Copy, Check,
   KeyRound, Loader2, ExternalLink, Calendar, ChevronRight, Download,
   UserPlus, Trash2, ChevronDown, MapPin, Clock, LayoutGrid, Sparkles,
   AlertTriangle, RefreshCw, XCircle, CheckCircle2, Receipt, ListChecks,
-  SlidersHorizontal, FileSpreadsheet, Scale, ArchiveIcon, Star,
+  SlidersHorizontal, FileSpreadsheet, Scale, ArchiveIcon, Star, Trophy,
 } from 'lucide-react';
 
 const PLAN_LABELS = {
@@ -59,6 +60,7 @@ const TABS = [
   { id: 'legal',       label: 'Legal',       icon: Scale,           bg: 'from-slate-500 to-slate-700' },
   { id: 'archive',     label: 'Archive',     icon: ArchiveIcon,     bg: 'from-stone-500 to-stone-700' },
   { id: 'feedback',    label: 'Feedback',    icon: Star,            bg: 'from-amber-400 to-amber-600' },
+  { id: 'awards',      label: 'Awards',      icon: Trophy,          bg: 'from-yellow-400 to-yellow-600' },
   { id: 'billing',     label: 'Billing',     icon: CreditCard,      bg: 'from-green-500 to-green-700' },
   { id: 'settings',    label: 'Settings',    icon: Settings,        bg: 'from-rose-500 to-rose-700' },
 ];
@@ -356,6 +358,9 @@ export default function OrgAdmin() {
 
       {/* ── FEEDBACK TAB ─────────────────────────────────────────── */}
       {tab === 'feedback' && <Feedback />}
+
+      {/* ── AWARDS TAB ───────────────────────────────────────────── */}
+      {tab === 'awards' && <StaffAwards />}
 
       {/* ── OVERVIEW TAB ─────────────────────────────────────────── */}
       {tab === 'overview' && (

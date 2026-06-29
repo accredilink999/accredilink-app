@@ -10,7 +10,7 @@ import {
   Briefcase, PoundSterling,
   CalendarClock, GraduationCap, Shield, Users, Grid3x3,
   CheckSquare,
-  Activity, Building2, Trophy,
+  Activity, Building2,
   SlidersHorizontal, ListChecks, Smartphone, Send, Loader2,
 
 } from 'lucide-react';
@@ -81,13 +81,6 @@ const PRIMARY = [
     icon: CalendarClock,
     bg: 'from-indigo-300 to-indigo-500',
     desc: 'Work calendar',
-  },
-  {
-    to: 'StaffAwards',
-    label: 'Awards',
-    icon: Trophy,
-    bg: 'from-amber-400 to-yellow-500',
-    desc: 'Recognise staff',
   },
 ];
 
