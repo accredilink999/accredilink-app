@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
 import PageHeader from '@/components/ui/PageHeader';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ import {
   Settings,
   MoreVertical,
   FileEdit,
+  Star,
 } from 'lucide-react';
 import CareLogFormBuilder from '@/components/admin/CareLogFormBuilder';
 import HelpTip from '@/components/ui/HelpTip';
@@ -53,6 +55,19 @@ export default function ClientManagement() {
   const { data: incidents = [] } = useQuery({
     queryKey: ['allIncidents'],
     queryFn: () => base44.entities.Incident.filter({ status: 'open' }),
+  });
+
+  const { data: recentFeedback = [] } = useQuery({
+    queryKey: ['recentClientFeedback'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('client_feedback')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(8);
+      return data || [];
+    },
+    staleTime: 60000,
   });
 
   const { data: careLogs = [] } = useQuery({
@@ -236,6 +251,38 @@ export default function ClientManagement() {
            </div>
         </Card>
       </div>
+
+      {/* Client Feedback — admin only */}
+      {isAdmin && recentFeedback.length > 0 && (
+        <Card className="p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+            <h3 className="text-sm font-semibold text-slate-800">Recent Feedback</h3>
+            <Badge variant="secondary" className="text-xs ml-auto">
+              {recentFeedback.length > 0 && (() => {
+                const avg = (recentFeedback.reduce((s, f) => s + (f.rating || 0), 0) / recentFeedback.length).toFixed(1);
+                return `${avg} avg`;
+              })()}
+            </Badge>
+          </div>
+          <div className="space-y-2">
+            {recentFeedback.slice(0, 5).map((fb) => (
+              <div key={fb.id} className="flex items-start gap-3 py-2 border-b border-slate-100 last:border-0">
+                <div className="flex gap-0.5 shrink-0 mt-0.5">
+                  {[1,2,3,4,5].map(s => (
+                    <Star key={s} className={`w-3 h-3 ${s <= (fb.rating || 0) ? 'text-amber-400 fill-amber-400' : 'text-slate-200'}`} />
+                  ))}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-slate-700 truncate">{fb.client_name || 'Unknown client'}</p>
+                  {fb.comment && <p className="text-xs text-slate-400 truncate italic">"{fb.comment}"</p>}
+                </div>
+                <p className="text-[10px] text-slate-300 shrink-0">{new Date(fb.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Filters */}
        <div className="flex flex-col gap-3 sm:gap-4">

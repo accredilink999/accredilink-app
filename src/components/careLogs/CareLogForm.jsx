@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/api/supabaseClient';
 import { ShiftCallApi } from '@/api/rotaApi';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Plus, Trash2, X } from 'lucide-react';
+import { Loader2, Plus, Trash2, X, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import MARChart from '@/components/medications/MARChart';
 import { createPageUrl } from '@/utils';
@@ -27,6 +28,10 @@ import { shouldShowField } from '@/utils/customFieldConditions';
 export default function CareLogForm({ shift, serviceUser, open, onClose, callId, scheduledTime }) {
   const queryClient = useQueryClient();
   const [submittedCareLog, setSubmittedCareLog] = useState(null);
+  const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
+  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackComment, setFeedbackComment] = useState('');
+  const [savingFeedback, setSavingFeedback] = useState(false);
 
   const { data: user } = useQuery({
     queryKey: ['currentUser'],
@@ -304,6 +309,7 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
       });
 
       setSubmittedCareLog(careLog);
+      setShowFeedbackPrompt(true);
 
       // Close modal after 2 seconds to show preview
       setTimeout(() => {
@@ -1227,6 +1233,73 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
         return null;
     }
   };
+
+  if (submittedCareLog && showFeedbackPrompt) {
+    const skipFeedback = () => setShowFeedbackPrompt(false);
+    const submitFeedback = async () => {
+      if (!feedbackComment.trim()) { skipFeedback(); return; }
+      setSavingFeedback(true);
+      try {
+        await supabase.from('client_feedback').insert({
+          client_name: serviceUser?.full_name || '',
+          service_user_id: serviceUser?.id || null,
+          reviewer_name: 'Client (via care call)',
+          reviewer_relationship: 'client',
+          rating: feedbackRating,
+          comment: feedbackComment.trim(),
+          source: 'care_call',
+          status: 'published',
+          created_by: user?.id || null,
+        });
+        toast.success('Feedback recorded');
+      } catch { toast.error('Could not save feedback'); }
+      setSavingFeedback(false);
+      skipFeedback();
+    };
+    return (
+      <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) { skipFeedback(); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
+              Client Feedback
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-1">
+            <p className="text-sm text-slate-500">
+              Does <span className="font-medium text-slate-700">{serviceUser?.full_name}</span> want to leave feedback about today's visit?
+            </p>
+            <div>
+              <Label className="text-xs font-medium text-slate-600 mb-2 block">Rating</Label>
+              <div className="flex gap-1">
+                {[1,2,3,4,5].map(s => (
+                  <button key={s} type="button" onClick={() => setFeedbackRating(s)}>
+                    <Star className={`w-8 h-8 transition-colors ${s <= feedbackRating ? 'text-amber-400 fill-amber-400' : 'text-slate-200 hover:text-amber-300'}`} />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs font-medium text-slate-600 mb-1 block">Comments <span className="font-normal text-slate-400">(optional — leave blank to skip)</span></Label>
+              <Textarea
+                value={feedbackComment}
+                onChange={e => setFeedbackComment(e.target.value)}
+                placeholder="Any comments from the client..."
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" size="sm" onClick={skipFeedback}>Skip</Button>
+            <Button size="sm" onClick={submitFeedback} disabled={savingFeedback} className="bg-amber-500 hover:bg-amber-600 text-white">
+              {savingFeedback ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Star className="w-4 h-4 mr-1" />}
+              Save Feedback
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   if (submittedCareLog) {
     return (
