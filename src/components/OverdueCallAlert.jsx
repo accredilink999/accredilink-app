@@ -286,6 +286,36 @@ export default function OverdueCallAlert({ userId }) {
         message: `Staff reported ${call.service_user_name}'s ${call.scheduled_time} call is not theirs and it has been flagged as missed.`,
         excludeUserId: userId,
       });
+      // Notify paired shift partner if applicable
+      if (call.shift_id) {
+        try {
+          const { data: callShift } = await supabase
+            .from('shifts')
+            .select('paired_shift_id, staff_name')
+            .eq('id', call.shift_id)
+            .single();
+          if (callShift?.paired_shift_id) {
+            const { data: pairedShift } = await supabase
+              .from('shifts')
+              .select('staff_id')
+              .eq('id', callShift.paired_shift_id)
+              .single();
+            if (pairedShift?.staff_id && pairedShift.staff_id !== userId) {
+              base44.functions.invoke('createNotification', {
+                recipient_ids: [pairedShift.staff_id],
+                type: 'shift_activity',
+                title: `Call flagged missed: ${call.service_user_name}`,
+                message: `${callShift.staff_name || 'Your partner'} reported ${call.service_user_name}'s ${call.scheduled_time} call as not theirs — flagged as missed.`,
+                priority: 'high',
+                action_url: '/Rota',
+                send_push: true,
+              }).catch(e => console.warn('Partner missed-call notification failed:', e));
+            }
+          }
+        } catch (e) {
+          console.warn('Could not notify partner of missed call:', e);
+        }
+      }
     } catch (e) {
       toast.error('Failed to remove call');
     } finally {
