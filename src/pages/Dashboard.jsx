@@ -2,7 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
-import { ShiftApi } from '@/api/rotaApi';
+import { ShiftApi, ShiftCallApi } from '@/api/rotaApi';
+import { notifySwapApproved, notifySwapRejected } from '@/utils/shiftSwapNotifications';
+import { notifyClaimApproved, notifyClaimRejected, notifyShiftsReleased } from '@/utils/shiftClaimNotifications';
+import { getMatchingCallsForShift } from '@/utils/shiftCallAutoAssign';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { format, isToday, parseISO, startOfWeek, endOfWeek, startOfMonth } from 'date-fns';
@@ -50,7 +53,10 @@ import {
   Share2,
   ClipboardCheck,
   Radio,
-  ChevronDown } from
+  ChevronDown,
+  Check,
+  X,
+  Loader2 } from
 'lucide-react';
 import ShiftSwapResponseModal from '@/components/rota/ShiftSwapResponseModal';
 import HelpTip from '@/components/ui/HelpTip';
@@ -68,6 +74,26 @@ export default function Dashboard() {
   const [lastSeenShiftsCount, setLastSeenShiftsCount] = useState(0);
   const [adminTasksExpanded, setAdminTasksExpanded] = useState(false);
   const [lastSeenAdminCount, setLastSeenAdminCount] = useState(0);
+  const [reviewNotes, setReviewNotes] = useState({});
+  const [processingId, setProcessingId] = useState(null);
+
+  const DISMISS_TTL = 24 * 60 * 60 * 1000;
+  const [dismissedTaskIds, setDismissedTaskIds] = useState(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('cc_dismissedTasks') || '{}');
+      const now = Date.now();
+      return Object.fromEntries(Object.entries(stored).filter(([, t]) => now - t < 24 * 60 * 60 * 1000));
+    } catch { return {}; }
+  });
+  const [dismissedShiftIds, setDismissedShiftIds] = useState(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('cc_dismissedShifts') || '{}');
+      const now = Date.now();
+      return Object.fromEntries(Object.entries(stored).filter(([, t]) => now - t < 24 * 60 * 60 * 1000));
+    } catch { return {}; }
+  });
+  useEffect(() => { localStorage.setItem('cc_dismissedTasks', JSON.stringify(dismissedTaskIds)); }, [dismissedTaskIds]);
+  useEffect(() => { localStorage.setItem('cc_dismissedShifts', JSON.stringify(dismissedShiftIds)); }, [dismissedShiftIds]);
   const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
   const [careLogData, setCareLogData] = useState({
     service_user_id: '',
@@ -427,6 +453,114 @@ export default function Dashboard() {
   cc.staff_id === user.id
   ) : [];
 
+  const dismissTask = (id) => setDismissedTaskIds(prev => ({ ...prev, [id]: Date.now() }));
+  const dismissShift = (id) => setDismissedShiftIds(prev => ({ ...prev, [id]: Date.now() }));
+  const dismissAllTasks = (ids) => {
+    const now = Date.now();
+    setDismissedTaskIds(prev => ({ ...prev, ...Object.fromEntries(ids.map(id => [id, now])) }));
+  };
+  const dismissAllShifts = () => {
+    const now = Date.now();
+    setDismissedShiftIds(prev => ({ ...prev, ...Object.fromEntries(availableShifts.map(s => [s.id, now])) }));
+    setLastSeenShiftsCount(availableShifts.length);
+  };
+
+  const SIT_IN_NAMES = new Set(['Sit In L', 'Sit In E', 'Sit In FD']);
+  const adminName = user?.gps_map_name || user?.staff_full_name || user?.full_name || 'Admin';
+
+  const handleClaimDecision = async (claim, status) => {
+    setProcessingId(claim.id);
+    if (status === 'approved') {
+      try {
+        await ShiftApi.update(claim.shift_id, { staff_id: claim.staff_id, staff_name: claim.staff_name, status: 'scheduled' });
+        const shiftData = (await ShiftApi.filter({ id: claim.shift_id }))[0];
+        if (shiftData && !SIT_IN_NAMES.has(shiftData.shift_name)) {
+          const serviceUsers = await base44.entities.ServiceUser.filter({ status: 'active' });
+          const matchingCalls = getMatchingCallsForShift(serviceUsers, claim.area_id, shiftData.start_time, shiftData.end_time);
+          const callTypesData = await base44.entities.CallType.filter({ is_active: true });
+          for (const call of matchingCalls) {
+            const ct = callTypesData.find(c => c.name === call.call_type);
+            const tasks = ct?.default_tasks?.length ? ct.default_tasks.map(t => ({ text: t, completed: false })) : [];
+            try { await ShiftCallApi.create({ shift_id: claim.shift_id, service_user_id: call.service_user_id, service_user_name: call.service_user_name, service_user_address: call.service_user_address, scheduled_time: call.scheduled_time, call_time: call.scheduled_time, duration_minutes: call.duration_minutes, call_type: call.call_type, call_types: call.call_types || [call.call_type], tasks, call_date: shiftData.date, status: 'pending', notes: call.notes || '' }); } catch (e) { console.error('[ClaimApprove] call create failed', e); }
+          }
+        }
+        await base44.entities.ShiftClaimRequest.update(claim.id, { status: 'approved', reviewed_by: user.id, reviewed_by_name: adminName, reviewed_at: new Date().toISOString(), review_notes: reviewNotes[claim.id] || '' });
+        const otherClaims = pendingClaimsAdmin.filter(c => c.shift_id === claim.shift_id && c.id !== claim.id && c.status === 'pending');
+        for (const other of otherClaims) {
+          await base44.entities.ShiftClaimRequest.update(other.id, { status: 'rejected', reviewed_by: user.id, reviewed_by_name: adminName, reviewed_at: new Date().toISOString(), review_notes: 'Shift claimed by another staff member' });
+          notifyClaimRejected({ claim: other, adminName, areaId: other.area_id });
+        }
+        queryClient.invalidateQueries({ queryKey: ['pendingClaims'] });
+        queryClient.invalidateQueries({ queryKey: ['myClaimRequests'] });
+        queryClient.invalidateQueries({ queryKey: ['shifts'] });
+        queryClient.invalidateQueries({ queryKey: ['shift-calls'] });
+        toast.success('Shift claim approved');
+        notifyClaimApproved({ claim, adminName, areaId: claim.area_id });
+      } catch (err) { toast.error('Failed to approve claim: ' + (err.message || 'Unknown error')); }
+    } else {
+      await base44.entities.ShiftClaimRequest.update(claim.id, { status: 'rejected', reviewed_by: user.id, reviewed_by_name: adminName, reviewed_at: new Date().toISOString(), review_notes: reviewNotes[claim.id] || '' });
+      queryClient.invalidateQueries({ queryKey: ['pendingClaims'] });
+      queryClient.invalidateQueries({ queryKey: ['myClaimRequests'] });
+      toast.success('Claim rejected');
+      notifyClaimRejected({ claim, adminName, areaId: claim.area_id });
+    }
+    setProcessingId(null);
+    setReviewNotes(n => { const next = { ...n }; delete next[claim.id]; return next; });
+  };
+
+  const handleSwapDecision = async (request, status) => {
+    setProcessingId(request.id);
+    if (status === 'approved') {
+      try {
+        const requesterShift = (await ShiftApi.filter({ id: request.shift_id }))[0];
+        if (!requesterShift) { toast.error('Could not find shift to swap'); setProcessingId(null); return; }
+        const targetShifts = await ShiftApi.filter({ staff_id: request.swap_with_id, date: request.shift_date });
+        if (!targetShifts.length) { toast.error(`No shift found for ${request.swap_with_name} on ${request.shift_date}`); setProcessingId(null); return; }
+        await ShiftApi.update(requesterShift.id, { staff_id: request.swap_with_id, staff_name: request.swap_with_name, shift_pattern_id: null });
+        await ShiftApi.update(targetShifts[0].id, { staff_id: request.requester_id, staff_name: request.requester_name, shift_pattern_id: null });
+        await base44.entities.ShiftSwapRequest.update(request.id, { status: 'approved', reviewed_by: user.id, reviewed_by_name: adminName, reviewed_at: new Date().toISOString(), review_notes: reviewNotes[request.id] || '' });
+        queryClient.invalidateQueries({ queryKey: ['shifts'] });
+        queryClient.invalidateQueries({ queryKey: ['pendingSwapsAdmin'] });
+        toast.success('Shift swap approved');
+        notifySwapApproved({ swap: request, adminName, areaId: request.rota_area_id });
+      } catch (err) { toast.error('Failed to swap shifts: ' + (err.message || 'Unknown error')); }
+    } else {
+      await base44.entities.ShiftSwapRequest.update(request.id, { status: 'rejected', reviewed_by: user.id, reviewed_by_name: adminName, reviewed_at: new Date().toISOString(), review_notes: reviewNotes[request.id] || '' });
+      queryClient.invalidateQueries({ queryKey: ['pendingSwapsAdmin'] });
+      toast.success('Swap rejected');
+      notifySwapRejected({ swap: request, adminName, areaId: request.rota_area_id });
+    }
+    setProcessingId(null);
+    setReviewNotes(n => { const next = { ...n }; delete next[request.id]; return next; });
+  };
+
+  const handleLeaveDecision = async (request, status) => {
+    setProcessingId(request.id);
+    if (status === 'approved') {
+      try {
+        const { data: affectedShifts = [] } = await supabase.from('shifts').select('id, date, start_time, end_time, shift_name, rota_area_id, paired_shift_id').eq('staff_id', request.staff_id).gte('date', request.start_date).lte('date', request.end_date);
+        for (const shift of affectedShifts) {
+          await supabase.from('shift_calls').delete().eq('shift_id', shift.id);
+          if (shift.paired_shift_id) await supabase.from('shifts').update({ paired_shift_id: null, paired_staff_name: null }).eq('id', shift.paired_shift_id);
+          await supabase.from('shifts').update({ staff_id: null, staff_name: null, paired_shift_id: null, paired_staff_name: null, shift_pattern_id: null, is_base_shift: true, status: 'available_cover' }).eq('id', shift.id);
+        }
+        await base44.entities.LeaveRequest.update(request.id, { status: 'approved', reviewed_by: user.id, reviewed_by_name: adminName, reviewed_at: new Date().toISOString(), review_notes: reviewNotes[request.id] || '' });
+        queryClient.invalidateQueries({ queryKey: ['shifts'] });
+        queryClient.invalidateQueries({ queryKey: ['leaveRequests'] });
+        queryClient.invalidateQueries({ queryKey: ['pendingLeave'] });
+        toast.success(`Leave approved${affectedShifts.length > 0 ? ` — ${affectedShifts.length} shift(s) released` : ''}`);
+        if (affectedShifts.length > 0) notifyShiftsReleased({ staffName: request.staff_name, staffId: request.staff_id, shiftCount: affectedShifts.length, startDate: request.start_date, endDate: request.end_date, areaId: affectedShifts[0]?.rota_area_id });
+      } catch (err) { toast.error('Failed to approve leave: ' + (err.message || 'Unknown error')); }
+    } else {
+      await base44.entities.LeaveRequest.update(request.id, { status: 'rejected', reviewed_by: user.id, reviewed_by_name: adminName, reviewed_at: new Date().toISOString(), review_notes: reviewNotes[request.id] || '' });
+      queryClient.invalidateQueries({ queryKey: ['leaveRequests'] });
+      queryClient.invalidateQueries({ queryKey: ['pendingLeave'] });
+      toast.success('Leave rejected');
+    }
+    setProcessingId(null);
+    setReviewNotes(n => { const next = { ...n }; delete next[request.id]; return next; });
+  };
+
   return (
     <div className="space-y-6">
       <style>{flashStyles}</style>
@@ -471,8 +605,22 @@ export default function Dashboard() {
       {(() => {
         const pendingSwapsMe = mySwapRequests.filter(r => !['approved', 'rejected', 'declined'].includes(r.status));
         const pendingClaimsMe = myClaimRequests.filter(r => r.status === 'pending');
-        const adminCount = totalAdminTasks + incomingSwapRequests.length + pendingSwapsMe.length + pendingClaimsMe.length;
-        if (adminCount === 0) return null;
+        // Visible = not dismissed within 24h
+        const visibleIncidents = openIncidents.filter(r => !dismissedTaskIds[r.id]);
+        const visibleLeave = pendingLeave.filter(r => !dismissedTaskIds[r.id]);
+        const visibleClaims = pendingClaimsAdmin.filter(r => !dismissedTaskIds[r.id]);
+        const visibleSwapsAdmin = pendingSwapsAdmin.filter(r => !dismissedTaskIds[r.id]);
+        const visibleIncomingSwaps = incomingSwapRequests.filter(r => !dismissedTaskIds[r.id]);
+        const adminCount = visibleIncidents.length + visibleLeave.length + visibleClaims.length + visibleSwapsAdmin.length + visibleIncomingSwaps.length + pendingSwapsMe.length + pendingClaimsMe.length;
+        const hasAnyTasks = adminCount > 0 || openIncidents.length > 0 || pendingLeave.length > 0 || pendingClaimsAdmin.length > 0 || pendingSwapsAdmin.length > 0 || incomingSwapRequests.length > 0;
+        if (!hasAnyTasks) return null;
+        const allDismissableIds = [
+          ...openIncidents.map(r => r.id),
+          ...pendingLeave.map(r => r.id),
+          ...pendingClaimsAdmin.map(r => r.id),
+          ...pendingSwapsAdmin.map(r => r.id),
+          ...incomingSwapRequests.map(r => r.id),
+        ];
         return (
           <div className="rounded-xl overflow-hidden shadow-sm border border-amber-200">
             <button
@@ -488,51 +636,109 @@ export default function Dashboard() {
             </button>
             {adminTasksExpanded && (
               <div className="bg-amber-50 p-3 space-y-2">
-                {openIncidents.length > 0 && (
-                  <Link to={createPageUrl('Incidents')}>
-                    <div className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-red-50 transition-colors border border-red-100">
-                      <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
-                      <span className="text-sm font-medium flex-1">{openIncidents.length} open incident{openIncidents.length > 1 ? 's' : ''}</span>
-                      <Badge className="bg-red-500 text-white text-xs">{openIncidents.length}</Badge>
+                <div className="flex justify-end">
+                  <button onClick={() => { dismissAllTasks(allDismissableIds); setLastSeenAdminCount(0); }}
+                    className="text-xs text-amber-700 hover:text-amber-900 font-medium underline underline-offset-2">
+                    Dismiss All
+                  </button>
+                </div>
+                {visibleIncidents.map(inc => (
+                  <div key={inc.id} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-red-100">
+                    <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                    <Link to={createPageUrl('Incidents')} className="flex-1 min-w-0">
+                      <span className="text-sm font-medium text-slate-900">Open incident — {inc.incident_type || 'Incident'}</span>
+                      <p className="text-xs text-slate-500">{inc.staff_name || ''} {inc.created_date ? new Date(inc.created_date).toLocaleDateString() : ''}</p>
+                    </Link>
+                    <button onClick={() => dismissTask(inc.id)} className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-slate-600 flex-shrink-0">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                {visibleLeave.map(req => (
+                  <div key={req.id} className="bg-white rounded-lg border border-amber-100 p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate">{req.staff_name} — Leave Request</p>
+                        <p className="text-xs text-slate-500">{req.start_date} → {req.end_date} &bull; {req.leave_type || 'Leave'}</p>
+                      </div>
+                      <button onClick={() => dismissTask(req.id)} className="p-1 rounded hover:bg-amber-50 text-slate-400 hover:text-slate-600 flex-shrink-0">
+                        <X className="w-4 h-4" />
+                      </button>
                     </div>
-                  </Link>
-                )}
-                {pendingLeave.length > 0 && isAdmin && (
-                  <Link to={createPageUrl('LeaveRequests')}>
-                    <div className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-amber-50 transition-colors border border-amber-100">
-                      <FileText className="w-5 h-5 text-amber-500 flex-shrink-0" />
-                      <span className="text-sm font-medium flex-1">{pendingLeave.length} pending leave request{pendingLeave.length > 1 ? 's' : ''}</span>
-                      <Badge className="bg-amber-500 text-white text-xs">{pendingLeave.length}</Badge>
+                    <div className="flex gap-2">
+                      <Button size="sm" disabled={processingId === req.id} onClick={() => handleLeaveDecision(req, 'approved')}
+                        className="flex-1 bg-green-600 hover:bg-green-700 text-white h-8 text-xs">
+                        {processingId === req.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Check className="w-3 h-3 mr-1" />Approve</>}
+                      </Button>
+                      <Button size="sm" disabled={processingId === req.id} onClick={() => handleLeaveDecision(req, 'rejected')}
+                        className="flex-1 bg-red-500 hover:bg-red-600 text-white h-8 text-xs">
+                        <X className="w-3 h-3 mr-1" />Reject
+                      </Button>
                     </div>
-                  </Link>
-                )}
-                {pendingClaimsAdmin.length > 0 && isAdmin && (
-                  <Link to={createPageUrl('RequestsManagement')}>
-                    <div className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-purple-50 transition-colors border border-purple-100">
-                      <Hand className="w-5 h-5 text-purple-500 flex-shrink-0" />
-                      <span className="text-sm font-medium flex-1">{pendingClaimsAdmin.length} pending shift claim{pendingClaimsAdmin.length > 1 ? 's' : ''}</span>
-                      <Badge className="bg-purple-500 text-white text-xs">{pendingClaimsAdmin.length}</Badge>
+                  </div>
+                ))}
+                {visibleClaims.map(claim => (
+                  <div key={claim.id} className="bg-white rounded-lg border border-purple-100 p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Hand className="w-4 h-4 text-purple-500 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate">{claim.staff_name} — Shift Claim</p>
+                        <p className="text-xs text-slate-500">{claim.shift_date} &bull; {claim.shift_time} {claim.shift_name ? `· ${claim.shift_name}` : ''}</p>
+                      </div>
+                      <button onClick={() => dismissTask(claim.id)} className="p-1 rounded hover:bg-purple-50 text-slate-400 hover:text-slate-600 flex-shrink-0">
+                        <X className="w-4 h-4" />
+                      </button>
                     </div>
-                  </Link>
-                )}
-                {pendingSwapsAdmin.length > 0 && isAdmin && (
-                  <Link to={createPageUrl('RequestsManagement')}>
-                    <div className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-blue-50 transition-colors border border-blue-100">
-                      <ArrowRightLeft className="w-5 h-5 text-blue-500 flex-shrink-0" />
-                      <span className="text-sm font-medium flex-1">{pendingSwapsAdmin.length} shift swap{pendingSwapsAdmin.length > 1 ? 's' : ''} awaiting approval</span>
-                      <Badge className="bg-blue-500 text-white text-xs">{pendingSwapsAdmin.length}</Badge>
+                    <div className="flex gap-2">
+                      <Button size="sm" disabled={processingId === claim.id} onClick={() => handleClaimDecision(claim, 'approved')}
+                        className="flex-1 bg-green-600 hover:bg-green-700 text-white h-8 text-xs">
+                        {processingId === claim.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Check className="w-3 h-3 mr-1" />Approve</>}
+                      </Button>
+                      <Button size="sm" disabled={processingId === claim.id} onClick={() => handleClaimDecision(claim, 'rejected')}
+                        className="flex-1 bg-red-500 hover:bg-red-600 text-white h-8 text-xs">
+                        <X className="w-3 h-3 mr-1" />Reject
+                      </Button>
                     </div>
-                  </Link>
-                )}
-                {incomingSwapRequests.map(swap => (
-                  <div key={swap.id} onClick={() => setSelectedSwapRequest(swap)}
-                    className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-yellow-50 transition-colors border border-yellow-100 cursor-pointer">
-                    <ArrowRightLeft className="w-5 h-5 text-yellow-500 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900 truncate">{swap.requester_name} wants to swap with you</p>
-                      <p className="text-xs text-slate-500">{swap.shift_date} &bull; {swap.shift_time}</p>
+                  </div>
+                ))}
+                {visibleSwapsAdmin.map(req => (
+                  <div key={req.id} className="bg-white rounded-lg border border-blue-100 p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <ArrowRightLeft className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate">{req.requester_name} ↔ {req.swap_with_name}</p>
+                        <p className="text-xs text-slate-500">{req.shift_date} &bull; {req.shift_time}</p>
+                      </div>
+                      <button onClick={() => dismissTask(req.id)} className="p-1 rounded hover:bg-blue-50 text-slate-400 hover:text-slate-600 flex-shrink-0">
+                        <X className="w-4 h-4" />
+                      </button>
                     </div>
-                    <Badge className="bg-yellow-500 text-white text-xs">Respond</Badge>
+                    <div className="flex gap-2">
+                      <Button size="sm" disabled={processingId === req.id} onClick={() => handleSwapDecision(req, 'approved')}
+                        className="flex-1 bg-green-600 hover:bg-green-700 text-white h-8 text-xs">
+                        {processingId === req.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Check className="w-3 h-3 mr-1" />Approve</>}
+                      </Button>
+                      <Button size="sm" disabled={processingId === req.id} onClick={() => handleSwapDecision(req, 'rejected')}
+                        className="flex-1 bg-red-500 hover:bg-red-600 text-white h-8 text-xs">
+                        <X className="w-3 h-3 mr-1" />Reject
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                {visibleIncomingSwaps.map(swap => (
+                  <div key={swap.id} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-yellow-100">
+                    <div onClick={() => setSelectedSwapRequest(swap)} className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer hover:opacity-80">
+                      <ArrowRightLeft className="w-5 h-5 text-yellow-500 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate">{swap.requester_name} wants to swap with you</p>
+                        <p className="text-xs text-slate-500">{swap.shift_date} &bull; {swap.shift_time}</p>
+                      </div>
+                      <Badge className="bg-yellow-500 text-white text-xs flex-shrink-0">Respond</Badge>
+                    </div>
+                    <button onClick={() => dismissTask(swap.id)} className="p-1 rounded hover:bg-yellow-50 text-slate-400 hover:text-slate-600 flex-shrink-0">
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
                 ))}
                 {pendingSwapsMe.map(swap => (
@@ -564,40 +770,48 @@ export default function Dashboard() {
       })()}
 
       {/* Cover Shifts Available — collapsible green bar */}
-      {availableShifts.length > 0 && (
+      {(() => {
+        const visibleShifts = availableShifts.filter(s => !dismissedShiftIds[s.id]);
+        if (availableShifts.length === 0) return null;
+        const shiftsByDate = visibleShifts.reduce((acc, s) => { if (!acc[s.date]) acc[s.date] = []; acc[s.date].push(s); return acc; }, {});
+        const dateEntries = Object.entries(shiftsByDate);
+        return (
         <div className="rounded-xl overflow-hidden shadow-sm border border-green-200">
           <button
-            onClick={() => { setShiftsExpanded(v => !v); setLastSeenShiftsCount(availableShifts.length); }}
+            onClick={() => { setShiftsExpanded(v => !v); setLastSeenShiftsCount(visibleShifts.length); }}
             className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white touch-manipulation active:scale-[0.99] transition-all"
           >
-            <Hand className={`w-4 h-4 flex-shrink-0 ${availableShifts.length > lastSeenShiftsCount ? 'animate-pulse' : ''}`} />
+            <Hand className={`w-4 h-4 flex-shrink-0 ${visibleShifts.length > lastSeenShiftsCount ? 'animate-pulse' : ''}`} />
             <span className="font-semibold text-sm flex-1 text-left">Cover Shifts Available</span>
             <span className="bg-white text-green-700 font-bold text-xs px-2 py-0.5 rounded-full min-w-[22px] text-center">
-              {availableShifts.length}
+              {visibleShifts.length}
             </span>
             <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 ${shiftsExpanded ? 'rotate-180' : ''}`} />
           </button>
           {shiftsExpanded && (
             <div className="bg-green-50 p-3 space-y-2">
-              {Object.entries(
-                availableShifts.reduce((acc, s) => {
-                  if (!acc[s.date]) acc[s.date] = [];
-                  acc[s.date].push(s);
-                  return acc;
-                }, {})
-              ).slice(0, 5).map(([date, shifts]) => (
-                <Link key={date} to={createPageUrl('Rota')}>
-                  <div className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-green-50 transition-colors border border-green-100">
+              <div className="flex justify-end">
+                <button onClick={() => { dismissAllShifts(); setShiftsExpanded(false); }}
+                  className="text-xs text-green-700 hover:text-green-900 font-medium underline underline-offset-2">
+                  Dismiss All
+                </button>
+              </div>
+              {dateEntries.slice(0, 5).map(([date, shifts]) => (
+                <div key={date} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-green-100">
+                  <Link to={createPageUrl('Rota')} className="flex items-center gap-3 flex-1 min-w-0">
                     <Calendar className="w-5 h-5 text-green-500 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-slate-900">{format(parseISO(date), 'EEE d MMM')}</p>
                       <p className="text-xs text-slate-500">{shifts.length} shift{shifts.length > 1 ? 's' : ''} available</p>
                     </div>
                     <Badge className="bg-green-600 text-white text-xs flex-shrink-0">Claim</Badge>
-                  </div>
-                </Link>
+                  </Link>
+                  <button onClick={() => shifts.forEach(s => dismissShift(s.id))} className="p-1 rounded hover:bg-green-100 text-slate-400 hover:text-slate-600 flex-shrink-0">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               ))}
-              {Object.keys(availableShifts.reduce((acc, s) => { acc[s.date] = true; return acc; }, {})).length > 5 && (
+              {dateEntries.length > 5 && (
                 <Link to={createPageUrl('Rota')}>
                   <div className="text-center text-sm text-green-600 font-medium py-1">View all available shifts</div>
                 </Link>
@@ -605,7 +819,8 @@ export default function Dashboard() {
             </div>
           )}
         </div>
-      )}
+        );
+      })()}
 
       {/* Shift Swap Response Modal */}
       {selectedSwapRequest && (
