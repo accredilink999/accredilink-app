@@ -1266,7 +1266,7 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
           </DialogHeader>
           <div className="space-y-4 py-1">
             <p className="text-sm text-slate-500">
-              Does <span className="font-medium text-slate-700">{serviceUser?.full_name}</span> want to leave feedback about today's visit?
+              Would <span className="font-medium text-slate-700">{serviceUser?.full_name}</span> like to leave feedback?
             </p>
             <div>
               <Label className="text-xs font-medium text-slate-600 mb-2 block">Rating</Label>

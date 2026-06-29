@@ -1463,7 +1463,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
             </DialogHeader>
             <div className="space-y-4 py-1">
               <p className="text-sm text-slate-500">
-                Feedback for <span className="font-medium text-slate-700">{feedbackCall.service_user_name}</span>
+                Would <span className="font-medium text-slate-700">{feedbackCall.service_user_name}</span> like to leave feedback?
               </p>
               <div>
                 <Label className="text-xs font-medium text-slate-600 mb-2 block">Rating</Label>
