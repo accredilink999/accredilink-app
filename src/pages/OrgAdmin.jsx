@@ -17,6 +17,7 @@ import LegalPages from '@/pages/LegalPages';
 import Archive from '@/pages/Archive';
 import Feedback from '@/pages/Feedback';
 import StaffAwards from '@/pages/StaffAwards';
+import StaffProfile from '@/components/staff/StaffProfile';
 import {
   Building2, Users, CreditCard, Settings, Shield, Crown, Copy, Check,
   KeyRound, Loader2, ExternalLink, Calendar, ChevronRight, Download,
@@ -81,6 +82,7 @@ export default function OrgAdmin() {
   const [companyName, setCompanyName] = useState('');
   const [savingName, setSavingName] = useState(false);
   const [roleChange, setRoleChange] = useState({});
+  const [selectedStaffId, setSelectedStaffId] = useState(null);
 
   // Fetch org details
   const { data: org, isLoading: orgLoading } = useQuery({
@@ -459,7 +461,11 @@ export default function OrgAdmin() {
       )}
 
       {/* ── STAFF TAB ────────────────────────────────────────────── */}
-      {tab === 'staff' && (
+      {tab === 'staff' && selectedStaffId && (
+        <StaffProfile staffId={selectedStaffId} onBack={() => setSelectedStaffId(null)} />
+      )}
+
+      {tab === 'staff' && !selectedStaffId && (
         <div className="space-y-4">
           {/* Invite code */}
           {org?.invite_code && (
@@ -496,7 +502,8 @@ export default function OrgAdmin() {
             ) : (
               <div className="divide-y divide-slate-100">
                 {members.map(m => (
-                  <div key={m.id} className="p-4 flex items-center justify-between gap-3">
+                  <div key={m.id} className="p-4 flex items-center justify-between gap-3 hover:bg-slate-50 cursor-pointer transition-colors"
+                    onClick={() => setSelectedStaffId(m.user_id)}>
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center flex-shrink-0">
                         <span className="text-sm font-medium text-slate-600">
@@ -510,7 +517,7 @@ export default function OrgAdmin() {
                         <p className="text-xs text-slate-400 truncate">{m.profile?.email}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-2 flex-shrink-0" onClick={e => e.stopPropagation()}>
                       {isOwner && m.role !== 'owner' ? (
                         <select
                           value={m.role}
