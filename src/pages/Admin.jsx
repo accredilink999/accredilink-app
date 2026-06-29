@@ -1,196 +1,197 @@
-import React from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
-import PageHeader from '@/components/ui/PageHeader';
-import HelpTip from '@/components/ui/HelpTip';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import {
-        Heart,
-        UserCog,
-        ClipboardCheck,
-        Calendar,
-        MessageCircle,
-        FolderOpen,
-        Briefcase,
-        PoundSterling,
-        BarChart3,
-        FileEdit,
-        CalendarClock,
-        GraduationCap,
-        Receipt,
-        Shield,
-        Users,
-        Grid3x3,
-        Archive,
-        Bot,
-        CheckSquare,
-        Download,
-        FileSpreadsheet,
-        Video,
-        Activity,
-        Building2,
-        Star,
-        FileText,
-        Scale,
-        ImagePlus,
-        Trophy
-      } from 'lucide-react';
+  Heart, UserCog, ClipboardCheck, Calendar, MessageCircle,
+  FolderOpen, Briefcase, PoundSterling, BarChart3, FileEdit,
+  CalendarClock, GraduationCap, Receipt, Shield, Users, Grid3x3,
+  Archive, Bot, CheckSquare, Download, FileSpreadsheet, Video,
+  Activity, Building2, Star, FileText, Scale, ImagePlus, Trophy,
+  ChevronDown, ChevronUp, SlidersHorizontal, ListChecks,
+} from 'lucide-react';
 
+// ─── PRIMARY tiles — shown always ────────────────────────────────────────────
+// These are the actions admins need every single day.
+const PRIMARY = [
+  {
+    to: 'OrgAdmin',
+    label: 'Organisation',
+    icon: Building2,
+    bg: 'from-teal-500 to-teal-700',
+    desc: 'Setup, permissions, staff, billing',
+  },
+  {
+    to: 'ControlRoom',
+    label: 'Control Room',
+    icon: Shield,
+    bg: 'from-slate-600 to-slate-800',
+    desc: 'Live staff & alerts',
+  },
+  {
+    to: 'StaffManagement',
+    label: 'Staff',
+    icon: Users,
+    bg: 'from-blue-500 to-blue-700',
+    desc: 'Manage your team',
+  },
+  {
+    to: 'ClientManagement',
+    label: 'Clients',
+    icon: Heart,
+    bg: 'from-rose-400 to-rose-600',
+    desc: 'Service users & care',
+  },
+  {
+    to: 'RotaManagement',
+    label: 'Rota',
+    icon: Calendar,
+    bg: 'from-orange-400 to-orange-600',
+    desc: 'Scheduling & patterns',
+  },
+  {
+    to: 'AdminApprovalsFinancials',
+    label: 'Approvals',
+    icon: CheckSquare,
+    bg: 'from-indigo-400 to-indigo-600',
+    desc: 'Leave, swaps & expenses',
+    badgeKey: 'pending',
+  },
+  {
+    to: 'Reports',
+    label: 'Reports',
+    icon: BarChart3,
+    bg: 'from-sky-400 to-sky-600',
+    desc: 'Analytics & exports',
+  },
+  {
+    to: 'ComplianceManagement',
+    label: 'Compliance',
+    icon: Shield,
+    bg: 'from-red-400 to-red-600',
+    desc: 'CQC / CIW readiness',
+  },
+  {
+    to: 'Training',
+    label: 'Training',
+    icon: GraduationCap,
+    bg: 'from-cyan-400 to-cyan-600',
+    desc: 'Courses & certificates',
+  },
+];
+
+// ─── MORE tiles — collapsed by default ───────────────────────────────────────
+const MORE = [
+  { to: 'Invoicing',        label: 'Invoicing',    icon: Receipt,         bg: 'from-teal-400 to-teal-600',    desc: 'Client invoices' },
+  { to: 'Payroll',          label: 'Payroll',      icon: PoundSterling,   bg: 'from-emerald-400 to-emerald-600', desc: 'Pay & payslips', superAdminOnly: true },
+  { to: 'DocumentManagement', label: 'Documents',  icon: FolderOpen,      bg: 'from-indigo-400 to-indigo-600', desc: 'Policies & HR docs' },
+  { to: 'ClinicalDashboard',label: 'Clinical',     icon: Activity,        bg: 'from-rose-500 to-rose-700',    desc: 'Clinical dashboard' },
+  { to: 'AIAssistant',      label: 'AI Assistant', icon: Bot,             bg: 'from-purple-400 to-purple-600', desc: 'AI admin helper' },
+  { to: 'FormBuilder',      label: 'Forms',        icon: FileEdit,        bg: 'from-fuchsia-400 to-fuchsia-600', desc: 'Custom form builder' },
+  { to: 'WorkCalendar',     label: 'Calendar',     icon: CalendarClock,   bg: 'from-indigo-300 to-indigo-500', desc: 'Work calendar' },
+  { to: 'Messages',         label: 'Messages',     icon: MessageCircle,   bg: 'from-pink-400 to-pink-600',    desc: 'Staff communications' },
+  { to: 'Archive',          label: 'Archive',      icon: Archive,         bg: 'from-slate-400 to-slate-600',  desc: 'Archived records' },
+  { to: 'DataImport',       label: 'Import',       icon: FileSpreadsheet, bg: 'from-amber-400 to-amber-600',  desc: 'CSV data import' },
+  { to: 'AppDownloads',     label: 'Downloads',    icon: Download,        bg: 'from-emerald-300 to-emerald-500', desc: 'App downloads' },
+  { to: 'PhotoGallery',     label: 'Photos',       icon: ImagePlus,       bg: 'from-violet-400 to-violet-600', desc: 'Org photo gallery' },
+  { to: 'StaffAwards',      label: 'Awards',       icon: Trophy,          bg: 'from-amber-400 to-yellow-500', desc: 'Recognise staff' },
+  { to: 'Feedback',         label: 'Feedback',     icon: Star,            bg: 'from-yellow-400 to-amber-500', desc: 'Client feedback' },
+  { to: 'Communications',   label: 'Video',        icon: Video,           bg: 'from-blue-400 to-blue-600',    desc: 'Video comms' },
+  { to: 'LegalPages',       label: 'Legal',        icon: Scale,           bg: 'from-gray-400 to-gray-600',    desc: 'Terms & policies' },
+  { to: 'Documents',        label: 'Files',        icon: FileText,        bg: 'from-blue-300 to-blue-500',    desc: 'Shared files' },
+];
+
+// ─── Tile component ───────────────────────────────────────────────────────────
+function Tile({ to, label, icon: Icon, bg, desc, badge }) {
+  return (
+    <Link
+      to={createPageUrl(to)}
+      className="relative flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-4 min-h-[100px] active:scale-95"
+    >
+      {badge > 0 && (
+        <span className="absolute top-2 right-2 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+          {badge > 99 ? '99+' : badge}
+        </span>
+      )}
+      <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${bg} flex items-center justify-center mb-2 shadow-sm`}>
+        <Icon className="w-5 h-5 text-white" strokeWidth={1.8} />
+      </div>
+      <span className="text-xs font-semibold text-slate-700 text-center leading-tight">{label}</span>
+      <span className="text-[10px] text-slate-400 text-center mt-0.5 leading-tight line-clamp-1">{desc}</span>
+    </Link>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 export default function AdminDashboard() {
+  const [showMore, setShowMore] = useState(false);
+
   const { data: user } = useQuery({
     queryKey: ['currentUser'],
     queryFn: () => base44.auth.me(),
   });
 
+  const { data: pendingSwaps = [] } = useQuery({
+    queryKey: ['pendingSwapsAdmin'],
+    queryFn: () => base44.entities.ShiftSwapRequest.filter({ status: 'pending_admin' }),
+  });
+  const { data: pendingLeave = [] } = useQuery({
+    queryKey: ['pendingLeaveAdmin'],
+    queryFn: () => base44.entities.LeaveRequest.filter({ status: 'pending' }),
+  });
+
   const isSuperAdmin = user?.role === 'super_admin';
+  const pendingCount = pendingSwaps.length + pendingLeave.length;
+
+  const moreTiles = MORE.filter(t => !t.superAdminOnly || isSuperAdmin);
 
   return (
-    <div className="max-w-6xl mx-auto pb-6">
+    <div className="max-w-2xl mx-auto pb-8 px-1">
+
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3">
-          <Shield className="w-8 h-8 fill-blue-600 text-blue-600" />
-          <HelpTip tip="Central hub for all admin tools. Only visible to admins and managers.">
-            <h1 className="text-2xl font-bold text-slate-900">Admin Panel</h1>
-          </HelpTip>
+      <div className="flex items-center gap-3 mb-5 pt-1">
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center shadow-sm">
+          <Shield className="w-5 h-5 text-white" strokeWidth={1.8} />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold text-slate-900 leading-tight">Admin Panel</h1>
+          <p className="text-xs text-slate-400">
+            {pendingCount > 0
+              ? <span className="text-amber-600 font-medium">{pendingCount} item{pendingCount !== 1 ? 's' : ''} need attention</span>
+              : 'All clear — no pending actions'}
+          </p>
         </div>
       </div>
 
-      {/* Core Management */}
-      <h2 className="text-lg font-bold text-slate-900 mb-2">Core</h2>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
-        {[
-          { to: 'OrgAdmin', label: 'Organisation', icon: Building2, bg: 'from-teal-400 to-teal-600', desc: 'Organisation admin' },
-          { to: 'ControlRoom', label: 'Control Room', icon: Shield, bg: 'from-slate-500 to-slate-700', desc: 'Live overview' },
-          { to: 'AIAssistant', label: 'AI Assistant', icon: Bot, bg: 'from-purple-400 to-purple-600', desc: 'AI admin helper' },
-          { to: 'Documents', label: 'Files', icon: FileText, bg: 'from-blue-400 to-blue-600', desc: 'File management' },
-          { to: 'LegalPages', label: 'Legal Docs', icon: Scale, bg: 'from-gray-400 to-gray-600', desc: 'Terms & policies' },
-          { to: 'StaffAwards', label: 'Staff Awards', icon: Trophy, bg: 'from-amber-400 to-yellow-500', desc: 'Recognise your team' },
-        ].map(section => {
-          const Icon = section.icon;
-          return (
-            <Link key={section.to} to={createPageUrl(section.to)} className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-4 sm:p-5 min-h-[110px] active:scale-95">
-              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${section.bg} flex items-center justify-center mb-2 shadow-sm`}>
-                <Icon className="w-6 h-6 text-white" strokeWidth={1.8} />
-              </div>
-              <span className="text-sm font-semibold text-slate-700 text-center leading-tight">{section.label}</span>
-              <span className="text-[10px] text-slate-400 text-center mt-1 leading-tight line-clamp-2">{section.desc}</span>
-            </Link>
-          );
-        })}
+      {/* Primary grid */}
+      <div className="grid grid-cols-3 gap-2.5 mb-4">
+        {PRIMARY.map(t => (
+          <Tile
+            key={t.to}
+            {...t}
+            badge={t.badgeKey === 'pending' ? pendingCount : 0}
+          />
+        ))}
       </div>
 
-      {/* People & Clinical */}
-      <h2 className="text-lg font-bold text-slate-900 mb-2">People & Clinical</h2>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
-        {[
-          { to: 'ClientManagement', label: 'Clients', icon: Heart, bg: 'from-teal-400 to-teal-600', desc: 'Client management' },
-          { to: 'StaffManagement', label: 'Staff', icon: Users, bg: 'from-blue-400 to-blue-600', desc: 'Staff management' },
-          { to: 'ClinicalDashboard', label: 'Clinical', icon: Activity, bg: 'from-rose-400 to-rose-600', desc: 'Clinical dashboard' },
-          { to: 'PhotoGallery', label: 'Photos', icon: ImagePlus, bg: 'from-violet-400 to-violet-600', desc: 'Organisation photos' },
-        ].map(section => {
-          const Icon = section.icon;
-          return (
-            <Link key={section.to} to={createPageUrl(section.to)} className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-4 sm:p-5 min-h-[110px] active:scale-95">
-              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${section.bg} flex items-center justify-center mb-2 shadow-sm`}>
-                <Icon className="w-6 h-6 text-white" strokeWidth={1.8} />
-              </div>
-              <span className="text-sm font-semibold text-slate-700 text-center leading-tight">{section.label}</span>
-              <span className="text-[10px] text-slate-400 text-center mt-1 leading-tight line-clamp-2">{section.desc}</span>
-            </Link>
-          );
-        })}
-      </div>
+      {/* More toggle */}
+      <button
+        onClick={() => setShowMore(v => !v)}
+        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-500 font-medium hover:bg-slate-50 transition-colors mb-2"
+      >
+        {showMore ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        {showMore ? 'Show less' : `More tools (${moreTiles.length})`}
+      </button>
 
-      {/* Scheduling */}
-      <h2 className="text-lg font-bold text-slate-900 mb-2">Scheduling</h2>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
-        {[
-          { to: 'RotaManagement', label: 'Rota', icon: Calendar, bg: 'from-orange-400 to-orange-600', desc: 'Rota management' },
-          { to: 'WorkCalendar', label: 'Calendar', icon: CalendarClock, bg: 'from-indigo-400 to-indigo-600', desc: 'Work calendar' },
-        ].map(section => {
-          const Icon = section.icon;
-          return (
-            <Link key={section.to} to={createPageUrl(section.to)} className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-4 sm:p-5 min-h-[110px] active:scale-95">
-              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${section.bg} flex items-center justify-center mb-2 shadow-sm`}>
-                <Icon className="w-6 h-6 text-white" strokeWidth={1.8} />
-              </div>
-              <span className="text-sm font-semibold text-slate-700 text-center leading-tight">{section.label}</span>
-              <span className="text-[10px] text-slate-400 text-center mt-1 leading-tight line-clamp-2">{section.desc}</span>
-            </Link>
-          );
-        })}
-      </div>
-
-      {/* HR & Finance */}
-      <h2 className="text-lg font-bold text-slate-900 mb-2">HR & Finance</h2>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
-        {[
-          { to: 'AdminApprovalsFinancials', label: 'Approvals', icon: CheckSquare, bg: 'from-indigo-400 to-indigo-600', desc: 'Approvals & financials' },
-          { to: 'Invoicing', label: 'Invoicing', icon: Receipt, bg: 'from-teal-400 to-teal-600', desc: 'Invoice management' },
-          ...(isSuperAdmin ? [{ to: 'Payroll', label: 'Payroll', icon: PoundSterling, bg: 'from-emerald-400 to-emerald-600', desc: 'Payroll processing' }] : []),
-          { to: 'ComplianceManagement', label: 'Compliance', icon: Shield, bg: 'from-red-400 to-red-600', desc: 'CIW/CQC compliance' },
-        ].map(section => {
-          const Icon = section.icon;
-          return (
-            <Link key={section.to} to={createPageUrl(section.to)} className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-4 sm:p-5 min-h-[110px] active:scale-95">
-              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${section.bg} flex items-center justify-center mb-2 shadow-sm`}>
-                <Icon className="w-6 h-6 text-white" strokeWidth={1.8} />
-              </div>
-              <span className="text-sm font-semibold text-slate-700 text-center leading-tight">{section.label}</span>
-              <span className="text-[10px] text-slate-400 text-center mt-1 leading-tight line-clamp-2">{section.desc}</span>
-            </Link>
-          );
-        })}
-      </div>
-
-      {/* Training & Documents */}
-      <h2 className="text-lg font-bold text-slate-900 mb-2">Training & Documents</h2>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
-        {[
-          { to: 'Training', label: 'Training', icon: GraduationCap, bg: 'from-cyan-400 to-cyan-600', desc: 'Training management' },
-          { to: 'StaffManagement', label: 'Staff Matrix', icon: Grid3x3, bg: 'from-violet-400 to-violet-600', desc: 'Onboarding, compliance & skills matrix' },
-          { to: 'DocumentManagement', label: 'Documents', icon: FolderOpen, bg: 'from-indigo-400 to-indigo-600', desc: 'Document management' },
-          { to: 'Archive', label: 'Archive', icon: Archive, bg: 'from-slate-400 to-slate-600', desc: 'Archived records' },
-          { to: 'FormBuilder', label: 'Forms', icon: FileEdit, bg: 'from-fuchsia-400 to-fuchsia-600', desc: 'Custom form builder' },
-        ].map(section => {
-          const Icon = section.icon;
-          return (
-            <Link key={section.to} to={createPageUrl(section.to)} className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-4 sm:p-5 min-h-[110px] active:scale-95">
-              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${section.bg} flex items-center justify-center mb-2 shadow-sm`}>
-                <Icon className="w-6 h-6 text-white" strokeWidth={1.8} />
-              </div>
-              <span className="text-sm font-semibold text-slate-700 text-center leading-tight">{section.label}</span>
-              <span className="text-[10px] text-slate-400 text-center mt-1 leading-tight line-clamp-2">{section.desc}</span>
-            </Link>
-          );
-        })}
-      </div>
-
-      {/* Communication & Reports */}
-      <h2 className="text-lg font-bold text-slate-900 mb-2">Communication & Reports</h2>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
-        {[
-          { to: 'Messages', label: 'Messages', icon: MessageCircle, bg: 'from-pink-400 to-pink-600', desc: 'Communication hub' },
-          { to: 'Communications', label: 'Video', icon: Video, bg: 'from-blue-400 to-blue-600', desc: 'Video comms' },
-          { to: 'Reports', label: 'Reports', icon: BarChart3, bg: 'from-sky-400 to-sky-600', desc: 'Reports & analytics' },
-          { to: 'AppDownloads', label: 'Downloads', icon: Download, bg: 'from-emerald-400 to-emerald-600', desc: 'App downloads' },
-          { to: 'DataImport', label: 'Import', icon: FileSpreadsheet, bg: 'from-amber-400 to-amber-600', desc: 'CSV data import' },
-          { to: 'Feedback', label: 'Feedback', icon: Star, bg: 'from-yellow-400 to-amber-500', desc: 'Client feedback' },
-        ].map(section => {
-          const Icon = section.icon;
-          return (
-            <Link key={section.to} to={createPageUrl(section.to)} className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-4 sm:p-5 min-h-[110px] active:scale-95">
-              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${section.bg} flex items-center justify-center mb-2 shadow-sm`}>
-                <Icon className="w-6 h-6 text-white" strokeWidth={1.8} />
-              </div>
-              <span className="text-sm font-semibold text-slate-700 text-center leading-tight">{section.label}</span>
-              <span className="text-[10px] text-slate-400 text-center mt-1 leading-tight line-clamp-2">{section.desc}</span>
-            </Link>
-          );
-        })}
-      </div>
+      {/* More grid */}
+      {showMore && (
+        <div className="grid grid-cols-3 gap-2.5">
+          {moreTiles.map(t => (
+            <Tile key={t.to} {...t} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
