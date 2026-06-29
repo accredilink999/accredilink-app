@@ -24,7 +24,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import SpeechButton from '@/components/ui/SpeechButton';
-import { Clock, MapPin, CheckCircle, AlertCircle, Play, Square, Plus, Edit, Trash2, FileText, Car, ListChecks, ClipboardList, User, Users, Home, XCircle, SkipForward, ChevronDown, Timer } from 'lucide-react';
+import { Clock, MapPin, CheckCircle, AlertCircle, Play, Square, Plus, Edit, Trash2, FileText, Car, ListChecks, ClipboardList, User, Users, Home, XCircle, SkipForward, ChevronDown, Timer, Star } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { notifyAdminsOfActivity } from '@/utils/adminNotifications';
 import { toast } from 'sonner';
@@ -58,6 +61,10 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
   const [logCompletorCall, setLogCompletorCall] = useState(null);
   const [delayCall, setDelayCall] = useState(null);
   const [delayMinutes, setDelayMinutes] = useState('');
+  const [feedbackCall, setFeedbackCall] = useState(null);
+  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackComment, setFeedbackComment] = useState('');
+  const [savingFeedback, setSavingFeedback] = useState(false);
 
   const [freshCalls, setFreshCalls] = useState(calls);
 
@@ -1429,10 +1436,88 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
 
                   return null;
                 })()}
+
+                {/* Feedback button — always available on every call */}
+                <button
+                  onClick={() => { setFeedbackCall(call); setFeedbackRating(5); setFeedbackComment(''); }}
+                  className="mt-2 w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors touch-manipulation"
+                >
+                  <Star className="w-3.5 h-3.5" />
+                  Feedback
+                </button>
               </Card>
             );
           })}
         </div>
+      )}
+
+      {/* Feedback dialog */}
+      {feedbackCall && (
+        <Dialog open={!!feedbackCall} onOpenChange={(open) => { if (!open) setFeedbackCall(null); }}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
+                Client Feedback
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-1">
+              <p className="text-sm text-slate-500">
+                Feedback for <span className="font-medium text-slate-700">{feedbackCall.service_user_name}</span>
+              </p>
+              <div>
+                <Label className="text-xs font-medium text-slate-600 mb-2 block">Rating</Label>
+                <div className="flex gap-1">
+                  {[1,2,3,4,5].map(s => (
+                    <button key={s} type="button" onClick={() => setFeedbackRating(s)}>
+                      <Star className={`w-8 h-8 transition-colors ${s <= feedbackRating ? 'text-amber-400 fill-amber-400' : 'text-slate-200 hover:text-amber-300'}`} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs font-medium text-slate-600 mb-1 block">Comments <span className="font-normal text-slate-400">(optional)</span></Label>
+                <Textarea
+                  value={feedbackComment}
+                  onChange={e => setFeedbackComment(e.target.value)}
+                  placeholder="Any comments from the client..."
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setFeedbackCall(null)}>Cancel</Button>
+              <Button
+                size="sm"
+                disabled={savingFeedback}
+                onClick={async () => {
+                  setSavingFeedback(true);
+                  try {
+                    await supabase.from('client_feedback').insert({
+                      client_name: feedbackCall.service_user_name || '',
+                      service_user_id: feedbackCall.service_user_id || null,
+                      shift_id: shift?.id || null,
+                      reviewer_name: 'Client (via care call)',
+                      reviewer_relationship: 'client',
+                      rating: feedbackRating,
+                      comment: feedbackComment.trim(),
+                      source: 'care_call',
+                      status: 'published',
+                      created_by: userId || null,
+                    });
+                    toast.success('Feedback recorded');
+                    setFeedbackCall(null);
+                  } catch { toast.error('Could not save feedback'); }
+                  setSavingFeedback(false);
+                }}
+                className="bg-amber-500 hover:bg-amber-600 text-white gap-1.5"
+              >
+                {savingFeedback ? <Loader2 className="w-4 h-4 animate-spin" /> : <Star className="w-4 h-4" />}
+                Save Feedback
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
 
       {isAddModalOpen && (
