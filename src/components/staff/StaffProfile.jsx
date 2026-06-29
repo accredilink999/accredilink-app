@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Avatar from '@/components/ui/Avatar';
 import StaffBasicInfo from '@/components/staff/StaffBasicInfo';
 import StaffEmployment from '@/components/staff/StaffEmployment';
@@ -18,7 +19,7 @@ import StaffSupervisions from '@/components/staff/StaffSupervisions';
 import StaffCompetencyManagement from '@/components/competencies/StaffCompetencyManagement';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from 'sonner';
-import { ArrowLeft, Edit, Shield, MapPin, UserX, UserCheck, Trash2, Mail, Loader2, User, Briefcase, Calendar, FileText, ClipboardList, ClipboardCheck, ChevronLeft, Palmtree, Trophy } from 'lucide-react';
+import { ArrowLeft, Shield, MapPin, UserX, UserCheck, Trash2, Mail, Loader2, User, Briefcase, FileText, ClipboardList, ClipboardCheck, ChevronLeft, Palmtree, Trophy, MoreVertical } from 'lucide-react';
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -412,87 +413,97 @@ export default function StaffProfile({ staffId, onBack, isAdmin, currentUserId }
             </div>
           </div>
           {isAdmin && !isOwnProfile && (
-           <div className="flex flex-col gap-2 w-full sm:w-auto">
-             <div className="flex flex-col sm:flex-row gap-2">
-               <Button
-                 variant="outline"
-                 size="sm"
-                 onClick={() => handleRoleChange(staff?.role === 'admin' || staff?.role === 'super_admin' ? 'user' : 'admin')}
-                 className="w-full sm:w-auto"
-               >
-                 <Shield className="w-4 h-4 mr-2" />
-                 <span className="hidden sm:inline">{staff?.role === 'admin' || staff?.role === 'super_admin' ? 'Remove Admin' : 'Make Admin'}</span>
-                 <span className="sm:hidden">{staff?.role === 'admin' || staff?.role === 'super_admin' ? 'Remove' : 'Make'}</span>
-               </Button>
-               <Select
-                 value={staff?.area_id || ''}
-                 onValueChange={(value) => updateAreaMutation.mutate(value === 'none' ? null : value)}
-               >
-                 <SelectTrigger className="w-full sm:w-48 h-9">
-                   <div className="flex items-center gap-2">
-                     <MapPin className="w-4 h-4 text-slate-400" />
-                     <SelectValue placeholder="Assign area..." />
-                   </div>
-                 </SelectTrigger>
-                 <SelectContent>
-                   <SelectItem value="none">No area</SelectItem>
-                   {rotaAreas.map((area) => (
-                     <SelectItem key={area.id} value={area.id}>
-                       <div className="flex items-center gap-2">
-                         <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: area.color }} />
-                         {area.name}
-                       </div>
-                     </SelectItem>
-                   ))}
-                 </SelectContent>
-               </Select>
-             </div>
-             <div className="flex flex-col sm:flex-row gap-2">
-               {staff?.is_active !== false ? (
-                 <Button
-                   variant="outline"
-                   size="sm"
-                   onClick={() => setShowDeactivateDialog(true)}
-                   className="w-full sm:w-auto text-amber-600 border-amber-300 hover:bg-amber-50"
-                 >
-                   <UserX className="w-4 h-4 mr-2" />
-                   Deactivate
-                 </Button>
-               ) : (
-                 <Button
-                   variant="outline"
-                   size="sm"
-                   onClick={() => deactivateMutation.mutate(true)}
-                   className="w-full sm:w-auto text-green-600 border-green-300 hover:bg-green-50"
-                 >
-                   <UserCheck className="w-4 h-4 mr-2" />
-                   Reactivate
-                 </Button>
-               )}
-               <Button
-                 variant="outline"
-                 size="sm"
-                 onClick={() => setShowDeleteDialog(true)}
-                 className="w-full sm:w-auto text-red-600 border-red-300 hover:bg-red-50"
-               >
-                 <Trash2 className="w-4 h-4 mr-2" />
-                 Delete User
-               </Button>
-             </div>
-             <Button
-               variant="outline"
-               size="sm"
-               onClick={handleResendOnboarding}
-               disabled={resendingEmail}
-               className="w-full text-blue-600 border-blue-300 hover:bg-blue-50"
-             >
-               {resendingEmail ? (
-                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending...</>
-               ) : (
-                 <><Mail className="w-4 h-4 mr-2" /> Send Password Reset Email</>
-               )}
-             </Button>
-           </div>
+            <div className="flex items-center gap-2 shrink-0 mt-1 sm:mt-0">
+              {/* Area quick-assign */}
+              <Select
+                value={staff?.area_id || 'none'}
+                onValueChange={(v) => updateAreaMutation.mutate(v === 'none' ? null : v)}
+              >
+                <SelectTrigger className="h-8 w-36 text-xs border-slate-200">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                    <SelectValue placeholder="Area…" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No area</SelectItem>
+                  {rotaAreas.map((area) => (
+                    <SelectItem key={area.id} value={area.id}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: area.color }} />
+                        {area.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* All other admin actions in one dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" className="h-8 w-8 shrink-0">
+                    <MoreVertical className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuItem
+                    onClick={() => handleRoleChange(
+                      staff?.role === 'admin' || staff?.role === 'super_admin' ? 'user' : 'admin'
+                    )}
+                  >
+                    <Shield className="w-4 h-4 mr-2 text-blue-500" />
+                    {staff?.role === 'admin' || staff?.role === 'super_admin'
+                      ? 'Remove admin role'
+                      : 'Make admin'}
+                  </DropdownMenuItem>
+                  {viewerIsSuperAdmin && staff?.role !== 'super_admin' && (
+                    <DropdownMenuItem onClick={() => handleRoleChange('super_admin')}>
+                      <Shield className="w-4 h-4 mr-2 text-amber-500" />
+                      Make super admin
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem
+                    onClick={handleResendOnboarding}
+                    disabled={resendingEmail}
+                  >
+                    {resendingEmail
+                      ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      : <Mail className="w-4 h-4 mr-2 text-slate-500" />}
+                    {resendingEmail ? 'Sending…' : 'Send password reset'}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowAwardDialog(true)}>
+                    <Trophy className="w-4 h-4 mr-2 text-amber-500" />
+                    Give an award
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {staff?.is_active !== false ? (
+                    <DropdownMenuItem
+                      onClick={() => setShowDeactivateDialog(true)}
+                      className="text-amber-600 focus:text-amber-600 focus:bg-amber-50"
+                    >
+                      <UserX className="w-4 h-4 mr-2" />
+                      Deactivate account
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem
+                      onClick={() => deactivateMutation.mutate(true)}
+                      className="text-green-600 focus:text-green-600 focus:bg-green-50"
+                    >
+                      <UserCheck className="w-4 h-4 mr-2" />
+                      Reactivate account
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setShowDeleteDialog(true)}
+                    className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete user…
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           )}
         </div>
       </Card>
