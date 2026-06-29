@@ -77,6 +77,7 @@
     <!-- Radio handset — wake screen on incoming call notification -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
+    <uses-permission android:name="android.permission.REORDER_TASKS" />
 
     <!-- Exempt from Doze mode so radio calls and alerter polling survive deep sleep -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
