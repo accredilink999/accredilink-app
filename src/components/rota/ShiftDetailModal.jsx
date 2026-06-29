@@ -1015,21 +1015,21 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
 
             {!isSitIn && (
             <TabsContent value="calls" className="space-y-4 mt-4">
-               {isAdmin && calls.length === 0 && (
-                 <div className="flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-lg">
+               {isAdmin && (
+                 <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg">
                    <div className="min-w-0">
-                     <p className="text-sm font-medium text-amber-800">No calls on this shift</p>
-                     <p className="text-xs text-amber-600">Auto-match service users from this area &amp; time window</p>
+                     <p className="text-sm font-medium text-slate-700">Regenerate Calls</p>
+                     <p className="text-xs text-slate-500">Re-match service users from this area &amp; time window</p>
                    </div>
                    <Button
                      size="sm"
                      onClick={() => regenerateCallsMutation.mutate()}
                      disabled={regenerateCallsMutation.isPending}
-                     className="shrink-0 ml-3 bg-amber-500 hover:bg-amber-600 text-white"
+                     className="shrink-0 ml-3 bg-slate-600 hover:bg-slate-700 text-white"
                    >
                      {regenerateCallsMutation.isPending
                        ? <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />Matching…</>
-                       : <><RefreshCw className="w-3.5 h-3.5 mr-1.5" />Generate Calls</>}
+                       : <><RefreshCw className="w-3.5 h-3.5 mr-1.5" />Regenerate</>}
                    </Button>
                  </div>
                )}
