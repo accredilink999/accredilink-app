@@ -12,12 +12,13 @@ import { toast } from 'sonner';
 import OwnerWelcomeModal from '@/components/OwnerWelcomeModal';
 import SetupHub from '@/components/admin/SetupHub';
 import FeaturePermissions from '@/components/admin/FeaturePermissions';
+import DataImport from '@/pages/DataImport';
 import {
   Building2, Users, CreditCard, Settings, Shield, Crown, Copy, Check,
   KeyRound, Loader2, ExternalLink, Calendar, ChevronRight, Download,
   UserPlus, Trash2, ChevronDown, MapPin, Clock, LayoutGrid, Sparkles,
   AlertTriangle, RefreshCw, XCircle, CheckCircle2, Receipt, ListChecks,
-  SlidersHorizontal,
+  SlidersHorizontal, FileSpreadsheet,
 } from 'lucide-react';
 
 const PLAN_LABELS = {
@@ -51,6 +52,7 @@ const TABS = [
   { id: 'overview',    label: 'Overview',    icon: Building2 },
   { id: 'staff',       label: 'Staff',       icon: Users },
   { id: 'permissions', label: 'Permissions', icon: SlidersHorizontal },
+  { id: 'import',      label: 'Import',      icon: FileSpreadsheet },
   { id: 'billing',     label: 'Billing',     icon: CreditCard },
   { id: 'settings',    label: 'Settings',    icon: Settings },
 ];
@@ -333,6 +335,9 @@ export default function OrgAdmin() {
 
       {/* ── PERMISSIONS TAB ──────────────────────────────────────── */}
       {tab === 'permissions' && <FeaturePermissions />}
+
+      {/* ── IMPORT TAB ───────────────────────────────────────────── */}
+      {tab === 'import' && <DataImport />}
 
       {/* ── OVERVIEW TAB ─────────────────────────────────────────── */}
       {tab === 'overview' && (
