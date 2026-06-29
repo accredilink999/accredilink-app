@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/api/supabaseClient';
 import { ShiftApi, ShiftCallApi } from '@/api/rotaApi';
+import { getMatchingCallsForShift } from '@/utils/shiftCallAutoAssign';
 import CareLogForm from '@/components/careLogs/CareLogForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -284,6 +285,48 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
       callDetails: regularCalls.sort((a, b) => (a.scheduled_time || '').localeCompare(b.scheduled_time || '')),
     };
   };
+
+  const regenerateCallsMutation = useMutation({
+    mutationFn: async () => {
+      const areaId = shift.rota_area_id || shift.area_id;
+      if (!areaId) throw new Error('Shift has no area — cannot match calls');
+      const serviceUsers = await base44.entities.ServiceUser.filter({ status: 'active' });
+      const matchingCalls = getMatchingCallsForShift(serviceUsers, areaId, shift.start_time, shift.end_time);
+      if (matchingCalls.length === 0) throw new Error('No matching service users found for this area and time window');
+      const callTypesData = await base44.entities.CallType.filter({ is_active: true });
+      // Get existing call service_user_ids to avoid duplicates
+      const existingCalls = await ShiftCallApi.filter({ shift_id: shift.id });
+      const existingUserIds = new Set(existingCalls.map(c => c.service_user_id));
+      let created = 0;
+      for (const call of matchingCalls) {
+        if (existingUserIds.has(call.service_user_id)) continue;
+        const ct = callTypesData.find(c => c.name === call.call_type);
+        const tasks = ct?.default_tasks?.length ? ct.default_tasks.map(t => ({ text: t, completed: false })) : [];
+        await ShiftCallApi.create({
+          shift_id: shift.id,
+          service_user_id: call.service_user_id,
+          service_user_name: call.service_user_name,
+          service_user_address: call.service_user_address,
+          scheduled_time: call.scheduled_time,
+          call_time: call.scheduled_time,
+          duration_minutes: call.duration_minutes,
+          call_type: call.call_type,
+          call_types: call.call_types || [call.call_type],
+          tasks,
+          call_date: shift.date,
+          status: 'pending',
+          notes: call.notes || '',
+        });
+        created++;
+      }
+      return created;
+    },
+    onSuccess: (created) => {
+      queryClient.invalidateQueries({ queryKey: ['shift-calls', shift.id] });
+      toast.success(`${created} call${created !== 1 ? 's' : ''} added to shift`);
+    },
+    onError: (e) => toast.error(e.message || 'Failed to regenerate calls'),
+  });
 
   const deleteShiftMutation = useMutation({
     mutationFn: async () => {
@@ -972,6 +1015,24 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
 
             {!isSitIn && (
             <TabsContent value="calls" className="space-y-4 mt-4">
+               {isAdmin && calls.length === 0 && (
+                 <div className="flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                   <div className="min-w-0">
+                     <p className="text-sm font-medium text-amber-800">No calls on this shift</p>
+                     <p className="text-xs text-amber-600">Auto-match service users from this area &amp; time window</p>
+                   </div>
+                   <Button
+                     size="sm"
+                     onClick={() => regenerateCallsMutation.mutate()}
+                     disabled={regenerateCallsMutation.isPending}
+                     className="shrink-0 ml-3 bg-amber-500 hover:bg-amber-600 text-white"
+                   >
+                     {regenerateCallsMutation.isPending
+                       ? <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />Matching…</>
+                       : <><RefreshCw className="w-3.5 h-3.5 mr-1.5" />Generate Calls</>}
+                   </Button>
+                 </div>
+               )}
                <CallManager
                  shift={shift}
                  calls={calls}

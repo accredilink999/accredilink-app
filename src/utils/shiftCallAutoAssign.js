@@ -30,8 +30,9 @@ export function getMatchingCallsForShift(serviceUsers, areaId, startTime, endTim
   for (const su of serviceUsers) {
     if (!su.call_times || su.call_times.length === 0) continue;
     if (su.status !== 'active') continue;
-    const suArea = su.area_id || su.rota_area_id;
-    if (suArea !== areaId) continue;
+    // Match on any area field — handles legacy area_id vs rota_area_id inconsistency
+    const suAreaIds = [su.area_id, su.rota_area_id].filter(Boolean);
+    if (!suAreaIds.includes(areaId)) continue;
 
     for (const ct of su.call_times) {
       const callStart = timeToMinutes(ct.time);
