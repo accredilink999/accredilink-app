@@ -50,6 +50,7 @@ jobs:
         env:
           VITE_SUPABASE_URL: https://edaifkkkqwgavxkgozwi.supabase.co
           VITE_SUPABASE_ANON_KEY: sb_publishable_XLzc3szPjmX4ZmBz_wz4tA_-MJf-XBg
+          VITE_APP_MODE: radio
 
       - name: Sync Capacitor
         run: npx cap sync android

@@ -19,6 +19,9 @@ export default function SubscriptionGate() {
     });
   }, [isAuthenticated, user?.id]);
 
+  // Radio APK users always have an existing org — no payment gate needed
+  if (import.meta.env.VITE_APP_MODE === 'radio') return null;
+
   // Also allow Settings through so users can reach billing
   const isSettingsPage = typeof window !== 'undefined' && window.location.pathname.toLowerCase().includes('settings');
 
