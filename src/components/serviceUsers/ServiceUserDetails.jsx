@@ -60,8 +60,10 @@ import {
   Star,
   Send,
   ExternalLink,
-  RefreshCw
+  RefreshCw,
+  MoreVertical,
 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useLanguage } from '@/lib/LanguageContext';
 
 function DownloadCarePlanButton({ downloadMutation }) {
@@ -628,10 +630,35 @@ export default function ServiceUserDetails({ serviceUser, open, onClose, onEdit,
           </div>
 
           {!onEditDisabled && (
-            <Button variant="outline" size="sm" onClick={onEdit} className="flex-shrink-0">
-              <Edit className="w-3 h-3 mr-1" />
-              Edit
-            </Button>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <Button variant="outline" size="sm" onClick={onEdit}>
+                <Edit className="w-3 h-3 mr-1" />
+                Edit
+              </Button>
+              {isAdmin && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon" className="h-8 w-8">
+                      <MoreVertical className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52">
+                    <DropdownMenuItem onClick={onEdit}>
+                      <Edit className="w-4 h-4 mr-2 text-slate-500" />
+                      Edit care plan
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => setDeleteServiceUserConfirmOpen(true)}
+                      className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete client…
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
           )}
         </div>
       </div>

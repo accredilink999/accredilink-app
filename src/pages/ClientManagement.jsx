@@ -13,12 +13,15 @@ import ServiceUserForm from '@/components/serviceUsers/ServiceUserForm';
 import ServiceUserDetails from '@/components/serviceUsers/ServiceUserDetails';
 import ClientCardGrid from '@/components/serviceUsers/ClientCardGrid';
 import ClientCardList from '@/components/serviceUsers/ClientCardList';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   Heart,
   Plus,
   Search,
   AlertCircle,
-  Settings
+  Settings,
+  MoreVertical,
+  FileEdit,
 } from 'lucide-react';
 import CareLogFormBuilder from '@/components/admin/CareLogFormBuilder';
 import HelpTip from '@/components/ui/HelpTip';
@@ -168,25 +171,27 @@ export default function ClientManagement() {
         className="[&_h1]:text-slate-900 [&_svg]:text-teal-600 [&_svg]:fill-teal-600"
       >
         {isAdmin && (
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <Button
-              variant="outline"
-              onClick={() => setShowFormBuilder(true)}
-              title="Configure Care Log Form"
+              onClick={() => { setEditingUser(null); setShowForm(true); }}
+              className="bg-teal-600 hover:bg-teal-700 gap-1.5"
             >
-              <Settings className="w-4 h-4 mr-2" />
-              Care Log Form
+              <Plus className="w-4 h-4" />
+              Add Client
             </Button>
-            <Button
-              onClick={() => {
-                setEditingUser(null);
-                setShowForm(true);
-              }}
-              className="bg-teal-600 hover:bg-teal-700"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Service User
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuItem onClick={() => setShowFormBuilder(true)}>
+                  <FileEdit className="w-4 h-4 mr-2 text-indigo-500" />
+                  Configure care log form
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <HelpTip tip="Add a new service user to the system with their care needs and preferences." inline />
           </div>
         )}
