@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, Trash2, UserCheck, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { notifyClaimCreated } from '@/utils/shiftClaimNotifications';
+import { getMatchingCallsForShift } from '@/utils/shiftCallAutoAssign';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 export default function ClaimShiftModal({ shift, open, onClose, isAdmin = false }) {
@@ -43,17 +44,53 @@ export default function ClaimShiftModal({ shift, open, onClose, isAdmin = false 
     enabled: isAdmin,
   });
 
+  const SIT_IN_NAMES = new Set(['Sit In L', 'Sit In E', 'Sit In FD']);
+
   const allocateMutation = useMutation({
     mutationFn: async (staffId) => {
       const staffMember = allStaff.find(s => s.id === staffId);
-      return ShiftApi.update(shift.id, {
+
+      // 1. Assign staff to shift
+      await ShiftApi.update(shift.id, {
         staff_id: staffId,
         staff_name: staffMember?.staff_full_name || staffMember?.full_name || '',
-        status: 'confirmed',
+        status: 'scheduled',
       });
+
+      // 2. Auto-create client calls (mirrors claim-approval logic)
+      if (!SIT_IN_NAMES.has(shift.shift_name)) {
+        const areaId = shift.rota_area_id || shift.area_id;
+        const serviceUsers = await base44.entities.ServiceUser.filter({ status: 'active' });
+        const matchingCalls = getMatchingCallsForShift(serviceUsers, areaId, shift.start_time, shift.end_time);
+        const callTypesData = await base44.entities.CallType.filter({ is_active: true });
+        for (const call of matchingCalls) {
+          const ct = callTypesData.find(c => c.name === call.call_type);
+          const tasks = ct?.default_tasks?.length ? ct.default_tasks.map(t => ({ text: t, completed: false })) : [];
+          try {
+            await ShiftCallApi.create({
+              shift_id: shift.id,
+              service_user_id: call.service_user_id,
+              service_user_name: call.service_user_name,
+              service_user_address: call.service_user_address,
+              scheduled_time: call.scheduled_time,
+              call_time: call.scheduled_time,
+              duration_minutes: call.duration_minutes,
+              call_type: call.call_type,
+              call_types: call.call_types || [call.call_type],
+              tasks,
+              call_date: shift.date,
+              status: 'pending',
+              notes: call.notes || '',
+            });
+          } catch (callErr) {
+            console.error('[Allocate] Failed to create call:', callErr);
+          }
+        }
+      }
+
+      return staffMember;
     },
-    onSuccess: (_, staffId) => {
-      const staffMember = allStaff.find(s => s.id === staffId);
+    onSuccess: (staffMember) => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       queryClient.invalidateQueries({ queryKey: ['shiftClaimRequests'] });
       toast.success(`Shift allocated to ${staffMember?.staff_full_name || staffMember?.full_name}`);
