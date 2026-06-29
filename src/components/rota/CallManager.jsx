@@ -1033,7 +1033,13 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
 
              const serviceUser = serviceUsers.find(su => su.id === call.service_user_id);
              const isOnHold = serviceUser?.status === 'on_hold';
-             const canClockIn = (isMyShift || isAdmin) && !call.clock_in_time && (call.status === 'pending' || call.status === 'in_progress') && !isOnHold;
+             // Block check-in if any other call is open (not checked out) or checked out but no care log
+             const hasBlockingCall = !isAdmin && callsToDisplay.some(c => {
+               if (c.id === call.id || !c.clock_in_time) return false;
+               if (!c.clock_out_time) return true; // still in progress
+               return !careLogs.some(log => log.id === c.care_log_id || log.shift_call_id === c.id); // checked out but no log
+             });
+             const canClockIn = (isMyShift || isAdmin) && !call.clock_in_time && (call.status === 'pending' || call.status === 'in_progress') && !isOnHold && !hasBlockingCall;
              const canClockOut = (isMyShift || isAdmin) && call.clock_in_time && !call.clock_out_time && call.status === 'in_progress' && !isOnHold;
              const hasCarLog = careLogs.some(log => log.id === call.care_log_id || (log.shift_call_id === call.id));
              const matchedPartnerCall = shift?.paired_shift_id ? getPartnerCall(call) : null;
@@ -1321,12 +1327,12 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                           {isExpanded && (
                             <div className="mt-2">
                               <button
-                                onClick={() => { clockInMutation.mutate(call); setExpandedCallId(null); }}
-                                disabled={clockInMutation.isPending}
-                                className="w-full py-3.5 px-4 bg-green-50 border border-green-200 text-green-700 font-semibold rounded-xl flex items-center gap-3 active:scale-[0.99] touch-manipulation disabled:opacity-50 transition-all"
+                                onClick={() => { if (!hasBlockingCall) { clockInMutation.mutate(call); setExpandedCallId(null); } }}
+                                disabled={clockInMutation.isPending || hasBlockingCall}
+                                className="w-full py-3.5 px-4 bg-green-50 border border-green-200 text-green-700 font-semibold rounded-xl flex items-center gap-3 active:scale-[0.99] touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                               >
                                 <Play className="w-4 h-4 flex-shrink-0" />
-                                Check In to Call
+                                {hasBlockingCall ? 'Complete current call & log first' : 'Check In to Call'}
                               </button>
                             </div>
                           )}
@@ -1355,12 +1361,12 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                         {isExpanded && (
                           <div className="mt-2 space-y-2">
                             <button
-                              onClick={() => { clockInMutation.mutate(call); setExpandedCallId(null); }}
-                              disabled={clockInMutation.isPending}
-                              className="w-full py-3.5 px-4 bg-green-50 border border-green-200 text-green-700 font-semibold rounded-xl flex items-center gap-3 active:scale-[0.99] touch-manipulation disabled:opacity-50 transition-all"
+                              onClick={() => { if (!hasBlockingCall) { clockInMutation.mutate(call); setExpandedCallId(null); } }}
+                              disabled={clockInMutation.isPending || hasBlockingCall}
+                              className="w-full py-3.5 px-4 bg-green-50 border border-green-200 text-green-700 font-semibold rounded-xl flex items-center gap-3 active:scale-[0.99] touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                             >
                               <Play className="w-4 h-4 flex-shrink-0" />
-                              Check In to Call
+                              {hasBlockingCall ? 'Complete current call & log first' : 'Check In to Call'}
                             </button>
                             {isOverdue && (
                               <button
