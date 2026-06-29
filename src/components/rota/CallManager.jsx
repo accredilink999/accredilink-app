@@ -1033,7 +1033,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
 
              const serviceUser = serviceUsers.find(su => su.id === call.service_user_id);
              const isOnHold = serviceUser?.status === 'on_hold';
-             // Block check-in if any other call is open (not checked out) or checked out but no care log
+             // Block check-in if another call is still open or checked out without a log (solo + paired)
              const blockingCall = !isAdmin ? callsToDisplay.find(c => {
                if (c.id === call.id || !c.clock_in_time) return false;
                if (!c.clock_out_time) return true;
@@ -1045,7 +1045,17 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                  ? `Check out of ${blockingCall.service_user_name || 'current call'} first`
                  : `Complete care log for ${blockingCall.service_user_name || 'previous call'} first`
                : null;
-             const canClockIn = (isMyShift || isAdmin) && !call.clock_in_time && (call.status === 'pending' || call.status === 'in_progress') && !isOnHold && !hasBlockingCall;
+             // Block independent check-in if partner assigned us a log to fill (paired shifts only)
+             // Does NOT block the "Partner In Progress — Check In Too?" button
+             const logRequiredCall = !isAdmin ? callsToDisplay.find(c => {
+               if (c.id === call.id || !c.log_required) return false;
+               return !careLogs.some(log => log.id === c.care_log_id || log.shift_call_id === c.id);
+             }) : null;
+             const hasLogRequiredBlock = !!logRequiredCall;
+             const logRequiredReason = logRequiredCall
+               ? `Complete care log for ${logRequiredCall.service_user_name || 'previous call'} first`
+               : null;
+             const canClockIn = (isMyShift || isAdmin) && !call.clock_in_time && (call.status === 'pending' || call.status === 'in_progress') && !isOnHold && !hasBlockingCall && !hasLogRequiredBlock;
              const canClockOut = (isMyShift || isAdmin) && call.clock_in_time && !call.clock_out_time && call.status === 'in_progress' && !isOnHold;
              const hasCarLog = careLogs.some(log => log.id === call.care_log_id || (log.shift_call_id === call.id));
              const matchedPartnerCall = shift?.paired_shift_id ? getPartnerCall(call) : null;
@@ -1338,7 +1348,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                                 className="w-full py-3.5 px-4 bg-green-50 border border-green-200 text-green-700 font-semibold rounded-xl flex items-center gap-3 active:scale-[0.99] touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                               >
                                 <Play className="w-4 h-4 flex-shrink-0" />
-                                {hasBlockingCall ? blockingReason : 'Check In to Call'}
+                                {hasBlockingCall ? blockingReason : 'Check In Too (Fuel/Mileage)'}
                               </button>
                             </div>
                           )}
@@ -1367,12 +1377,12 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                         {isExpanded && (
                           <div className="mt-2 space-y-2">
                             <button
-                              onClick={() => { if (!hasBlockingCall) { clockInMutation.mutate(call); setExpandedCallId(null); } }}
-                              disabled={clockInMutation.isPending || hasBlockingCall}
+                              onClick={() => { if (!hasBlockingCall && !hasLogRequiredBlock) { clockInMutation.mutate(call); setExpandedCallId(null); } }}
+                              disabled={clockInMutation.isPending || hasBlockingCall || hasLogRequiredBlock}
                               className="w-full py-3.5 px-4 bg-green-50 border border-green-200 text-green-700 font-semibold rounded-xl flex items-center gap-3 active:scale-[0.99] touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                             >
                               <Play className="w-4 h-4 flex-shrink-0" />
-                              {hasBlockingCall ? blockingReason : 'Check In to Call'}
+                              {hasBlockingCall ? blockingReason : hasLogRequiredBlock ? logRequiredReason : 'Check In to Call'}
                             </button>
                             {isOverdue && (
                               <button

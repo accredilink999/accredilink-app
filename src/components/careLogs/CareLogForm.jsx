@@ -310,6 +310,27 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
 
       setSubmittedCareLog(careLog);
 
+      // Clear log_required flag and notify partner on paired shifts
+      if (callId && shift?.paired_shift_id) {
+        try {
+          await supabase.from('shift_calls').update({ log_required: false }).eq('id', callId);
+          const pairedShift = await base44.entities.Shift.read(shift.paired_shift_id);
+          if (pairedShift?.staff_id && pairedShift.staff_id !== user?.id) {
+            base44.functions.invoke('createNotification', {
+              recipient_ids: [pairedShift.staff_id],
+              type: 'care_log',
+              title: `Care log completed: ${clientName}`,
+              message: `${staffName} has completed the care log for ${clientName}.`,
+              priority: 'normal',
+              action_url: '/Rota',
+              send_push: true,
+            }).catch(e => console.warn('Partner log-complete notification failed:', e));
+          }
+        } catch (e) {
+          console.warn('Could not clear log_required or notify partner:', e);
+        }
+      }
+
       // Close modal after 2 seconds to show preview
       setTimeout(() => {
         onClose();
