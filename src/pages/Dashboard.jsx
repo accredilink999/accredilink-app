@@ -65,7 +65,6 @@ export default function Dashboard() {
   const [dismissedAwardIds, setDismissedAwardIds] = useState([]);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [notificationsExpanded, setNotificationsExpanded] = useState(false);
-  const [lastSeenNotifCount, setLastSeenNotifCount] = useState(0);
   const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
   const [careLogData, setCareLogData] = useState({
     service_user_id: '',
@@ -465,156 +464,48 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Admin Notifications Centre — collapsed by default, expandable */}
-      {(() => {
-        const pendingSwapsMe = mySwapRequests.filter(r => !['approved', 'rejected', 'declined'].includes(r.status));
-        const pendingClaimsMe = myClaimRequests.filter(r => r.status === 'pending');
-        const totalCount = unreadNotifications.length + unacknowledgedAnnouncements.length + totalAdminTasks + incomingSwapRequests.length + pendingSwapsMe.length + pendingClaimsMe.length;
-        if (totalCount === 0) return null;
-        return (
-          <div className="rounded-xl overflow-hidden shadow-sm border border-teal-200">
-            <button
-              onClick={() => { setNotificationsExpanded(v => !v); setLastSeenNotifCount(totalCount); }}
-              className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-teal-600 to-cyan-600 text-white touch-manipulation active:scale-[0.99] transition-all"
-            >
-              <Bell className={`w-4 h-4 flex-shrink-0 ${totalCount > lastSeenNotifCount ? 'animate-pulse' : ''}`} />
-              <span className="font-semibold text-sm flex-1 text-left">Admin Notifications Centre</span>
-              <span className="bg-white text-teal-700 font-bold text-xs px-2 py-0.5 rounded-full min-w-[22px] text-center">
-                {totalCount}
-              </span>
-              <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 ${notificationsExpanded ? 'rotate-180' : ''}`} />
-            </button>
-            {notificationsExpanded && (
-              <div className="bg-teal-50 p-3 space-y-2">
-                {unreadNotifications.length > 0 && (
-                  <Link to={createPageUrl('NotificationCenter')}>
-                    <div className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-teal-50 transition-colors border border-teal-100">
-                      <Bell className="w-5 h-5 text-teal-500 flex-shrink-0" />
-                      <span className="text-sm font-medium flex-1">{unreadNotifications.length} unread notification{unreadNotifications.length > 1 ? 's' : ''}</span>
-                      <Badge className="bg-teal-600 text-white text-xs flex-shrink-0">View</Badge>
-                    </div>
-                  </Link>
-                )}
-                {unacknowledgedAnnouncements.length > 0 && (
-                  <Link to={createPageUrl('NotificationCenter')}>
-                    <div className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-amber-50 transition-colors border border-amber-100">
-                      <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0" />
-                      <span className="text-sm font-medium flex-1">{unacknowledgedAnnouncements.length} announcement{unacknowledgedAnnouncements.length > 1 ? 's' : ''} to acknowledge</span>
-                      <Badge className="bg-amber-500 text-white text-xs flex-shrink-0">Action</Badge>
-                    </div>
-                  </Link>
-                )}
-                {openIncidents.length > 0 && (
-                  <Link to={createPageUrl('Incidents')}>
-                    <div className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-red-50 transition-colors border border-red-100">
-                      <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
-                      <span className="text-sm font-medium flex-1">{openIncidents.length} open incident{openIncidents.length > 1 ? 's' : ''}</span>
-                      <Badge className="bg-red-500 text-white text-xs flex-shrink-0">{openIncidents.length}</Badge>
-                    </div>
-                  </Link>
-                )}
-                {pendingLeave.length > 0 && isAdmin && (
-                  <Link to={createPageUrl('LeaveRequests')}>
-                    <div className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-amber-50 transition-colors border border-amber-100">
-                      <FileText className="w-5 h-5 text-amber-500 flex-shrink-0" />
-                      <span className="text-sm font-medium flex-1">{pendingLeave.length} pending leave request{pendingLeave.length > 1 ? 's' : ''}</span>
-                      <Badge className="bg-amber-500 text-white text-xs flex-shrink-0">{pendingLeave.length}</Badge>
-                    </div>
-                  </Link>
-                )}
-                {pendingClaimsAdmin.length > 0 && isAdmin && (
-                  <Link to={createPageUrl('RequestsManagement')}>
-                    <div className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-purple-50 transition-colors border border-purple-100">
-                      <Hand className="w-5 h-5 text-purple-500 flex-shrink-0" />
-                      <span className="text-sm font-medium flex-1">{pendingClaimsAdmin.length} pending shift claim{pendingClaimsAdmin.length > 1 ? 's' : ''}</span>
-                      <Badge className="bg-purple-500 text-white text-xs flex-shrink-0">{pendingClaimsAdmin.length}</Badge>
-                    </div>
-                  </Link>
-                )}
-                {pendingSwapsAdmin.length > 0 && isAdmin && (
-                  <Link to={createPageUrl('RequestsManagement')}>
-                    <div className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-blue-50 transition-colors border border-blue-100">
-                      <ArrowRightLeft className="w-5 h-5 text-blue-500 flex-shrink-0" />
-                      <span className="text-sm font-medium flex-1">{pendingSwapsAdmin.length} shift swap{pendingSwapsAdmin.length > 1 ? 's' : ''} awaiting approval</span>
-                      <Badge className="bg-blue-500 text-white text-xs flex-shrink-0">{pendingSwapsAdmin.length}</Badge>
-                    </div>
-                  </Link>
-                )}
-                {incomingSwapRequests.map(swap => (
-                  <div key={swap.id} onClick={() => setSelectedSwapRequest(swap)}
-                    className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-yellow-50 transition-colors border border-yellow-100 cursor-pointer">
-                    <ArrowRightLeft className="w-5 h-5 text-yellow-500 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900 truncate">{swap.requester_name} wants to swap shifts with you</p>
-                      <p className="text-xs text-slate-500">{swap.shift_date} &bull; {swap.shift_time}</p>
-                    </div>
-                    <Badge className="bg-yellow-500 text-white text-xs flex-shrink-0">Respond</Badge>
-                  </div>
-                ))}
-                {pendingSwapsMe.map(swap => (
-                  <div key={swap.id} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-100">
-                    <ArrowRightLeft className="w-5 h-5 text-blue-400 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900 truncate">Swap with {swap.swap_with_name} — {swap.shift_date}</p>
-                      <p className="text-xs text-slate-500">
-                        {swap.status === 'pending_target' ? `Awaiting ${swap.swap_with_name}'s response` : 'Accepted — awaiting admin approval'}
-                      </p>
-                    </div>
-                    <Badge className={`text-xs flex-shrink-0 ${swap.status === 'pending_target' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
-                      {swap.status === 'pending_target' ? 'Pending' : 'With Admin'}
-                    </Badge>
-                  </div>
-                ))}
-                {pendingClaimsMe.map(claim => (
-                  <div key={claim.id} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-100">
-                    <Hand className="w-5 h-5 text-purple-400 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900 truncate">{claim.shift_name || 'Shift'} — {claim.shift_date}</p>
-                      <p className="text-xs text-slate-500">{claim.shift_time} &bull; Awaiting admin approval</p>
-                    </div>
-                    <Badge className="bg-purple-100 text-purple-700 text-xs flex-shrink-0">Pending</Badge>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
-      {/* Available Shifts to Claim */}
+      {/* Cover Shifts Available — collapsible green bar */}
       {availableShifts.length > 0 && (
-        <Card className="p-4 sm:p-5 bg-gradient-to-br from-green-50 to-emerald-50 border-0 shadow-sm">
-          <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2 text-sm sm:text-base">
-            <Hand className="w-4 h-4 text-green-600 flex-shrink-0" />
-            Cover Shifts Available
-            <Badge variant="secondary" className="bg-green-500 text-white text-xs ml-auto">{availableShifts.length}</Badge>
-          </h3>
-          <div className="space-y-2">
-            {Object.entries(
-              availableShifts.reduce((acc, s) => {
-                if (!acc[s.date]) acc[s.date] = [];
-                acc[s.date].push(s);
-                return acc;
-              }, {})
-            ).slice(0, 5).map(([date, shifts]) => (
-              <Link key={date} to={createPageUrl('Rota')}>
-                <div className="flex items-center gap-3 p-3 bg-white/80 rounded-lg hover:bg-white transition-colors">
-                  <Calendar className="w-5 h-5 text-green-500" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-900">{format(parseISO(date), 'EEE d MMM')}</p>
-                    <p className="text-xs text-slate-500">{shifts.length} shift{shifts.length > 1 ? 's' : ''} available</p>
+        <div className="rounded-xl overflow-hidden shadow-sm border border-green-200">
+          <button
+            onClick={() => setNotificationsExpanded(v => !v)}
+            className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white touch-manipulation active:scale-[0.99] transition-all"
+          >
+            <Hand className="w-4 h-4 flex-shrink-0" />
+            <span className="font-semibold text-sm flex-1 text-left">Cover Shifts Available</span>
+            <span className="bg-white text-green-700 font-bold text-xs px-2 py-0.5 rounded-full min-w-[22px] text-center">
+              {availableShifts.length}
+            </span>
+            <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 ${notificationsExpanded ? 'rotate-180' : ''}`} />
+          </button>
+          {notificationsExpanded && (
+            <div className="bg-green-50 p-3 space-y-2">
+              {Object.entries(
+                availableShifts.reduce((acc, s) => {
+                  if (!acc[s.date]) acc[s.date] = [];
+                  acc[s.date].push(s);
+                  return acc;
+                }, {})
+              ).slice(0, 5).map(([date, shifts]) => (
+                <Link key={date} to={createPageUrl('Rota')}>
+                  <div className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-green-50 transition-colors border border-green-100">
+                    <Calendar className="w-5 h-5 text-green-500 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-900">{format(parseISO(date), 'EEE d MMM')}</p>
+                      <p className="text-xs text-slate-500">{shifts.length} shift{shifts.length > 1 ? 's' : ''} available</p>
+                    </div>
+                    <Badge className="bg-green-600 text-white text-xs flex-shrink-0">Claim</Badge>
                   </div>
-                  <Badge variant="secondary" className="bg-green-100 text-green-700 text-xs flex-shrink-0">Claim</Badge>
-                </div>
-              </Link>
-            ))}
-            {Object.keys(availableShifts.reduce((acc, s) => { acc[s.date] = true; return acc; }, {})).length > 5 && (
-              <Link to={createPageUrl('Rota')}>
-                <div className="text-center text-sm text-green-600 font-medium py-1">View all available shifts</div>
-              </Link>
-            )}
-          </div>
-        </Card>
+                </Link>
+              ))}
+              {Object.keys(availableShifts.reduce((acc, s) => { acc[s.date] = true; return acc; }, {})).length > 5 && (
+                <Link to={createPageUrl('Rota')}>
+                  <div className="text-center text-sm text-green-600 font-medium py-1">View all available shifts</div>
+                </Link>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Shift Swap Response Modal */}
