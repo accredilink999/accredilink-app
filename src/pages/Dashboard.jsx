@@ -64,7 +64,10 @@ export default function Dashboard() {
   const [showAwardBanner, setShowAwardBanner] = useState(false);
   const [dismissedAwardIds, setDismissedAwardIds] = useState([]);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [notificationsExpanded, setNotificationsExpanded] = useState(false);
+  const [shiftsExpanded, setShiftsExpanded] = useState(false);
+  const [lastSeenShiftsCount, setLastSeenShiftsCount] = useState(0);
+  const [adminTasksExpanded, setAdminTasksExpanded] = useState(false);
+  const [lastSeenAdminCount, setLastSeenAdminCount] = useState(0);
   const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
   const [careLogData, setCareLogData] = useState({
     service_user_id: '',
@@ -464,21 +467,117 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Admin Tasks — collapsible amber bar */}
+      {(() => {
+        const pendingSwapsMe = mySwapRequests.filter(r => !['approved', 'rejected', 'declined'].includes(r.status));
+        const pendingClaimsMe = myClaimRequests.filter(r => r.status === 'pending');
+        const adminCount = totalAdminTasks + incomingSwapRequests.length + pendingSwapsMe.length + pendingClaimsMe.length;
+        if (adminCount === 0) return null;
+        return (
+          <div className="rounded-xl overflow-hidden shadow-sm border border-amber-200">
+            <button
+              onClick={() => { setAdminTasksExpanded(v => !v); setLastSeenAdminCount(adminCount); }}
+              className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white touch-manipulation active:scale-[0.99] transition-all"
+            >
+              <AlertTriangle className={`w-4 h-4 flex-shrink-0 ${adminCount > lastSeenAdminCount ? 'animate-pulse' : ''}`} />
+              <span className="font-semibold text-sm flex-1 text-left">Tasks Requiring Attention</span>
+              <span className="bg-white text-amber-700 font-bold text-xs px-2 py-0.5 rounded-full min-w-[22px] text-center">
+                {adminCount}
+              </span>
+              <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 ${adminTasksExpanded ? 'rotate-180' : ''}`} />
+            </button>
+            {adminTasksExpanded && (
+              <div className="bg-amber-50 p-3 space-y-2">
+                {openIncidents.length > 0 && (
+                  <Link to={createPageUrl('Incidents')}>
+                    <div className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-red-50 transition-colors border border-red-100">
+                      <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                      <span className="text-sm font-medium flex-1">{openIncidents.length} open incident{openIncidents.length > 1 ? 's' : ''}</span>
+                      <Badge className="bg-red-500 text-white text-xs">{openIncidents.length}</Badge>
+                    </div>
+                  </Link>
+                )}
+                {pendingLeave.length > 0 && isAdmin && (
+                  <Link to={createPageUrl('LeaveRequests')}>
+                    <div className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-amber-50 transition-colors border border-amber-100">
+                      <FileText className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                      <span className="text-sm font-medium flex-1">{pendingLeave.length} pending leave request{pendingLeave.length > 1 ? 's' : ''}</span>
+                      <Badge className="bg-amber-500 text-white text-xs">{pendingLeave.length}</Badge>
+                    </div>
+                  </Link>
+                )}
+                {pendingClaimsAdmin.length > 0 && isAdmin && (
+                  <Link to={createPageUrl('RequestsManagement')}>
+                    <div className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-purple-50 transition-colors border border-purple-100">
+                      <Hand className="w-5 h-5 text-purple-500 flex-shrink-0" />
+                      <span className="text-sm font-medium flex-1">{pendingClaimsAdmin.length} pending shift claim{pendingClaimsAdmin.length > 1 ? 's' : ''}</span>
+                      <Badge className="bg-purple-500 text-white text-xs">{pendingClaimsAdmin.length}</Badge>
+                    </div>
+                  </Link>
+                )}
+                {pendingSwapsAdmin.length > 0 && isAdmin && (
+                  <Link to={createPageUrl('RequestsManagement')}>
+                    <div className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-blue-50 transition-colors border border-blue-100">
+                      <ArrowRightLeft className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                      <span className="text-sm font-medium flex-1">{pendingSwapsAdmin.length} shift swap{pendingSwapsAdmin.length > 1 ? 's' : ''} awaiting approval</span>
+                      <Badge className="bg-blue-500 text-white text-xs">{pendingSwapsAdmin.length}</Badge>
+                    </div>
+                  </Link>
+                )}
+                {incomingSwapRequests.map(swap => (
+                  <div key={swap.id} onClick={() => setSelectedSwapRequest(swap)}
+                    className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-yellow-50 transition-colors border border-yellow-100 cursor-pointer">
+                    <ArrowRightLeft className="w-5 h-5 text-yellow-500 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-900 truncate">{swap.requester_name} wants to swap with you</p>
+                      <p className="text-xs text-slate-500">{swap.shift_date} &bull; {swap.shift_time}</p>
+                    </div>
+                    <Badge className="bg-yellow-500 text-white text-xs">Respond</Badge>
+                  </div>
+                ))}
+                {pendingSwapsMe.map(swap => (
+                  <div key={swap.id} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-100">
+                    <ArrowRightLeft className="w-5 h-5 text-blue-400 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-900 truncate">Swap with {swap.swap_with_name} — {swap.shift_date}</p>
+                      <p className="text-xs text-slate-500">{swap.status === 'pending_target' ? `Awaiting ${swap.swap_with_name}'s response` : 'With admin'}</p>
+                    </div>
+                    <Badge className={`text-xs ${swap.status === 'pending_target' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
+                      {swap.status === 'pending_target' ? 'Pending' : 'With Admin'}
+                    </Badge>
+                  </div>
+                ))}
+                {pendingClaimsMe.map(claim => (
+                  <div key={claim.id} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-100">
+                    <Hand className="w-5 h-5 text-purple-400 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-900 truncate">{claim.shift_name || 'Shift'} — {claim.shift_date}</p>
+                      <p className="text-xs text-slate-500">{claim.shift_time} &bull; Awaiting admin approval</p>
+                    </div>
+                    <Badge className="bg-purple-100 text-purple-700 text-xs">Pending</Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Cover Shifts Available — collapsible green bar */}
       {availableShifts.length > 0 && (
         <div className="rounded-xl overflow-hidden shadow-sm border border-green-200">
           <button
-            onClick={() => setNotificationsExpanded(v => !v)}
+            onClick={() => { setShiftsExpanded(v => !v); setLastSeenShiftsCount(availableShifts.length); }}
             className="w-full flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white touch-manipulation active:scale-[0.99] transition-all"
           >
-            <Hand className="w-4 h-4 flex-shrink-0" />
+            <Hand className={`w-4 h-4 flex-shrink-0 ${availableShifts.length > lastSeenShiftsCount ? 'animate-pulse' : ''}`} />
             <span className="font-semibold text-sm flex-1 text-left">Cover Shifts Available</span>
             <span className="bg-white text-green-700 font-bold text-xs px-2 py-0.5 rounded-full min-w-[22px] text-center">
               {availableShifts.length}
             </span>
-            <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 ${notificationsExpanded ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 ${shiftsExpanded ? 'rotate-180' : ''}`} />
           </button>
-          {notificationsExpanded && (
+          {shiftsExpanded && (
             <div className="bg-green-50 p-3 space-y-2">
               {Object.entries(
                 availableShifts.reduce((acc, s) => {
