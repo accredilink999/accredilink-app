@@ -13,6 +13,7 @@ import OwnerWelcomeModal from '@/components/OwnerWelcomeModal';
 import { getCurrentOrgRole, getCurrentOrg } from '@/lib/orgContext';
 import { useHelpMode } from '@/lib/HelpModeContext';
 import AppDownloadPrompt from '@/components/AppDownloadPrompt';
+import RadioPagerPanel from '@/components/RadioPagerPanel';
 import PWAInstallButton from '@/components/PWAInstallButton';
 import PWAInstallPrompt from '@/components/PWAInstallPrompt';
 import APKNudgeBanner from '@/components/APKNudgeBanner';
@@ -91,6 +92,7 @@ export default function Layout({ children, currentPageName }) {
   const [showAdminPointer, setShowAdminPointer] = useState(false);
   const [showNotifBanner, setShowNotifBanner] = useState(false);
   const { helpMode, setHelpMode } = useHelpMode();
+  const [commsOpen, setCommsOpen] = useState(false);
 
   // Track previous page so logo tap returns user to where they were
   const prevPageRef = useRef(null);
@@ -1316,21 +1318,28 @@ export default function Layout({ children, currentPageName }) {
                       {/* Bottom Navigation for Mobile */}
                       <BottomNavigation
                         currentPageName={currentPageName}
-                        unreadChatCount={unreadConversations.length}
                         unreadAssetsCount={openIncidents.length}
                         isControlDevice={!!user?.is_control_device}
+                        onOpenComms={() => setCommsOpen(true)}
                       />
 
-                      {/* Floating Radio button — visible on all pages when radio is enabled */}
+                      {/* Floating Comms button — opens Radio/Pager panel */}
                       {radioEnabled && !user?.is_control_device && currentPageName !== 'TwoWayRadio' && (
                         <button
-                          onClick={() => navigate(createPageUrl('TwoWayRadio'))}
+                          onClick={() => setCommsOpen(true)}
                           className="fixed bottom-20 right-4 z-[9998] w-12 h-12 rounded-full bg-slate-900 text-green-400 shadow-lg flex items-center justify-center hover:bg-slate-700 active:scale-95 transition-all touch-manipulation"
-                          aria-label="Open Radio"
+                          aria-label="Open Comms"
                         >
                           <Radio className="w-5 h-5" />
                         </button>
                       )}
+
+                      {/* Radio + Pager slide-in panel */}
+                      <RadioPagerPanel
+                        open={commsOpen}
+                        onOpenChange={setCommsOpen}
+                        missedCallCount={visibleMissedCalls.length}
+                      />
 
                       {user?.id && <ActiveShiftAutoOpen userId={user.id} />}
                       <OfflineManager />
