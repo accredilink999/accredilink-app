@@ -309,7 +309,6 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
       });
 
       setSubmittedCareLog(careLog);
-      setShowFeedbackPrompt(true);
 
       // Close modal after 2 seconds to show preview
       setTimeout(() => {
@@ -1361,6 +1360,14 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
             Cancel
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setShowFeedbackPrompt(true)}
+            className="border-amber-200 text-amber-700 hover:bg-amber-50 gap-1.5"
+          >
+            <Star className="w-4 h-4" />
+            Feedback
           </Button>
           <Button
             onClick={handleSubmit}
