@@ -37,8 +37,8 @@ export default function ClaimShiftModal({ shift, open, onClose, isAdmin = false 
   const hasPendingClaim = existingClaims.length > 0;
 
   const { data: allStaff = [] } = useQuery({
-    queryKey: ['allStaffForAllocation'],
-    queryFn: () => base44.entities.User.filter({ role__ne: 'super_admin' }),
+    queryKey: ['allUsers'],
+    queryFn: () => base44.entities.User.list(),
     enabled: isAdmin,
   });
 
