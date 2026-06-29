@@ -38,13 +38,15 @@ import {
   Settings,
   ChevronLeft,
   LayoutGrid,
-  ClipboardCheck
+  ClipboardCheck,
+  Trophy
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import AppDownloadGuide from '@/components/profile/AppDownloadGuide';
 import StaffMyMatrix from '@/components/profile/StaffMyMatrix';
 import StaffCompetencies from '@/components/profile/StaffCompetencies';
+import StaffStarRating from '@/components/profile/StaffStarRating';
 
 export default function Profile() {
   const queryClient = useQueryClient();
@@ -359,6 +361,9 @@ export default function Profile() {
                 <p className="text-xl sm:text-2xl font-bold text-purple-600">{validTraining}</p>
                 <p className="text-xs text-slate-500">Certifications</p>
               </div>
+            </div>
+            <div className="mt-3 flex justify-center">
+              <StaffStarRating userId={user?.id} startDate={user?.start_date} showBreakdown={true} />
             </div>
           </div>
 
@@ -702,6 +707,16 @@ export default function Profile() {
                 </div>
                 <span className="text-sm font-semibold text-slate-700 text-center leading-tight">Competencies</span>
                 <span className="text-[10px] text-slate-400 text-center mt-1 leading-tight line-clamp-2">Probationary &amp; skills assessments</span>
+              </Link>
+              <Link
+                to={createPageUrl('StaffLeaderboard')}
+                className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all p-4 sm:p-5 min-h-[110px] active:scale-95"
+              >
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center mb-2 shadow-sm">
+                  <Trophy className="w-6 h-6 text-white" strokeWidth={1.8} />
+                </div>
+                <span className="text-sm font-semibold text-slate-700 text-center leading-tight">Leaderboard</span>
+                <span className="text-[10px] text-slate-400 text-center mt-1 leading-tight line-clamp-2">Star rankings &amp; recognition</span>
               </Link>
             </div>
           )}

@@ -42,6 +42,7 @@ import MyMentoring from './pages/MyMentoring';
 import TwoWayRadio from './pages/TwoWayRadio';
 import CompetencyHub from './pages/CompetencyHub';
 import Feedback from './pages/Feedback';
+import StaffLeaderboard from './pages/StaffLeaderboard';
 import __Layout from './Layout.jsx';
 
 
@@ -85,6 +86,7 @@ export const PAGES = {
     "ControlRoom": ControlRoom,
     "OrgAdmin": OrgAdmin,
     "StaffAwards": StaffAwards,
+    "StaffLeaderboard": StaffLeaderboard,
     "TwoWayRadio": TwoWayRadio,
     "CompetencyHub": CompetencyHub,
 }

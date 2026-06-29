@@ -660,7 +660,7 @@ export default function Dashboard() {
                       <FileText className="w-4 h-4 text-amber-500 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-slate-900 truncate">{req.staff_name} — Leave Request</p>
-                        <p className="text-xs text-slate-500">{req.start_date} → {req.end_date} &bull; {req.leave_type || 'Leave'}</p>
+                        <p className="text-xs text-slate-500">{req.start_date} → {req.end_date} &bull; {req.type || 'Leave'}</p>
                       </div>
                       <button onClick={() => dismissTask(req.id)} className="p-1 rounded hover:bg-amber-50 text-slate-400 hover:text-slate-600 flex-shrink-0">
                         <X className="w-4 h-4" />
