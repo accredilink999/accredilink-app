@@ -1259,8 +1259,15 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                   const isMissed = call.status === 'missed';
                   const isExpanded = expandedCallId === call.id;
 
-                  // Lock pending calls while another call is in progress and awaiting completion
-                  const isLockedByActiveCall = isMyShift && isPending && activeInProgressCall && activeInProgressCall.id !== call.id;
+                  // Allow simultaneous check-in when calls are at the same address (e.g. a couple in the same home)
+                  const sameAddressAsActive =
+                    activeInProgressCall &&
+                    call.service_user_address &&
+                    activeInProgressCall.service_user_address &&
+                    call.service_user_address.trim().toLowerCase() === activeInProgressCall.service_user_address.trim().toLowerCase();
+
+                  // Lock pending calls while another call is in progress — unless both are at the same address
+                  const isLockedByActiveCall = isMyShift && isPending && activeInProgressCall && activeInProgressCall.id !== call.id && !sameAddressAsActive;
                   if (isLockedByActiveCall) {
                     return (
                       <div className="w-full py-4 px-5 bg-slate-100 text-slate-500 font-semibold text-base rounded-xl flex items-center gap-3 mt-1 border border-slate-200">
