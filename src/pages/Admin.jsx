@@ -12,7 +12,7 @@ import {
   CheckSquare,
   Activity, Building2,
   SlidersHorizontal, ListChecks, Smartphone, Send, Loader2,
-
+  CalendarDays,
 } from 'lucide-react';
 
 // ─── PRIMARY tiles — shown always ────────────────────────────────────────────
@@ -81,6 +81,13 @@ const PRIMARY = [
     icon: CalendarClock,
     bg: 'from-indigo-300 to-indigo-500',
     desc: 'Work calendar',
+  },
+  {
+    to: 'RotaManagement',
+    label: 'Rota Management',
+    icon: CalendarDays,
+    bg: 'from-violet-500 to-violet-700',
+    desc: 'Shifts, templates & patterns',
   },
 ];
 
