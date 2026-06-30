@@ -38,7 +38,7 @@ export function getMatchingCallsForShift(serviceUsers, areaId, startTime, endTim
       const callStart = timeToMinutes(ct.time);
       const callDuration = parseInt(ct.duration) || 30;
       const callEnd = callStart + callDuration;
-      if (callStart >= shiftStart && callEnd <= shiftEnd) {
+      if (callStart >= shiftStart && callStart < shiftEnd) {
         const types = (ct.types && Array.isArray(ct.types)) ? ct.types : (ct.type ? [ct.type] : ['Visit']);
         calls.push({
           service_user_id: su.id,
