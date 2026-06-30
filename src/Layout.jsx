@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import OnboardingModal from '@/components/OnboardingModal';
 import OwnerWelcomeModal from '@/components/OwnerWelcomeModal';
-import { getCurrentOrgRole, getCurrentOrg } from '@/lib/orgContext';
+import { getCurrentOrgRole, getCurrentOrg, initOrg, getCurrentOrgId } from '@/lib/orgContext';
 import { useHelpMode } from '@/lib/HelpModeContext';
 import AppDownloadPrompt from '@/components/AppDownloadPrompt';
 import RadioPagerPanel from '@/components/RadioPagerPanel';
@@ -570,7 +570,8 @@ export default function Layout({ children, currentPageName }) {
     queryKey: ['unreadPagerAlerts', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      const orgId = user.organization_id || localStorage.getItem('organizationId') || '';
+      await initOrg(); // ensure org context is ready before querying
+      const orgId = getCurrentOrgId() || localStorage.getItem('organizationId') || '';
       if (!orgId) return [];
       const seenAt = localStorage.getItem('pager_last_seen_' + user.id) || '1970-01-01T00:00:00Z';
       const { data } = await supabase
@@ -611,10 +612,13 @@ export default function Layout({ children, currentPageName }) {
     setPagerOpen(true);
   }, [user?.id, unreadPagerAlerts, pagerOpen]);
 
-  // Reset so next new alert can auto-open after panel closes
+  // Reset and refetch when panel closes so stale cache can't re-trigger auto-open
   useEffect(() => {
-    if (!pagerOpen) alerterAutoOpenedRef.current = false;
-  }, [pagerOpen]);
+    if (!pagerOpen) {
+      alerterAutoOpenedRef.current = false;
+      queryClient.invalidateQueries({ queryKey: ['unreadPagerAlerts'] });
+    }
+  }, [pagerOpen, queryClient]);
 
   // Auto-redirect to Radio on app open / return from background if missed calls or callback requests exist
   const autoRedirectedRef = useRef(false);
