@@ -52,6 +52,8 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
   const [sitInTimeOff, setSitInTimeOff] = useState('');
   const [recurrenceDialogOpen, setRecurrenceDialogOpen] = useState(false);
   const [pendingShiftsData, setPendingShiftsData] = useState([]);
+  const [useCustomName, setUseCustomName] = useState(false);
+  const [autoPair, setAutoPair] = useState(false);
   const shiftInitialData = {
       shift_name: '',
       staff_id: '',
@@ -59,6 +61,7 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
       start_time: '09:00',
       end_time: '17:00',
       visit_details: '',
+      shift_type_id: null,
     };
 
   const { formData, setFormData, hasDraft, restoreDraft, discardDraft, clearDraft } = useFormPersistence(
@@ -157,7 +160,7 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
         const callStart = timeToMinutes(ct.time);
         const callDuration = parseInt(ct.duration) || 30;
         const callEnd = callStart + callDuration;
-        if (callStart >= shiftStart && callEnd <= shiftEnd) {
+        if (callStart >= shiftStart && callStart < shiftEnd) {
           // One call_time entry = one visit = one ShiftCall
           const types = (ct.types && Array.isArray(ct.types)) ? ct.types : (ct.type ? [ct.type] : ['Visit']);
           calls.push({
@@ -189,7 +192,7 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
   }, [serviceUsers, selectedRotaAreaId, selectedAreaId, formData.start_time, formData.end_time, formData.shift_name, tab]);
 
   const createShiftMutation = useMutation({
-    mutationFn: async (shiftsData) => {
+    mutationFn: async ({ shiftsData, autoPair: shouldAutoPair = false }) => {
        console.log('[CreateShift] Creating shifts:', shiftsData.map(s => ({ date: s.date, area: s.rota_area_id, times: s.start_time + '-' + s.end_time, name: s.shift_name })));
 
        // Fetch blank shifts for the relevant dates/area to find replaceable slots
@@ -362,17 +365,43 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
            });
          }
        }
-       console.log('[CreateShift] Done. Total calls auto-assigned:', totalCalls, 'Replaced blank shifts:', replaced);
-       return { shifts, totalCalls, replaced };
+       // Auto-pair: match newly created shifts with existing unpaired shifts of same type/date
+       let pairedCount = 0;
+       if (shouldAutoPair) {
+         for (const newShift of shifts) {
+           if (!newShift.shift_type_id || !newShift.staff_id || newShift.paired_shift_id) continue;
+           const { data: candidates } = await supabase
+             .from('shifts')
+             .select('id, staff_name, staff_id')
+             .eq('shift_type_id', newShift.shift_type_id)
+             .eq('date', newShift.date)
+             .is('paired_shift_id', null)
+             .neq('id', newShift.id)
+             .not('staff_id', 'is', null)
+             .limit(1);
+           if (candidates && candidates.length > 0) {
+             const partner = candidates[0];
+             await supabase.from('shifts').update({ paired_shift_id: partner.id, paired_staff_name: partner.staff_name }).eq('id', newShift.id);
+             await supabase.from('shifts').update({ paired_shift_id: newShift.id, paired_staff_name: newShift.staff_name }).eq('id', partner.id);
+             pairedCount++;
+           }
+         }
+       }
+
+       console.log('[CreateShift] Done. Total calls auto-assigned:', totalCalls, 'Replaced blank shifts:', replaced, 'Auto-paired:', pairedCount);
+       return { shifts, totalCalls, replaced, pairedCount };
      },
-    onSuccess: ({ shifts, totalCalls, replaced }) => {
+    onSuccess: ({ shifts, totalCalls, replaced, pairedCount }) => {
       clearDraft();
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       queryClient.invalidateQueries({ queryKey: ['shift-calls'] });
       const callMsg = totalCalls > 0 ? ` with ${totalCalls} call${totalCalls !== 1 ? 's' : ''} auto-assigned` : '';
       const replaceMsg = replaced > 0 ? ` (${replaced} filled available slot${replaced !== 1 ? 's' : ''})` : '';
-      toast.success(`${shifts.length} shift${shifts.length !== 1 ? 's' : ''} created${callMsg}${replaceMsg}`);
+      const pairMsg = pairedCount > 0 ? ` · ${pairedCount} auto-paired` : '';
+      toast.success(`${shifts.length} shift${shifts.length !== 1 ? 's' : ''} created${callMsg}${replaceMsg}${pairMsg}`);
       setShiftsToCreate([]);
+      setAutoPair(false);
+      setUseCustomName(false);
       setTimeout(() => onClose(), 100);
     },
     onError: (error) => {
@@ -415,6 +444,7 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
       status: 'scheduled',
       rota_area_id: areaId,
       area_id: areaId,
+      shift_type_id: formData.shift_type_id || null,
       _matchingCalls: matchCount, // preview only, stripped before create
       _sitInCover: (tab === 'staff' && sitInCoverRequired === 'yes' && sitInTimeOn && sitInTimeOff)
         ? { time_on: sitInTimeOn, time_off: sitInTimeOff }
@@ -455,25 +485,29 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
       setPendingShiftsData(cleaned);
       setRecurrenceDialogOpen(true);
     } else {
-      createShiftMutation.mutate(cleaned);
+      createShiftMutation.mutate({ shiftsData: cleaned, autoPair });
     }
   };
 
   const handleRecurrenceChoice = (mode) => {
     setRecurrenceDialogOpen(false);
     if (mode === 'single' || pendingShiftsData.length === 0) {
-      createShiftMutation.mutate(pendingShiftsData);
+      createShiftMutation.mutate({ shiftsData: pendingShiftsData, autoPair });
       return;
     }
     const base = pendingShiftsData[0];
     const baseDate = new Date(base.date + 'T12:00:00');
-    const intervalDays = mode === 'biweekly' ? 14 : 7;
+    const intervalMap = { weekly: 7, biweekly: 14, '3weekly': 21, '4weekly': 28 };
+    const weeksMap = { weekly: 1, biweekly: 2, '3weekly': 3, '4weekly': 4 };
+    const intervalDays = intervalMap[mode] || 7;
+    const recurrenceWeeks = weeksMap[mode] || 1;
     const occurrences = 12;
     const expanded = Array.from({ length: occurrences }, (_, i) => ({
       ...base,
       date: format(addDays(baseDate, i * intervalDays), 'yyyy-MM-dd'),
+      recurrence_weeks: recurrenceWeeks,
     }));
-    createShiftMutation.mutate(expanded);
+    createShiftMutation.mutate({ shiftsData: expanded, autoPair });
   };
 
   return (
@@ -520,31 +554,66 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
 
 
             <div className="space-y-2">
-              <Label>Shift Name (Optional)</Label>
-              <Select
-                value={formData.shift_name}
-                onValueChange={(value) => {
-                  const selectedType = shiftTypes.find(t => t.name === value);
-                  setFormData({ 
-                    ...formData, 
-                    shift_name: value,
-                    start_time: selectedType?.start_time || formData.start_time,
-                    end_time: selectedType?.end_time || formData.end_time
-                  });
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select or leave blank" />
-                </SelectTrigger>
-                <SelectContent>
-                  {shiftTypes.map((type) => (
-                    <SelectItem key={type.id} value={type.name}>
-                      {type.name} {type.start_time && type.end_time && `(${type.start_time}-${type.end_time})`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center justify-between">
+                <Label>Shift Name</Label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUseCustomName(!useCustomName);
+                    setFormData({ ...formData, shift_name: '', shift_type_id: null });
+                  }}
+                  className="text-xs text-teal-600 underline"
+                >
+                  {useCustomName ? 'Pick from shift types' : 'Custom / ad-hoc name'}
+                </button>
+              </div>
+              {useCustomName ? (
+                <Input
+                  placeholder="e.g. Cover Shift, Ad Hoc Visit, Training..."
+                  value={formData.shift_name}
+                  onChange={(e) => setFormData({ ...formData, shift_name: e.target.value, shift_type_id: null })}
+                />
+              ) : (
+                <Select
+                  value={formData.shift_name}
+                  onValueChange={(value) => {
+                    const selectedType = shiftTypes.find(t => t.name === value);
+                    setFormData({
+                      ...formData,
+                      shift_name: value,
+                      start_time: selectedType?.start_time || formData.start_time,
+                      end_time: selectedType?.end_time || formData.end_time,
+                      shift_type_id: selectedType?.id || null,
+                    });
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select shift type or leave blank" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {shiftTypes.map((type) => (
+                      <SelectItem key={type.id} value={type.name}>
+                        {type.name} {type.start_time && type.end_time && `(${type.start_time}-${type.end_time})`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
+
+            {/* Auto-pair toggle — only when a shift type is selected */}
+            {formData.shift_type_id && (
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="auto-pair"
+                  checked={autoPair}
+                  onCheckedChange={setAutoPair}
+                />
+                <Label htmlFor="auto-pair" className="text-sm font-normal cursor-pointer">
+                  Auto-pair with matching shift on same type & date
+                </Label>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Staff Member</Label>
@@ -802,6 +871,14 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
           <Button variant="outline" className="justify-start min-h-[44px]" onClick={() => handleRecurrenceChoice('biweekly')}>
             <span className="font-semibold mr-2">Repeat every 2 weeks</span>
             <span className="text-slate-500 text-xs">— alternating weeks, 12 occurrences</span>
+          </Button>
+          <Button variant="outline" className="justify-start min-h-[44px]" onClick={() => handleRecurrenceChoice('3weekly')}>
+            <span className="font-semibold mr-2">Repeat every 3 weeks</span>
+            <span className="text-slate-500 text-xs">— every 3rd week, 12 occurrences</span>
+          </Button>
+          <Button variant="outline" className="justify-start min-h-[44px]" onClick={() => handleRecurrenceChoice('4weekly')}>
+            <span className="font-semibold mr-2">Repeat every 4 weeks</span>
+            <span className="text-slate-500 text-xs">— every 4th week, 12 occurrences</span>
           </Button>
         </div>
         <div className="flex justify-end">

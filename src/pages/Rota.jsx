@@ -16,7 +16,6 @@ import WeekView from '@/components/rota/WeekView';
 import DayView from '@/components/rota/DayView';
 import ShiftDetailModal from '@/components/rota/ShiftDetailModal';
 import CreateShiftModal from '@/components/rota/CreateShiftModal';
-import PatternManager from '@/components/rota/PatternManager';
 import ClaimShiftModal from '@/components/rota/ClaimShiftModal';
 import RotaAreaSelector from '@/components/rota/RotaAreaSelector';
 import { ChevronLeft, ChevronRight, Plus, Settings } from 'lucide-react';
@@ -31,7 +30,6 @@ export default function Rota() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedShift, setSelectedShift] = useState(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isPatternManagerOpen, setIsPatternManagerOpen] = useState(false);
   const [createShiftDate, setCreateShiftDate] = useState(null);
   const [selectedAreaId, setSelectedAreaId] = useState(null);
   const [isCreateAreaOpen, setIsCreateAreaOpen] = useState(false);
@@ -291,15 +289,6 @@ export default function Rota() {
                 <span className="hidden sm:inline">New Shift</span>
                 <span className="sm:hidden">Add</span>
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => setIsPatternManagerOpen(true)}
-                className="text-xs sm:text-sm px-2 sm:px-3 h-9 sm:h-10"
-              >
-                <Settings className="w-3 sm:w-4 h-3 sm:h-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Patterns</span>
-              </Button>
-              <HelpTip tip="Set up recurring shift patterns and deploy them to auto-fill the rota." inline />
             </>
           )}
           {isAdmin && (
@@ -399,13 +388,6 @@ export default function Rota() {
           }}
           selectedDate={createShiftDate}
           selectedAreaId={selectedAreaId}
-        />
-      )}
-
-      {isPatternManagerOpen && (
-        <PatternManager
-          open={isPatternManagerOpen}
-          onClose={() => setIsPatternManagerOpen(false)}
         />
       )}
 

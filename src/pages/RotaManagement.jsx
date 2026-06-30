@@ -10,7 +10,6 @@ import WeekView from '@/components/rota/WeekView';
 import DayView from '@/components/rota/DayView';
 import ShiftDetailModal from '@/components/rota/ShiftDetailModal';
 import CreateShiftModal from '@/components/rota/CreateShiftModal';
-import PatternManager from '@/components/rota/PatternManager';
 import BaseShiftTemplateManager from '@/components/rota/BaseShiftTemplateManager';
 import ClaimShiftModal from '@/components/rota/ClaimShiftModal';
 import RotaAreaSelector from '@/components/rota/RotaAreaSelector';
@@ -24,7 +23,6 @@ export default function RotaManagement() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedShift, setSelectedShift] = useState(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isPatternManagerOpen, setIsPatternManagerOpen] = useState(false);
   const [isCallManagerOpen, setIsCallManagerOpen] = useState(false);
   const [isShiftTypeManagerOpen, setIsShiftTypeManagerOpen] = useState(false);
   const [isTemplateManagerOpen, setIsTemplateManagerOpen] = useState(false);
@@ -187,10 +185,6 @@ export default function RotaManagement() {
                   Create new area
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setIsPatternManagerOpen(true)}>
-                  <Settings className="w-4 h-4 mr-2 text-slate-500" />
-                  Shift patterns
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setIsTemplateManagerOpen(true)}>
                   <LayoutTemplate className="w-4 h-4 mr-2 text-indigo-500" />
                   Base templates
@@ -212,14 +206,6 @@ export default function RotaManagement() {
         {/* Non-admin: still show Patterns + Client Calls */}
         {!isAdmin && (
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setIsPatternManagerOpen(true)}
-              className="gap-1.5 text-sm h-9 flex-1 sm:flex-none"
-            >
-              <Settings className="w-4 h-4" />
-              My Patterns
-            </Button>
             <Button
               variant="outline"
               onClick={() => setIsCallManagerOpen(true)}
@@ -307,14 +293,6 @@ export default function RotaManagement() {
             setCreateShiftDate(null);
           }}
           selectedDate={createShiftDate}
-          selectedAreaId={selectedAreaId}
-        />
-      )}
-
-      {isPatternManagerOpen && (
-        <PatternManager
-          open={isPatternManagerOpen}
-          onClose={() => setIsPatternManagerOpen(false)}
           selectedAreaId={selectedAreaId}
         />
       )}

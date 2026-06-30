@@ -65,6 +65,8 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
 
   const [currentShift, setCurrentShift] = useState(shift);
   const [staffSaveDialogOpen, setStaffSaveDialogOpen] = useState(false);
+  const [endPatternDialogOpen, setEndPatternDialogOpen] = useState(false);
+  const [endPatternDate, setEndPatternDate] = useState('');
   const [summaryLogCall, setSummaryLogCall] = useState(null);
   const [sitInCoverRequired, setSitInCoverRequired] = useState('no');
   const [sitInTimeOn, setSitInTimeOn] = useState('');
@@ -112,6 +114,45 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
       .subscribe();
     return () => supabase.removeChannel(channel);
   }, [shift.id, shift.paired_shift_id, queryClient]);
+
+  // Silently sync calls from current service users when viewing a future shift
+  useEffect(() => {
+    if (!open) return;
+    const today = new Date().toISOString().slice(0, 10);
+    if (shift.date <= today || shift.clock_in_time || SIT_IN_NAMES.has(shift.shift_name)) return;
+    const areaId = shift.rota_area_id || shift.area_id;
+    if (!areaId) return;
+    (async () => {
+      try {
+        const serviceUsers = await base44.entities.ServiceUser.filter({ status: 'active' });
+        const matchingCalls = getMatchingCallsForShift(serviceUsers, areaId, shift.start_time, shift.end_time);
+        if (!matchingCalls.length) return;
+        const existingCalls = await ShiftCallApi.filter({ shift_id: shift.id });
+        const existingKey = new Set(existingCalls.map(c => `${c.service_user_id}|${c.scheduled_time}`));
+        const newCalls = matchingCalls.filter(c => !existingKey.has(`${c.service_user_id}|${c.scheduled_time}`));
+        if (!newCalls.length) return;
+        for (const call of newCalls) {
+          await ShiftCallApi.create({
+            shift_id: shift.id,
+            service_user_id: call.service_user_id,
+            service_user_name: call.service_user_name,
+            service_user_address: call.service_user_address,
+            scheduled_time: call.scheduled_time,
+            call_time: call.scheduled_time,
+            duration_minutes: call.duration_minutes,
+            call_type: call.call_type,
+            call_types: call.call_types || [call.call_type],
+            notes: call.notes || '',
+            call_date: shift.date,
+            status: 'pending',
+          });
+        }
+        queryClient.invalidateQueries({ queryKey: ['shift-calls', shift.id] });
+      } catch (e) {
+        console.warn('[ShiftDetailModal] Silent call sync failed:', e);
+      }
+    })();
+  }, [open, shift.id]);
 
   const { data: calls = [] } = useQuery({
     queryKey: ['shift-calls', shift.id],
@@ -393,6 +434,25 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
     },
   });
 
+  const endPatternMutation = useMutation({
+    mutationFn: async () => {
+      if (!shift.shift_pattern_id || !endPatternDate) throw new Error('No pattern or date selected');
+      const { error } = await supabase
+        .from('shifts')
+        .delete()
+        .eq('shift_pattern_id', shift.shift_pattern_id)
+        .gt('date', endPatternDate);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      toast.success('Pattern ended — future shifts removed from that date');
+      setEndPatternDialogOpen(false);
+      onClose();
+    },
+    onError: (e) => toast.error(e.message || 'Failed to end pattern'),
+  });
+
   const clockOnMutation = useMutation({
     mutationFn: () => {
       const now = new Date().toISOString();
@@ -522,11 +582,13 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
           const shiftDayOfWeek = new Date(shift.date + 'T12:00:00').getDay();
           let toUpdate = patternShifts.filter(s => new Date(s.date + 'T12:00:00').getDay() === shiftDayOfWeek);
 
-          if (saveMode === 'biweekly') {
+          const intervalMap = { biweekly: 14, '3weekly': 21, '4weekly': 28 };
+          const intervalDays = intervalMap[saveMode];
+          if (intervalDays) {
             const baseTime = new Date(shift.date + 'T12:00:00').getTime();
             toUpdate = toUpdate.filter(s => {
               const days = Math.round((new Date(s.date + 'T12:00:00').getTime() - baseTime) / 86400000);
-              return days % 14 === 0;
+              return days % intervalDays === 0;
             });
           }
 
@@ -1256,6 +1318,15 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
                 <X className="w-4 h-4 mr-2" />
                 Cancel
               </Button>
+              {isAdmin && shift.shift_pattern_id && (
+                <Button
+                  variant="outline"
+                  onClick={() => { setEndPatternDate(shift.date); setEndPatternDialogOpen(true); }}
+                  className="w-full md:w-auto border-red-200 text-red-600 hover:bg-red-50 min-h-[44px] px-4 touch-manipulation"
+                >
+                  End Pattern
+                </Button>
+              )}
               <Button
                 onClick={() => {
                   const staffChanged = editData.staff_id !== shift.staff_id;
@@ -1311,9 +1382,56 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
                   <span className="font-semibold mr-2">Every 2 weeks</span>
                   <span className="text-slate-500 text-xs">— update alternating weeks from now on</span>
                 </Button>
+                <Button
+                  variant="outline"
+                  className="justify-start min-h-[44px] text-left"
+                  onClick={() => { setStaffSaveDialogOpen(false); updateShiftMutation.mutate({ saveMode: '3weekly' }); }}
+                >
+                  <span className="font-semibold mr-2">Every 3 weeks</span>
+                  <span className="text-slate-500 text-xs">— update every 3rd week from now on</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="justify-start min-h-[44px] text-left"
+                  onClick={() => { setStaffSaveDialogOpen(false); updateShiftMutation.mutate({ saveMode: '4weekly' }); }}
+                >
+                  <span className="font-semibold mr-2">Every 4 weeks</span>
+                  <span className="text-slate-500 text-xs">— update every 4th week from now on</span>
+                </Button>
               </div>
               <div className="flex justify-end">
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
+              </div>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          {/* End Pattern dialog */}
+          <AlertDialog open={endPatternDialogOpen} onOpenChange={setEndPatternDialogOpen}>
+            <AlertDialogContent className="max-w-sm">
+              <AlertDialogHeader>
+                <AlertDialogTitle>End Recurring Pattern</AlertDialogTitle>
+                <AlertDialogDescription>
+                  All shifts in this pattern after the chosen date will be permanently removed. Past shifts are untouched.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="py-3 space-y-2">
+                <Label>End pattern after this date</Label>
+                <Input
+                  type="date"
+                  min={shift.date}
+                  value={endPatternDate}
+                  onChange={(e) => setEndPatternDate(e.target.value)}
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <Button
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                  disabled={!endPatternDate || endPatternMutation.isPending}
+                  onClick={() => endPatternMutation.mutate()}
+                >
+                  {endPatternMutation.isPending ? 'Removing...' : 'End Pattern'}
+                </Button>
               </div>
             </AlertDialogContent>
           </AlertDialog>
