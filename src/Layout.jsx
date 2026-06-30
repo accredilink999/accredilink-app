@@ -109,13 +109,18 @@ export default function Layout({ children, currentPageName }) {
     return () => window.removeEventListener('alerter:incoming', handleIncoming);
   }, []);
 
+  // Alerter notification trigger — set when notification tapped or ?alerter=open detected.
+  // We open the panel immediately, then fetch the actual message once the user is known.
+  const [needsAlerterFetch, setNeedsAlerterFetch] = useState(false);
+
   // Handle service worker notification click (app already open when notification tapped)
   useEffect(() => {
     const handler = (event) => {
       const { type, data } = event.data || {};
       if (type === 'NOTIFICATION_CLICK' && data?.type === 'alerter') {
         setPagerOpen(true);
-        setIncomingAlert('deeplink');
+        setIncomingAlert('deeplink'); // enter alerting state immediately (vibrate + audio)
+        setNeedsAlerterFetch(true);
       }
     };
     navigator.serviceWorker?.addEventListener('message', handler);
@@ -127,12 +132,45 @@ export default function Layout({ children, currentPageName }) {
     const params = new URLSearchParams(window.location.search);
     if (params.get('alerter') === 'open') {
       setPagerOpen(true);
-      setIncomingAlert('deeplink'); // signal to panel to load + alert latest unread
-      // Clean the URL without reload
-      const clean = window.location.pathname;
-      window.history.replaceState({}, '', clean);
+      setIncomingAlert('deeplink'); // enter alerting state immediately (vibrate + audio)
+      setNeedsAlerterFetch(true);
+      window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
+
+  // Once user is authenticated, fetch the actual unread alert and surface it immediately —
+  // same pattern as radio which navigates to its page and loads state there.
+  useEffect(() => {
+    if (!needsAlerterFetch || !user?.id) return;
+    setNeedsAlerterFetch(false);
+
+    const orgId = localStorage.getItem('organizationId') || sessionStorage.getItem('organizationId') || '';
+    if (!orgId) return;
+
+    const seenAt = localStorage.getItem('pager_last_seen_' + user.id) || '1970-01-01T00:00:00Z';
+    const userAreaId = user.rota_area_id || user.area_id;
+
+    supabase
+      .from('pager_messages')
+      .select('*')
+      .eq('organization_id', orgId)
+      .gt('created_at', seenAt)
+      .order('created_at', { ascending: false })
+      .limit(10)
+      .then(({ data }) => {
+        if (!data) return;
+        const msg = data.find((m) => {
+          const directlyAddressed = m.recipient_mode === 'individual' && m.recipient_id === user.id;
+          if (m.sent_by === user.id && !directlyAddressed) return false;
+          return (
+            m.recipient_mode === 'global' ||
+            (m.recipient_mode === 'area' && m.recipient_area_id === userAreaId) ||
+            directlyAddressed
+          );
+        });
+        if (msg) setIncomingAlert(msg);
+      });
+  }, [needsAlerterFetch, user?.id, user?.rota_area_id, user?.area_id]);
 
   // Track previous page so logo tap returns user to where they were
   const prevPageRef = useRef(null);
