@@ -2,31 +2,43 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { ShiftApi, ShiftCallApi } from '@/api/rotaApi';
+import { supabase } from '@/api/supabaseClient';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Trash2, UserCheck, Search, X } from 'lucide-react';
+import { Loader2, Trash2, UserCheck, Search, X, Repeat2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { notifyClaimCreated } from '@/utils/shiftClaimNotifications';
-import { getMatchingCallsForShift } from '@/utils/shiftCallAutoAssign';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+
+const RECURRENCE_OPTIONS = [
+  { mode: 'single',   label: 'One-off',        desc: 'Just this shift' },
+  { mode: 'weekly',   label: 'Every week',      desc: 'Same day every week' },
+  { mode: 'biweekly', label: 'Every 2 weeks',   desc: 'Same day every fortnight' },
+  { mode: '3weekly',  label: 'Every 3 weeks',   desc: 'Same day every 3 weeks' },
+  { mode: '4weekly',  label: 'Every 4 weeks',   desc: 'Same day every 4 weeks' },
+];
+
+const INTERVAL_MAP = { weekly: 7, biweekly: 14, '3weekly': 21, '4weekly': 28 };
 
 export default function ClaimShiftModal({ shift, open, onClose, isAdmin = false }) {
   const queryClient = useQueryClient();
   const [reason, setReason] = useState('');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [claimApproveConfirmOpen, setClaimApproveConfirmOpen] = useState(false);
   const [allocateStaffId, setAllocateStaffId] = useState('');
   const [staffSearch, setStaffSearch] = useState('');
+  const [recurrenceDialogOpen, setRecurrenceDialogOpen] = useState(false);
+  const [pendingStaffId, setPendingStaffId] = useState(null);
+  const [selfClaimRecurrenceOpen, setSelfClaimRecurrenceOpen] = useState(false);
 
   const { data: user } = useQuery({
     queryKey: ['currentUser'],
     queryFn: () => base44.auth.me(),
   });
 
-  // Check if user already has a pending claim for this shift
   const { data: existingClaims = [] } = useQuery({
     queryKey: ['myClaimsForShift', shift?.id, user?.id],
     queryFn: () => base44.entities.ShiftClaimRequest.filter({
@@ -45,50 +57,37 @@ export default function ClaimShiftModal({ shift, open, onClose, isAdmin = false 
     enabled: isAdmin,
   });
 
-  const SIT_IN_NAMES = new Set(['Sit In L', 'Sit In E', 'Sit In FD']);
+  async function propagateToFutureBlankShifts(staffId, staffName, mode) {
+    if (mode === 'single' || !shift.shift_pattern_id) return;
+    const intervalDays = INTERVAL_MAP[mode];
+    const { data: futureShifts } = await supabase
+      .from('shifts')
+      .select('id, date')
+      .eq('shift_pattern_id', shift.shift_pattern_id)
+      .gt('date', shift.date)
+      .is('staff_id', null);
+    if (!futureShifts || futureShifts.length === 0) return;
+    const shiftDayOfWeek = new Date(shift.date + 'T12:00:00').getDay();
+    const baseTime = new Date(shift.date + 'T12:00:00').getTime();
+    const toUpdate = futureShifts
+      .filter(s => new Date(s.date + 'T12:00:00').getDay() === shiftDayOfWeek)
+      .filter(s => {
+        const days = Math.round((new Date(s.date + 'T12:00:00').getTime() - baseTime) / 86400000);
+        return days % intervalDays === 0;
+      });
+    if (toUpdate.length > 0) {
+      await supabase.from('shifts')
+        .update({ staff_id: staffId, staff_name: staffName, status: 'scheduled' })
+        .in('id', toUpdate.map(s => s.id));
+    }
+  }
 
   const allocateMutation = useMutation({
-    mutationFn: async (staffId) => {
+    mutationFn: async ({ staffId, mode = 'single' }) => {
       const staffMember = allStaff.find(s => s.id === staffId);
-
-      // 1. Assign staff to shift
-      await ShiftApi.update(shift.id, {
-        staff_id: staffId,
-        staff_name: staffMember?.staff_full_name || staffMember?.full_name || '',
-        status: 'scheduled',
-      });
-
-      // 2. Auto-create client calls (mirrors claim-approval logic)
-      if (!SIT_IN_NAMES.has(shift.shift_name)) {
-        const areaId = shift.rota_area_id || shift.area_id;
-        const serviceUsers = await base44.entities.ServiceUser.filter({ status: 'active' });
-        const matchingCalls = getMatchingCallsForShift(serviceUsers, areaId, shift.start_time, shift.end_time);
-        const callTypesData = await base44.entities.CallType.filter({ is_active: true });
-        for (const call of matchingCalls) {
-          const ct = callTypesData.find(c => c.name === call.call_type);
-          const tasks = ct?.default_tasks?.length ? ct.default_tasks.map(t => ({ text: t, completed: false })) : [];
-          try {
-            await ShiftCallApi.create({
-              shift_id: shift.id,
-              service_user_id: call.service_user_id,
-              service_user_name: call.service_user_name,
-              service_user_address: call.service_user_address,
-              scheduled_time: call.scheduled_time,
-              call_time: call.scheduled_time,
-              duration_minutes: call.duration_minutes,
-              call_type: call.call_type,
-              call_types: call.call_types || [call.call_type],
-              tasks,
-              call_date: shift.date,
-              status: 'pending',
-              notes: call.notes || '',
-            });
-          } catch (callErr) {
-            console.error('[Allocate] Failed to create call:', callErr);
-          }
-        }
-      }
-
+      const staffName = staffMember?.staff_full_name || staffMember?.full_name || '';
+      await ShiftApi.update(shift.id, { staff_id: staffId, staff_name: staffName, status: 'scheduled' });
+      await propagateToFutureBlankShifts(staffId, staffName, mode);
       return staffMember;
     },
     onSuccess: (staffMember) => {
@@ -103,10 +102,7 @@ export default function ClaimShiftModal({ shift, open, onClose, isAdmin = false 
   const claimMutation = useMutation({
     mutationFn: async (data) => {
       const result = await base44.entities.ShiftClaimRequest.create(data);
-      notifyClaimCreated({
-        claim: data,
-        areaId: shift.rota_area_id || shift.area_id,
-      });
+      notifyClaimCreated({ claim: data, areaId: shift.rota_area_id || shift.area_id });
       return result;
     },
     onSuccess: () => {
@@ -116,19 +112,13 @@ export default function ClaimShiftModal({ shift, open, onClose, isAdmin = false 
       queryClient.invalidateQueries({ queryKey: ['myClaimsForShift'] });
       onClose();
     },
-    onError: (e) => {
-      console.error('Claim failed:', e);
-    },
+    onError: (e) => console.error('Claim failed:', e),
   });
 
   const deleteShiftMutation = useMutation({
     mutationFn: async () => {
-      // Delete associated shift_calls
       const calls = await ShiftCallApi.filter({ shift_id: shift.id });
-      for (const call of calls) {
-        await ShiftCallApi.delete(call.id);
-      }
-      // Revert to blank available shift instead of deleting
+      for (const call of calls) await ShiftCallApi.delete(call.id);
       return ShiftApi.update(shift.id, {
         staff_id: null,
         staff_name: null,
@@ -144,9 +134,22 @@ export default function ClaimShiftModal({ shift, open, onClose, isAdmin = false 
       toast.success('Shift cleared — now available to claim');
       onClose();
     },
-    onError: (err) => {
-      toast.error(err.message || 'Failed to clear shift');
+    onError: (err) => toast.error(err.message || 'Failed to clear shift'),
+  });
+
+  const adminClaimMutation = useMutation({
+    mutationFn: async ({ mode = 'single' } = {}) => {
+      const staffId = user.id;
+      const staffName = user.staff_full_name || user.full_name;
+      await ShiftApi.update(shift.id, { staff_id: staffId, staff_name: staffName, status: 'scheduled' });
+      await propagateToFutureBlankShifts(staffId, staffName, mode);
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      toast.success('Shift claimed and approved');
+      onClose();
+    },
+    onError: (e) => toast.error(e.message || 'Failed to claim shift'),
   });
 
   const handleSubmit = () => {
@@ -164,87 +167,54 @@ export default function ClaimShiftModal({ shift, open, onClose, isAdmin = false 
     });
   };
 
-  const adminClaimMutation = useMutation({
-    mutationFn: async () => {
-      await ShiftApi.update(shift.id, {
-        staff_id: user.id,
-        staff_name: user.staff_full_name || user.full_name,
-        status: 'scheduled',
-      });
-      if (!SIT_IN_NAMES.has(shift.shift_name)) {
-        const areaId = shift.rota_area_id || shift.area_id;
-        const serviceUsers = await base44.entities.ServiceUser.filter({ status: 'active' });
-        const matchingCalls = getMatchingCallsForShift(serviceUsers, areaId, shift.start_time, shift.end_time);
-        const callTypesData = await base44.entities.CallType.filter({ is_active: true });
-        for (const call of matchingCalls) {
-          const ct = callTypesData.find(c => c.name === call.call_type);
-          const tasks = ct?.default_tasks?.length ? ct.default_tasks.map(t => ({ text: t, completed: false })) : [];
-          try {
-            await ShiftCallApi.create({
-              shift_id: shift.id,
-              service_user_id: call.service_user_id,
-              service_user_name: call.service_user_name,
-              service_user_address: call.service_user_address,
-              scheduled_time: call.scheduled_time,
-              call_time: call.scheduled_time,
-              duration_minutes: call.duration_minutes,
-              call_type: call.call_type,
-              call_types: call.call_types || [call.call_type],
-              tasks,
-              call_date: shift.date,
-              status: 'pending',
-              notes: call.notes || '',
-            });
-          } catch (callErr) {
-            console.error('[AdminClaim] Failed to create call:', callErr);
-          }
-        }
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['shifts'] });
-      toast.success('Shift claimed and approved');
-      onClose();
-    },
-    onError: (e) => toast.error(e.message || 'Failed to claim shift'),
-  });
+  const handleAllocateClick = () => {
+    if (!allocateStaffId) return;
+    setPendingStaffId(allocateStaffId);
+    setRecurrenceDialogOpen(true);
+  };
+
+  const handleAllocateChoice = (mode) => {
+    setRecurrenceDialogOpen(false);
+    allocateMutation.mutate({ staffId: pendingStaffId, mode });
+  };
+
+  const handleSelfClaimChoice = (mode) => {
+    setSelfClaimRecurrenceOpen(false);
+    adminClaimMutation.mutate({ mode });
+  };
 
   const areaName = shift?.rota_area_name || shift?.area_name || '';
+  const selectedMember = allStaff.find(s => s.id === allocateStaffId);
+  const filtered = allStaff.filter(s =>
+    (s.staff_full_name || s.full_name || '').toLowerCase().includes(staffSearch.toLowerCase())
+  );
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Claim Available Shift</DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onClose}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Claim Available Shift</DialogTitle>
+          </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          <div className="p-3 bg-teal-50 rounded-lg">
-            <p className="text-sm text-teal-600 font-medium">Shift Details</p>
-            {shift?.shift_name && (
-              <p className="font-medium text-slate-900">{shift.shift_name}</p>
-            )}
-            <p className="text-sm text-slate-600">
-              {shift?.date} &bull; {shift?.start_time} - {shift?.end_time}
-            </p>
-            {areaName && (
-              <p className="text-xs text-slate-500 mt-1">{areaName}</p>
-            )}
-          </div>
+          <div className="space-y-4 py-4">
+            <div className="p-3 bg-teal-50 rounded-lg">
+              <p className="text-sm text-teal-600 font-medium">Shift Details</p>
+              {shift?.shift_name && (
+                <p className="font-medium text-slate-900">{shift.shift_name}</p>
+              )}
+              <p className="text-sm text-slate-600">
+                {shift?.date} &bull; {shift?.start_time} - {shift?.end_time}
+              </p>
+              {areaName && <p className="text-xs text-slate-500 mt-1">{areaName}</p>}
+            </div>
 
-          {isAdmin && (() => {
-            const selectedMember = allStaff.find(s => s.id === allocateStaffId);
-            const filtered = allStaff.filter(s => {
-              const name = (s.staff_full_name || s.full_name || '').toLowerCase();
-              return name.includes(staffSearch.toLowerCase());
-            });
-            return (
+            {isAdmin && (
               <div className="rounded-xl border-2 border-teal-200 bg-teal-50 p-3 space-y-2">
                 <p className="text-sm font-semibold text-teal-700 flex items-center gap-1.5">
                   <UserCheck className="w-4 h-4" /> Allocate to Staff
                 </p>
 
-                {/* Search input */}
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                   <input
@@ -262,7 +232,6 @@ export default function ClaimShiftModal({ shift, open, onClose, isAdmin = false 
                   )}
                 </div>
 
-                {/* Dropdown list — only shown while searching */}
                 {staffSearch && !allocateStaffId && (
                   <div className="max-h-40 overflow-y-auto rounded-lg border border-slate-200 bg-white divide-y divide-slate-100">
                     {filtered.length === 0 ? (
@@ -279,7 +248,6 @@ export default function ClaimShiftModal({ shift, open, onClose, isAdmin = false 
                   </div>
                 )}
 
-                {/* Or pick from full dropdown */}
                 <Select value={allocateStaffId} onValueChange={v => {
                   setAllocateStaffId(v);
                   const m = allStaff.find(s => s.id === v);
@@ -297,9 +265,8 @@ export default function ClaimShiftModal({ shift, open, onClose, isAdmin = false 
                   </SelectContent>
                 </Select>
 
-                {/* Allocate button */}
                 <Button
-                  onClick={() => allocateMutation.mutate(allocateStaffId)}
+                  onClick={handleAllocateClick}
                   disabled={!allocateStaffId || allocateMutation.isPending}
                   className="w-full bg-teal-600 hover:bg-teal-700"
                 >
@@ -310,82 +277,135 @@ export default function ClaimShiftModal({ shift, open, onClose, isAdmin = false 
                 </Button>
                 <p className="text-xs text-teal-600 text-center">Auto-approved — bypasses claim queue</p>
               </div>
-            );
-          })()}
+            )}
 
-          <div className="border-t border-slate-100 pt-1">
-            <p className="text-xs font-medium text-slate-400 mb-3">Or claim for yourself</p>
+            <div className="border-t border-slate-100 pt-1">
+              <p className="text-xs font-medium text-slate-400 mb-3">Or claim for yourself</p>
+            </div>
+
+            {hasPendingClaim ? (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <p className="text-sm text-amber-700 font-medium">You already have a pending claim for this shift.</p>
+                <p className="text-xs text-amber-600 mt-1">Please wait for admin to review your existing claim.</p>
+              </div>
+            ) : (
+              <div>
+                <Label>Reason (optional)</Label>
+                <Textarea
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Optionally explain why you'd like to claim this shift..."
+                  className="min-h-[80px]"
+                />
+              </div>
+            )}
           </div>
 
-          {hasPendingClaim ? (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-              <p className="text-sm text-amber-700 font-medium">
-                You already have a pending claim for this shift.
-              </p>
-              <p className="text-xs text-amber-600 mt-1">
-                Please wait for admin to review your existing claim.
-              </p>
-            </div>
-          ) : (
-            <div>
-              <Label>Reason (optional)</Label>
-              <Textarea
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="Optionally explain why you'd like to claim this shift..."
-                className="min-h-[80px]"
-              />
-            </div>
-          )}
-        </div>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            {isAdmin && (
+              <Button
+                variant="destructive"
+                onClick={() => setDeleteConfirmOpen(true)}
+                disabled={deleteShiftMutation.isPending}
+                className="w-full sm:w-auto sm:mr-auto"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete Shift
+              </Button>
+            )}
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            {!hasPendingClaim && (
+              <Button
+                onClick={isAdmin ? () => setSelfClaimRecurrenceOpen(true) : handleSubmit}
+                disabled={claimMutation.isPending || adminClaimMutation.isPending}
+                className="bg-teal-600 hover:bg-teal-700"
+              >
+                {(claimMutation.isPending || adminClaimMutation.isPending)
+                  ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                {isAdmin ? 'Claim & Approve' : 'Claim Shift'}
+              </Button>
+            )}
+          </DialogFooter>
 
-        <DialogFooter className="flex-col sm:flex-row gap-2">
-          {isAdmin && (
-            <Button
-              variant="destructive"
-              onClick={() => setDeleteConfirmOpen(true)}
-              disabled={deleteShiftMutation.isPending}
-              className="w-full sm:w-auto sm:mr-auto"
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Delete Shift
-            </Button>
-          )}
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          {!hasPendingClaim && (
-            <Button
-              onClick={isAdmin ? () => setClaimApproveConfirmOpen(true) : handleSubmit}
-              disabled={claimMutation.isPending || adminClaimMutation.isPending}
-              className="bg-teal-600 hover:bg-teal-700"
-            >
-              {(claimMutation.isPending || adminClaimMutation.isPending) ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : null}
-              {isAdmin ? 'Claim & Approve' : 'Claim Shift'}
-            </Button>
-          )}
-        </DialogFooter>
+          <ConfirmDialog
+            open={deleteConfirmOpen}
+            onOpenChange={setDeleteConfirmOpen}
+            title="Clear Shift?"
+            description="This will remove the staff assignment and revert this shift to a blank available slot."
+            confirmLabel="Clear Shift"
+            variant="destructive"
+            onConfirm={() => deleteShiftMutation.mutate()}
+          />
+        </DialogContent>
+      </Dialog>
 
-        <ConfirmDialog
-          open={deleteConfirmOpen}
-          onOpenChange={setDeleteConfirmOpen}
-          title="Clear Shift?"
-          description="This will remove the staff assignment and revert this shift to a blank available slot."
-          confirmLabel="Clear Shift"
-          variant="destructive"
-          onConfirm={() => deleteShiftMutation.mutate()}
-        />
-        <ConfirmDialog
-          open={claimApproveConfirmOpen}
-          onOpenChange={setClaimApproveConfirmOpen}
-          title="Claim & Approve Shift?"
-          description="This will assign this shift to you and approve it immediately — no approval request raised."
-          confirmLabel="Yes, Claim & Approve"
-          onConfirm={() => adminClaimMutation.mutate()}
-        />
-      </DialogContent>
-    </Dialog>
+      {/* Recurrence dialog — allocating a staff member */}
+      <AlertDialog open={recurrenceDialogOpen} onOpenChange={setRecurrenceDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Repeat2 className="w-5 h-5 text-teal-600" />
+              How often does {selectedMember?.staff_full_name || selectedMember?.full_name || 'this staff member'} work this shift?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Allocates to this shift and matching future blank shifts in the same pattern.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="grid gap-2 py-2">
+            {RECURRENCE_OPTIONS.map(({ mode, label, desc }) => (
+              <Button
+                key={mode}
+                variant="outline"
+                className="justify-start h-auto py-2.5 px-4"
+                onClick={() => handleAllocateChoice(mode)}
+                disabled={allocateMutation.isPending}
+              >
+                <div className="text-left">
+                  <p className="font-medium text-sm text-slate-900">{label}</p>
+                  <p className="text-xs text-slate-500">{desc}</p>
+                </div>
+              </Button>
+            ))}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Recurrence dialog — admin claiming for themselves */}
+      <AlertDialog open={selfClaimRecurrenceOpen} onOpenChange={setSelfClaimRecurrenceOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Repeat2 className="w-5 h-5 text-teal-600" />
+              How often do you work this shift?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Claims this shift and matching future blank shifts in the same pattern.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="grid gap-2 py-2">
+            {RECURRENCE_OPTIONS.map(({ mode, label, desc }) => (
+              <Button
+                key={mode}
+                variant="outline"
+                className="justify-start h-auto py-2.5 px-4"
+                onClick={() => handleSelfClaimChoice(mode)}
+                disabled={adminClaimMutation.isPending}
+              >
+                <div className="text-left">
+                  <p className="font-medium text-sm text-slate-900">{label}</p>
+                  <p className="text-xs text-slate-500">{desc}</p>
+                </div>
+              </Button>
+            ))}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

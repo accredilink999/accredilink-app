@@ -54,6 +54,7 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
   const [pendingShiftsData, setPendingShiftsData] = useState([]);
   const [useCustomName, setUseCustomName] = useState(false);
   const [autoPair, setAutoPair] = useState(false);
+  const [includeClientCalls, setIncludeClientCalls] = useState(false);
   const shiftInitialData = {
       shift_name: '',
       staff_id: '',
@@ -180,16 +181,15 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
     return calls;
   };
 
-  // Preview count for the current form state (skip for sit-in shifts)
   const previewCalls = useMemo(() => {
-    if (tab !== 'staff') return [];
+    if (!includeClientCalls || tab !== 'staff') return [];
     if (SIT_IN_NAMES.has(formData.shift_name)) return [];
     return getMatchingCallsForShift(
       selectedRotaAreaId || selectedAreaId,
       formData.start_time,
       formData.end_time
     );
-  }, [serviceUsers, selectedRotaAreaId, selectedAreaId, formData.start_time, formData.end_time, formData.shift_name, tab]);
+  }, [includeClientCalls, serviceUsers, selectedRotaAreaId, selectedAreaId, formData.start_time, formData.end_time, formData.shift_name, tab]);
 
   const createShiftMutation = useMutation({
     mutationFn: async ({ shiftsData, autoPair: shouldAutoPair = false }) => {
@@ -233,7 +233,7 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
        let totalCalls = 0;
        let replaced = 0;
        for (const rawShiftData of shiftsData) {
-         const { _sitInCover, ...shiftData } = rawShiftData;
+         const { _sitInCover, includeClientCalls, ...shiftData } = rawShiftData;
 
          // Find a blank shift to replace — prefer matching by shift_name, fall back to times
          const areaId = shiftData.rota_area_id || shiftData.area_id || '';
@@ -275,40 +275,34 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
          }
          shifts.push(shift);
 
-         // Sit-in shifts don't get client calls
-         if (SIT_IN_NAMES.has(shiftData.shift_name)) {
-           console.log('[CreateShift] Sit-in shift, skipping call auto-assign');
-           continue;
-         }
-
-         // Auto-create ShiftCall records from matching service user call_times
-         const matchingCalls = getMatchingCallsForShift(
-           shiftData.rota_area_id,
-           shiftData.start_time,
-           shiftData.end_time
-         );
-         console.log('[CreateShift] Shift', shift.id, 'area:', shiftData.rota_area_id, '→', matchingCalls.length, 'matching calls');
-
-         for (const call of matchingCalls) {
-           try {
-             await ShiftCallApi.create({
-               shift_id: shift.id,
-               service_user_id: call.service_user_id,
-               service_user_name: call.service_user_name,
-               service_user_address: call.service_user_address,
-               scheduled_time: call.scheduled_time,
-               call_time: call.scheduled_time,
-               duration_minutes: call.duration_minutes,
-               call_type: call.call_type,
-               call_types: call.call_types || [call.call_type],
-               tasks: getDefaultTasks(call.call_type),
-               call_date: shiftData.date,
-               status: 'pending',
-               notes: call.notes || '',
-             });
-             totalCalls++;
-           } catch (callError) {
-             console.error('[CreateShift] Failed to create call:', call.service_user_name, call.scheduled_time, callError);
+         // Only auto-create client calls if explicitly opted in (ad hoc shifts have no calls by default)
+         if (!SIT_IN_NAMES.has(shiftData.shift_name) && includeClientCalls) {
+           const matchingCalls = getMatchingCallsForShift(
+             shiftData.rota_area_id,
+             shiftData.start_time,
+             shiftData.end_time
+           );
+           for (const call of matchingCalls) {
+             try {
+               await ShiftCallApi.create({
+                 shift_id: shift.id,
+                 service_user_id: call.service_user_id,
+                 service_user_name: call.service_user_name,
+                 service_user_address: call.service_user_address,
+                 scheduled_time: call.scheduled_time,
+                 call_time: call.scheduled_time,
+                 duration_minutes: call.duration_minutes,
+                 call_type: call.call_type,
+                 call_types: call.call_types || [call.call_type],
+                 tasks: getDefaultTasks(call.call_type),
+                 call_date: shiftData.date,
+                 status: 'pending',
+                 notes: call.notes || '',
+               });
+               totalCalls++;
+             } catch (callError) {
+               console.error('[CreateShift] Failed to create call:', call.service_user_name, call.scheduled_time, callError);
+             }
            }
          }
 
@@ -445,6 +439,7 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
       rota_area_id: areaId,
       area_id: areaId,
       shift_type_id: formData.shift_type_id || null,
+      includeClientCalls: includeClientCalls && !SIT_IN_NAMES.has(formData.shift_name),
       _matchingCalls: matchCount, // preview only, stripped before create
       _sitInCover: (tab === 'staff' && sitInCoverRequired === 'yes' && sitInTimeOn && sitInTimeOff)
         ? { time_on: sitInTimeOn, time_off: sitInTimeOff }
@@ -611,6 +606,20 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
                 />
                 <Label htmlFor="auto-pair" className="text-sm font-normal cursor-pointer">
                   Auto-pair with matching shift on same type & date
+                </Label>
+              </div>
+            )}
+
+            {/* Client calls — opt-in only; ad hoc shifts don't need them */}
+            {!SIT_IN_NAMES.has(formData.shift_name) && (
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="include-calls"
+                  checked={includeClientCalls}
+                  onCheckedChange={setIncludeClientCalls}
+                />
+                <Label htmlFor="include-calls" className="text-sm font-normal cursor-pointer">
+                  Include client calls for this shift
                 </Label>
               </div>
             )}
