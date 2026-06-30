@@ -117,18 +117,17 @@ async function sendFCMMessage(
     token: fcmToken,
     android: {
       priority: priority === 'high' ? 'HIGH' : 'NORMAL',
-      notification: {
-        title,
-        body,
-        click_action: 'FLUTTER_NOTIFICATION_CLICK',
-        default_vibrate_timings: !isAlerter,
-        default_sound:           !isAlerter,
-        ...(isAlerter ? {
-          vibrate_timings: ['0.3s', '0.1s', '0.3s', '0.1s', '0.3s', '0.1s', '0.3s'],
-          sound: 'default',
-          channel_id: 'carecall_alerter',
-        } : {}),
-      },
+      // Alerter: no android.notification — data-only so the native APK SDK does NOT
+      // auto-display a duplicate. firebase-messaging-sw.js handles display for web.
+      ...(!isAlerter ? {
+        notification: {
+          title,
+          body,
+          click_action: 'FLUTTER_NOTIFICATION_CLICK',
+          default_vibrate_timings: true,
+          default_sound: true,
+        },
+      } : {}),
     },
     webpush: {
       headers: { Urgency: priority === 'high' ? 'high' : 'normal' },
