@@ -105,8 +105,8 @@ export default function PagerInboxPanel({ open, onOpenChange, user }) {
             </div>
           )}
 
-          {/* ── Pager device showing latest message ── */}
-          <div className="px-5 pt-4 pb-3">
+          {/* ── Pager device showing latest message (staff only — admin already has compose pager above) ── */}
+          {!isAdmin && <div className="px-5 pt-4 pb-3">
             <div className="relative select-none">
               <PagerSvg className="w-full drop-shadow-md" />
 
@@ -129,7 +129,7 @@ export default function PagerInboxPanel({ open, onOpenChange, user }) {
                 )}
               </div>
             </div>
-          </div>
+          </div>}
 
           {/* ── Message list ── */}
           <div className="px-4 pb-6 space-y-2">
