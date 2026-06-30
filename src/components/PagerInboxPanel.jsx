@@ -71,7 +71,16 @@ export default function PagerInboxPanel({ open, onOpenChange, user }) {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:w-80 p-0 flex flex-col bg-white">
 
-        <SheetHeader className="px-5 pt-5 pb-3 border-b border-slate-100">
+        {/* Drag bar — click to close */}
+        <div
+          onClick={() => onOpenChange(false)}
+          className="flex justify-center pt-3 pb-1 shrink-0 cursor-pointer touch-manipulation"
+          aria-label="Close pager inbox"
+        >
+          <div className="w-12 h-1.5 rounded-full bg-slate-400 opacity-60" />
+        </div>
+
+        <SheetHeader className="px-5 pt-2 pb-3 border-b border-slate-100">
           <SheetTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
             Pager Inbox
             {unreadCount > 0 && (

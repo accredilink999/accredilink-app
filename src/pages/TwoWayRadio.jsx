@@ -337,7 +337,7 @@ function speakText(text) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-export default function TwoWayRadio() {
+export default function TwoWayRadio({ onClose } = {}) {
   const queryClient = useQueryClient();
   const location    = useLocation();
   const navigate    = useNavigate();
@@ -2160,7 +2160,7 @@ export default function TwoWayRadio() {
           </div>
         ) : (
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => onClose ? onClose() : navigate(-1)}
             className={`w-full flex items-center gap-3 px-5 font-semibold text-base flex-shrink-0 touch-manipulation ${theme.homeBar}`}
             style={{ paddingTop: `calc(0.875rem + env(safe-area-inset-top))`, paddingBottom: '0.875rem' }}
           >

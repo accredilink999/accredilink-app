@@ -17,12 +17,7 @@ const MODES = [
   { key: 'individual', label: 'Individual', Icon: User   },
 ];
 
-// SVG button positions (viewBox 440×340)
-const LCD      = { top: '12.94%', left: '12.73%', right: '12.73%', height: '52.35%' };
-const BTN_GREEN = { top: '72.94%', left: '13.64%', width: '11.82%', height: '10.59%' };
-const BTN_RED   = { top: '72.94%', left: '28.18%', width: '11.82%', height: '10.59%' };
-const BTN_LEFT  = { top: '73.5%',  left: '60.2%',  width: '6.8%',   height: '9.4%'  };
-const BTN_RIGHT = { top: '73.5%',  left: '76.6%',  width: '5.2%',   height: '9.4%'  };
+const LCD = { top: '12.94%', left: '12.73%', right: '12.73%', height: '52.35%' };
 
 export default function PagerPanel({ user }) {
   const queryClient = useQueryClient();
@@ -33,10 +28,8 @@ export default function PagerPanel({ user }) {
   const [selectedStaff, setSelectedStaff] = useState('');
   const [selectedArea,  setSelectedArea]  = useState('');
   const [justSent,      setJustSent]      = useState(false);
-  // Controls pop up when typing or when red/arrow buttons pressed
-  const [controlsForced, setControlsForced] = useState(false);
 
-  const showControls = message.length > 0 || controlsForced;
+  const showControls = message.length > 0;
 
   const { data: staff = [] } = useQuery({
     queryKey: ['staff'],
@@ -83,7 +76,6 @@ export default function PagerPanel({ user }) {
     },
     onSuccess: () => {
       setMessage('');
-      setControlsForced(false);
       setJustSent(true);
       setTimeout(() => setJustSent(false), 2000);
       queryClient.invalidateQueries({ queryKey: ['pagerMessages'] });
@@ -95,12 +87,6 @@ export default function PagerPanel({ user }) {
     (recipientMode === 'global' ||
      (recipientMode === 'individual' && selectedStaff) ||
      (recipientMode === 'area'       && selectedArea));
-
-  const modeIndex = MODES.findIndex(m => m.key === recipientMode);
-  const cycleMode = (dir) => {
-    setRecipientMode(MODES[(modeIndex + dir + MODES.length) % MODES.length].key);
-    setControlsForced(true);
-  };
 
   const recipientLabel =
     recipientMode === 'global'     ? 'All Staff' :
@@ -114,7 +100,7 @@ export default function PagerPanel({ user }) {
       <div className="relative select-none" style={{ isolation: 'isolate' }}>
         <PagerSvg className="w-full drop-shadow-xl" />
 
-        {/* LCD overlay */}
+        {/* LCD textarea overlay */}
         <div className="absolute flex flex-col overflow-hidden" style={LCD}>
           {justSent ? (
             <div className="flex flex-col items-center justify-center h-full">
@@ -135,30 +121,7 @@ export default function PagerPanel({ user }) {
           </div>
         </div>
 
-        {/* ── Hardware button overlays ── */}
-        {/* Green = Send */}
-        <button
-          onClick={() => canSend && sendMutation.mutate()}
-          disabled={!canSend || sendMutation.isPending}
-          title="Send page"
-          className="absolute rounded opacity-0 hover:opacity-20 bg-green-400 transition-opacity cursor-pointer"
-          style={BTN_GREEN}
-        />
-        {/* Red = Show controls / cycle mode */}
-        <button
-          onClick={() => { cycleMode(1); }}
-          title="Choose recipient"
-          className="absolute rounded opacity-0 hover:opacity-20 bg-red-400 transition-opacity cursor-pointer"
-          style={BTN_RED}
-        />
-        {/* Left arrow = prev mode */}
-        <button onClick={() => cycleMode(-1)} title="Previous recipient mode"
-          className="absolute opacity-0 hover:opacity-10 bg-white cursor-pointer" style={BTN_LEFT} />
-        {/* Right arrow = next mode */}
-        <button onClick={() => cycleMode(1)} title="Next recipient mode"
-          className="absolute opacity-0 hover:opacity-10 bg-white cursor-pointer" style={BTN_RIGHT} />
-
-        {/* ── Controls panel — slides up inside the pager body ── */}
+        {/* ── Controls — slides up inside the pager body when typing ── */}
         <div
           className="absolute rounded-b-[7%] rounded-t-2xl transition-transform duration-300 ease-out"
           style={{
@@ -187,7 +150,6 @@ export default function PagerPanel({ user }) {
             ))}
           </div>
 
-          {/* Staff / area selector */}
           {recipientMode === 'individual' && (
             <Select value={selectedStaff} onValueChange={setSelectedStaff}>
               <SelectTrigger className="bg-slate-700 border-slate-600 text-white text-xs h-8 mb-2">
@@ -214,7 +176,6 @@ export default function PagerPanel({ user }) {
             </Select>
           )}
 
-          {/* Send button */}
           <button
             onClick={() => canSend && sendMutation.mutate()}
             disabled={!canSend || sendMutation.isPending}
