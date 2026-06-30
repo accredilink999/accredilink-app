@@ -293,7 +293,12 @@ Deno.serve(async (req) => {
             // (e.g. an old "Accredilink" install alongside the current "APP.CARECALL AI" one).
             // Native tokens are kept separately for APK users.
             const nativeTokens = candidates.filter((e: any) => e.platform === 'android' || e.platform === 'ios');
-            const webTokens    = candidates.filter((e: any) => e.platform !== 'android' && e.platform !== 'ios');
+            // Exclude web tokens from other origins (e.g. old Accredilink PWA at a different domain).
+            // Tokens with no origin set are legacy registrations — keep them.
+            const webTokens    = candidates.filter((e: any) =>
+              e.platform !== 'android' && e.platform !== 'ios' &&
+              (!e.origin || e.origin.includes('carecallai'))
+            );
 
             const topWeb = [...webTokens]
               .sort((a: any, b: any) => {

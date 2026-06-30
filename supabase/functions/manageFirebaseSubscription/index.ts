@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'Unauthorized' }, 401);
     }
 
-    const { firebaseToken, apnsToken, platform } = await req.json();
+    const { firebaseToken, apnsToken, platform, origin } = await req.json();
 
     // --- iOS APNS token path ---
     if (apnsToken) {
@@ -77,6 +77,7 @@ Deno.serve(async (req) => {
     filtered.push({
       token: firebaseToken,
       platform: platform || 'unknown',
+      origin: origin || '',
       updated_at: new Date().toISOString(),
     });
 

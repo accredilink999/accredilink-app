@@ -45,7 +45,11 @@ async function saveApnsToken(token) {
 
 /** Save FCM token via Supabase edge function */
 async function saveFcmToken(token, platform) {
-  const result = await invokeFunction('manageFirebaseSubscription', { firebaseToken: token, platform });
+  const result = await invokeFunction('manageFirebaseSubscription', {
+    firebaseToken: token,
+    platform,
+    origin: window.location.origin,
+  });
   console.log('[FCM] Save result:', JSON.stringify(result));
   return result;
 }
