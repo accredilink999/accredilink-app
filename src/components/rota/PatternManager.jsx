@@ -18,6 +18,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import CreatePatternModal from '@/components/rota/CreatePatternModal';
 import { Plus, Trash2, Play, Square, Calendar, Edit, Zap, Eraser, UserX } from 'lucide-react';
 import { toast } from 'sonner';
@@ -34,6 +35,7 @@ export default function PatternManager({ open, onClose, selectedAreaId }) {
   const [cleanupStaffId, setCleanupStaffId] = useState('');
   const [cleanupConfirmOpen, setCleanupConfirmOpen] = useState(false);
   const [redeployWeeks, setRedeployWeeks] = useState(1);
+  const [redeployFromDate, setRedeployFromDate] = useState(today);
 
   const { data: patterns = [] } = useQuery({
     queryKey: ['shift-patterns'],
@@ -372,12 +374,13 @@ export default function PatternManager({ open, onClose, selectedAreaId }) {
   });
 
   const deployPatternMutation = useMutation({
-    mutationFn: async (pattern) => {
+    mutationFn: async ({ pattern, fromDate }) => {
       toast.info('Clearing previous shifts...');
       const cleared = await clearPatternShifts({
         patternId: pattern.id,
         staffId: pattern.staff_id,
         areaId: pattern.rota_area_id,
+        fromDate,
       });
       if (cleared > 0) toast.info(`Cleared ${cleared} previous shifts`);
 
@@ -387,6 +390,7 @@ export default function PatternManager({ open, onClose, selectedAreaId }) {
         staffName: pattern.staff_name,
         repeatCount: pattern.repeat_count || 1,
         patternId: pattern.id,
+        fromDate,
       });
     },
     onSuccess: ({ filled, calls }) => {
@@ -577,43 +581,62 @@ export default function PatternManager({ open, onClose, selectedAreaId }) {
       {/* Re-deploy confirmation */}
       <AlertDialog open={!!redeployConfirmPattern} onOpenChange={(open) => {
         if (!open) setRedeployConfirmPattern(null);
-        else if (redeployConfirmPattern) setRedeployWeeks(redeployConfirmPattern.repeat_count || 1);
+        else if (redeployConfirmPattern) {
+          setRedeployWeeks(redeployConfirmPattern.repeat_count || 1);
+          setRedeployFromDate(today);
+        }
       }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Re-deploy Pattern?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will clear all existing future shifts for this pattern and redeploy fresh. Choose how many repeats to deploy.
+              Shifts <strong>before</strong> the date below are left untouched — payroll history stays intact.
+              Only shifts from that date onwards will be cleared and redeployed with the updated pattern.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="my-4 space-y-2">
-            <Label>Deploy for how many repeats?</Label>
-            <Select
-              value={redeployWeeks.toString()}
-              onValueChange={(value) => setRedeployWeeks(parseInt(value))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Array.from({ length: 56 }, (_, i) => i + 1).map((num) => (
-                  <SelectItem key={num} value={num.toString()}>
-                    {num} {num === 1 ? 'repeat' : 'repeats'}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="my-4 space-y-4">
+            <div className="space-y-1">
+              <Label>Apply changes from</Label>
+              <Input
+                type="date"
+                value={redeployFromDate}
+                min={today}
+                onChange={(e) => setRedeployFromDate(e.target.value)}
+              />
+              <p className="text-xs text-slate-500">Defaults to today — past shifts and payroll will not be affected.</p>
+            </div>
+            <div className="space-y-1">
+              <Label>Deploy for how many repeats?</Label>
+              <Select
+                value={redeployWeeks.toString()}
+                onValueChange={(value) => setRedeployWeeks(parseInt(value))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 56 }, (_, i) => i + 1).map((num) => (
+                    <SelectItem key={num} value={num.toString()}>
+                      {num} {num === 1 ? 'repeat' : 'repeats'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="flex justify-end gap-2">
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-teal-600 hover:bg-teal-700"
               onClick={() => {
-                deployPatternMutation.mutate({ ...redeployConfirmPattern, repeat_count: redeployWeeks });
+                deployPatternMutation.mutate({
+                  pattern: { ...redeployConfirmPattern, repeat_count: redeployWeeks },
+                  fromDate: redeployFromDate,
+                });
                 setRedeployConfirmPattern(null);
               }}
             >
-              Yes, Re-deploy
+              Re-deploy from {redeployFromDate}
             </AlertDialogAction>
           </div>
         </AlertDialogContent>

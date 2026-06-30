@@ -64,6 +64,7 @@ export async function deployPatternShifts({
   repeatCount,
   patternId,
   areaId: areaIdOverride,
+  fromDate,
 }) {
   toast.info(`Deploy ${VER} starting...`);
 
@@ -97,6 +98,7 @@ export async function deployPatternShifts({
       // anchor + (cycle * full-cycle-days) + (week-1 * 7) + day-of-week
       const date = localAdd(anchor, cycle * daysPerCycle + (shift.week - 1) * 7 + dayNum);
       if (date < startDate || date > endDate) continue;
+      if (fromDate && date < fromDate) continue;
       targets.push({ date, start_time: shift.start_time, end_time: shift.end_time });
     }
   }
@@ -146,6 +148,7 @@ export async function deployPatternShifts({
   }
 
   // ── Step 2: Fetch ALL blank shifts in area with a shift_name (paginated) ──
+  const deployFrom = fromDate && fromDate > startDate ? fromDate : startDate;
   let blanks = [];
   let offset = 0;
   while (true) {
@@ -154,7 +157,7 @@ export async function deployPatternShifts({
       .select('id, date, start_time, end_time, shift_name')
       .is('staff_id', null)
       .not('shift_name', 'is', null)
-      .gte('date', startDate)
+      .gte('date', deployFrom)
       .lte('date', endDate)
       .range(offset, offset + PAGE - 1);
     blankQ = applyAreaFilter(blankQ, areaId);
@@ -346,8 +349,9 @@ export async function deployPatternShifts({
 /**
  * Clear previously deployed shifts for a pattern back to blank.
  */
-export async function clearPatternShifts({ patternId, staffId, areaId }) {
+export async function clearPatternShifts({ patternId, staffId, areaId, fromDate }) {
   const today = new Date().toISOString().split('T')[0];
+  const clearFrom = fromDate || today;
   let total = 0;
   const partnerIds = new Set(); // collect paired shift IDs so we can clear the other side
 
@@ -357,7 +361,7 @@ export async function clearPatternShifts({ patternId, staffId, areaId }) {
       .from('shifts')
       .select('id, shift_name, paired_shift_id')
       .eq('shift_pattern_id', patternId)
-      .gte('date', today);
+      .gte('date', clearFrom);
     if (staffId) q = q.eq('staff_id', staffId);
     const { data } = await q;
 
@@ -388,7 +392,7 @@ export async function clearPatternShifts({ patternId, staffId, areaId }) {
 
   // 2. Fallback: by staff_id + area (ALWAYS scoped to area to prevent cross-area clearing)
   if (staffId && areaId) {
-    let q = withOrgFilter(supabase.from('shifts').select('id, shift_name, paired_shift_id')).eq('staff_id', staffId).gte('date', today);
+    let q = withOrgFilter(supabase.from('shifts').select('id, shift_name, paired_shift_id')).eq('staff_id', staffId).gte('date', clearFrom);
     q = applyAreaFilter(q, areaId);
     const { data } = await q;
 
