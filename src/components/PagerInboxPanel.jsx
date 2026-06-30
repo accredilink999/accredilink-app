@@ -77,7 +77,7 @@ export default function PagerInboxPanel({ open, onOpenChange, user }) {
 
         <SheetHeader className="px-5 pt-5 pb-3 border-b border-slate-100">
           <SheetTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
-            Pager Inbox
+            Alerter Inbox
             {unreadCount > 0 && (
               <span className="min-w-[20px] h-5 px-1.5 bg-amber-500 text-white text-[11px] font-bold rounded-full flex items-center justify-center">
                 {unreadCount}
@@ -124,7 +124,7 @@ export default function PagerInboxPanel({ open, onOpenChange, user }) {
           {/* ── Message list ── */}
           <div className="px-4 pb-6 space-y-2">
             {messages.length === 0 ? (
-              <p className="text-xs text-slate-400 text-center py-6">No pages received yet</p>
+              <p className="text-xs text-slate-400 text-center py-6">No alerts received yet</p>
             ) : (
               messages.map(msg => {
                 const isNew = msg.created_at > seenAt;
@@ -174,7 +174,7 @@ export default function PagerInboxPanel({ open, onOpenChange, user }) {
       <button
         onClick={() => onOpenChange(false)}
         className="fixed left-0 top-24 z-[99999] bg-red-600 text-white py-4 px-2 rounded-r-xl shadow-xl hover:bg-red-700 active:bg-red-800 touch-manipulation"
-        aria-label="Close pager"
+        aria-label="Close alerter"
       >
         <X className="w-5 h-5" />
       </button>

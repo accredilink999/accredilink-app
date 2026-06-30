@@ -662,7 +662,7 @@ export default function ControlRoom() {
             className={`flex items-center justify-center gap-1.5 flex-1 text-xs sm:text-sm py-1 sm:py-2 rounded-lg font-medium transition-all shadow-md hover:shadow-lg overflow-hidden ${activeTab === 'pager' ? 'bg-slate-800 ring-2 ring-slate-500' : 'bg-slate-700 hover:bg-slate-800'}`}
           >
             <PagerSvg className="h-8 sm:h-10 w-auto" />
-            <span className="text-white">Pager</span>
+            <span className="text-white">Alerter</span>
           </button>
         )}
       </div>

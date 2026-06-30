@@ -1347,7 +1347,7 @@ export default function Layout({ children, currentPageName }) {
                         <button
                           onClick={() => setPagerOpen(true)}
                           className="fixed bottom-36 right-4 z-[9998] w-12 h-12 rounded-full bg-slate-800 shadow-lg flex items-center justify-center hover:bg-slate-700 active:scale-95 transition-all touch-manipulation overflow-hidden"
-                          aria-label="Open Pager"
+                          aria-label="Open Alerter"
                         >
                           <PagerSvg className="w-9 h-9" />
                         </button>

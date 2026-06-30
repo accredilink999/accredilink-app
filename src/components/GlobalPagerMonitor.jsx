@@ -133,7 +133,7 @@ export default function GlobalPagerMonitor() {
               className="mt-3 w-full py-3.5 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98]"
             >
               <CheckCircle className="w-4 h-4" />
-              Acknowledge Page
+              Acknowledge Alert
             </button>
 
             {/* Who sent it */}

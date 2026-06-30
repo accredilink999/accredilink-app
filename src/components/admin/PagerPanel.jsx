@@ -127,12 +127,12 @@ export default function PagerPanel({ user }) {
           {justSent ? (
             <div className="flex flex-col items-center justify-center h-full">
               <CheckCircle className="w-7 h-7 text-green-700 mb-1" />
-              <span className="text-xs font-bold font-mono text-green-800 tracking-widest">PAGE SENT</span>
+              <span className="text-xs font-bold font-mono text-green-800 tracking-widest">ALERT SENT</span>
             </div>
           ) : (
             <textarea
               className="w-full flex-1 bg-transparent text-slate-700 text-sm resize-none px-2 pt-2 focus:outline-none font-mono placeholder-slate-500 leading-snug"
-              placeholder="Type your page message…"
+              placeholder="Type your alert message…"
               value={message}
               onChange={e => setMessage(e.target.value)}
               maxLength={200}
@@ -215,7 +215,7 @@ export default function PagerPanel({ user }) {
               : justSent
               ? <CheckCircle className="w-4 h-4" />
               : <Send className="w-4 h-4" />}
-            {justSent ? 'Sent!' : 'Send Page'}
+            {justSent ? 'Sent!' : 'Send Alert'}
           </button>
 
           {sendMutation.isError && (
@@ -227,7 +227,7 @@ export default function PagerPanel({ user }) {
       {/* ── Sent message log ── */}
       {sentMessages.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-1">Recent pages</p>
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-1">Recent alerts</p>
           {sentMessages.map(msg => (
             <Card key={msg.id} className="p-3 bg-white border-0 shadow-sm">
               <p className="text-sm text-slate-800 font-mono leading-snug break-words">{msg.message}</p>
