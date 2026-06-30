@@ -138,40 +138,6 @@ export default function Layout({ children, currentPageName }) {
     }
   }, []);
 
-  // Once user is authenticated, fetch the actual unread alert and surface it immediately —
-  // same pattern as radio which navigates to its page and loads state there.
-  useEffect(() => {
-    if (!needsAlerterFetch || !user?.id) return;
-    setNeedsAlerterFetch(false);
-
-    const orgId = localStorage.getItem('organizationId') || sessionStorage.getItem('organizationId') || '';
-    if (!orgId) return;
-
-    const seenAt = localStorage.getItem('pager_last_seen_' + user.id) || '1970-01-01T00:00:00Z';
-    const userAreaId = user.rota_area_id || user.area_id;
-
-    supabase
-      .from('pager_messages')
-      .select('*')
-      .eq('organization_id', orgId)
-      .gt('created_at', seenAt)
-      .order('created_at', { ascending: false })
-      .limit(10)
-      .then(({ data }) => {
-        if (!data) return;
-        const msg = data.find((m) => {
-          const directlyAddressed = m.recipient_mode === 'individual' && m.recipient_id === user.id;
-          if (m.sent_by === user.id && !directlyAddressed) return false;
-          return (
-            m.recipient_mode === 'global' ||
-            (m.recipient_mode === 'area' && m.recipient_area_id === userAreaId) ||
-            directlyAddressed
-          );
-        });
-        if (msg) setIncomingAlert(msg);
-      });
-  }, [needsAlerterFetch, user?.id, user?.rota_area_id, user?.area_id]);
-
   // Track previous page so logo tap returns user to where they were
   const prevPageRef = useRef(null);
   const trackedPageRef = useRef(currentPageName);
@@ -199,6 +165,37 @@ export default function Layout({ children, currentPageName }) {
       }
     },
   });
+
+  // Once user is authenticated, fetch the actual unread alert and surface it immediately.
+  // needsAlerterFetch is set by notification tap or ?alerter=open URL param.
+  useEffect(() => {
+    if (!needsAlerterFetch || !user?.id) return;
+    setNeedsAlerterFetch(false);
+    const orgId = localStorage.getItem('organizationId') || sessionStorage.getItem('organizationId') || '';
+    if (!orgId) return;
+    const seenAt = localStorage.getItem('pager_last_seen_' + user.id) || '1970-01-01T00:00:00Z';
+    const userAreaId = user.rota_area_id || user.area_id;
+    supabase
+      .from('pager_messages')
+      .select('*')
+      .eq('organization_id', orgId)
+      .gt('created_at', seenAt)
+      .order('created_at', { ascending: false })
+      .limit(10)
+      .then(({ data }) => {
+        if (!data) return;
+        const msg = data.find((m) => {
+          const directlyAddressed = m.recipient_mode === 'individual' && m.recipient_id === user.id;
+          if (m.sent_by === user.id && !directlyAddressed) return false;
+          return (
+            m.recipient_mode === 'global' ||
+            (m.recipient_mode === 'area' && m.recipient_area_id === userAreaId) ||
+            directlyAddressed
+          );
+        });
+        if (msg) setIncomingAlert(msg);
+      });
+  }, [needsAlerterFetch, user?.id, user?.rota_area_id, user?.area_id]);
 
   // Control device — auto-redirect to Radio page and stay there
   React.useEffect(() => {
