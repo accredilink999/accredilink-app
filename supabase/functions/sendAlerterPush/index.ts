@@ -70,13 +70,13 @@ Deno.serve(async (req) => {
       {
         body: {
           recipient_ids:      recipientIds,
-          title:              'Incoming CareCall AI Alert',
-          message:            message,
+          title:              'CareCall AI Alert',
+          message:            'Tap to open',
           priority:           'high',
           notification_type:  'alerter',
-          action_url:         '/?alerter=open',
+          action_url:         '/',
           data: {
-            url:  '/?alerter=open',
+            url:  '/',
             type: 'alerter',
           },
         },
