@@ -73,7 +73,6 @@ import {
                                 PhoneOff,
                                 Mic,
                                 Radio,
-                                X,
                               } from 'lucide-react';
 
 
@@ -98,6 +97,29 @@ export default function Layout({ children, currentPageName }) {
   const { helpMode, setHelpMode } = useHelpMode();
   const [commsOpen, setCommsOpen] = useState(false);
   const [pagerOpen, setPagerOpen] = useState(false);
+  const [incomingAlert, setIncomingAlert] = useState(null);
+
+  // Open alerter panel on real-time incoming alert
+  useEffect(() => {
+    const handleIncoming = (e) => {
+      setIncomingAlert(e.detail);
+      setPagerOpen(true);
+    };
+    window.addEventListener('alerter:incoming', handleIncoming);
+    return () => window.removeEventListener('alerter:incoming', handleIncoming);
+  }, []);
+
+  // Handle deep link on startup: /?alerter=open
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('alerter') === 'open') {
+      setPagerOpen(true);
+      setIncomingAlert('deeplink'); // signal to panel to load + alert latest unread
+      // Clean the URL without reload
+      const clean = window.location.pathname;
+      window.history.replaceState({}, '', clean);
+    }
+  }, []);
 
   // Track previous page so logo tap returns user to where they were
   const prevPageRef = useRef(null);
@@ -1367,6 +1389,8 @@ export default function Layout({ children, currentPageName }) {
                         open={pagerOpen}
                         onOpenChange={setPagerOpen}
                         user={user}
+                        incomingAlert={incomingAlert}
+                        onAlertSilenced={() => setIncomingAlert(null)}
                       />
 
                       {/* Slide-in close tabs — portalled to <body> so they sit above Radix Sheet */}

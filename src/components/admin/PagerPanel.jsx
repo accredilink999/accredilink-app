@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { base44 } from '@/api/base44Client';
+import { invokeFunction } from '@/api/functions';
 import { format } from 'date-fns';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -94,9 +95,20 @@ export default function PagerPanel({ user }) {
         sent_by_name:        user?.full_name || 'Admin',
       }]);
       if (error) throw error;
+      // Return vars for onSuccess
+      return { message: message.trim(), recipientMode, selectedStaff, selectedArea };
     },
-    onSuccess: () => {
+    onSuccess: (vars) => {
       playPageSentBeep();
+      // Send push notifications to off-app users
+      invokeFunction('sendAlerterPush', {
+        organization_id:   orgId,
+        message:           vars.message,
+        recipient_mode:    vars.recipientMode,
+        recipient_id:      vars.selectedStaff || null,
+        recipient_area_id: vars.selectedArea  || null,
+        sent_by:           user?.id || '',
+      }).catch(() => {}); // fire-and-forget
       setMessage('');
       setJustSent(true);
       setTimeout(() => setJustSent(false), 2000);

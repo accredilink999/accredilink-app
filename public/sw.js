@@ -56,12 +56,18 @@ self.addEventListener('push', function(event) {
   }
 
   var notification = payload.notification || {};
-  var title = notification.title || 'Care Call';
+  var data = payload.data || {};
+  var isAlerter = data.type === 'alerter';
+
+  var title = notification.title || (isAlerter ? 'Incoming CareCall AI Alert' : 'Care Call');
   var options = {
-    body: notification.body || '',
-    icon: '/pwa-192x192.png',
-    badge: '/pwa-192x192.png',
-    data: payload.data || {}
+    body:    notification.body || notification.message || '',
+    icon:    '/pwa-192x192.png',
+    badge:   '/pwa-192x192.png',
+    vibrate: isAlerter ? [300, 100, 300, 100, 300, 100, 300] : [200],
+    requireInteraction: isAlerter, // keep on screen until tapped
+    tag:     isAlerter ? 'carecall-alerter' : undefined,
+    data:    data,
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
