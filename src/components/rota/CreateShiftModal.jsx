@@ -50,6 +50,8 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
   const [showSitInTimePopup, setShowSitInTimePopup] = useState(false);
   const [sitInTimeOn, setSitInTimeOn] = useState('');
   const [sitInTimeOff, setSitInTimeOff] = useState('');
+  const [recurrenceDialogOpen, setRecurrenceDialogOpen] = useState(false);
+  const [pendingShiftsData, setPendingShiftsData] = useState([]);
   const shiftInitialData = {
       shift_name: '',
       staff_id: '',
@@ -445,11 +447,33 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
       handleAddShift();
       return;
     }
-    // Strip preview-only fields before sending to mutation
     const cleaned = shiftsToCreate
       .filter(s => s !== undefined)
       .map(({ _matchingCalls, ...rest }) => rest);
-    createShiftMutation.mutate(cleaned);
+    // Only offer recurrence when creating a single shift
+    if (cleaned.length === 1) {
+      setPendingShiftsData(cleaned);
+      setRecurrenceDialogOpen(true);
+    } else {
+      createShiftMutation.mutate(cleaned);
+    }
+  };
+
+  const handleRecurrenceChoice = (mode) => {
+    setRecurrenceDialogOpen(false);
+    if (mode === 'single' || pendingShiftsData.length === 0) {
+      createShiftMutation.mutate(pendingShiftsData);
+      return;
+    }
+    const base = pendingShiftsData[0];
+    const baseDate = new Date(base.date + 'T12:00:00');
+    const intervalDays = mode === 'biweekly' ? 14 : 7;
+    const occurrences = 12;
+    const expanded = Array.from({ length: occurrences }, (_, i) => ({
+      ...base,
+      date: format(addDays(baseDate, i * intervalDays), 'yyyy-MM-dd'),
+    }));
+    createShiftMutation.mutate(expanded);
   };
 
   return (
@@ -756,6 +780,35 @@ export default function CreateShiftModal({ open, onClose, selectedDate, selected
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Recurrence dialog */}
+    <AlertDialog open={recurrenceDialogOpen} onOpenChange={setRecurrenceDialogOpen}>
+      <AlertDialogContent className="max-w-sm">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Repeating Shift?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Would you like to create this as a one-off or a repeating shift?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div className="flex flex-col gap-2 py-2">
+          <Button variant="outline" className="justify-start min-h-[44px]" onClick={() => handleRecurrenceChoice('single')}>
+            <span className="font-semibold mr-2">This shift only</span>
+            <span className="text-slate-500 text-xs">— one date, no recurrence</span>
+          </Button>
+          <Button variant="outline" className="justify-start min-h-[44px]" onClick={() => handleRecurrenceChoice('weekly')}>
+            <span className="font-semibold mr-2">Repeat every week</span>
+            <span className="text-slate-500 text-xs">— same day, 12 weeks</span>
+          </Button>
+          <Button variant="outline" className="justify-start min-h-[44px]" onClick={() => handleRecurrenceChoice('biweekly')}>
+            <span className="font-semibold mr-2">Repeat every 2 weeks</span>
+            <span className="text-slate-500 text-xs">— alternating weeks, 12 occurrences</span>
+          </Button>
+        </div>
+        <div className="flex justify-end">
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+        </div>
+      </AlertDialogContent>
+    </AlertDialog>
 
     {/* Sit-in Cover Time Popup */}
     <AlertDialog open={showSitInTimePopup} onOpenChange={setShowSitInTimePopup}>
