@@ -117,17 +117,18 @@ async function sendFCMMessage(
     token: fcmToken,
     android: {
       priority: priority === 'high' ? 'HIGH' : 'NORMAL',
-      // Alerter: no android.notification — data-only so the native APK SDK does NOT
-      // auto-display a duplicate. firebase-messaging-sw.js handles display for web.
-      ...(!isAlerter ? {
-        notification: {
-          title,
-          body,
-          click_action: 'FLUTTER_NOTIFICATION_CLICK',
-          default_vibrate_timings: true,
-          default_sound: true,
-        },
-      } : {}),
+      notification: {
+        title,
+        body,
+        click_action: 'FLUTTER_NOTIFICATION_CLICK',
+        default_vibrate_timings: !isAlerter,
+        default_sound:           !isAlerter,
+        ...(isAlerter ? {
+          vibrate_timings: ['0.3s', '0.1s', '0.3s', '0.1s', '0.3s'],
+          sound: 'default',
+          channel_id: 'carecall_alerter',
+        } : {}),
+      },
     },
     webpush: {
       headers: { Urgency: priority === 'high' ? 'high' : 'normal' },
@@ -289,11 +290,12 @@ Deno.serve(async (req) => {
             const candidates = fresh.length > 0 ? fresh : tokenArray.filter((e: any) => !!e.token);
 
             if (isAlerterPush) {
-              // Alerter: send to ONE token per user (native preferred over web, then newest)
-              // — avoids duplicate alert sounds when the same user has multiple devices
+              // Alerter: send to ONE token per user — web preferred over native.
+              // Web tokens are handled by firebase-messaging-sw.js which correctly
+              // opens the deeplink. Native tokens are the fallback for APK-only users.
               const nativeTokens = candidates.filter((e: any) => e.platform === 'android' || e.platform === 'ios');
               const webTokens    = candidates.filter((e: any) => e.platform !== 'android' && e.platform !== 'ios');
-              const pool = nativeTokens.length > 0 ? nativeTokens : webTokens;
+              const pool = webTokens.length > 0 ? webTokens : nativeTokens;
               const chosen = pool.length === 0 ? null :
                 pool.reduce((best: any, cur: any) => {
                   const tb = best.updated_at ? new Date(best.updated_at).getTime() : 0;
