@@ -99,7 +99,14 @@ export default function Layout({ children, currentPageName }) {
   const [pagerOpen, setPagerOpen] = useState(false);
   const [incomingAlert, setIncomingAlert] = useState(null);
 
-  // Open alerter panel on real-time incoming alert
+  // Clean up ?alerter=open URL param left by push notification deep link
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('alerter') === 'open') {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
+  // Open alerter panel on real-time incoming alert (from GlobalPagerMonitor Realtime subscription)
   useEffect(() => {
     const handleIncoming = (e) => {
       setIncomingAlert(e.detail);
@@ -107,35 +114,6 @@ export default function Layout({ children, currentPageName }) {
     };
     window.addEventListener('alerter:incoming', handleIncoming);
     return () => window.removeEventListener('alerter:incoming', handleIncoming);
-  }, []);
-
-  // Alerter notification trigger — set when notification tapped or ?alerter=open detected.
-  // We open the panel immediately, then fetch the actual message once the user is known.
-  const [needsAlerterFetch, setNeedsAlerterFetch] = useState(false);
-
-  // Handle service worker notification click (app already open when notification tapped)
-  useEffect(() => {
-    const handler = (event) => {
-      const { type, data } = event.data || {};
-      if (type === 'NOTIFICATION_CLICK' && data?.type === 'alerter') {
-        setPagerOpen(true);
-        setIncomingAlert('deeplink'); // enter alerting state immediately (vibrate + audio)
-        setNeedsAlerterFetch(true);
-      }
-    };
-    navigator.serviceWorker?.addEventListener('message', handler);
-    return () => navigator.serviceWorker?.removeEventListener('message', handler);
-  }, []);
-
-  // Handle deep link on startup: /?alerter=open
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('alerter') === 'open') {
-      setPagerOpen(true);
-      setIncomingAlert('deeplink'); // enter alerting state immediately (vibrate + audio)
-      setNeedsAlerterFetch(true);
-      window.history.replaceState({}, '', window.location.pathname);
-    }
   }, []);
 
   // Track previous page so logo tap returns user to where they were
@@ -165,37 +143,6 @@ export default function Layout({ children, currentPageName }) {
       }
     },
   });
-
-  // Once user is authenticated, fetch the actual unread alert and surface it immediately.
-  // needsAlerterFetch is set by notification tap or ?alerter=open URL param.
-  useEffect(() => {
-    if (!needsAlerterFetch || !user?.id) return;
-    setNeedsAlerterFetch(false);
-    const orgId = localStorage.getItem('organizationId') || sessionStorage.getItem('organizationId') || '';
-    if (!orgId) return;
-    const seenAt = localStorage.getItem('pager_last_seen_' + user.id) || '1970-01-01T00:00:00Z';
-    const userAreaId = user.rota_area_id || user.area_id;
-    supabase
-      .from('pager_messages')
-      .select('*')
-      .eq('organization_id', orgId)
-      .gt('created_at', seenAt)
-      .order('created_at', { ascending: false })
-      .limit(10)
-      .then(({ data }) => {
-        if (!data) return;
-        const msg = data.find((m) => {
-          const directlyAddressed = m.recipient_mode === 'individual' && m.recipient_id === user.id;
-          if (m.sent_by === user.id && !directlyAddressed) return false;
-          return (
-            m.recipient_mode === 'global' ||
-            (m.recipient_mode === 'area' && m.recipient_area_id === userAreaId) ||
-            directlyAddressed
-          );
-        });
-        if (msg) setIncomingAlert(msg);
-      });
-  }, [needsAlerterFetch, user?.id, user?.rota_area_id, user?.area_id]);
 
   // Control device — auto-redirect to Radio page and stay there
   React.useEffect(() => {
@@ -617,6 +564,57 @@ export default function Layout({ children, currentPageName }) {
     ? callbackRequestCalls.filter(c => !dismissedCbBannerIds.has(c.id))
     : [];
   const anyRadioAlerts = visibleMissedCalls.length > 0 || visibleCbRequests.length > 0;
+
+  // ─── Unread pager alerts — same pattern as radio missed calls ────────────
+  const { data: unreadPagerAlerts = [] } = useQuery({
+    queryKey: ['unreadPagerAlerts', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const orgId = user.organization_id || localStorage.getItem('organizationId') || '';
+      if (!orgId) return [];
+      const seenAt = localStorage.getItem('pager_last_seen_' + user.id) || '1970-01-01T00:00:00Z';
+      const { data } = await supabase
+        .from('pager_messages')
+        .select('*')
+        .eq('organization_id', orgId)
+        .gt('created_at', seenAt)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (!data) return [];
+      const dismissed = (() => { try { return JSON.parse(localStorage.getItem('pager_dismissed_' + user.id) || '[]'); } catch { return []; } })();
+      const dismissedSet = new Set(dismissed);
+      const userAreaId = user.rota_area_id || user.area_id;
+      return data.filter((m) => {
+        if (dismissedSet.has(m.id)) return false;
+        const directlyAddressed = m.recipient_mode === 'individual' && m.recipient_id === user.id;
+        if (m.sent_by === user.id && !directlyAddressed) return false;
+        return (
+          m.recipient_mode === 'global' ||
+          (m.recipient_mode === 'area' && m.recipient_area_id === userAreaId) ||
+          directlyAddressed
+        );
+      });
+    },
+    enabled: !!user?.id,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+  });
+
+  const alerterAutoOpenedRef = useRef(false);
+  useEffect(() => {
+    if (alerterAutoOpenedRef.current) return;
+    if (!user?.id || unreadPagerAlerts.length === 0 || pagerOpen) return;
+    alerterAutoOpenedRef.current = true;
+    // Mark seen so query returns empty until a new alert arrives
+    try { localStorage.setItem('pager_last_seen_' + user.id, new Date().toISOString()); } catch {}
+    setIncomingAlert(unreadPagerAlerts[0]);
+    setPagerOpen(true);
+  }, [user?.id, unreadPagerAlerts, pagerOpen]);
+
+  // Reset so next new alert can auto-open after panel closes
+  useEffect(() => {
+    if (!pagerOpen) alerterAutoOpenedRef.current = false;
+  }, [pagerOpen]);
 
   // Auto-redirect to Radio on app open / return from background if missed calls or callback requests exist
   const autoRedirectedRef = useRef(false);
