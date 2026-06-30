@@ -111,7 +111,7 @@ export default function PagerPanel({ user }) {
     <div className="max-w-lg mx-auto space-y-4">
 
       {/* ── Pager device ── */}
-      <div className="relative select-none">
+      <div className="relative select-none" style={{ isolation: 'isolate' }}>
         <PagerSvg className="w-full drop-shadow-xl" />
 
         {/* LCD overlay */}
@@ -157,28 +157,31 @@ export default function PagerPanel({ user }) {
         {/* Right arrow = next mode */}
         <button onClick={() => cycleMode(1)} title="Next recipient mode"
           className="absolute opacity-0 hover:opacity-10 bg-white cursor-pointer" style={BTN_RIGHT} />
-      </div>
 
-      {/* ── Slide-up controls — appear when typing or button pressed ── */}
-      <div
-        className="overflow-hidden transition-all duration-300 ease-out"
-        style={{ maxHeight: showControls ? '260px' : '0', opacity: showControls ? 1 : 0 }}
-      >
-        <div className="bg-slate-800 rounded-2xl p-4 space-y-3 shadow-xl">
-
+        {/* ── Controls panel — slides up inside the pager body ── */}
+        <div
+          className="absolute rounded-b-[7%] rounded-t-2xl transition-transform duration-300 ease-out"
+          style={{
+            left: '7%', right: '7%', bottom: '6%',
+            transform: showControls ? 'translateY(0)' : 'translateY(110%)',
+            background: '#1a1a1a',
+            padding: '10px 12px 14px',
+            zIndex: 10,
+          }}
+        >
           {/* Recipient mode tabs */}
-          <div className="flex gap-2">
+          <div className="flex gap-1.5 mb-2">
             {MODES.map(({ key, label, Icon }) => (
               <button
                 key={key}
                 onClick={() => setRecipientMode(key)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold flex-1 justify-center transition-all ${
+                className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-semibold flex-1 justify-center transition-all ${
                   recipientMode === key
-                    ? 'bg-green-500 text-white shadow-md'
+                    ? 'bg-green-500 text-white'
                     : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                 }`}
               >
-                <Icon className="w-3.5 h-3.5 shrink-0" />
+                <Icon className="w-3 h-3 shrink-0" />
                 {label}
               </button>
             ))}
@@ -187,7 +190,7 @@ export default function PagerPanel({ user }) {
           {/* Staff / area selector */}
           {recipientMode === 'individual' && (
             <Select value={selectedStaff} onValueChange={setSelectedStaff}>
-              <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+              <SelectTrigger className="bg-slate-700 border-slate-600 text-white text-xs h-8 mb-2">
                 <SelectValue placeholder="Select staff member…" />
               </SelectTrigger>
               <SelectContent>
@@ -200,7 +203,7 @@ export default function PagerPanel({ user }) {
 
           {recipientMode === 'area' && (
             <Select value={selectedArea} onValueChange={setSelectedArea}>
-              <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+              <SelectTrigger className="bg-slate-700 border-slate-600 text-white text-xs h-8 mb-2">
                 <SelectValue placeholder="Select rota area…" />
               </SelectTrigger>
               <SelectContent>
@@ -215,9 +218,9 @@ export default function PagerPanel({ user }) {
           <button
             onClick={() => canSend && sendMutation.mutate()}
             disabled={!canSend || sendMutation.isPending}
-            className={`w-full py-3 rounded-xl font-bold text-white text-sm flex items-center justify-center gap-2 transition-all ${
+            className={`w-full py-2.5 rounded-xl font-bold text-white text-sm flex items-center justify-center gap-2 transition-all ${
               canSend && !sendMutation.isPending
-                ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-md'
+                ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700'
                 : 'bg-slate-700 opacity-50 cursor-not-allowed'
             }`}
           >
@@ -230,7 +233,7 @@ export default function PagerPanel({ user }) {
           </button>
 
           {sendMutation.isError && (
-            <p className="text-xs text-red-400 text-center">Failed to send — please try again.</p>
+            <p className="text-[10px] text-red-400 text-center mt-1">Failed — try again.</p>
           )}
         </div>
       </div>
