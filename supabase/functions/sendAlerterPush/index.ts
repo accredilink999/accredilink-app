@@ -53,8 +53,10 @@ Deno.serve(async (req) => {
       recipientIds = [recipient_id];
     }
 
-    // Exclude the sender
-    recipientIds = recipientIds.filter(id => id !== sent_by);
+    // Exclude sender from group broadcasts (but keep them if individually addressed to themselves)
+    if (recipient_mode !== 'individual') {
+      recipientIds = recipientIds.filter(id => id !== sent_by);
+    }
 
     if (recipientIds.length === 0) {
       return new Response(JSON.stringify({ ok: true, sent: 0 }), {

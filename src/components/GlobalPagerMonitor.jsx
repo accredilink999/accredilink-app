@@ -24,7 +24,6 @@ export default function GlobalPagerMonitor() {
           const msg = payload.new;
           if (msg.organization_id !== orgId) return;
           if (seenRef.current.has(msg.id)) return;
-          if (msg.sent_by === user.id) return;
           seenRef.current.add(msg.id);
 
           const userAreaId = user.rota_area_id || user.area_id;
@@ -34,6 +33,8 @@ export default function GlobalPagerMonitor() {
             (msg.recipient_mode === 'individual' && msg.recipient_id === user.id);
 
           if (!addressed) return;
+          // Skip group broadcasts you sent yourself (but allow individual alerts addressed to you)
+          if (msg.sent_by === user.id && msg.recipient_mode !== 'individual') return;
 
           // Vibrate device
           if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300]);
@@ -58,7 +59,9 @@ export default function GlobalPagerMonitor() {
           window.dispatchEvent(new CustomEvent('alerter:incoming', { detail: msg }));
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[GlobalPagerMonitor] channel status:', status);
+      });
 
     return () => {
       supabase.removeChannel(channel);

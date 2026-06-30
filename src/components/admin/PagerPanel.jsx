@@ -73,6 +73,7 @@ export default function PagerPanel({ user }) {
         .from('pager_messages')
         .select('*')
         .eq('organization_id', orgId)
+        .eq('sent_by', user?.id || '')
         .order('created_at', { ascending: false })
         .limit(20);
       return data || [];
