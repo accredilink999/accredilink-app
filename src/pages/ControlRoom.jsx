@@ -12,7 +12,8 @@ import PageHeader from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Navigation, Search, Check, AlertCircle, ChevronDown, Edit, Loader2, Mail, Clock, Plus, Users, Radio, BellRing } from 'lucide-react';
+import { MapPin, Navigation, Search, Check, AlertCircle, ChevronDown, Edit, Loader2, Mail, Clock, Plus, Users, Radio } from 'lucide-react';
+import PagerPanel from '@/components/admin/PagerPanel';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -42,7 +43,7 @@ function FlyToLocation({ lat, lng, zoom, onComplete }) {
 export default function ControlRoom() {
   const queryClient = useQueryClient();
   const [mapMaximized, setMapMaximized] = useState(false);
-  const [activeTab, setActiveTab] = useState('tracking');
+  const [activeTab, setActiveTab] = useState('announcements');
   const [showLogoUploader, setShowLogoUploader] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [flyToTarget, setFlyToTarget] = useState(null);
@@ -642,142 +643,28 @@ export default function ControlRoom() {
       {showLogoUploader && <CompanyLogoUploader />}
 
       {/* Tabs */}
-      <div className="w-full grid grid-cols-2 sm:grid-cols-4 h-auto p-1 gap-1">
-        <button onClick={() => setActiveTab('tracking')} className={`flex items-center justify-center sm:justify-start gap-1 flex-1 text-xs sm:text-sm py-2 sm:py-3 rounded-lg font-medium transition-all shadow-md hover:shadow-lg ${activeTab === 'tracking' ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white' : 'bg-gradient-to-r from-blue-400 to-blue-500 text-white hover:from-blue-500 hover:to-blue-600'}`}>
-          <MapPin className="w-4 h-4 flex-shrink-0" />
-          <span className="hidden sm:inline">Tracking</span>
-          <span className="sm:hidden">Map</span>
-        </button>
-        <button onClick={() => setActiveTab('shifts')} className={`flex items-center justify-center sm:justify-start gap-1 flex-1 text-xs sm:text-sm py-2 sm:py-3 rounded-lg font-medium transition-all shadow-md hover:shadow-lg ${activeTab === 'shifts' ? 'bg-gradient-to-r from-red-500 to-red-600 text-white' : 'bg-gradient-to-r from-red-400 to-red-500 text-white hover:from-red-500 hover:to-red-600'}`}>
-          <Clock className="w-4 h-4 flex-shrink-0" />
-          <span className="hidden sm:inline">Today's Shifts</span>
-          <span className="sm:hidden">Shifts</span>
-        </button>
-        <button onClick={() => setActiveTab('announcements')} className={`flex items-center justify-center sm:justify-start gap-1 flex-1 text-xs sm:text-sm py-2 sm:py-3 rounded-lg font-medium transition-all shadow-md hover:shadow-lg ${activeTab === 'announcements' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' : 'bg-gradient-to-r from-orange-400 to-orange-500 text-white hover:from-orange-500 hover:to-orange-600'}`}>
+      <div className="w-full grid grid-cols-3 h-auto p-1 gap-1">
+        <button onClick={() => setActiveTab('announcements')} className={`flex items-center justify-center gap-1.5 flex-1 text-xs sm:text-sm py-2 sm:py-3 rounded-lg font-medium transition-all shadow-md hover:shadow-lg ${activeTab === 'announcements' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' : 'bg-gradient-to-r from-orange-400 to-orange-500 text-white hover:from-orange-500 hover:to-orange-600'}`}>
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
           <span className="hidden sm:inline">Announcements</span>
           <span className="sm:hidden">Announce</span>
         </button>
-        <button onClick={() => setActiveTab('email-settings')} className={`flex items-center justify-center sm:justify-start gap-1 flex-1 text-xs sm:text-sm py-2 sm:py-3 rounded-lg font-medium transition-all shadow-md hover:shadow-lg ${activeTab === 'email-settings' ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white' : 'bg-gradient-to-r from-indigo-400 to-indigo-500 text-white hover:from-indigo-500 hover:to-indigo-600'}`}>
-          <Mail className="w-4 h-4 flex-shrink-0" />
-          <span className="hidden sm:inline">Email</span>
-          <span className="sm:hidden">Mail</span>
-        </button>
         {user?.role === 'super_admin' && (
-          <button onClick={() => setActiveTab('radio-settings')} className={`flex items-center justify-center sm:justify-start gap-1 flex-1 text-xs sm:text-sm py-2 sm:py-3 rounded-lg font-medium transition-all shadow-md hover:shadow-lg ${activeTab === 'radio-settings' ? 'bg-gradient-to-r from-teal-500 to-teal-600 text-white' : 'bg-gradient-to-r from-teal-400 to-teal-500 text-white hover:from-teal-500 hover:to-teal-600'}`}>
+          <button onClick={() => setActiveTab('radio-settings')} className={`flex items-center justify-center gap-1.5 flex-1 text-xs sm:text-sm py-2 sm:py-3 rounded-lg font-medium transition-all shadow-md hover:shadow-lg ${activeTab === 'radio-settings' ? 'bg-gradient-to-r from-teal-500 to-teal-600 text-white' : 'bg-gradient-to-r from-teal-400 to-teal-500 text-white hover:from-teal-500 hover:to-teal-600'}`}>
             <Radio className="w-4 h-4 flex-shrink-0" />
             <span>Radio</span>
           </button>
         )}
-        {user?.role === 'super_admin' && (
-          <button onClick={() => setActiveTab('alerter')} className={`flex items-center justify-center sm:justify-start gap-1 flex-1 text-xs sm:text-sm py-2 sm:py-3 rounded-lg font-medium transition-all shadow-md hover:shadow-lg ${activeTab === 'alerter' ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white' : 'bg-gradient-to-r from-amber-400 to-amber-500 text-white hover:from-amber-500 hover:to-amber-600'}`}>
-            <BellRing className="w-4 h-4 flex-shrink-0" />
-            <span>Alerter</span>
+        {isAdmin && (
+          <button
+            onClick={() => setActiveTab('pager')}
+            className={`flex items-center justify-center gap-1.5 flex-1 text-xs sm:text-sm py-1 sm:py-2 rounded-lg font-medium transition-all shadow-md hover:shadow-lg overflow-hidden ${activeTab === 'pager' ? 'bg-slate-800 ring-2 ring-slate-500' : 'bg-slate-700 hover:bg-slate-800'}`}
+          >
+            <img src="/pager-icon.png" alt="Pager" className="h-8 sm:h-10 w-auto object-contain" />
+            <span className="text-white">Pager</span>
           </button>
         )}
       </div>
-
-      {activeTab === 'tracking' && isAdmin && (
-      <div className="max-w-4xl space-y-4">
-        {/* Map */}
-        <Card className="p-0 bg-white border-0 shadow-sm overflow-hidden relative group h-[350px] z-0">
-          <MapContainer center={[centerLat, centerLng]} zoom={13} style={{ height: '100%', width: '100%' }} ref={mapRef}>
-            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap contributors' />
-            {renderClientMarkers()}
-            {renderStaffMarkers()}
-            {flyToTarget && <FlyToLocation lat={flyToTarget.lat} lng={flyToTarget.lng} zoom={16} onComplete={() => setFlyToTarget(null)} />}
-          </MapContainer>
-          {clientMarkers.length === 0 && staffMarkers.length === 0 && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white/80">
-              <p className="text-slate-500 text-xs">No markers to show — client and staff markers will appear when shifts are active</p>
-            </div>
-          )}
-          <button
-            onClick={() => setMapMaximized(true)}
-            className="absolute top-2 right-2 bg-white p-2 rounded-lg shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
-            title="Maximize map"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6v4m12-4h4v4M6 18h4v4m6-4h4v4" />
-            </svg>
-          </button>
-        </Card>
-
-        {/* Map Legend */}
-        <div className="flex flex-wrap gap-3 px-1">
-          <div className="flex items-center gap-1.5 text-xs text-slate-600">
-            <div className="w-3 h-3 rounded-full bg-amber-500"></div>
-            In Progress
-          </div>
-          <div className="flex items-center gap-1.5 text-xs text-slate-600">
-            <div className="w-3 h-3 rounded-full bg-green-500"></div>
-            Completed / Pending
-          </div>
-          <div className="flex items-center gap-1.5 text-xs text-slate-600">
-            <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-            Staff (Live)
-          </div>
-          <div className="flex items-center gap-1.5 text-xs text-slate-600">
-            <div className="w-3 h-3 rounded-full bg-gray-400"></div>
-            Staff (Last Known)
-          </div>
-          <div className="text-xs text-slate-400">
-            {clientMarkers.length} client{clientMarkers.length !== 1 ? 's' : ''} · {staffMarkers.length} staff on map
-          </div>
-        </div>
-
-        {/* Active Staff List */}
-        <Card className="p-4 bg-white border-0 shadow-sm">
-          <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-            <Users className="w-4 h-4" />
-            Active Staff ({activeStaffList.length})
-          </h3>
-          {activeStaffList.length === 0 ? (
-            <p className="text-sm text-slate-500">No active staff in the last hour</p>
-          ) : (
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {activeStaffList.map(shift => {
-                const gpsMarker = staffMarkers.find(m => m.staffId === shift.staff_id);
-                return (
-                  <div
-                    key={shift.staff_id}
-                    className={`flex items-center justify-between p-3 bg-slate-50 rounded-lg transition-colors ${gpsMarker ? 'cursor-pointer hover:bg-blue-50' : ''}`}
-                    onClick={() => {
-                      if (!gpsMarker) return;
-                      setFlyToTarget({ lat: gpsMarker.lat, lng: gpsMarker.lng });
-                      setMapMaximized(true);
-                    }}
-                  >
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
-                        gpsMarker?.isLive ? 'bg-blue-500 animate-pulse' :
-                        gpsMarker ? 'bg-gray-400' :
-                        'bg-transparent border border-dashed border-slate-300'
-                      }`} title={gpsMarker?.isLive ? 'Live GPS' : gpsMarker ? 'Last known' : 'No GPS'} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-900 truncate">{shift.staff_name}</p>
-                        <p className="text-xs text-slate-500">{shift.shift_name} &middot; {shift.start_time}–{shift.end_time}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                      <span className="text-xs text-slate-600">{shift.completedCalls}/{shift.totalCalls} calls</span>
-                      <span className={`text-xs font-medium ${shift.statusColor}`}>{shift.statusLabel}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Card>
-      </div>
-      )}
-
-      {activeTab === 'shifts' && isAdmin && (
-      <div className="space-y-6">
-        <ShiftStatusOverview />
-        <ShiftReminderSettings />
-      </div>
-      )}
 
       {activeTab === 'announcements' && (
       <div className="space-y-4">
@@ -943,16 +830,12 @@ export default function ControlRoom() {
       </div>
       )}
 
-      {activeTab === 'email-settings' && isAdmin && (
-        <EmailNotificationCenter />
-      )}
-
       {activeTab === 'radio-settings' && user?.role === 'super_admin' && (
         <RadioSettingsPanel queryClient={queryClient} user={user} />
       )}
 
-      {activeTab === 'alerter' && user?.role === 'super_admin' && (
-        <AlerterSettingsPanel user={user} />
+      {activeTab === 'pager' && isAdmin && (
+        <PagerPanel user={user} />
       )}
 
       {/* Edit Announcement Dialog */}
