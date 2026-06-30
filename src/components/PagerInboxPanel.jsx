@@ -3,7 +3,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { format } from 'date-fns';
-import { CheckCircle, X } from 'lucide-react';
+import { CheckCircle, X, Volume2 } from 'lucide-react';
 import PagerSvg from '@/components/PagerSvg';
 import PagerPanel from '@/components/admin/PagerPanel';
 
@@ -61,9 +61,11 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
 
   const [seenAt]        = useState(() => localStorage.getItem(seenKey) || '1970-01-01T00:00:00Z');
   const [dismissedIds, setDismissedIds] = useState(() => loadDismissed(dismissedKey));
-  const [alerting, setAlerting] = useState(false);
-  const [silenced, setSilenced] = useState(false);
-  const [alertMsg, setAlertMsg] = useState(null);
+  const [alerting,     setAlerting]     = useState(false);
+  const [silenced,     setSilenced]     = useState(false);
+  const [alertMsg,     setAlertMsg]     = useState(null);
+  // true when browser blocked autoplay — user needs to tap to enable sound
+  const [needsGesture, setNeedsGesture] = useState(false);
   const audioRef = useRef(null);
 
   const dismissOne = (id) => {
@@ -92,6 +94,7 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
   useEffect(() => {
     if (!incomingAlert || !open) return;
     setSilenced(false);
+    setNeedsGesture(false);
     setAlerting(true);
     if (typeof incomingAlert === 'object') setAlertMsg(incomingAlert);
 
@@ -99,7 +102,12 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
       if (!audioRef.current) return;
       audioRef.current.currentTime = 0;
       audioRef.current.play().catch(() => {
+        // Browser blocked autoplay (common after page load / PIN entry).
+        // Show a "tap to enable sound" banner; the listener below starts audio
+        // on the next user gesture.
+        setNeedsGesture(true);
         const resume = () => {
+          setNeedsGesture(false);
           if (audioRef.current) audioRef.current.play().catch(() => {});
           window.removeEventListener('click',      resume);
           window.removeEventListener('touchstart', resume);
@@ -118,6 +126,7 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
     if (!open) {
       setAlerting(false);
       setSilenced(false);
+      setNeedsGesture(false);
       if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
       if (navigator.vibrate) navigator.vibrate(0);
       window.dispatchEvent(new CustomEvent('alerter:silence'));
@@ -127,6 +136,7 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
   const silence = () => {
     setAlerting(false);
     setSilenced(true);
+    setNeedsGesture(false);
     if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
     if (navigator.vibrate) navigator.vibrate(0);
     window.dispatchEvent(new CustomEvent('alerter:silence'));
@@ -156,11 +166,14 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
         .limit(50);
       const userAreaId = user ? (user.rota_area_id || user.area_id) : null;
       return (data || []).filter((msg) => {
-        if (msg.sent_by === userId) return false;
+        // Always show messages individually addressed to this user, even if they sent it
+        const directlyAddressed = msg.recipient_mode === 'individual' && msg.recipient_id === userId;
+        // Otherwise, skip messages this user sent (they're in the sent log, not the inbox)
+        if (msg.sent_by === userId && !directlyAddressed) return false;
         return (
           msg.recipient_mode === 'global' ||
           (msg.recipient_mode === 'area' && msg.recipient_area_id === userAreaId) ||
-          (msg.recipient_mode === 'individual' && msg.recipient_id === userId)
+          directlyAddressed
         );
       });
     },
@@ -207,6 +220,20 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
 
         <div className="flex-1 overflow-y-auto">
 
+          {/* Banner shown when browser blocked autoplay (e.g. after PIN entry) */}
+          {alerting && needsGesture && (
+            <button
+              className="w-full flex items-center justify-center gap-2 py-3 bg-red-600 text-white text-sm font-bold animate-pulse"
+              onClick={() => {
+                setNeedsGesture(false);
+                if (audioRef.current) audioRef.current.play().catch(() => {});
+              }}
+            >
+              <Volume2 className="w-4 h-4" />
+              TAP TO ENABLE ALERT SOUND
+            </button>
+          )}
+
           {/* Admin compose */}
           {isAdmin && !alerting && (
             <div className="px-4 pt-4 pb-2 border-b border-slate-100">
@@ -243,10 +270,17 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
                   )}
                 </div>
 
-                {alerting && (
+                {alerting && !needsGesture && (
                   <div className="absolute inset-0 flex items-end justify-center pb-[8%]">
                     <span className="text-[9px] font-bold text-red-600 bg-white/80 px-2 py-0.5 rounded-full animate-pulse">
                       TAP TO SILENCE
+                    </span>
+                  </div>
+                )}
+                {alerting && needsGesture && (
+                  <div className="absolute inset-0 flex items-end justify-center pb-[8%]">
+                    <span className="text-[9px] font-bold text-amber-700 bg-white/90 px-2 py-0.5 rounded-full animate-pulse">
+                      TAP BANNER ABOVE FOR SOUND
                     </span>
                   </div>
                 )}

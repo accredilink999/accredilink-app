@@ -279,10 +279,17 @@ Deno.serve(async (req) => {
             : null;
 
           if (tokenArray) {
-            for (const entry of tokenArray) {
-              if (entry.token) {
-                tokensToSend.push({ userId: p.id, token: entry.token });
-              }
+            // Send only to the most recently updated token per user to avoid
+            // duplicate notifications when a user has multiple browser/PWA registrations
+            const sorted = [...tokenArray]
+              .filter((e: any) => !!e.token)
+              .sort((a: any, b: any) => {
+                const ta = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+                const tb = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+                return tb - ta; // newest first
+              });
+            if (sorted.length > 0) {
+              tokensToSend.push({ userId: p.id, token: sorted[0].token });
             }
           } else if (p.firebase_messaging_token) {
             // Fallback to single token for backwards compatibility
