@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus } from 'lucide-react';
+import ShiftStatusPills from './ShiftStatusPills';
 
 
 export default function DayView({ currentDate, onShiftClick, onCreateShift, isAdmin, userId, selectedAreaId, filterByUserId }) {
@@ -73,6 +74,8 @@ export default function DayView({ currentDate, onShiftClick, onCreateShift, isAd
     const shiftColor = shiftType?.color || '#14b8a6';
     const shiftCalls = isSitIn(shift.shift_name) ? [] : getCallsForShift(shift.id);
     const isAvailable = !shift.staff_id;
+    const partnerShift = shift.paired_shift_id ? shifts.find(s => s.id === shift.paired_shift_id) : null;
+    const partnerCalls = partnerShift ? getCallsForShift(partnerShift.id) : [];
 
     return (
       <button
@@ -120,6 +123,14 @@ export default function DayView({ currentDate, onShiftClick, onCreateShift, isAd
                ))}
              </div>
            </div>
+         )}
+         {!isAvailable && (
+           <ShiftStatusPills
+             shift={shift}
+             shiftCalls={shiftCalls}
+             partnerShift={partnerShift}
+             partnerCalls={partnerCalls}
+           />
          )}
        </button>
     );

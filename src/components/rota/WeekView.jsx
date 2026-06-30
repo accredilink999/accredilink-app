@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { Plus, Filter } from 'lucide-react';
+import ShiftStatusPills from './ShiftStatusPills';
 import { Button } from "@/components/ui/button";
 
 export default function WeekView({ currentDate, onShiftClick, onCreateShift, isAdmin, selectedAreaId, userId, filterByUserId }) {
@@ -125,6 +126,8 @@ export default function WeekView({ currentDate, onShiftClick, onCreateShift, isA
                       const isSitIn = shift.shift_name && /^sit\s*in/i.test(shift.shift_name);
                       const shiftCalls = isSitIn ? [] : getCallsForShift(shift.id);
                       const isAvailable = !shift.staff_id;
+                      const partnerShift = shift.paired_shift_id ? shifts.find(s => s.id === shift.paired_shift_id) : null;
+                      const partnerCalls = partnerShift ? getCallsForShift(partnerShift.id) : [];
                       return (
                         <button
                           key={shift.id}
@@ -173,6 +176,14 @@ export default function WeekView({ currentDate, onShiftClick, onCreateShift, isA
                               </div>
                             </div>
                           )}
+                          {!isAvailable && (
+                            <ShiftStatusPills
+                              shift={shift}
+                              shiftCalls={shiftCalls}
+                              partnerShift={partnerShift}
+                              partnerCalls={partnerCalls}
+                            />
+                          )}
                         </button>
                       );
                     })
@@ -220,6 +231,8 @@ export default function WeekView({ currentDate, onShiftClick, onCreateShift, isA
                         const isSitIn = shift.shift_name && /^sit\s*in/i.test(shift.shift_name);
                         const shiftCalls = isSitIn ? [] : getCallsForShift(shift.id);
                         const isAvailable = !shift.staff_id;
+                        const partnerShift = shift.paired_shift_id ? shifts.find(s => s.id === shift.paired_shift_id) : null;
+                        const partnerCalls = partnerShift ? getCallsForShift(partnerShift.id) : [];
                         return (
                           <button
                             key={shift.id}
@@ -274,6 +287,14 @@ export default function WeekView({ currentDate, onShiftClick, onCreateShift, isA
                                   ))}
                                 </div>
                               </div>
+                            )}
+                            {!isAvailable && (
+                              <ShiftStatusPills
+                                shift={shift}
+                                shiftCalls={shiftCalls}
+                                partnerShift={partnerShift}
+                                partnerCalls={partnerCalls}
+                              />
                             )}
                           </button>
                         );
