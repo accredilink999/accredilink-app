@@ -48,11 +48,33 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const seenKey = `pager_last_seen_${userId}`;
 
+  const dismissedKey = `pager_dismissed_${userId}`;
   const [seenAt]   = useState(() => localStorage.getItem(seenKey) || '1970-01-01T00:00:00Z');
+  const [dismissed, setDismissed] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(dismissedKey) || '[]')); }
+    catch { return new Set(); }
+  });
   const [alerting, setAlerting]       = useState(false);  // shake + sound active
   const [silenced, setSilenced]       = useState(false);  // silenced, showing message
   const [alertMsg, setAlertMsg]       = useState(null);   // the incoming message object
   const audioRef = useRef(null);
+
+  const saveDismissed = (set) => {
+    setDismissed(new Set(set));
+    localStorage.setItem(dismissedKey, JSON.stringify([...set]));
+  };
+
+  const dismissOne = (id) => {
+    const next = new Set(dismissed);
+    next.add(id);
+    saveDismissed(next);
+  };
+
+  const dismissAll = (msgs) => {
+    const next = new Set(dismissed);
+    msgs.forEach(m => next.add(m.id));
+    saveDismissed(next);
+  };
 
   // Mark seen when panel opens
   useEffect(() => {
@@ -151,9 +173,10 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
     refetchInterval: open ? 8000 : false,
   });
 
-  const unreadCount = messages.filter(m => m.created_at > seenAt).length;
+  const visibleMessages = messages.filter(m => !dismissed.has(m.id));
+  const unreadCount = visibleMessages.filter(m => m.created_at > seenAt).length;
   // The message to show in the LCD when not alerting
-  const latestMsg = alertMsg || messages[0] || null;
+  const latestMsg = alertMsg || visibleMessages[0] || null;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -255,17 +278,34 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
           {/* ── Message list ── */}
           {!alerting && (
             <div className="px-4 pb-6 space-y-2">
-              {messages.length === 0 ? (
+              {visibleMessages.length > 0 && (
+                <div className="flex justify-end pb-1">
+                  <button
+                    onClick={() => dismissAll(visibleMessages)}
+                    className="text-[10px] text-slate-400 hover:text-red-500 font-medium underline underline-offset-2 transition-colors"
+                  >
+                    Clear all
+                  </button>
+                </div>
+              )}
+              {visibleMessages.length === 0 ? (
                 <p className="text-xs text-slate-400 text-center py-6">No alerts received yet</p>
               ) : (
-                messages.map(msg => {
+                visibleMessages.map(msg => {
                   const isNew = msg.created_at > seenAt;
                   return (
                     <div
                       key={msg.id}
-                      className={`p-3 rounded-xl border ${isNew ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'}`}
+                      className={`p-3 rounded-xl border relative ${isNew ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'}`}
                     >
-                      <p className="text-sm font-mono text-slate-800 leading-snug break-words">{msg.message}</p>
+                      <button
+                        onClick={() => dismissOne(msg.id)}
+                        className="absolute top-2 right-2 text-slate-300 hover:text-slate-500 transition-colors"
+                        aria-label="Clear alert"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                      <p className="text-sm font-mono text-slate-800 leading-snug break-words pr-5">{msg.message}</p>
                       <div className="flex items-start justify-between gap-2 mt-1.5 flex-wrap">
                         <p className="text-[10px] text-slate-500">
                           <span className="font-medium">{msg.sent_by_name}</span>
