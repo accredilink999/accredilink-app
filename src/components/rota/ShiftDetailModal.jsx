@@ -64,6 +64,7 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
   });
 
   const [currentShift, setCurrentShift] = useState(shift);
+  const [staffSaveDialogOpen, setStaffSaveDialogOpen] = useState(false);
   const [summaryLogCall, setSummaryLogCall] = useState(null);
   const [sitInCoverRequired, setSitInCoverRequired] = useState('no');
   const [sitInTimeOn, setSitInTimeOn] = useState('');
@@ -505,8 +506,38 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
   });
 
   const updateShiftMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ saveMode = 'single' } = {}) => {
       await ShiftApi.update(shift.id, editData);
+
+      // If staff changed and shift is in a pattern, propagate to future shifts
+      const staffChanged = editData.staff_id !== shift.staff_id;
+      if (staffChanged && shift.shift_pattern_id && saveMode !== 'single') {
+        const { data: patternShifts } = await supabase
+          .from('shifts')
+          .select('id, date')
+          .eq('shift_pattern_id', shift.shift_pattern_id)
+          .gt('date', shift.date);
+
+        if (patternShifts && patternShifts.length > 0) {
+          const shiftDayOfWeek = new Date(shift.date + 'T12:00:00').getDay();
+          let toUpdate = patternShifts.filter(s => new Date(s.date + 'T12:00:00').getDay() === shiftDayOfWeek);
+
+          if (saveMode === 'biweekly') {
+            const baseTime = new Date(shift.date + 'T12:00:00').getTime();
+            toUpdate = toUpdate.filter(s => {
+              const days = Math.round((new Date(s.date + 'T12:00:00').getTime() - baseTime) / 86400000);
+              return days % 14 === 0;
+            });
+          }
+
+          if (toUpdate.length > 0) {
+            await supabase
+              .from('shifts')
+              .update({ staff_id: editData.staff_id, staff_name: editData.staff_name })
+              .in('id', toUpdate.map(s => s.id));
+          }
+        }
+      }
 
       // If staff changed and shift is paired, update or clear pairing on partner
       const pairedId = currentShift.paired_shift_id;
@@ -1211,7 +1242,14 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
                 Cancel
               </Button>
               <Button
-                onClick={() => updateShiftMutation.mutate()}
+                onClick={() => {
+                  const staffChanged = editData.staff_id !== shift.staff_id;
+                  if (staffChanged && shift.shift_pattern_id) {
+                    setStaffSaveDialogOpen(true);
+                  } else {
+                    updateShiftMutation.mutate({ saveMode: 'single' });
+                  }
+                }}
                 disabled={updateShiftMutation.isPending}
                 className="w-full md:w-auto bg-teal-600 hover:bg-teal-700 min-h-[44px] px-4 touch-manipulation"
               >
@@ -1223,6 +1261,47 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
           </div>
           </DialogContent>
           </Dialog>
+
+          {/* Staff change scope dialog */}
+          <AlertDialog open={staffSaveDialogOpen} onOpenChange={setStaffSaveDialogOpen}>
+            <AlertDialogContent className="max-w-sm">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Update Recurring Shifts?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This shift is part of a recurring pattern. How would you like to apply this staff change?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="flex flex-col gap-2 py-2">
+                <Button
+                  variant="outline"
+                  className="justify-start min-h-[44px] text-left"
+                  onClick={() => { setStaffSaveDialogOpen(false); updateShiftMutation.mutate({ saveMode: 'single' }); }}
+                >
+                  <span className="font-semibold mr-2">This shift only</span>
+                  <span className="text-slate-500 text-xs">— change this one date only</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="justify-start min-h-[44px] text-left"
+                  onClick={() => { setStaffSaveDialogOpen(false); updateShiftMutation.mutate({ saveMode: 'weekly' }); }}
+                >
+                  <span className="font-semibold mr-2">Every week</span>
+                  <span className="text-slate-500 text-xs">— update this day each week from now on</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="justify-start min-h-[44px] text-left"
+                  onClick={() => { setStaffSaveDialogOpen(false); updateShiftMutation.mutate({ saveMode: 'biweekly' }); }}
+                >
+                  <span className="font-semibold mr-2">Every 2 weeks</span>
+                  <span className="text-slate-500 text-xs">— update alternating weeks from now on</span>
+                </Button>
+              </div>
+              <div className="flex justify-end">
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+              </div>
+            </AlertDialogContent>
+          </AlertDialog>
 
           {isSwapModalOpen && (
           <ShiftSwapRequest
