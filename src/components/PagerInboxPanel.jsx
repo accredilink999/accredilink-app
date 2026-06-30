@@ -3,7 +3,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { format } from 'date-fns';
-import { CheckCircle, X, Volume2 } from 'lucide-react';
+import { CheckCircle, X } from 'lucide-react';
 import PagerSvg from '@/components/PagerSvg';
 import PagerPanel from '@/components/admin/PagerPanel';
 
@@ -64,7 +64,6 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
   const [alerting,     setAlerting]     = useState(false);
   const [silenced,     setSilenced]     = useState(false);
   const [alertMsg,     setAlertMsg]     = useState(null);
-  const [needsGesture, setNeedsGesture] = useState(false);
   const audioRef = useRef(null);
 
   const dismissOne = (id) => {
@@ -96,18 +95,12 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
   useEffect(() => {
     if (!incomingAlert || !open) return;
     setSilenced(false);
-    setNeedsGesture(false);
     setAlerting(true);
     if (typeof incomingAlert === 'object') setAlertMsg(incomingAlert);
-
     if (audioRef.current) {
       audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(() => {
-        // Autoplay blocked — set flag so tapping the pager starts audio
-        setNeedsGesture(true);
-      });
+      audioRef.current.play().catch(() => {}); // silent fail — browser may block autoplay on cold start
     }
-
     if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300, 100, 300]);
   }, [incomingAlert, open]);
 
@@ -116,7 +109,6 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
     if (!open) {
       setAlerting(false);
       setSilenced(false);
-      setNeedsGesture(false);
       if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
       if (navigator.vibrate) navigator.vibrate(0);
       window.dispatchEvent(new CustomEvent('alerter:silence'));
@@ -126,7 +118,6 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
   const silence = () => {
     setAlerting(false);
     setSilenced(true);
-    setNeedsGesture(false);
     if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
     if (navigator.vibrate) navigator.vibrate(0);
     window.dispatchEvent(new CustomEvent('alerter:silence'));
@@ -226,12 +217,8 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
               <div
                 className="relative select-none"
                 style={alerting ? { animation: 'alerterVibrate 0.35s ease-in-out infinite', cursor: 'pointer' } : {}}
-                onClick={alerting ? (needsGesture ? () => {
-                  // First tap: browser blocked autoplay — use this gesture to start audio
-                  setNeedsGesture(false);
-                  if (audioRef.current) audioRef.current.play().catch(() => {});
-                } : silence) : undefined}
-                title={alerting ? (needsGesture ? 'Tap to enable sound' : 'Tap to silence') : undefined}
+                onClick={alerting ? silence : undefined}
+                title={alerting ? 'Tap to silence' : undefined}
               >
                 <PagerSvg className="w-full drop-shadow-md" />
 
@@ -253,17 +240,10 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
                   )}
                 </div>
 
-                {alerting && !needsGesture && (
+                {alerting && (
                   <div className="absolute inset-0 flex items-end justify-center pb-[8%]">
                     <span className="text-[9px] font-bold text-red-600 bg-white/80 px-2 py-0.5 rounded-full animate-pulse">
                       TAP TO SILENCE
-                    </span>
-                  </div>
-                )}
-                {alerting && needsGesture && (
-                  <div className="absolute inset-0 flex items-end justify-center pb-[8%]">
-                    <span className="text-[9px] font-bold text-amber-700 bg-white/90 px-2 py-0.5 rounded-full animate-pulse">
-                      TAP TO ENABLE SOUND
                     </span>
                   </div>
                 )}
