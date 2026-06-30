@@ -71,17 +71,9 @@ export default function PagerInboxPanel({ open, onOpenChange, user }) {
   const unreadCount = messages.filter(m => m.created_at > seenAt).length;
 
   return (
+    <>
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className={`w-full p-0 flex flex-col bg-white ${isAdmin ? 'sm:w-[480px]' : 'sm:w-80'}`} style={{ overflow: 'visible' }}>
-
-        {/* Tab protruding from the left edge — click to slide back right */}
-        <button
-          onClick={() => onOpenChange(false)}
-          className="absolute -left-9 top-20 bg-red-600 text-white py-4 px-2 rounded-l-xl shadow-xl hover:bg-red-700 active:bg-red-800 touch-manipulation z-10 flex items-center justify-center"
-          aria-label="Close pager inbox"
-        >
-          <X className="w-5 h-5" />
-        </button>
+      <SheetContent side="right" className={`w-full p-0 flex flex-col bg-white overflow-hidden ${isAdmin ? 'sm:w-[480px]' : 'sm:w-80'}`}>
 
         <SheetHeader className="px-5 pt-5 pb-3 border-b border-slate-100">
           <SheetTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
@@ -176,5 +168,17 @@ export default function PagerInboxPanel({ open, onOpenChange, user }) {
         </div>
       </SheetContent>
     </Sheet>
+
+    {/* Fixed close tab — always reachable on the left edge of the screen */}
+    {open && (
+      <button
+        onClick={() => onOpenChange(false)}
+        className="fixed left-0 top-24 z-[99999] bg-red-600 text-white py-4 px-2 rounded-r-xl shadow-xl hover:bg-red-700 active:bg-red-800 touch-manipulation"
+        aria-label="Close pager"
+      >
+        <X className="w-5 h-5" />
+      </button>
+    )}
+    </>
   );
 }
