@@ -279,18 +279,24 @@ Deno.serve(async (req) => {
             : null;
 
           if (tokenArray) {
-            // Send only to the most recently updated token per user to avoid
-            // duplicate notifications when a user has multiple browser/PWA registrations
-            const sorted = [...tokenArray]
-              .filter((e: any) => !!e.token)
-              .sort((a: any, b: any) => {
-                const ta = a.updated_at ? new Date(a.updated_at).getTime() : 0;
-                const tb = b.updated_at ? new Date(b.updated_at).getTime() : 0;
-                return tb - ta; // newest first
+            // Separate native (APK) and web (PWA) tokens
+            const nativeTokens = tokenArray.filter((e: any) => e.token && (e.platform === 'android' || e.platform === 'ios'));
+            const webTokens    = tokenArray.filter((e: any) => e.token && e.platform === 'web');
+
+            const newestOf = (arr: any[]) => arr.length === 0 ? null :
+              arr.reduce((best: any, cur: any) => {
+                const tb = best.updated_at ? new Date(best.updated_at).getTime() : 0;
+                const tc = cur.updated_at  ? new Date(cur.updated_at).getTime()  : 0;
+                return tc > tb ? cur : best;
               });
-            if (sorted.length > 0) {
-              tokensToSend.push({ userId: p.id, token: sorted[0].token });
-            }
+
+            // APK users get native push; if no native token, fall back to latest web token
+            // (avoids sending to stale PWA registrations when only the newest matters)
+            const chosen = nativeTokens.length > 0
+              ? newestOf(nativeTokens)
+              : newestOf(webTokens);
+
+            if (chosen) tokensToSend.push({ userId: p.id, token: chosen.token });
           } else if (p.firebase_messaging_token) {
             // Fallback to single token for backwards compatibility
             tokensToSend.push({ userId: p.id, token: p.firebase_messaging_token });
