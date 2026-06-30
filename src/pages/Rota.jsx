@@ -22,7 +22,8 @@ import ClientCallManager from '@/components/rota/ClientCallManager';
 import ShiftTypeManager from '@/components/rota/ShiftTypeManager';
 import BaseShiftTemplateManager from '@/components/rota/BaseShiftTemplateManager';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ChevronLeft, ChevronRight, Settings, Tag, MapPin, LayoutTemplate, ChevronDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Settings, Tag, MapPin, LayoutTemplate, ChevronDown, HelpCircle } from 'lucide-react';
+import RotaTutorialModal from '@/components/rota/RotaTutorialModal';
 
 export default function Rota() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -41,6 +42,7 @@ export default function Rota() {
   const [isCallManagerOpen, setIsCallManagerOpen] = useState(false);
   const [isShiftTypeManagerOpen, setIsShiftTypeManagerOpen] = useState(false);
   const [isTemplateManagerOpen, setIsTemplateManagerOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [showMyShiftsOnly, setShowMyShiftsOnly] = useState(filterParam === 'myshifts');
   const [claimShift, setClaimShift] = useState(null);
   // Two-phase slide: 'idle' → 'exit' (old slides out) → 'enter-prep' (jump to entry position) → 'enter' (new slides in) → 'idle'
@@ -289,6 +291,15 @@ export default function Rota() {
             Next
             <ChevronRight className="w-5 h-5 ml-0.5" />
           </Button>
+          <Button
+            variant="outline"
+            onClick={() => setIsHelpOpen(true)}
+            className="h-9 px-3 sm:h-10 sm:px-4 text-sm gap-1.5 border-2 border-blue-200 text-blue-700 hover:bg-blue-50"
+          >
+            <HelpCircle className="w-4 h-4" />
+            <span className="hidden sm:inline">Rota Help</span>
+          </Button>
+
           {isAdmin && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -435,6 +446,12 @@ export default function Rota() {
           selectedAreaId={selectedAreaId}
         />
       )}
+
+      <RotaTutorialModal
+        open={isHelpOpen}
+        onClose={() => setIsHelpOpen(false)}
+        defaultTab={isAdmin ? 'admin' : 'staff'}
+      />
 
       </div>
       );
