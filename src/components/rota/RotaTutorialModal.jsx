@@ -117,6 +117,39 @@ function AdminGuide() {
 
       <StepCard
         number="3"
+        icon={ClipboardList}
+        iconColor="bg-rose-500"
+        title="Create Client Call Times"
+        tip='Go to the Clients section → open each client → add their scheduled call times, duration, and call type (e.g. Morning, Lunch, Tea, Bed). Do this for every active client before building templates.'
+        warning="This step must be done before deploying base shifts. Call times on the client record are what the system uses to automatically populate visits onto shifts."
+      >
+        <p>
+          Each client has a set of <strong>call times</strong> — the scheduled visits they receive each day.
+          These live on the client's record, not on the shift.
+        </p>
+        <p>
+          When a shift is opened or a staff member is allocated, the system reads the client's call times and automatically links the right visits to that shift — so you never have to add them manually.
+        </p>
+        <p>
+          For each call time you will set:
+        </p>
+        <ul className="list-none space-y-1 mt-1 ml-1">
+          {[
+            ['Time', 'e.g. 07:30, 12:00, 17:00'],
+            ['Duration', 'e.g. 30 min, 45 min, 1 hour'],
+            ['Call type', 'e.g. Morning, Lunch, Tea, Bed, Personal Care'],
+            ['Rota Area', 'Must match the area the client belongs to'],
+          ].map(([label, desc]) => (
+            <li key={label} className="flex items-start gap-1.5">
+              <ChevronRight className="w-3 h-3 text-rose-500 mt-0.5 shrink-0" />
+              <span><strong>{label}</strong> — {desc}</span>
+            </li>
+          ))}
+        </ul>
+      </StepCard>
+
+      <StepCard
+        number="4"
         icon={LayoutTemplate}
         iconColor="bg-indigo-500"
         title="Build Base Shift Templates"
@@ -127,13 +160,13 @@ function AdminGuide() {
           You add each shift slot (by shift type) once — Monday Late, Tuesday Late, etc.
         </p>
         <p>
-          Client calls are <em>not</em> set here — they live on the client record and are resolved automatically when staff open a shift.
+          Client calls are <em>not</em> set here — they live on the client record (Step 3) and are resolved automatically when staff open a shift.
           The template is purely about which shifts exist on which days of the week.
         </p>
       </StepCard>
 
       <StepCard
-        number="4"
+        number="5"
         icon={Rocket}
         iconColor="bg-teal-600"
         title="Deploy Base Shifts"
@@ -152,7 +185,7 @@ function AdminGuide() {
       <SectionHeading>Day-to-Day Management</SectionHeading>
 
       <StepCard
-        number="5"
+        number="6"
         icon={UserCheck}
         iconColor="bg-teal-600"
         title="Allocate Staff to Blank Shifts"
@@ -181,7 +214,7 @@ function AdminGuide() {
       </StepCard>
 
       <StepCard
-        number="6"
+        number="7"
         icon={Settings}
         iconColor="bg-slate-600"
         title="Ongoing Rota Management"
