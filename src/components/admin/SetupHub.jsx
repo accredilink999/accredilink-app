@@ -207,6 +207,20 @@ function buildGroups(d, manual, toggle) {
       label: 'Scheduling & Care',
       icon: Calendar,
       color: 'indigo',
+      description: [
+        {
+          heading: 'Why the setup order matters',
+          body: 'Base shift templates are the foundation of your entire rota. Every feature that comes after — staff allocation, shift claims, annual leave cover, shift swaps, and automatic client call assignment — depends on blank shifts existing on the rota first. If you deploy base shifts before your clients have call times set, no visits will be linked to those shifts. If you skip templates altogether, there are no blank slots for staff to claim or for leave to create cover needs against. Following the order below ensures everything connects correctly from day one.',
+        },
+        {
+          heading: 'Why base templates matter for swaps, leave & claims',
+          body: 'When a staff member goes on annual leave or calls in sick, the system needs an empty (blank) shift in their place to mark as uncovered and open for claiming. When a shift swap is requested, both sides of the swap must exist as deployed shifts. When a new staff member joins and needs to be added to a run, blank shifts in the pattern let you allocate them immediately without creating anything from scratch. Base templates are what create that supply of blank shifts in advance — without them, every absence or change requires manual rota editing.',
+        },
+        {
+          heading: 'Why client call times must come before deploying',
+          body: 'Client call times (set on each client record) are what the system reads to automatically populate a shift with the right visits. This happens silently when a staff member opens their shift or when an admin allocates staff to a blank shift. If call times are missing at deploy time, visits will be absent from shifts and will need to be added manually — which defeats the purpose of the system. Always complete client call times for every active client before deploying base shifts.',
+        },
+      ],
       items: [
         { id: 'templates',  label: `Base shift templates built (${d.shiftTemplatesCount})`,           done: d.shiftTemplatesCount > 0,     action: 'Rota', note: 'Step 4 — open Rota → Setup / Edit Rotas → Create / Manage / Deploy Base Shifts. Build your weekly blank shift blueprint per area.' },
         { id: 'shifts',     label: `Base shifts deployed to rota (${d.shiftsCount} shifts)`,          done: d.shiftsCount > 0,             action: 'Rota', note: 'Step 5 — inside the Base Shifts manager, choose a start date and how many weeks to deploy. Creates blank (grey) shifts on the rota.' },
@@ -523,6 +537,20 @@ export default function SetupHub() {
             {/* Items */}
             {isOpen && (
               <div className="border-t border-slate-100 divide-y divide-slate-50">
+                {/* Explanatory panels for groups that have them */}
+                {group.description && (
+                  <div className="px-4 py-4 space-y-3 bg-indigo-50 border-b border-indigo-100">
+                    {group.description.map((panel) => (
+                      <div key={panel.heading} className="rounded-lg bg-white border border-indigo-100 p-3 shadow-sm">
+                        <p className="text-xs font-semibold text-indigo-700 mb-1 flex items-center gap-1.5">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          {panel.heading}
+                        </p>
+                        <p className="text-xs text-slate-600 leading-relaxed">{panel.body}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {group.items.map((item) => (
                   <div
                     key={item.id}
