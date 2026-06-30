@@ -22,7 +22,7 @@ import ClientCallManager from '@/components/rota/ClientCallManager';
 import ShiftTypeManager from '@/components/rota/ShiftTypeManager';
 import BaseShiftTemplateManager from '@/components/rota/BaseShiftTemplateManager';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ChevronLeft, ChevronRight, Plus, Settings, Phone, Tag, MapPin, LayoutTemplate, ChevronDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Settings, Tag, MapPin, LayoutTemplate, ChevronDown } from 'lucide-react';
 
 export default function Rota() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -308,28 +308,18 @@ export default function Rota() {
                   <ChevronDown className="w-3 h-3 opacity-60" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuContent align="end" className="w-64">
                 <DropdownMenuItem onClick={() => setIsManageAreasOpen(true)}>
                   <MapPin className="w-4 h-4 mr-2 text-orange-500" />
-                  Manage rota areas
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setIsCreateAreaOpen(true)}>
-                  <Plus className="w-4 h-4 mr-2 text-teal-500" />
-                  Create new area
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setIsTemplateManagerOpen(true)}>
-                  <LayoutTemplate className="w-4 h-4 mr-2 text-indigo-500" />
-                  Base templates
+                  1. Create / Manage Rota Areas
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setIsShiftTypeManagerOpen(true)}>
                   <Tag className="w-4 h-4 mr-2 text-violet-500" />
-                  Shift types
+                  2. Create / Manage Shift Types
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setIsCallManagerOpen(true)}>
-                  <Phone className="w-4 h-4 mr-2 text-blue-500" />
-                  Client calls
+                <DropdownMenuItem onClick={() => setIsTemplateManagerOpen(true)}>
+                  <LayoutTemplate className="w-4 h-4 mr-2 text-indigo-500" />
+                  3. Create / Manage / Deploy Base Shifts
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
