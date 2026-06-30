@@ -74,9 +74,9 @@ Deno.serve(async (req) => {
           message:            'Tap to open',
           priority:           'high',
           notification_type:  'alerter',
-          action_url:         '/',
+          action_url:         '/?alerter=open',
           data: {
-            url:  '/',
+            url:  '/?alerter=open',
             type: 'alerter',
           },
         },
