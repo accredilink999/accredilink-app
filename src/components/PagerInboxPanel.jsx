@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { X } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
@@ -77,12 +77,10 @@ export default function PagerInboxPanel({ open, onOpenChange, user }) {
         {/* Tab protruding from the left edge — click to slide back right */}
         <button
           onClick={() => onOpenChange(false)}
-          className="absolute -left-9 top-20 bg-slate-800 text-slate-200 py-5 px-2 rounded-l-xl shadow-xl hover:bg-slate-700 active:bg-slate-900 touch-manipulation z-10 flex flex-col items-center gap-1"
+          className="absolute -left-9 top-20 bg-red-600 text-white py-4 px-2 rounded-l-xl shadow-xl hover:bg-red-700 active:bg-red-800 touch-manipulation z-10 flex items-center justify-center"
           aria-label="Close pager inbox"
-          style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
         >
-          <ChevronRight className="w-3.5 h-3.5" style={{ transform: 'rotate(180deg)' }} />
-          <span className="text-[10px] font-semibold tracking-wider">Pager</span>
+          <X className="w-5 h-5" />
         </button>
 
         <SheetHeader className="px-5 pt-5 pb-3 border-b border-slate-100">
