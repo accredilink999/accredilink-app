@@ -279,7 +279,9 @@ Deno.serve(async (req) => {
             : null;
 
           if (tokenArray) {
-            // Drop tokens older than 60 days — stale registrations from old app installs
+            const isAlerterPush = notification_type === 'alerter';
+
+            // Drop tokens not refreshed in 60 days — stale registrations from old installs
             const cutoff = Date.now() - 60 * 24 * 60 * 60 * 1000;
             const fresh = tokenArray.filter((e: any) =>
               e.token && (!e.updated_at || new Date(e.updated_at).getTime() > cutoff)
@@ -287,23 +289,26 @@ Deno.serve(async (req) => {
             // Fall back to all tokens if everything is older than 60 days
             const candidates = fresh.length > 0 ? fresh : tokenArray.filter((e: any) => !!e.token);
 
-            // Separate native (APK) and web (PWA) tokens
-            const nativeTokens = candidates.filter((e: any) => e.platform === 'android' || e.platform === 'ios');
-            const webTokens    = candidates.filter((e: any) => e.platform !== 'android' && e.platform !== 'ios');
-
-            const newestOf = (arr: any[]) => arr.length === 0 ? null :
-              arr.reduce((best: any, cur: any) => {
-                const tb = best.updated_at ? new Date(best.updated_at).getTime() : 0;
-                const tc = cur.updated_at  ? new Date(cur.updated_at).getTime()  : 0;
-                return tc > tb ? cur : best;
-              });
-
-            // APK users get native push; if no native token, fall back to latest web token
-            const chosen = nativeTokens.length > 0
-              ? newestOf(nativeTokens)
-              : newestOf(webTokens);
-
-            if (chosen) tokensToSend.push({ userId: p.id, token: chosen.token });
+            if (isAlerterPush) {
+              // Alerter: send to ONE token per user (native preferred over web, then newest)
+              // — avoids duplicate alert sounds when the same user has multiple devices
+              const nativeTokens = candidates.filter((e: any) => e.platform === 'android' || e.platform === 'ios');
+              const webTokens    = candidates.filter((e: any) => e.platform !== 'android' && e.platform !== 'ios');
+              const pool = nativeTokens.length > 0 ? nativeTokens : webTokens;
+              const chosen = pool.length === 0 ? null :
+                pool.reduce((best: any, cur: any) => {
+                  const tb = best.updated_at ? new Date(best.updated_at).getTime() : 0;
+                  const tc = cur.updated_at  ? new Date(cur.updated_at).getTime()  : 0;
+                  return tc > tb ? cur : best;
+                });
+              if (chosen) tokensToSend.push({ userId: p.id, token: chosen.token });
+            } else {
+              // Regular notifications (shift events, chat, etc.): send to ALL valid tokens
+              // so the admin/user gets them on every active device
+              for (const entry of candidates) {
+                tokensToSend.push({ userId: p.id, token: entry.token });
+              }
+            }
           } else if (p.firebase_messaging_token) {
             // Fallback to single token for backwards compatibility
             tokensToSend.push({ userId: p.id, token: p.firebase_messaging_token });
