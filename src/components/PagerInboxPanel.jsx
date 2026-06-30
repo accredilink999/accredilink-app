@@ -64,16 +64,41 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
     if (!incomingAlert || !open) return;
     setSilenced(false);
     setAlerting(true);
-    // If it's a real message object (not 'deeplink'), store it
-    if (typeof incomingAlert === 'object') setAlertMsg(incomingAlert);
-    // Play looping audio
-    if (audioRef.current) {
-      audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(() => {});
+
+    if (typeof incomingAlert === 'object') {
+      // Real-time message object
+      setAlertMsg(incomingAlert);
     }
+    // For 'deeplink' case, alertMsg will be set once messages load (see below)
+
+    // Play looping audio — use a short silence then retry to work around
+    // browsers that block autoplay on fresh page loads
+    const tryPlay = () => {
+      if (!audioRef.current) return;
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(() => {
+        // autoplay blocked — retry once on first user interaction
+        const resume = () => {
+          audioRef.current?.play().catch(() => {});
+          window.removeEventListener('click',      resume);
+          window.removeEventListener('touchstart', resume);
+        };
+        window.addEventListener('click',      resume, { once: true });
+        window.addEventListener('touchstart', resume, { once: true });
+      });
+    };
+    tryPlay();
+
     // Vibrate pattern
     if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300, 100, 300]);
   }, [incomingAlert, open]);
+
+  // When deep-linking in, set alertMsg to latest message once messages load
+  useEffect(() => {
+    if (incomingAlert === 'deeplink' && messages.length > 0 && !alertMsg) {
+      setAlertMsg(messages[0]);
+    }
+  }, [incomingAlert, messages, alertMsg]);
 
   // When panel closes, silence everything
   useEffect(() => {
