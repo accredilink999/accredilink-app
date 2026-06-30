@@ -531,10 +531,25 @@ export default function ShiftDetailModal({ shift, open, onClose, isAdmin, userId
           }
 
           if (toUpdate.length > 0) {
+            const toUpdateIds = toUpdate.map(s => s.id);
             await supabase
               .from('shifts')
               .update({ staff_id: editData.staff_id, staff_name: editData.staff_name })
-              .in('id', toUpdate.map(s => s.id));
+              .in('id', toUpdateIds);
+
+            // Also update each paired partner's display name
+            const { data: withPairs } = await supabase
+              .from('shifts')
+              .select('paired_shift_id')
+              .in('id', toUpdateIds)
+              .not('paired_shift_id', 'is', null);
+            if (withPairs && withPairs.length > 0) {
+              const partnerIds = withPairs.map(s => s.paired_shift_id).filter(Boolean);
+              await supabase
+                .from('shifts')
+                .update({ paired_staff_name: editData.staff_name })
+                .in('id', partnerIds);
+            }
           }
         }
       }
