@@ -11,6 +11,27 @@ import PagerSvg from '@/components/PagerSvg';
 const getOrgId = () =>
   localStorage.getItem('organizationId') || sessionStorage.getItem('organizationId') || '';
 
+function playPageSentBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const beep = (startTime, freq) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.25, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.15);
+      osc.start(startTime);
+      osc.stop(startTime + 0.15);
+    };
+    beep(ctx.currentTime,        880);
+    beep(ctx.currentTime + 0.22, 1100);
+    setTimeout(() => ctx.close(), 800);
+  } catch (e) {}
+}
+
 const MODES = [
   { key: 'global',     label: 'All Staff',  Icon: Users  },
   { key: 'area',       label: 'By Area',    Icon: MapPin },
@@ -75,6 +96,7 @@ export default function PagerPanel({ user }) {
       if (error) throw error;
     },
     onSuccess: () => {
+      playPageSentBeep();
       setMessage('');
       setJustSent(true);
       setTimeout(() => setJustSent(false), 2000);

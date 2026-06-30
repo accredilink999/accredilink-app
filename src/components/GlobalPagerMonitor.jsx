@@ -55,9 +55,10 @@ export default function GlobalPagerMonitor() {
           seenRef.current.add(msg.id);
 
           // Check if this page is addressed to this user
+          const userAreaId = user.rota_area_id || user.area_id;
           const addressed =
             msg.recipient_mode === 'global' ||
-            msg.recipient_mode === 'area' ||
+            (msg.recipient_mode === 'area' && msg.recipient_area_id && msg.recipient_area_id === userAreaId) ||
             (msg.recipient_mode === 'individual' && msg.recipient_id === user.id);
 
           if (!addressed) return;
