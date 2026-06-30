@@ -1,27 +1,28 @@
 import { Sheet, SheetContent } from '@/components/ui/sheet';
-import { ChevronDown } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import TwoWayRadio from '@/pages/TwoWayRadio';
 
 export default function RadioPagerPanel({ open, onOpenChange }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
-        side="bottom"
-        className="p-0 h-[96vh] flex flex-col rounded-t-2xl"
+        side="right"
+        className="w-full sm:w-[480px] p-0 flex flex-col"
         style={{ overflow: 'visible' }}
       >
-        {/* Tab protruding above the sheet — click to slide back down */}
+        {/* Tab protruding from the left edge — click to slide back right */}
         <button
           onClick={() => onOpenChange(false)}
-          className="absolute left-1/2 -translate-x-1/2 -top-9 bg-slate-800 text-slate-200 px-8 py-2 rounded-t-xl text-xs font-semibold flex items-center gap-1.5 shadow-xl hover:bg-slate-700 active:bg-slate-900 touch-manipulation z-10"
+          className="absolute -left-9 top-20 bg-slate-900 text-slate-200 py-5 px-2 rounded-l-xl shadow-xl hover:bg-slate-700 active:bg-slate-800 touch-manipulation z-10 flex flex-col items-center gap-1"
           aria-label="Close radio"
+          style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
         >
-          <ChevronDown className="w-3.5 h-3.5" />
-          Radio
+          <ChevronRight className="w-3.5 h-3.5" style={{ transform: 'rotate(180deg)' }} />
+          <span className="text-[10px] font-semibold tracking-wider">Radio</span>
         </button>
 
         {/* Full radio page */}
-        <div className="flex-1 overflow-hidden rounded-t-2xl">
+        <div className="flex-1 overflow-hidden">
           <TwoWayRadio onClose={() => onOpenChange(false)} />
         </div>
       </SheetContent>
