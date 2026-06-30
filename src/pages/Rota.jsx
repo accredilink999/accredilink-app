@@ -22,7 +22,7 @@ import ClientCallManager from '@/components/rota/ClientCallManager';
 import ShiftTypeManager from '@/components/rota/ShiftTypeManager';
 import BaseShiftTemplateManager from '@/components/rota/BaseShiftTemplateManager';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ChevronLeft, ChevronRight, Plus, Settings, Tag, MapPin, LayoutTemplate, ChevronDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Settings, Tag, MapPin, LayoutTemplate, ChevronDown } from 'lucide-react';
 
 export default function Rota() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -289,16 +289,6 @@ export default function Rota() {
             Next
             <ChevronRight className="w-5 h-5 ml-0.5" />
           </Button>
-          {canEdit && (
-            <Button
-              onClick={() => handleCreateShift(currentDate)}
-              className="bg-teal-600 hover:bg-teal-700 text-xs sm:text-sm px-2 sm:px-3 h-9 sm:h-10"
-            >
-              <Plus className="w-3 sm:w-4 h-3 sm:h-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">New Shift</span>
-              <span className="sm:hidden">Add</span>
-            </Button>
-          )}
           {isAdmin && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
