@@ -311,7 +311,7 @@ export default function Rota() {
               <DropdownMenuContent align="end" className="w-52">
                 <DropdownMenuItem onClick={() => setIsManageAreasOpen(true)}>
                   <MapPin className="w-4 h-4 mr-2 text-orange-500" />
-                  Manage areas
+                  Manage rota areas
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setIsCreateAreaOpen(true)}>
                   <Plus className="w-4 h-4 mr-2 text-teal-500" />
