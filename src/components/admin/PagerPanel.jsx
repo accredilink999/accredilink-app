@@ -17,15 +17,11 @@ const MODES = [
   { key: 'individual', label: 'Individual', Icon: User   },
 ];
 
-// LCD sits at SVG coords: x=56 y=44 w=328 h=178 inside viewBox 440×340
-const LCD = { top: '12.94%', left: '12.73%', right: '12.73%', height: '52.35%' };
-// Green button: x=60 y=248 w=52 h=36
+// SVG button positions (viewBox 440×340)
+const LCD      = { top: '12.94%', left: '12.73%', right: '12.73%', height: '52.35%' };
 const BTN_GREEN = { top: '72.94%', left: '13.64%', width: '11.82%', height: '10.59%' };
-// Red button: x=124 y=248 w=52 h=36
 const BTN_RED   = { top: '72.94%', left: '28.18%', width: '11.82%', height: '10.59%' };
-// D-pad left arrow area
 const BTN_LEFT  = { top: '73.5%',  left: '60.2%',  width: '6.8%',   height: '9.4%'  };
-// D-pad right arrow area
 const BTN_RIGHT = { top: '73.5%',  left: '76.6%',  width: '5.2%',   height: '9.4%'  };
 
 export default function PagerPanel({ user }) {
@@ -37,6 +33,10 @@ export default function PagerPanel({ user }) {
   const [selectedStaff, setSelectedStaff] = useState('');
   const [selectedArea,  setSelectedArea]  = useState('');
   const [justSent,      setJustSent]      = useState(false);
+  // Controls pop up when typing or when red/arrow buttons pressed
+  const [controlsForced, setControlsForced] = useState(false);
+
+  const showControls = message.length > 0 || controlsForced;
 
   const { data: staff = [] } = useQuery({
     queryKey: ['staff'],
@@ -83,6 +83,7 @@ export default function PagerPanel({ user }) {
     },
     onSuccess: () => {
       setMessage('');
+      setControlsForced(false);
       setJustSent(true);
       setTimeout(() => setJustSent(false), 2000);
       queryClient.invalidateQueries({ queryKey: ['pagerMessages'] });
@@ -96,8 +97,10 @@ export default function PagerPanel({ user }) {
      (recipientMode === 'area'       && selectedArea));
 
   const modeIndex = MODES.findIndex(m => m.key === recipientMode);
-  const cycleMode = (dir) =>
+  const cycleMode = (dir) => {
     setRecipientMode(MODES[(modeIndex + dir + MODES.length) % MODES.length].key);
+    setControlsForced(true);
+  };
 
   const recipientLabel =
     recipientMode === 'global'     ? 'All Staff' :
@@ -111,7 +114,7 @@ export default function PagerPanel({ user }) {
       <div className="relative select-none">
         <PagerSvg className="w-full drop-shadow-xl" />
 
-        {/* LCD overlay — message input */}
+        {/* LCD overlay */}
         <div className="absolute flex flex-col overflow-hidden" style={LCD}>
           {justSent ? (
             <div className="flex flex-col items-center justify-center h-full">
@@ -137,104 +140,100 @@ export default function PagerPanel({ user }) {
         <button
           onClick={() => canSend && sendMutation.mutate()}
           disabled={!canSend || sendMutation.isPending}
-          title="Send page (green button)"
+          title="Send page"
           className="absolute rounded opacity-0 hover:opacity-20 bg-green-400 transition-opacity cursor-pointer"
           style={BTN_GREEN}
         />
-        {/* Red = Cycle recipient forward */}
+        {/* Red = Show controls / cycle mode */}
         <button
-          onClick={() => cycleMode(1)}
-          title="Change recipient (red button)"
+          onClick={() => { cycleMode(1); }}
+          title="Choose recipient"
           className="absolute rounded opacity-0 hover:opacity-20 bg-red-400 transition-opacity cursor-pointer"
           style={BTN_RED}
         />
         {/* Left arrow = prev mode */}
-        <button
-          onClick={() => cycleMode(-1)}
-          title="Previous recipient mode"
-          className="absolute opacity-0 hover:opacity-10 bg-white cursor-pointer"
-          style={BTN_LEFT}
-        />
+        <button onClick={() => cycleMode(-1)} title="Previous recipient mode"
+          className="absolute opacity-0 hover:opacity-10 bg-white cursor-pointer" style={BTN_LEFT} />
         {/* Right arrow = next mode */}
-        <button
-          onClick={() => cycleMode(1)}
-          title="Next recipient mode"
-          className="absolute opacity-0 hover:opacity-10 bg-white cursor-pointer"
-          style={BTN_RIGHT}
-        />
+        <button onClick={() => cycleMode(1)} title="Next recipient mode"
+          className="absolute opacity-0 hover:opacity-10 bg-white cursor-pointer" style={BTN_RIGHT} />
       </div>
 
-      {/* ── Controls panel ── */}
-      <Card className="p-4 space-y-3 bg-slate-800 border-0 shadow-xl rounded-2xl">
+      {/* ── Slide-up controls — appear when typing or button pressed ── */}
+      <div
+        className="overflow-hidden transition-all duration-300 ease-out"
+        style={{ maxHeight: showControls ? '260px' : '0', opacity: showControls ? 1 : 0 }}
+      >
+        <div className="bg-slate-800 rounded-2xl p-4 space-y-3 shadow-xl">
 
-        {/* Recipient mode tabs */}
-        <div className="flex gap-2">
-          {MODES.map(({ key, label, Icon }) => (
-            <button
-              key={key}
-              onClick={() => setRecipientMode(key)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold flex-1 justify-center transition-all ${
-                recipientMode === key
-                  ? 'bg-green-500 text-white shadow-md'
-                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5 shrink-0" />
-              {label}
-            </button>
-          ))}
+          {/* Recipient mode tabs */}
+          <div className="flex gap-2">
+            {MODES.map(({ key, label, Icon }) => (
+              <button
+                key={key}
+                onClick={() => setRecipientMode(key)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold flex-1 justify-center transition-all ${
+                  recipientMode === key
+                    ? 'bg-green-500 text-white shadow-md'
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5 shrink-0" />
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Staff / area selector */}
+          {recipientMode === 'individual' && (
+            <Select value={selectedStaff} onValueChange={setSelectedStaff}>
+              <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                <SelectValue placeholder="Select staff member…" />
+              </SelectTrigger>
+              <SelectContent>
+                {staff.filter(s => s.is_active !== false).map(s => (
+                  <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {recipientMode === 'area' && (
+            <Select value={selectedArea} onValueChange={setSelectedArea}>
+              <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                <SelectValue placeholder="Select rota area…" />
+              </SelectTrigger>
+              <SelectContent>
+                {areas.map(a => (
+                  <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* Send button */}
+          <button
+            onClick={() => canSend && sendMutation.mutate()}
+            disabled={!canSend || sendMutation.isPending}
+            className={`w-full py-3 rounded-xl font-bold text-white text-sm flex items-center justify-center gap-2 transition-all ${
+              canSend && !sendMutation.isPending
+                ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-md'
+                : 'bg-slate-700 opacity-50 cursor-not-allowed'
+            }`}
+          >
+            {sendMutation.isPending
+              ? <Loader2 className="w-4 h-4 animate-spin" />
+              : justSent
+              ? <CheckCircle className="w-4 h-4" />
+              : <Send className="w-4 h-4" />}
+            {justSent ? 'Sent!' : 'Send Page'}
+          </button>
+
+          {sendMutation.isError && (
+            <p className="text-xs text-red-400 text-center">Failed to send — please try again.</p>
+          )}
         </div>
-
-        {/* Staff / area selector */}
-        {recipientMode === 'individual' && (
-          <Select value={selectedStaff} onValueChange={setSelectedStaff}>
-            <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-              <SelectValue placeholder="Select staff member…" />
-            </SelectTrigger>
-            <SelectContent>
-              {staff.filter(s => s.is_active !== false).map(s => (
-                <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-
-        {recipientMode === 'area' && (
-          <Select value={selectedArea} onValueChange={setSelectedArea}>
-            <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-              <SelectValue placeholder="Select rota area…" />
-            </SelectTrigger>
-            <SelectContent>
-              {areas.map(a => (
-                <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-
-        {/* Send button */}
-        <button
-          onClick={() => canSend && sendMutation.mutate()}
-          disabled={!canSend || sendMutation.isPending}
-          className={`w-full py-3 rounded-xl font-bold text-white text-sm flex items-center justify-center gap-2 transition-all ${
-            canSend && !sendMutation.isPending
-              ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-md hover:shadow-lg'
-              : 'bg-slate-700 opacity-50 cursor-not-allowed'
-          }`}
-        >
-          {sendMutation.isPending
-            ? <Loader2 className="w-4 h-4 animate-spin" />
-            : justSent
-            ? <CheckCircle className="w-4 h-4" />
-            : <Send className="w-4 h-4" />
-          }
-          {justSent ? 'Sent!' : 'Send Page'}
-        </button>
-
-        {sendMutation.isError && (
-          <p className="text-xs text-red-400 text-center">Failed to send — please try again.</p>
-        )}
-      </Card>
+      </div>
 
       {/* ── Sent message log ── */}
       {sentMessages.length > 0 && (
@@ -250,10 +249,8 @@ export default function PagerPanel({ user }) {
                    msg.recipient_mode === 'area'       ? msg.recipient_area_name :
                    msg.recipient_name}
                 </span>
-                {' · '}
-                {format(new Date(msg.created_at), 'dd MMM HH:mm')}
-                {' · '}
-                <span className="text-slate-400">by {msg.sent_by_name}</span>
+                {' · '}{format(new Date(msg.created_at), 'dd MMM HH:mm')}
+                {' · '}<span className="text-slate-400">by {msg.sent_by_name}</span>
               </p>
             </Card>
           ))}
