@@ -80,11 +80,24 @@ Deno.serve(async (req) => {
       updated_at: new Date().toISOString(),
     });
 
-    // Keep only the last 10 tokens (prevent unbounded growth) and remove tokens older than 60 days
-    const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
-    const cleanedTokens = filtered
-      .filter((t) => t.updated_at > sixtyDaysAgo)
-      .slice(-10);
+    // Enforce separate limits per platform to prevent old app versions accumulating.
+    // Web tokens: keep only the 2 most recently updated (covers phone + laptop).
+    //   Older web registrations (e.g. an old "Accredilink" PWA install) are dropped
+    //   as soon as the user registers a fresh token in the current app.
+    // Native tokens: keep up to 3, within 60 days.
+    const sixtyDaysAgo  = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+    const webEntries    = filtered.filter((t) => t.platform !== 'android' && t.platform !== 'ios');
+    const nativeEntries = filtered.filter((t) => t.platform === 'android' || t.platform === 'ios');
+
+    const freshWeb    = webEntries
+      .sort((a, b) => (a.updated_at || '').localeCompare(b.updated_at || ''))
+      .slice(-2);                                         // keep 2 most recent web tokens
+    const freshNative = nativeEntries
+      .filter((t) => !t.updated_at || t.updated_at > sixtyDaysAgo)
+      .sort((a, b) => (a.updated_at || '').localeCompare(b.updated_at || ''))
+      .slice(-3);                                         // keep 3 most recent native tokens
+
+    const cleanedTokens = [...freshWeb, ...freshNative];
 
     // Save to profiles — both fcm_tokens array and firebase_messaging_token (latest, for backwards compat)
     const { error: updateError } = await supabaseAdmin

@@ -300,7 +300,17 @@ Deno.serve(async (req) => {
               const nativeTokens = candidates.filter((e: any) => e.platform === 'android' || e.platform === 'ios');
               const webTokens    = candidates.filter((e: any) => e.platform !== 'android' && e.platform !== 'ios');
               if (webTokens.length > 0) {
-                for (const entry of webTokens) {
+                // Send to the 2 most recently registered web tokens only.
+                // This avoids notifying old app installations (e.g. a stale PWA from
+                // when the app had a different name) while still covering phone + laptop.
+                const topWeb = [...webTokens]
+                  .sort((a: any, b: any) => {
+                    const ta = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+                    const tb = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+                    return tb - ta;                       // newest first
+                  })
+                  .slice(0, 2);
+                for (const entry of topWeb) {
                   tokensToSend.push({ userId: p.id, token: entry.token });
                 }
               } else if (nativeTokens.length > 0) {
