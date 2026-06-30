@@ -289,31 +289,28 @@ Deno.serve(async (req) => {
             // Fall back to all tokens if everything is older than 60 days
             const candidates = fresh.length > 0 ? fresh : tokenArray.filter((e: any) => !!e.token);
 
+            // Always cap to 2 most recent web tokens to avoid hitting stale PWA registrations
+            // (e.g. an old "Accredilink" install alongside the current "APP.CARECALL AI" one).
+            // Native tokens are kept separately for APK users.
+            const nativeTokens = candidates.filter((e: any) => e.platform === 'android' || e.platform === 'ios');
+            const webTokens    = candidates.filter((e: any) => e.platform !== 'android' && e.platform !== 'ios');
+
+            const topWeb = [...webTokens]
+              .sort((a: any, b: any) => {
+                const ta = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+                const tb = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+                return tb - ta;
+              })
+              .slice(0, 2);
+
+            for (const entry of topWeb) {
+              tokensToSend.push({ userId: p.id, token: entry.token });
+            }
+
             if (isAlerterPush) {
-              // Alerter: send to ALL web tokens for this user.
-              // firebase-messaging-sw.js uses tag:'carecall-alerter' so Chrome replaces
-              // duplicate notifications — the user sees exactly one even if multiple tokens
-              // are sent to. Sending to all avoids a single stale/invalid token silently
-              // killing the alert. Native tokens are excluded (they show a second native
-              // notification that doesn't open the deeplink); fall back to one native token
-              // only when the user has no web tokens at all.
-              const nativeTokens = candidates.filter((e: any) => e.platform === 'android' || e.platform === 'ios');
-              const webTokens    = candidates.filter((e: any) => e.platform !== 'android' && e.platform !== 'ios');
-              if (webTokens.length > 0) {
-                // Send to the 2 most recently registered web tokens only.
-                // This avoids notifying old app installations (e.g. a stale PWA from
-                // when the app had a different name) while still covering phone + laptop.
-                const topWeb = [...webTokens]
-                  .sort((a: any, b: any) => {
-                    const ta = a.updated_at ? new Date(a.updated_at).getTime() : 0;
-                    const tb = b.updated_at ? new Date(b.updated_at).getTime() : 0;
-                    return tb - ta;                       // newest first
-                  })
-                  .slice(0, 2);
-                for (const entry of topWeb) {
-                  tokensToSend.push({ userId: p.id, token: entry.token });
-                }
-              } else if (nativeTokens.length > 0) {
+              // Alerter: web-only — native tokens open a separate native notification that
+              // doesn't carry the deeplink, so only fall back to native if no web tokens.
+              if (topWeb.length === 0 && nativeTokens.length > 0) {
                 const chosen = nativeTokens.reduce((best: any, cur: any) => {
                   const tb = best.updated_at ? new Date(best.updated_at).getTime() : 0;
                   const tc = cur.updated_at  ? new Date(cur.updated_at).getTime()  : 0;
@@ -322,9 +319,8 @@ Deno.serve(async (req) => {
                 tokensToSend.push({ userId: p.id, token: chosen.token });
               }
             } else {
-              // Regular notifications (shift events, chat, etc.): send to ALL valid tokens
-              // so the admin/user gets them on every active device
-              for (const entry of candidates) {
+              // Non-alerter (shift events, chat, etc.): also send to native tokens
+              for (const entry of nativeTokens) {
                 tokensToSend.push({ userId: p.id, token: entry.token });
               }
             }
