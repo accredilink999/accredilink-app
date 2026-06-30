@@ -14,6 +14,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, Navigation, Search, Check, AlertCircle, ChevronDown, Edit, Loader2, Mail, Clock, Plus, Users, Radio } from 'lucide-react';
 import PagerPanel from '@/components/admin/PagerPanel';
+import PagerSvg from '@/components/PagerSvg';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -660,7 +661,7 @@ export default function ControlRoom() {
             onClick={() => setActiveTab('pager')}
             className={`flex items-center justify-center gap-1.5 flex-1 text-xs sm:text-sm py-1 sm:py-2 rounded-lg font-medium transition-all shadow-md hover:shadow-lg overflow-hidden ${activeTab === 'pager' ? 'bg-slate-800 ring-2 ring-slate-500' : 'bg-slate-700 hover:bg-slate-800'}`}
           >
-            <img src="/pager-icon.png" alt="Pager" className="h-8 sm:h-10 w-auto object-contain" />
+            <PagerSvg className="h-8 sm:h-10 w-auto" />
             <span className="text-white">Pager</span>
           </button>
         )}

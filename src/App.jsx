@@ -19,6 +19,7 @@ import HelpButton from '@/components/HelpButton';
 import AutoPushRegistration from '@/components/notifications/AutoPushRegistration';
 import AppUpdateChecker from '@/components/AppUpdateChecker';
 import GlobalAlerterMonitor from '@/components/GlobalAlerterMonitor';
+import GlobalPagerMonitor from '@/components/GlobalPagerMonitor';
 import HelpNudge from '@/components/HelpNudge';
 import { initOrg, resetOrg } from '@/lib/orgContext';
 import SubscriptionGate from '@/components/billing/SubscriptionGate';
@@ -260,6 +261,7 @@ const AppShell = () => {
     return (
       <>
         <GlobalAlerterMonitor />
+        <GlobalPagerMonitor />
         <TwoWayRadio />
       </>
     );
@@ -326,6 +328,7 @@ const AppShell = () => {
       <AutoPushRegistration />
       <AppUpdateChecker />
       <GlobalAlerterMonitor />
+      <GlobalPagerMonitor />
       <SubscriptionGate />
       <Layout currentPageName={currentPageName} />
       {/* PIN setup prompt — shown once after first login if no PIN set */}

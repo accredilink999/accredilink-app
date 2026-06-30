@@ -124,14 +124,6 @@ export default function DayView({ currentDate, onShiftClick, onCreateShift, isAd
              </div>
            </div>
          )}
-         {!isAvailable && (
-           <ShiftStatusPills
-             shift={shift}
-             shiftCalls={shiftCalls}
-             partnerShift={partnerShift}
-             partnerCalls={partnerCalls}
-           />
-         )}
        </button>
     );
   };

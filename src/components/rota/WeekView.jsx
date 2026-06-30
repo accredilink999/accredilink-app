@@ -176,14 +176,6 @@ export default function WeekView({ currentDate, onShiftClick, onCreateShift, isA
                               </div>
                             </div>
                           )}
-                          {!isAvailable && (
-                            <ShiftStatusPills
-                              shift={shift}
-                              shiftCalls={shiftCalls}
-                              partnerShift={partnerShift}
-                              partnerCalls={partnerCalls}
-                            />
-                          )}
                         </button>
                       );
                     })

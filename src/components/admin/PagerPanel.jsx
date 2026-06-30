@@ -6,25 +6,37 @@ import { format } from 'date-fns';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Send, Users, User, MapPin, CheckCircle } from 'lucide-react';
+import PagerSvg from '@/components/PagerSvg';
 
 const getOrgId = () =>
   localStorage.getItem('organizationId') || sessionStorage.getItem('organizationId') || '';
 
 const MODES = [
-  { key: 'global',     label: 'All Staff',  Icon: Users   },
-  { key: 'area',       label: 'By Area',    Icon: MapPin  },
-  { key: 'individual', label: 'Individual', Icon: User    },
+  { key: 'global',     label: 'All Staff',  Icon: Users  },
+  { key: 'area',       label: 'By Area',    Icon: MapPin },
+  { key: 'individual', label: 'Individual', Icon: User   },
 ];
+
+// LCD sits at SVG coords: x=56 y=44 w=328 h=178 inside viewBox 440×340
+const LCD = { top: '12.94%', left: '12.73%', right: '12.73%', height: '52.35%' };
+// Green button: x=60 y=248 w=52 h=36
+const BTN_GREEN = { top: '72.94%', left: '13.64%', width: '11.82%', height: '10.59%' };
+// Red button: x=124 y=248 w=52 h=36
+const BTN_RED   = { top: '72.94%', left: '28.18%', width: '11.82%', height: '10.59%' };
+// D-pad left arrow area
+const BTN_LEFT  = { top: '73.5%',  left: '60.2%',  width: '6.8%',   height: '9.4%'  };
+// D-pad right arrow area
+const BTN_RIGHT = { top: '73.5%',  left: '76.6%',  width: '5.2%',   height: '9.4%'  };
 
 export default function PagerPanel({ user }) {
   const queryClient = useQueryClient();
   const orgId = getOrgId();
 
-  const [message,        setMessage]        = useState('');
-  const [recipientMode,  setRecipientMode]  = useState('global');
-  const [selectedStaff,  setSelectedStaff]  = useState('');
-  const [selectedArea,   setSelectedArea]   = useState('');
-  const [justSent,       setJustSent]       = useState(false);
+  const [message,       setMessage]       = useState('');
+  const [recipientMode, setRecipientMode] = useState('global');
+  const [selectedStaff, setSelectedStaff] = useState('');
+  const [selectedArea,  setSelectedArea]  = useState('');
+  const [justSent,      setJustSent]      = useState(false);
 
   const { data: staff = [] } = useQuery({
     queryKey: ['staff'],
@@ -57,15 +69,15 @@ export default function PagerPanel({ user }) {
       const staffMember = staff.find(s => s.id === selectedStaff);
       const area        = areas.find(a => a.id === selectedArea);
       const { error } = await supabase.from('pager_messages').insert([{
-        organization_id:    orgId,
-        message:            message.trim(),
-        recipient_mode:     recipientMode,
-        recipient_id:       recipientMode === 'individual' ? selectedStaff     : null,
-        recipient_name:     recipientMode === 'individual' ? staffMember?.full_name : null,
-        recipient_area_id:  recipientMode === 'area'       ? selectedArea       : null,
-        recipient_area_name:recipientMode === 'area'       ? area?.name         : null,
-        sent_by:            user?.id       || '',
-        sent_by_name:       user?.full_name || 'Admin',
+        organization_id:     orgId,
+        message:             message.trim(),
+        recipient_mode:      recipientMode,
+        recipient_id:        recipientMode === 'individual' ? selectedStaff          : null,
+        recipient_name:      recipientMode === 'individual' ? staffMember?.full_name  : null,
+        recipient_area_id:   recipientMode === 'area'       ? selectedArea            : null,
+        recipient_area_name: recipientMode === 'area'       ? area?.name              : null,
+        sent_by:             user?.id        || '',
+        sent_by_name:        user?.full_name || 'Admin',
       }]);
       if (error) throw error;
     },
@@ -84,7 +96,8 @@ export default function PagerPanel({ user }) {
      (recipientMode === 'area'       && selectedArea));
 
   const modeIndex = MODES.findIndex(m => m.key === recipientMode);
-  const cycleMode = (dir) => setRecipientMode(MODES[(modeIndex + dir + MODES.length) % MODES.length].key);
+  const cycleMode = (dir) =>
+    setRecipientMode(MODES[(modeIndex + dir + MODES.length) % MODES.length].key);
 
   const recipientLabel =
     recipientMode === 'global'     ? 'All Staff' :
@@ -96,27 +109,18 @@ export default function PagerPanel({ user }) {
 
       {/* ── Pager device ── */}
       <div className="relative select-none">
-        <img
-          src="/pager-icon.png"
-          alt="Pager"
-          className="w-full"
-          draggable={false}
-          style={{ imageRendering: 'crisp-edges' }}
-        />
+        <PagerSvg className="w-full drop-shadow-xl" />
 
-        {/* LCD screen — message input */}
-        <div
-          className="absolute flex flex-col overflow-hidden"
-          style={{ top: '9%', left: '8.5%', right: '8.5%', height: '48%' }}
-        >
+        {/* LCD overlay — message input */}
+        <div className="absolute flex flex-col overflow-hidden" style={LCD}>
           {justSent ? (
             <div className="flex flex-col items-center justify-center h-full">
-              <CheckCircle className="w-7 h-7 text-green-600 mb-1" />
-              <span className="text-xs font-bold font-mono text-green-700 tracking-widest">PAGE SENT</span>
+              <CheckCircle className="w-7 h-7 text-green-700 mb-1" />
+              <span className="text-xs font-bold font-mono text-green-800 tracking-widest">PAGE SENT</span>
             </div>
           ) : (
             <textarea
-              className="w-full flex-1 bg-transparent text-slate-700 text-sm resize-none px-2 pt-2 focus:outline-none font-mono placeholder-slate-400 leading-snug"
+              className="w-full flex-1 bg-transparent text-slate-700 text-sm resize-none px-2 pt-2 focus:outline-none font-mono placeholder-slate-500 leading-snug"
               placeholder="Type your page message…"
               value={message}
               onChange={e => setMessage(e.target.value)}
@@ -124,52 +128,39 @@ export default function PagerPanel({ user }) {
             />
           )}
           <div className="text-right text-[9px] text-slate-500 pr-1.5 pb-0.5 font-mono shrink-0">
-            TO: {recipientLabel} &nbsp;|&nbsp; {message.length}/200
+            TO: {recipientLabel}&nbsp;|&nbsp;{message.length}/200
           </div>
         </div>
 
-        {/* ── Invisible button overlays matching pager hardware ── */}
-
+        {/* ── Hardware button overlays ── */}
         {/* Green = Send */}
         <button
           onClick={() => canSend && sendMutation.mutate()}
           disabled={!canSend || sendMutation.isPending}
           title="Send page (green button)"
           className="absolute rounded opacity-0 hover:opacity-20 bg-green-400 transition-opacity cursor-pointer"
-          style={{ top: '65%', left: '15%', width: '13%', height: '13%' }}
+          style={BTN_GREEN}
         />
-        {/* Red = Toggle recipient picker (cycles mode) */}
+        {/* Red = Cycle recipient forward */}
         <button
           onClick={() => cycleMode(1)}
           title="Change recipient (red button)"
           className="absolute rounded opacity-0 hover:opacity-20 bg-red-400 transition-opacity cursor-pointer"
-          style={{ top: '65%', left: '29%', width: '13%', height: '13%' }}
+          style={BTN_RED}
         />
         {/* Left arrow = prev mode */}
         <button
           onClick={() => cycleMode(-1)}
           title="Previous recipient mode"
-          className="absolute rounded opacity-0 hover:opacity-20 bg-white transition-opacity cursor-pointer"
-          style={{ top: '62%', left: '52%', width: '10%', height: '13%' }}
-        />
-        {/* Up arrow (unused — reserved) */}
-        <button
-          onClick={() => {}}
-          className="absolute rounded opacity-0 cursor-pointer"
-          style={{ top: '52%', left: '62%', width: '10%', height: '13%' }}
+          className="absolute opacity-0 hover:opacity-10 bg-white cursor-pointer"
+          style={BTN_LEFT}
         />
         {/* Right arrow = next mode */}
         <button
           onClick={() => cycleMode(1)}
           title="Next recipient mode"
-          className="absolute rounded opacity-0 hover:opacity-20 bg-white transition-opacity cursor-pointer"
-          style={{ top: '62%', left: '73%', width: '10%', height: '13%' }}
-        />
-        {/* Down arrow (unused — reserved) */}
-        <button
-          onClick={() => {}}
-          className="absolute rounded opacity-0 cursor-pointer"
-          style={{ top: '72%', left: '62%', width: '10%', height: '13%' }}
+          className="absolute opacity-0 hover:opacity-10 bg-white cursor-pointer"
+          style={BTN_RIGHT}
         />
       </div>
 
@@ -255,7 +246,7 @@ export default function PagerPanel({ user }) {
               <p className="text-xs text-slate-500 mt-1">
                 To:{' '}
                 <span className="font-medium text-slate-600">
-                  {msg.recipient_mode === 'global'     ? 'All Staff'           :
+                  {msg.recipient_mode === 'global'     ? 'All Staff'             :
                    msg.recipient_mode === 'area'       ? msg.recipient_area_name :
                    msg.recipient_name}
                 </span>
