@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { ChevronRight } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { format } from 'date-fns';
 import PagerSvg from '@/components/PagerSvg';
+import PagerPanel from '@/components/admin/PagerPanel';
 
 const getOrgId = () =>
   localStorage.getItem('organizationId') || sessionStorage.getItem('organizationId') || '';
@@ -30,6 +32,7 @@ function LcdTicker({ text }) {
 export default function PagerInboxPanel({ open, onOpenChange, user }) {
   const orgId   = getOrgId();
   const userId  = user?.id;
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const seenKey = `pager_last_seen_${userId}`;
 
   // Snapshot the "last seen" time at mount so new-message badges reflect state at open time
@@ -69,18 +72,20 @@ export default function PagerInboxPanel({ open, onOpenChange, user }) {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:w-80 p-0 flex flex-col bg-white">
+      <SheetContent side="right" className={`w-full p-0 flex flex-col bg-white ${isAdmin ? 'sm:w-[480px]' : 'sm:w-80'}`} style={{ overflow: 'visible' }}>
 
-        {/* Drag bar — click to close */}
-        <div
+        {/* Tab protruding from the left edge — click to slide back right */}
+        <button
           onClick={() => onOpenChange(false)}
-          className="flex justify-center pt-3 pb-1 shrink-0 cursor-pointer touch-manipulation"
+          className="absolute -left-9 top-20 bg-slate-800 text-slate-200 py-5 px-2 rounded-l-xl shadow-xl hover:bg-slate-700 active:bg-slate-900 touch-manipulation z-10 flex flex-col items-center gap-1"
           aria-label="Close pager inbox"
+          style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
         >
-          <div className="w-12 h-1.5 rounded-full bg-slate-400 opacity-60" />
-        </div>
+          <ChevronRight className="w-3.5 h-3.5" style={{ transform: 'rotate(180deg)' }} />
+          <span className="text-[10px] font-semibold tracking-wider">Pager</span>
+        </button>
 
-        <SheetHeader className="px-5 pt-2 pb-3 border-b border-slate-100">
+        <SheetHeader className="px-5 pt-5 pb-3 border-b border-slate-100">
           <SheetTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
             Pager Inbox
             {unreadCount > 0 && (
@@ -92,6 +97,13 @@ export default function PagerInboxPanel({ open, onOpenChange, user }) {
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto">
+
+          {/* ── Admin compose section ── */}
+          {isAdmin && (
+            <div className="px-4 pt-4 pb-2 border-b border-slate-100">
+              <PagerPanel user={user} />
+            </div>
+          )}
 
           {/* ── Pager device showing latest message ── */}
           <div className="px-5 pt-4 pb-3">

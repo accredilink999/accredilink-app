@@ -123,10 +123,13 @@ export default function PagerPanel({ user }) {
 
         {/* ── Controls — slides up inside the pager body when typing ── */}
         <div
-          className="absolute rounded-b-[7%] rounded-t-2xl transition-transform duration-300 ease-out"
+          className="absolute rounded-b-[7%] rounded-t-2xl"
           style={{
             left: '7%', right: '7%', bottom: '6%',
             transform: showControls ? 'translateY(0)' : 'translateY(110%)',
+            opacity: showControls ? 1 : 0,
+            pointerEvents: showControls ? 'auto' : 'none',
+            transition: 'transform 0.3s ease-out, opacity 0.3s ease-out',
             background: '#1a1a1a',
             padding: '10px 12px 14px',
             zIndex: 10,
