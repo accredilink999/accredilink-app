@@ -11,6 +11,15 @@ export default function GlobalPagerMonitor() {
   const seenRef       = useRef(new Set());
   const wakeLockRef   = useRef(null);
   const lastCheckRef  = useRef(0); // timestamp of last unread check
+  // Snapshot of pager_last_seen taken at mount — BEFORE any panel-open effect can
+  // update localStorage. This prevents the panel opening via ?alerter=open from
+  // immediately marking all alerts as "seen" and blocking the on-load check.
+  const mountSeenAtRef = useRef(null);
+
+  useEffect(() => {
+    if (!user?.id || mountSeenAtRef.current !== null) return;
+    mountSeenAtRef.current = localStorage.getItem('pager_last_seen_' + user.id) || '1970-01-01T00:00:00Z';
+  }, [user?.id]);
 
   // ── Unread check (runs on load + on foreground) ──────────────────────
   const checkUnread = useCallback(async () => {
@@ -23,7 +32,9 @@ export default function GlobalPagerMonitor() {
     if (now - lastCheckRef.current < 10_000) return;
     lastCheckRef.current = now;
 
-    const seenAt     = localStorage.getItem('pager_last_seen_' + user.id) || '1970-01-01T00:00:00Z';
+    // Use the mount-time snapshot so the panel opening via ?alerter=open cannot
+    // advance seenAt before this check runs and hide the incoming alert.
+    const seenAt = mountSeenAtRef.current || localStorage.getItem('pager_last_seen_' + user.id) || '1970-01-01T00:00:00Z';
     const dismissed  = (() => {
       try { return JSON.parse(localStorage.getItem('pager_dismissed_' + user.id) || '[]'); }
       catch (e) { return []; }

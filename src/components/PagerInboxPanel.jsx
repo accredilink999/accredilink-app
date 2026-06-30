@@ -64,7 +64,6 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
   const [alerting,     setAlerting]     = useState(false);
   const [silenced,     setSilenced]     = useState(false);
   const [alertMsg,     setAlertMsg]     = useState(null);
-  // true when browser blocked autoplay — user needs to tap to enable sound
   const [needsGesture, setNeedsGesture] = useState(false);
   const audioRef = useRef(null);
 
@@ -83,12 +82,15 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
     try { localStorage.setItem(dismissedKey, JSON.stringify(next)); } catch (e) {}
   };
 
-  // Mark seen when panel opens
+  // Mark seen when panel opens MANUALLY (no incoming alert).
+  // When opened from a push notification (incomingAlert is set), do NOT update seenAt
+  // here — the on-load check in GlobalPagerMonitor needs the original seenAt to find
+  // the unread alert. seenAt is updated on acknowledge() instead.
   useEffect(() => {
-    if (open) {
+    if (open && !incomingAlert) {
       try { localStorage.setItem(seenKey, new Date().toISOString()); } catch (e) {}
     }
-  }, [open]);
+  }, [open, incomingAlert]);
 
   // Trigger alert state when incomingAlert changes
   useEffect(() => {
@@ -98,25 +100,13 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
     setAlerting(true);
     if (typeof incomingAlert === 'object') setAlertMsg(incomingAlert);
 
-    const tryPlay = () => {
-      if (!audioRef.current) return;
+    if (audioRef.current) {
       audioRef.current.currentTime = 0;
       audioRef.current.play().catch(() => {
-        // Browser blocked autoplay (common after page load / PIN entry).
-        // Show a "tap to enable sound" banner; the listener below starts audio
-        // on the next user gesture.
+        // Autoplay blocked — set flag so tapping the pager starts audio
         setNeedsGesture(true);
-        const resume = () => {
-          setNeedsGesture(false);
-          if (audioRef.current) audioRef.current.play().catch(() => {});
-          window.removeEventListener('click',      resume);
-          window.removeEventListener('touchstart', resume);
-        };
-        window.addEventListener('click',      resume, { once: true });
-        window.addEventListener('touchstart', resume, { once: true });
       });
-    };
-    tryPlay();
+    }
 
     if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300, 100, 300]);
   }, [incomingAlert, open]);
@@ -146,6 +136,8 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
     silence();
     setSilenced(false);
     setAlertMsg(null);
+    // Mark all messages seen now that the user has acknowledged the alert
+    try { localStorage.setItem(seenKey, new Date().toISOString()); } catch (e) {}
     if (onAlertSilenced) onAlertSilenced();
   };
 
@@ -220,19 +212,6 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
 
         <div className="flex-1 overflow-y-auto">
 
-          {/* Banner shown when browser blocked autoplay (e.g. after PIN entry) */}
-          {alerting && needsGesture && (
-            <button
-              className="w-full flex items-center justify-center gap-2 py-3 bg-red-600 text-white text-sm font-bold animate-pulse"
-              onClick={() => {
-                setNeedsGesture(false);
-                if (audioRef.current) audioRef.current.play().catch(() => {});
-              }}
-            >
-              <Volume2 className="w-4 h-4" />
-              TAP TO ENABLE ALERT SOUND
-            </button>
-          )}
 
           {/* Admin compose */}
           {isAdmin && !alerting && (
@@ -247,8 +226,12 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
               <div
                 className="relative select-none"
                 style={alerting ? { animation: 'alerterVibrate 0.35s ease-in-out infinite', cursor: 'pointer' } : {}}
-                onClick={alerting ? silence : undefined}
-                title={alerting ? 'Tap to silence' : undefined}
+                onClick={alerting ? (needsGesture ? () => {
+                  // First tap: browser blocked autoplay — use this gesture to start audio
+                  setNeedsGesture(false);
+                  if (audioRef.current) audioRef.current.play().catch(() => {});
+                } : silence) : undefined}
+                title={alerting ? (needsGesture ? 'Tap to enable sound' : 'Tap to silence') : undefined}
               >
                 <PagerSvg className="w-full drop-shadow-md" />
 
@@ -280,7 +263,7 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
                 {alerting && needsGesture && (
                   <div className="absolute inset-0 flex items-end justify-center pb-[8%]">
                     <span className="text-[9px] font-bold text-amber-700 bg-white/90 px-2 py-0.5 rounded-full animate-pulse">
-                      TAP BANNER ABOVE FOR SOUND
+                      TAP TO ENABLE SOUND
                     </span>
                   </div>
                 )}
