@@ -1034,10 +1034,16 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
              const serviceUser = serviceUsers.find(su => su.id === call.service_user_id);
              const isOnHold = serviceUser?.status === 'on_hold';
              // Block check-in if another call is still open or checked out without a log (solo + paired)
+             // Exception: if the partner was assigned to fill the log (log_required on partner's call),
+             // don't block — the care log will appear on the partner's record, not this one.
              const blockingCall = !isAdmin ? callsToDisplay.find(c => {
                if (c.id === call.id || !c.clock_in_time) return false;
                if (!c.clock_out_time) return true;
-               return !careLogs.some(log => log.id === c.care_log_id || log.shift_call_id === c.id);
+               if (careLogs.some(log => log.id === c.care_log_id || log.shift_call_id === c.id)) return false;
+               // Partner-completing handoff: partner's matching call has log_required set — don't block
+               const partnerC = shift?.paired_shift_id ? getPartnerCall(c) : null;
+               if (partnerC?.log_required) return false;
+               return true;
              }) : null;
              const hasBlockingCall = !!blockingCall;
              const blockingReason = blockingCall
@@ -1046,9 +1052,10 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
                  : `Complete care log for ${blockingCall.service_user_name || 'previous call'} first`
                : null;
              // Block independent check-in if partner assigned us a log to fill (paired shifts only)
-             // Does NOT block the "Partner In Progress — Check In Too?" button
+             // Only block once the call has actually been started — if the call is still pending the
+             // staff member will fill the log when they arrive, not before visiting other clients first.
              const logRequiredCall = !isAdmin ? callsToDisplay.find(c => {
-               if (c.id === call.id || !c.log_required) return false;
+               if (c.id === call.id || !c.log_required || !c.clock_in_time) return false;
                return !careLogs.some(log => log.id === c.care_log_id || log.shift_call_id === c.id);
              }) : null;
              const hasLogRequiredBlock = !!logRequiredCall;
