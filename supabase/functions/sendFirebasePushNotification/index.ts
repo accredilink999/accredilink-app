@@ -290,19 +290,27 @@ Deno.serve(async (req) => {
             const candidates = fresh.length > 0 ? fresh : tokenArray.filter((e: any) => !!e.token);
 
             if (isAlerterPush) {
-              // Alerter: send to ONE token per user — web preferred over native.
-              // Web tokens are handled by firebase-messaging-sw.js which correctly
-              // opens the deeplink. Native tokens are the fallback for APK-only users.
+              // Alerter: send to ALL web tokens for this user.
+              // firebase-messaging-sw.js uses tag:'carecall-alerter' so Chrome replaces
+              // duplicate notifications — the user sees exactly one even if multiple tokens
+              // are sent to. Sending to all avoids a single stale/invalid token silently
+              // killing the alert. Native tokens are excluded (they show a second native
+              // notification that doesn't open the deeplink); fall back to one native token
+              // only when the user has no web tokens at all.
               const nativeTokens = candidates.filter((e: any) => e.platform === 'android' || e.platform === 'ios');
               const webTokens    = candidates.filter((e: any) => e.platform !== 'android' && e.platform !== 'ios');
-              const pool = webTokens.length > 0 ? webTokens : nativeTokens;
-              const chosen = pool.length === 0 ? null :
-                pool.reduce((best: any, cur: any) => {
+              if (webTokens.length > 0) {
+                for (const entry of webTokens) {
+                  tokensToSend.push({ userId: p.id, token: entry.token });
+                }
+              } else if (nativeTokens.length > 0) {
+                const chosen = nativeTokens.reduce((best: any, cur: any) => {
                   const tb = best.updated_at ? new Date(best.updated_at).getTime() : 0;
                   const tc = cur.updated_at  ? new Date(cur.updated_at).getTime()  : 0;
                   return tc > tb ? cur : best;
                 });
-              if (chosen) tokensToSend.push({ userId: p.id, token: chosen.token });
+                tokensToSend.push({ userId: p.id, token: chosen.token });
+              }
             } else {
               // Regular notifications (shift events, chat, etc.): send to ALL valid tokens
               // so the admin/user gets them on every active device
