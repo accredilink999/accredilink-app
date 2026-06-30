@@ -42,43 +42,50 @@ function LcdTicker({ text }) {
   );
 }
 
+function loadDismissed(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
 export default function PagerInboxPanel({ open, onOpenChange, user, incomingAlert, onAlertSilenced }) {
   const orgId   = getOrgId();
-  const userId  = user?.id;
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
-  const seenKey = `pager_last_seen_${userId}`;
+  const userId  = user ? user.id : null;
+  const isAdmin = user ? (user.role === 'admin' || user.role === 'super_admin') : false;
+  const seenKey      = 'pager_last_seen_' + userId;
+  const dismissedKey = 'pager_dismissed_' + userId;
 
-  const dismissedKey = `pager_dismissed_${userId}`;
-  const [seenAt]   = useState(() => localStorage.getItem(seenKey) || '1970-01-01T00:00:00Z');
-  const [dismissed, setDismissed] = useState(() => {
-    try { return new Set(JSON.parse(localStorage.getItem(dismissedKey) || '[]')); }
-    catch { return new Set(); }
-  });
-  const [alerting, setAlerting]       = useState(false);  // shake + sound active
-  const [silenced, setSilenced]       = useState(false);  // silenced, showing message
-  const [alertMsg, setAlertMsg]       = useState(null);   // the incoming message object
+  const [seenAt]        = useState(() => localStorage.getItem(seenKey) || '1970-01-01T00:00:00Z');
+  const [dismissedIds, setDismissedIds] = useState(() => loadDismissed(dismissedKey));
+  const [alerting, setAlerting] = useState(false);
+  const [silenced, setSilenced] = useState(false);
+  const [alertMsg, setAlertMsg] = useState(null);
   const audioRef = useRef(null);
 
-  const saveDismissed = (set) => {
-    setDismissed(new Set(set));
-    localStorage.setItem(dismissedKey, JSON.stringify([...set]));
-  };
-
   const dismissOne = (id) => {
-    const next = new Set(dismissed);
-    next.add(id);
-    saveDismissed(next);
+    const next = dismissedIds.concat([id]);
+    setDismissedIds(next);
+    try { localStorage.setItem(dismissedKey, JSON.stringify(next)); } catch (e) {}
   };
 
   const dismissAll = (msgs) => {
-    const next = new Set(dismissed);
-    msgs.forEach(m => next.add(m.id));
-    saveDismissed(next);
+    const lookup = {};
+    dismissedIds.forEach((i) => { lookup[i] = true; });
+    msgs.forEach((m) => { lookup[m.id] = true; });
+    const next = Object.keys(lookup);
+    setDismissedIds(next);
+    try { localStorage.setItem(dismissedKey, JSON.stringify(next)); } catch (e) {}
   };
 
   // Mark seen when panel opens
   useEffect(() => {
-    if (open) localStorage.setItem(seenKey, new Date().toISOString());
+    if (open) {
+      try { localStorage.setItem(seenKey, new Date().toISOString()); } catch (e) {}
+    }
   }, [open]);
 
   // Trigger alert state when incomingAlert changes
@@ -86,22 +93,14 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
     if (!incomingAlert || !open) return;
     setSilenced(false);
     setAlerting(true);
+    if (typeof incomingAlert === 'object') setAlertMsg(incomingAlert);
 
-    if (typeof incomingAlert === 'object') {
-      // Real-time message object
-      setAlertMsg(incomingAlert);
-    }
-    // For 'deeplink' case, alertMsg will be set once messages load (see below)
-
-    // Play looping audio — use a short silence then retry to work around
-    // browsers that block autoplay on fresh page loads
     const tryPlay = () => {
       if (!audioRef.current) return;
       audioRef.current.currentTime = 0;
       audioRef.current.play().catch(() => {
-        // autoplay blocked — retry once on first user interaction
         const resume = () => {
-          audioRef.current?.play().catch(() => {});
+          if (audioRef.current) audioRef.current.play().catch(() => {});
           window.removeEventListener('click',      resume);
           window.removeEventListener('touchstart', resume);
         };
@@ -111,21 +110,17 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
     };
     tryPlay();
 
-    // Vibrate pattern
     if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300, 100, 300]);
   }, [incomingAlert, open]);
-
-  // When deep-linking in, set alertMsg to latest message once messages load
-  useEffect(() => {
-    if (incomingAlert === 'deeplink' && messages.length > 0 && !alertMsg) {
-      setAlertMsg(messages[0]);
-    }
-  }, [incomingAlert, messages, alertMsg]);
 
   // When panel closes, silence everything
   useEffect(() => {
     if (!open) {
-      silence();
+      setAlerting(false);
+      setSilenced(false);
+      if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
+      if (navigator.vibrate) navigator.vibrate(0);
+      window.dispatchEvent(new CustomEvent('alerter:silence'));
     }
   }, [open]);
 
@@ -141,10 +136,10 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
     silence();
     setSilenced(false);
     setAlertMsg(null);
-    onAlertSilenced?.();
+    if (onAlertSilenced) onAlertSilenced();
   };
 
-  const dismiss = () => {
+  const dismissPanel = () => {
     acknowledge();
     onOpenChange(false);
   };
@@ -159,8 +154,8 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
         .eq('organization_id', orgId)
         .order('created_at', { ascending: false })
         .limit(50);
-      const userAreaId = user?.rota_area_id || user?.area_id;
-      return (data || []).filter(msg => {
+      const userAreaId = user ? (user.rota_area_id || user.area_id) : null;
+      return (data || []).filter((msg) => {
         if (msg.sent_by === userId) return false;
         return (
           msg.recipient_mode === 'global' ||
@@ -173,9 +168,19 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
     refetchInterval: open ? 8000 : false,
   });
 
-  const visibleMessages = messages.filter(m => !dismissed.has(m.id));
-  const unreadCount = visibleMessages.filter(m => m.created_at > seenAt).length;
-  // The message to show in the LCD when not alerting
+  // When deep-linking in, set alertMsg to latest message once messages load
+  useEffect(() => {
+    if (incomingAlert === 'deeplink' && messages.length > 0 && !alertMsg) {
+      setAlertMsg(messages[0]);
+    }
+  }, [incomingAlert, messages, alertMsg]);
+
+  // Fast O(1) dismissed lookup using plain object
+  const dismissedLookup = {};
+  dismissedIds.forEach((id) => { dismissedLookup[id] = true; });
+
+  const visibleMessages = messages.filter((m) => !dismissedLookup[m.id]);
+  const unreadCount = visibleMessages.filter((m) => m.created_at > seenAt).length;
   const latestMsg = alertMsg || visibleMessages[0] || null;
 
   return (
@@ -202,14 +207,14 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
 
         <div className="flex-1 overflow-y-auto">
 
-          {/* ── Admin compose section ── */}
+          {/* Admin compose */}
           {isAdmin && !alerting && (
             <div className="px-4 pt-4 pb-2 border-b border-slate-100">
               <PagerPanel user={user} />
             </div>
           )}
 
-          {/* ── Pager device (staff view, or alerting mode for all) ── */}
+          {/* Pager device — staff view or alerting mode */}
           {(!isAdmin || alerting) && (
             <div className="px-5 pt-4 pb-3">
               <div
@@ -220,7 +225,6 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
               >
                 <PagerSvg className="w-full drop-shadow-md" />
 
-                {/* LCD overlay */}
                 <div
                   className="absolute flex flex-col overflow-hidden"
                   style={{ top: '12.94%', left: '12.73%', right: '12.73%', height: '52.35%' }}
@@ -239,7 +243,6 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
                   )}
                 </div>
 
-                {/* Tap-to-silence hint when alerting */}
                 {alerting && (
                   <div className="absolute inset-0 flex items-end justify-center pb-[8%]">
                     <span className="text-[9px] font-bold text-red-600 bg-white/80 px-2 py-0.5 rounded-full animate-pulse">
@@ -251,7 +254,7 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
             </div>
           )}
 
-          {/* ── Acknowledge / Dismiss buttons (shown after silencing) ── */}
+          {/* Acknowledge / Dismiss after silencing */}
           {silenced && alertMsg && (
             <div className="px-5 pb-4 space-y-2">
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
@@ -266,7 +269,7 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
                 Acknowledge
               </button>
               <button
-                onClick={dismiss}
+                onClick={dismissPanel}
                 className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold rounded-xl text-sm flex items-center justify-center gap-2"
               >
                 <X className="w-4 h-4" />
@@ -275,7 +278,7 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
             </div>
           )}
 
-          {/* ── Message list ── */}
+          {/* Message list */}
           {!alerting && (
             <div className="px-4 pb-6 space-y-2">
               {visibleMessages.length > 0 && (
@@ -291,7 +294,7 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
               {visibleMessages.length === 0 ? (
                 <p className="text-xs text-slate-400 text-center py-6">No alerts received yet</p>
               ) : (
-                visibleMessages.map(msg => {
+                visibleMessages.map((msg) => {
                   const isNew = msg.created_at > seenAt;
                   return (
                     <div
