@@ -304,7 +304,7 @@ export default function Rota() {
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="text-xs sm:text-sm px-2 sm:px-3 h-9 sm:h-10 gap-1">
                   <Settings className="w-3 sm:w-4 h-3 sm:h-4" />
-                  <span className="hidden sm:inline">Tools</span>
+                  <span className="hidden sm:inline">Setup / Edit Rotas</span>
                   <ChevronDown className="w-3 h-3 opacity-60" />
                 </Button>
               </DropdownMenuTrigger>
