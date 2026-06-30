@@ -483,7 +483,9 @@ export default function Layout({ children, currentPageName }) {
     if (!navigator.serviceWorker) return;
     const handler = (event) => {
       const url = event.data?.data?.action_url || event.data?.data?.url;
-      if (event.data?.type === 'NOTIFICATION_CLICK' && url) {
+      const notifType = event.data?.data?.type;
+      // Alerter notifications are handled by their own handler — skip here
+      if (event.data?.type === 'NOTIFICATION_CLICK' && url && notifType !== 'alerter') {
         navigate(url);
       }
     };

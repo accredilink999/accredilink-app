@@ -279,9 +279,17 @@ Deno.serve(async (req) => {
             : null;
 
           if (tokenArray) {
+            // Drop tokens older than 60 days — stale registrations from old app installs
+            const cutoff = Date.now() - 60 * 24 * 60 * 60 * 1000;
+            const fresh = tokenArray.filter((e: any) =>
+              e.token && (!e.updated_at || new Date(e.updated_at).getTime() > cutoff)
+            );
+            // Fall back to all tokens if everything is older than 60 days
+            const candidates = fresh.length > 0 ? fresh : tokenArray.filter((e: any) => !!e.token);
+
             // Separate native (APK) and web (PWA) tokens
-            const nativeTokens = tokenArray.filter((e: any) => e.token && (e.platform === 'android' || e.platform === 'ios'));
-            const webTokens    = tokenArray.filter((e: any) => e.token && e.platform === 'web');
+            const nativeTokens = candidates.filter((e: any) => e.platform === 'android' || e.platform === 'ios');
+            const webTokens    = candidates.filter((e: any) => e.platform !== 'android' && e.platform !== 'ios');
 
             const newestOf = (arr: any[]) => arr.length === 0 ? null :
               arr.reduce((best: any, cur: any) => {
@@ -291,7 +299,6 @@ Deno.serve(async (req) => {
               });
 
             // APK users get native push; if no native token, fall back to latest web token
-            // (avoids sending to stale PWA registrations when only the newest matters)
             const chosen = nativeTokens.length > 0
               ? newestOf(nativeTokens)
               : newestOf(webTokens);
