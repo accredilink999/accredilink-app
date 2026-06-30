@@ -18,7 +18,11 @@ import ShiftDetailModal from '@/components/rota/ShiftDetailModal';
 import CreateShiftModal from '@/components/rota/CreateShiftModal';
 import ClaimShiftModal from '@/components/rota/ClaimShiftModal';
 import RotaAreaSelector from '@/components/rota/RotaAreaSelector';
-import { ChevronLeft, ChevronRight, Plus, Settings } from 'lucide-react';
+import ClientCallManager from '@/components/rota/ClientCallManager';
+import ShiftTypeManager from '@/components/rota/ShiftTypeManager';
+import BaseShiftTemplateManager from '@/components/rota/BaseShiftTemplateManager';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ChevronLeft, ChevronRight, Plus, Settings, Phone, Tag, MapPin, LayoutTemplate, ChevronDown } from 'lucide-react';
 
 export default function Rota() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -33,6 +37,10 @@ export default function Rota() {
   const [createShiftDate, setCreateShiftDate] = useState(null);
   const [selectedAreaId, setSelectedAreaId] = useState(null);
   const [isCreateAreaOpen, setIsCreateAreaOpen] = useState(false);
+  const [isManageAreasOpen, setIsManageAreasOpen] = useState(false);
+  const [isCallManagerOpen, setIsCallManagerOpen] = useState(false);
+  const [isShiftTypeManagerOpen, setIsShiftTypeManagerOpen] = useState(false);
+  const [isTemplateManagerOpen, setIsTemplateManagerOpen] = useState(false);
   const [showMyShiftsOnly, setShowMyShiftsOnly] = useState(filterParam === 'myshifts');
   const [claimShift, setClaimShift] = useState(null);
   // Two-phase slide: 'idle' → 'exit' (old slides out) → 'enter-prep' (jump to entry position) → 'enter' (new slides in) → 'idle'
@@ -261,6 +269,8 @@ export default function Rota() {
             userId={user?.id}
             createOpen={isCreateAreaOpen}
             onCreateOpenChange={setIsCreateAreaOpen}
+            manageOpen={isManageAreasOpen}
+            onManageOpenChange={setIsManageAreasOpen}
           />
           <HelpTip tip="Filter shifts by care area. Each area has its own team and shift schedule." inline />
           <Button
@@ -280,27 +290,49 @@ export default function Rota() {
             <ChevronRight className="w-5 h-5 ml-0.5" />
           </Button>
           {canEdit && (
-            <>
-              <Button
-                onClick={() => handleCreateShift(currentDate)}
-                className="bg-teal-600 hover:bg-teal-700 text-xs sm:text-sm px-2 sm:px-3 h-9 sm:h-10"
-              >
-                <Plus className="w-3 sm:w-4 h-3 sm:h-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">New Shift</span>
-                <span className="sm:hidden">Add</span>
-              </Button>
-            </>
-          )}
-          {isAdmin && (
             <Button
-              variant="outline"
-              onClick={() => setIsCreateAreaOpen(true)}
-              className="text-xs sm:text-sm px-2 sm:px-3 h-9 sm:h-10"
+              onClick={() => handleCreateShift(currentDate)}
+              className="bg-teal-600 hover:bg-teal-700 text-xs sm:text-sm px-2 sm:px-3 h-9 sm:h-10"
             >
               <Plus className="w-3 sm:w-4 h-3 sm:h-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Create Area</span>
-              <span className="sm:hidden">Area</span>
+              <span className="hidden sm:inline">New Shift</span>
+              <span className="sm:hidden">Add</span>
             </Button>
+          )}
+          {isAdmin && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="text-xs sm:text-sm px-2 sm:px-3 h-9 sm:h-10 gap-1">
+                  <Settings className="w-3 sm:w-4 h-3 sm:h-4" />
+                  <span className="hidden sm:inline">Tools</span>
+                  <ChevronDown className="w-3 h-3 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuItem onClick={() => setIsManageAreasOpen(true)}>
+                  <MapPin className="w-4 h-4 mr-2 text-orange-500" />
+                  Manage areas
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsCreateAreaOpen(true)}>
+                  <Plus className="w-4 h-4 mr-2 text-teal-500" />
+                  Create new area
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setIsTemplateManagerOpen(true)}>
+                  <LayoutTemplate className="w-4 h-4 mr-2 text-indigo-500" />
+                  Base templates
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsShiftTypeManagerOpen(true)}>
+                  <Tag className="w-4 h-4 mr-2 text-violet-500" />
+                  Shift types
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setIsCallManagerOpen(true)}>
+                  <Phone className="w-4 h-4 mr-2 text-blue-500" />
+                  Client calls
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
       </PageHeader>
@@ -397,6 +429,30 @@ export default function Rota() {
           open={!!claimShift}
           onClose={() => setClaimShift(null)}
           isAdmin={canEdit}
+        />
+      )}
+
+      {isCallManagerOpen && (
+        <ClientCallManager
+          open={isCallManagerOpen}
+          onClose={() => setIsCallManagerOpen(false)}
+          selectedAreaId={selectedAreaId}
+        />
+      )}
+
+      {isShiftTypeManagerOpen && (
+        <ShiftTypeManager
+          open={isShiftTypeManagerOpen}
+          onClose={() => setIsShiftTypeManagerOpen(false)}
+          selectedAreaId={selectedAreaId}
+        />
+      )}
+
+      {isTemplateManagerOpen && (
+        <BaseShiftTemplateManager
+          open={isTemplateManagerOpen}
+          onClose={() => setIsTemplateManagerOpen(false)}
+          selectedAreaId={selectedAreaId}
         />
       )}
 
