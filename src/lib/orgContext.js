@@ -39,6 +39,7 @@ export async function initOrg() {
       if (!error && data) {
         _currentOrgId = data.organization_id
         _currentOrgRole = data.role
+        try { localStorage.setItem('organizationId', _currentOrgId) } catch {}
       } else {
         // Fallback: check users table for organization_id
         const { data: userRow } = await supabase
@@ -50,6 +51,7 @@ export async function initOrg() {
         if (userRow?.organization_id) {
           _currentOrgId = userRow.organization_id
           _currentOrgRole = 'member'
+          try { localStorage.setItem('organizationId', _currentOrgId) } catch {}
           // Auto-repair: re-insert into organization_members
           await supabase.from('organization_members').upsert({
             organization_id: userRow.organization_id,

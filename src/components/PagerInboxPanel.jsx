@@ -2,13 +2,14 @@ import { useState, useEffect, useRef } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
+import { getCurrentOrgId } from '@/lib/orgContext';
 import { format } from 'date-fns';
 import { CheckCircle, X } from 'lucide-react';
 import PagerSvg from '@/components/PagerSvg';
 import PagerPanel from '@/components/admin/PagerPanel';
 
 const getOrgId = () =>
-  localStorage.getItem('organizationId') || sessionStorage.getItem('organizationId') || '';
+  getCurrentOrgId() || localStorage.getItem('organizationId') || sessionStorage.getItem('organizationId') || '';
 
 const SHAKE_CSS = `
   @keyframes alerterVibrate {

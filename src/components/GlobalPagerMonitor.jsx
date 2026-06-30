@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from '@/api/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
+import { getCurrentOrgId } from '@/lib/orgContext';
 
 const getOrgId = () =>
-  localStorage.getItem('organizationId') || sessionStorage.getItem('organizationId') || '';
+  getCurrentOrgId() || localStorage.getItem('organizationId') || sessionStorage.getItem('organizationId') || '';
 
 export default function GlobalPagerMonitor() {
   const { user, isAuthenticated } = useAuth();
