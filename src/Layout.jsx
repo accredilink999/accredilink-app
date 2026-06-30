@@ -14,6 +14,8 @@ import { getCurrentOrgRole, getCurrentOrg } from '@/lib/orgContext';
 import { useHelpMode } from '@/lib/HelpModeContext';
 import AppDownloadPrompt from '@/components/AppDownloadPrompt';
 import RadioPagerPanel from '@/components/RadioPagerPanel';
+import PagerInboxPanel from '@/components/PagerInboxPanel';
+import PagerSvg from '@/components/PagerSvg';
 import PWAInstallButton from '@/components/PWAInstallButton';
 import PWAInstallPrompt from '@/components/PWAInstallPrompt';
 import APKNudgeBanner from '@/components/APKNudgeBanner';
@@ -93,6 +95,7 @@ export default function Layout({ children, currentPageName }) {
   const [showNotifBanner, setShowNotifBanner] = useState(false);
   const { helpMode, setHelpMode } = useHelpMode();
   const [commsOpen, setCommsOpen] = useState(false);
+  const [pagerOpen, setPagerOpen] = useState(false);
 
   // Track previous page so logo tap returns user to where they were
   const prevPageRef = useRef(null);
@@ -1323,22 +1326,45 @@ export default function Layout({ children, currentPageName }) {
                         onOpenComms={() => setCommsOpen(true)}
                       />
 
-                      {/* Floating Comms button — opens Radio/Pager panel */}
+                      {/* Floating Radio button */}
                       {radioEnabled && !user?.is_control_device && currentPageName !== 'TwoWayRadio' && (
                         <button
                           onClick={() => setCommsOpen(true)}
                           className="fixed bottom-20 right-4 z-[9998] w-12 h-12 rounded-full bg-slate-900 text-green-400 shadow-lg flex items-center justify-center hover:bg-slate-700 active:scale-95 transition-all touch-manipulation"
-                          aria-label="Open Comms"
+                          aria-label="Open Radio"
                         >
                           <Radio className="w-5 h-5" />
+                          {visibleMissedCalls.length > 0 && (
+                            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                              {visibleMissedCalls.length}
+                            </span>
+                          )}
                         </button>
                       )}
 
-                      {/* Radio + Pager slide-in panel */}
+                      {/* Floating Pager button */}
+                      {!user?.is_control_device && (
+                        <button
+                          onClick={() => setPagerOpen(true)}
+                          className="fixed bottom-20 left-4 z-[9998] w-12 h-12 rounded-full bg-slate-800 shadow-lg flex items-center justify-center hover:bg-slate-700 active:scale-95 transition-all touch-manipulation overflow-hidden"
+                          aria-label="Open Pager"
+                        >
+                          <PagerSvg className="w-9 h-9" />
+                        </button>
+                      )}
+
+                      {/* Radio slide-in panel */}
                       <RadioPagerPanel
                         open={commsOpen}
                         onOpenChange={setCommsOpen}
                         missedCallCount={visibleMissedCalls.length}
+                      />
+
+                      {/* Pager inbox slide-in panel */}
+                      <PagerInboxPanel
+                        open={pagerOpen}
+                        onOpenChange={setPagerOpen}
+                        user={user}
                       />
 
                       {user?.id && <ActiveShiftAutoOpen userId={user.id} />}
