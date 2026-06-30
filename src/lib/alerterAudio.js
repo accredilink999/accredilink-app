@@ -1,61 +1,64 @@
 /**
  * alerterAudio.js
- * Mirrors the AudioContext oscillator pattern from TwoWayRadio.jsx so alerter
- * tones fire reliably in all contexts (cold start, background, notification tap).
- * HTMLAudioElement.play() is blocked by autoplay policy on cold start;
- * AudioContext.resume() is not, matching how P2P call ringtones work.
+ * Plays pager.mp3 via AudioContext (not HTMLAudioElement) so autoplay works on
+ * cold start / notification tap — same pattern as the P2P call ringtone.
+ * The buffer is preloaded on app mount so playback is instant.
  */
 
-let _ctx = null;
+let _ctx    = null;
+let _buffer = null;
+let _source = null;
 
 function getCtx() {
   try {
     if (!_ctx || _ctx.state === 'closed') {
       _ctx = new (window.AudioContext || window.webkitAudioContext)();
     }
-    if (_ctx.state === 'suspended') _ctx.resume().catch(() => {});
     return _ctx;
   } catch { return null; }
 }
 
-// Pager-style tone pattern (distinct from radio ring)
-const FREQS = [1400, 1000, 1400, 1000];
+async function loadBuffer() {
+  if (_buffer) return _buffer;
+  const ctx = getCtx();
+  if (!ctx) return null;
+  try {
+    const resp = await fetch('/pager.mp3');
+    const ab   = await resp.arrayBuffer();
+    _buffer    = await ctx.decodeAudioData(ab);
+  } catch {}
+  return _buffer;
+}
 
 export function playAlerterTone() {
   const ctx = getCtx();
   if (!ctx) return () => {};
 
-  let timer = null;
-  const burst = () => FREQS.forEach((freq, i) => {
-    const osc  = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value = freq;
-    osc.type = 'sine';
-    const t = ctx.currentTime + i * 0.13;
-    gain.gain.setValueAtTime(0.7, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
-    osc.start(t);
-    osc.stop(t + 0.11);
-  });
-
-  const start = () => { burst(); timer = setInterval(burst, 2200); };
+  const doPlay = () => {
+    if (!_buffer) return;
+    if (_source) { try { _source.stop(); } catch {} _source = null; }
+    _source = ctx.createBufferSource();
+    _source.buffer = _buffer;
+    _source.loop   = true;
+    _source.connect(ctx.destination);
+    _source.start();
+  };
 
   if (ctx.state === 'running') {
-    start();
+    doPlay();
   } else {
-    ctx.resume().then(start).catch(() => {});
+    ctx.resume().then(doPlay).catch(() => {});
   }
 
-  return () => { if (timer) clearInterval(timer); };
+  return () => {
+    if (_source) { try { _source.stop(); } catch {} _source = null; }
+  };
 }
 
-export function stopAlerterTone(stopFn) {
-  if (typeof stopFn === 'function') stopFn();
-}
-
-// Pre-warm so the context exists before first alert
-export function preWarmAlerterAudio() {
-  try { getCtx(); } catch {}
+// Pre-warm: create context and preload buffer so first play is instant
+export async function preWarmAlerterAudio() {
+  try {
+    getCtx();
+    await loadBuffer();
+  } catch {}
 }
