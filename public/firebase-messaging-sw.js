@@ -44,18 +44,30 @@ async function initMessaging() {
 
     const messaging = firebase.messaging();
 
+    // onBackgroundMessage fires for DATA-ONLY pushes (no notification field).
+    // Alerter messages are sent data-only for web → we handle display here once.
+    // Standard messages include a notification field → Firebase auto-displays them
+    // without calling onBackgroundMessage, so no double-show.
     messaging.onBackgroundMessage((payload) => {
-      const title = payload.notification?.title || 'Care Call AI';
-      const data  = payload.data || {};
-      const isCall = data.type === 'radio_call';
+      const data  = payload.data  || {};
+      const notif = payload.notification;
+
+      // If Firebase already auto-showed a notification (notification field present), skip.
+      if (notif && notif.title) return;
+
+      const title     = data.title || 'CareCall AI';
+      const body      = data.body  || '';
+      const isAlerter = data.type  === 'alerter';
+      const isCall    = data.type  === 'radio_call';
+
       const options = {
-        body: payload.notification?.body || '',
-        icon: payload.notification?.icon || '/pwa-192x192.png',
-        badge: '/pwa-64x64.png',
-        tag: isCall ? `radio-call-${Date.now()}` : (data.tag || 'care-call-notification'),
+        body,
+        icon:    '/pwa-192x192.png',
+        badge:   '/pwa-64x64.png',
+        tag:     isAlerter ? 'carecall-alerter' : (isCall ? `radio-call-${Date.now()}` : (data.tag || 'care-call-notification')),
         data,
-        vibrate: isCall ? [300, 100, 300, 100, 300] : [200, 100, 200],
-        requireInteraction: isCall || data.requireInteraction === 'true',
+        vibrate: isAlerter ? [300, 100, 300, 100, 300, 100, 300] : (isCall ? [300, 100, 300, 100, 300] : [200, 100, 200]),
+        requireInteraction: isAlerter || isCall,
       };
 
       self.registration.showNotification(title, options);
@@ -78,18 +90,17 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// Handle notification click: focus existing window or open app
+// Handle notification click: focus existing window or open app at the deep link URL
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = event.notification.data?.action_url || event.notification.data?.url || '/';
+  const data = event.notification.data || {};
+  const url  = data.action_url || data.url || '/';
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {
         if (client.url.startsWith(self.location.origin)) {
-          // Post message so React can handle navigation without a full reload.
-          // Also try navigate() for the ?call= PIN-bypass — falls back gracefully if unsupported.
-          client.postMessage({ type: 'NOTIFICATION_CLICK', data: event.notification.data });
+          client.postMessage({ type: 'NOTIFICATION_CLICK', data });
           if ('focus' in client) return client.focus();
           return;
         }

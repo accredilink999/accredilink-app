@@ -108,36 +108,56 @@ async function sendFCMMessage(
   data?: Record<string, string>,
   priority?: string,
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  const isAlerter = data?.type === 'alerter';
+
+  // Alerter messages: data-only for web (no notification field) so firebase-messaging-sw.js
+  // handles display exactly once. Android keeps a notification field for native display.
+  // Other messages: include notification field for cross-platform auto-display.
   const message: Record<string, unknown> = {
     token: fcmToken,
-    notification: { title, body },
     android: {
       priority: priority === 'high' ? 'HIGH' : 'NORMAL',
       notification: {
+        title,
+        body,
         click_action: 'FLUTTER_NOTIFICATION_CLICK',
-        default_vibrate_timings: true,
-        default_sound: true,
+        default_vibrate_timings: !isAlerter,
+        default_sound:           !isAlerter,
+        ...(isAlerter ? {
+          vibrate_timings: ['0.3s', '0.1s', '0.3s', '0.1s', '0.3s', '0.1s', '0.3s'],
+          sound: 'default',
+          channel_id: 'carecall_alerter',
+        } : {}),
       },
     },
     webpush: {
       headers: { Urgency: priority === 'high' ? 'high' : 'normal' },
-      notification: {
-        icon: '/pwa-192x192.png',
-        badge: '/pwa-64x64.png',
-        vibrate: [200, 100, 200],
-        requireInteraction: priority === 'high' || priority === 'critical',
-      },
+      // NO webpush.notification for alerter → data-only on web → onBackgroundMessage fires once
+      ...(!isAlerter ? {
+        notification: {
+          icon: '/pwa-192x192.png',
+          badge: '/pwa-64x64.png',
+          vibrate: [200, 100, 200],
+          requireInteraction: priority === 'high' || priority === 'critical',
+        },
+      } : {}),
     },
   };
 
+  // Non-alerter messages get top-level notification for cross-platform auto-display
+  if (!isAlerter) {
+    (message as any).notification = { title, body };
+  }
+
+  // Build data payload — always include title/body so onBackgroundMessage can show them
+  const strData: Record<string, string> = { title, body };
   if (data && Object.keys(data).length > 0) {
     // FCM data values must be strings
-    const strData: Record<string, string> = {};
     for (const [k, v] of Object.entries(data)) {
       strData[k] = typeof v === 'string' ? v : JSON.stringify(v);
     }
-    message.data = strData;
   }
+  message.data = strData;
 
   const url = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
 

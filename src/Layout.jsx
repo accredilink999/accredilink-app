@@ -109,6 +109,19 @@ export default function Layout({ children, currentPageName }) {
     return () => window.removeEventListener('alerter:incoming', handleIncoming);
   }, []);
 
+  // Handle service worker notification click (app already open when notification tapped)
+  useEffect(() => {
+    const handler = (event) => {
+      const { type, data } = event.data || {};
+      if (type === 'NOTIFICATION_CLICK' && data?.type === 'alerter') {
+        setPagerOpen(true);
+        setIncomingAlert('deeplink');
+      }
+    };
+    navigator.serviceWorker?.addEventListener('message', handler);
+    return () => navigator.serviceWorker?.removeEventListener('message', handler);
+  }, []);
+
   // Handle deep link on startup: /?alerter=open
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
