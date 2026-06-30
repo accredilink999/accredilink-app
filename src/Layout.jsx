@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from './utils';
 import { base44 } from '@/api/base44Client';
@@ -72,6 +73,7 @@ import {
                                 PhoneOff,
                                 Mic,
                                 Radio,
+                                X,
                               } from 'lucide-react';
 
 
@@ -1360,12 +1362,34 @@ export default function Layout({ children, currentPageName }) {
                         missedCallCount={visibleMissedCalls.length}
                       />
 
-                      {/* Pager inbox slide-in panel */}
+                      {/* Alerter inbox slide-in panel */}
                       <PagerInboxPanel
                         open={pagerOpen}
                         onOpenChange={setPagerOpen}
                         user={user}
                       />
+
+                      {/* Slide-in close tabs — portalled to <body> so they sit above Radix Sheet */}
+                      {commsOpen && createPortal(
+                        <button
+                          onClick={() => setCommsOpen(false)}
+                          className="fixed left-0 top-24 z-[99999] bg-red-600 text-white py-4 px-2 rounded-r-xl shadow-xl hover:bg-red-700 active:bg-red-800 touch-manipulation"
+                          aria-label="Close radio"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>,
+                        document.body
+                      )}
+                      {pagerOpen && createPortal(
+                        <button
+                          onClick={() => setPagerOpen(false)}
+                          className="fixed left-0 top-24 z-[99999] bg-red-600 text-white py-4 px-2 rounded-r-xl shadow-xl hover:bg-red-700 active:bg-red-800 touch-manipulation"
+                          aria-label="Close alerter"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>,
+                        document.body
+                      )}
 
                       {user?.id && <ActiveShiftAutoOpen userId={user.id} />}
                       <OfflineManager />

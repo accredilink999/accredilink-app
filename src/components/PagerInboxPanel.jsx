@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
@@ -71,7 +70,6 @@ export default function PagerInboxPanel({ open, onOpenChange, user }) {
   const unreadCount = messages.filter(m => m.created_at > seenAt).length;
 
   return (
-    <>
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className={`w-full p-0 flex flex-col bg-white overflow-hidden ${isAdmin ? 'sm:w-[480px]' : 'sm:w-80'}`}>
 
@@ -168,17 +166,5 @@ export default function PagerInboxPanel({ open, onOpenChange, user }) {
         </div>
       </SheetContent>
     </Sheet>
-
-    {/* Fixed close tab — always reachable on the left edge of the screen */}
-    {open && (
-      <button
-        onClick={() => onOpenChange(false)}
-        className="fixed left-0 top-24 z-[99999] bg-red-600 text-white py-4 px-2 rounded-r-xl shadow-xl hover:bg-red-700 active:bg-red-800 touch-manipulation"
-        aria-label="Close alerter"
-      >
-        <X className="w-5 h-5" />
-      </button>
-    )}
-    </>
   );
 }
