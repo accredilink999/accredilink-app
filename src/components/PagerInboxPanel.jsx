@@ -3,6 +3,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/supabaseClient';
 import { getCurrentOrgId } from '@/lib/orgContext';
+import { playAlerterTone } from '@/lib/alerterAudio';
 import { format } from 'date-fns';
 import { CheckCircle, X } from 'lucide-react';
 import PagerSvg from '@/components/PagerSvg';
@@ -65,7 +66,7 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
   const [alerting,     setAlerting]     = useState(false);
   const [silenced,     setSilenced]     = useState(false);
   const [alertMsg,     setAlertMsg]     = useState(null);
-  const audioRef = useRef(null);
+  const stopToneRef = useRef(null);
 
   const dismissOne = (id) => {
     const next = dismissedIds.concat([id]);
@@ -98,17 +99,9 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
     setSilenced(false);
     setAlerting(true);
     if (typeof incomingAlert === 'object') setAlertMsg(incomingAlert);
-    if (audioRef.current) {
-      audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(() => {
-        // Autoplay blocked on cold start — play on first user gesture (e.g. tapping the pager)
-        const playOnGesture = () => {
-          if (audioRef.current) { audioRef.current.currentTime = 0; audioRef.current.play().catch(() => {}); }
-        };
-        document.addEventListener('touchstart', playOnGesture, { capture: true, once: true });
-        document.addEventListener('click',      playOnGesture, { capture: true, once: true });
-      });
-    }
+    // Oscillator tone — same pattern as P2P call ringtone, works on cold start
+    if (stopToneRef.current) { stopToneRef.current(); stopToneRef.current = null; }
+    stopToneRef.current = playAlerterTone();
     if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300, 100, 300]);
   }, [incomingAlert, open]);
 
@@ -117,7 +110,7 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
     if (!open) {
       setAlerting(false);
       setSilenced(false);
-      if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
+      if (stopToneRef.current) { stopToneRef.current(); stopToneRef.current = null; }
       if (navigator.vibrate) navigator.vibrate(0);
       window.dispatchEvent(new CustomEvent('alerter:silence'));
     }
@@ -126,7 +119,7 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
   const silence = () => {
     setAlerting(false);
     setSilenced(true);
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
+    if (stopToneRef.current) { stopToneRef.current(); stopToneRef.current = null; }
     if (navigator.vibrate) navigator.vibrate(0);
     window.dispatchEvent(new CustomEvent('alerter:silence'));
   };
@@ -191,7 +184,6 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className={`w-full p-0 flex flex-col bg-white overflow-hidden ${isAdmin ? 'sm:w-[480px]' : 'sm:w-80'}`}>
         <style>{SHAKE_CSS}</style>
-        <audio ref={audioRef} src="/pager.mp3" preload="auto" loop />
 
         <SheetHeader className="px-5 pt-5 pb-3 border-b border-slate-100 shrink-0">
           <SheetTitle className="text-base font-bold text-slate-800 flex items-center gap-2">

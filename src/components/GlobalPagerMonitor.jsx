@@ -2,13 +2,14 @@ import { useEffect, useRef } from 'react';
 import { supabase } from '@/api/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { getCurrentOrgId } from '@/lib/orgContext';
+import { playAlerterTone } from '@/lib/alerterAudio';
 
 const getOrgId = () =>
   getCurrentOrgId() || localStorage.getItem('organizationId') || sessionStorage.getItem('organizationId') || '';
 
 export default function GlobalPagerMonitor() {
   const { user, isAuthenticated } = useAuth();
-  const audioRef    = useRef(null);
+  const stopToneRef = useRef(null);
   const seenRef     = useRef(new Set());
   const wakeLockRef = useRef(null);
 
@@ -47,10 +48,10 @@ export default function GlobalPagerMonitor() {
 
           if (window.AndroidApp?.wakeForCall) window.AndroidApp.wakeForCall();
 
-          if (audioRef.current) {
-            audioRef.current.currentTime = 0;
-            audioRef.current.play().catch(() => {});
-          }
+          // Oscillator-based tone — same pattern as P2P call ringtone, bypasses
+          // HTMLAudioElement autoplay restrictions
+          if (stopToneRef.current) { stopToneRef.current(); stopToneRef.current = null; }
+          stopToneRef.current = playAlerterTone();
 
           window.dispatchEvent(new CustomEvent('alerter:incoming', { detail: msg }));
         }
@@ -66,12 +67,12 @@ export default function GlobalPagerMonitor() {
   // ── Silence handler ──────────────────────────────────────────────────
   useEffect(() => {
     const silence = () => {
-      if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
+      if (stopToneRef.current) { stopToneRef.current(); stopToneRef.current = null; }
       wakeLockRef.current?.release().catch(() => {});
     };
     window.addEventListener('alerter:silence', silence);
     return () => window.removeEventListener('alerter:silence', silence);
   }, []);
 
-  return <audio ref={audioRef} src="/pager.mp3" preload="auto" loop />;
+  return null;
 }

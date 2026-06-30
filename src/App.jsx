@@ -22,6 +22,7 @@ import GlobalAlerterMonitor from '@/components/GlobalAlerterMonitor';
 import GlobalPagerMonitor from '@/components/GlobalPagerMonitor';
 import HelpNudge from '@/components/HelpNudge';
 import { initOrg, resetOrg } from '@/lib/orgContext';
+import { preWarmAlerterAudio } from '@/lib/alerterAudio';
 import SubscriptionGate from '@/components/billing/SubscriptionGate';
 import OrgSetup from '@/pages/OrgSetup';
 import TermsConsentGate from '@/components/TermsConsentGate';
@@ -187,6 +188,9 @@ const AppShell = () => {
 
     initOrgContext();
   }, [isAuthenticated]);
+
+  // Pre-warm alerter AudioContext on mount (mirrors TwoWayRadio pre-warm pattern)
+  useEffect(() => { preWarmAlerterAudio(); }, []);
 
   // Unlock browser audio on first user gesture so alerter tones fire automatically
   useEffect(() => {
