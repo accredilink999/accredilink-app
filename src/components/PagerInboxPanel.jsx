@@ -100,7 +100,14 @@ export default function PagerInboxPanel({ open, onOpenChange, user, incomingAler
     if (typeof incomingAlert === 'object') setAlertMsg(incomingAlert);
     if (audioRef.current) {
       audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(() => {}); // silent fail — browser may block autoplay on cold start
+      audioRef.current.play().catch(() => {
+        // Autoplay blocked on cold start — play on first user gesture (e.g. tapping the pager)
+        const playOnGesture = () => {
+          if (audioRef.current) { audioRef.current.currentTime = 0; audioRef.current.play().catch(() => {}); }
+        };
+        document.addEventListener('touchstart', playOnGesture, { capture: true, once: true });
+        document.addEventListener('click',      playOnGesture, { capture: true, once: true });
+      });
     }
     if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300, 100, 300]);
   }, [incomingAlert, open]);
