@@ -314,6 +314,7 @@ export default function LeaveManagement() {
       <PageHeader
         title="Leave Management"
         subtitle="Manage holidays, sickness, and time off"
+        tutorialKey="LeaveManagement"
       >
         <Calendar className="w-6 h-6 text-teal-600" />
       </PageHeader>

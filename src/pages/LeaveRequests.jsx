@@ -170,9 +170,10 @@ export default function LeaveRequests() {
 
   return (
     <div className="space-y-6">
-      <PageHeader 
-        title="Leave Requests" 
+      <PageHeader
+        title="Leave Requests"
         subtitle="Manage time off and availability"
+        tutorialKey="LeaveManagement"
       >
         <Button onClick={() => setIsDialogOpen(true)} className="bg-teal-600 hover:bg-teal-700">
           <Plus className="w-4 h-4 mr-2" />

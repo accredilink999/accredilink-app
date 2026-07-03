@@ -118,9 +118,10 @@ export default function TrainingMatrix() {
 
   return (
     <div className="space-y-6">
-      <PageHeader 
+      <PageHeader
         title="Staff Training Matrix"
         subtitle="View and manage training completion status across all staff"
+        tutorialKey="TrainingMatrix"
       >
         <Dialog open={showNewItemDialog} onOpenChange={setShowNewItemDialog}>
           <DialogTrigger asChild>

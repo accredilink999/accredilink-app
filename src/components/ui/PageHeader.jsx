@@ -3,11 +3,27 @@ import { useHelpMode } from '@/lib/HelpModeContext';
 import { PAGE_TIPS } from '@/config/helpTips';
 import { HelpCircle, X } from 'lucide-react';
 import { useState } from 'react';
+import TutorialModal from '@/components/TutorialModal';
+import { PAGE_TUTORIALS } from '@/config/pageTutorials';
+import { useQuery } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
 
-export default function PageHeader({ title, subtitle, children, className, icon: Icon, helpTip }) {
+export default function PageHeader({ title, subtitle, children, className, icon: Icon, helpTip, tutorialKey }) {
   const { helpMode } = useHelpMode();
   const [dismissed, setDismissed] = useState(false);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
   const tip = helpTip || PAGE_TIPS[title];
+  const tutorial = tutorialKey ? PAGE_TUTORIALS[tutorialKey] : null;
+
+  const { data: currentUser } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: () => base44.auth.me(),
+    enabled: !!tutorial,
+    staleTime: 300000,
+  });
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin' ||
+    ['admin', 'manager', 'supervisor'].includes(currentUser?.job_title);
+  const defaultTab = isAdmin ? 'admin' : 'staff';
 
   return (
     <div className={cn("flex flex-col gap-2 mb-6", className)}>
@@ -16,11 +32,18 @@ export default function PageHeader({ title, subtitle, children, className, icon:
           {Icon && <Icon className="w-8 h-8" />}
           <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
         </div>
-        {children && (
-          <div className="flex items-center gap-3 flex-wrap">
-            {children}
-          </div>
-        )}
+        <div className="flex items-center gap-3 flex-wrap">
+          {tutorial && (
+            <button
+              onClick={() => setTutorialOpen(true)}
+              className="h-9 px-3 flex items-center gap-1.5 rounded-lg border-2 border-blue-200 text-blue-700 hover:bg-blue-50 text-sm font-medium transition-colors"
+            >
+              <HelpCircle className="w-4 h-4" />
+              <span className="hidden sm:inline">How To</span>
+            </button>
+          )}
+          {children}
+        </div>
       </div>
       {subtitle && <p className="text-slate-500">{subtitle}</p>}
       {/* Auto-show help banner when help mode is ON */}
@@ -46,6 +69,17 @@ export default function PageHeader({ title, subtitle, children, className, icon:
         >
           <HelpCircle className="w-4 h-4 text-teal-500" />
         </button>
+      )}
+      {tutorial && (
+        <TutorialModal
+          open={tutorialOpen}
+          onClose={() => setTutorialOpen(false)}
+          title={tutorial.title}
+          adminContent={tutorial.adminContent}
+          staffContent={tutorial.staffContent}
+          staffOnly={tutorial.staffOnly || (!tutorial.adminContent)}
+          defaultTab={tutorial.staffOnly || !tutorial.adminContent ? 'staff' : defaultTab}
+        />
       )}
     </div>
   );

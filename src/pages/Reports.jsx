@@ -303,10 +303,11 @@ export default function Reports() {
 
   return (
     <div className="space-y-6">
-      <PageHeader 
-        title="Reports & Analytics" 
+      <PageHeader
+        title="Reports & Analytics"
         subtitle="Comprehensive business intelligence and performance metrics"
         icon={LineChartIcon}
+        tutorialKey="Reports"
       >
         <div className="flex items-center gap-3">
           <Select value={dateRange} onValueChange={setDateRange}>

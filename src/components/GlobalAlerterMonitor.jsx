@@ -152,6 +152,9 @@ export default function GlobalAlerterMonitor() {
       unsilenceAlerter();
       startPagerLoop();
 
+      // Vibrate device (Android WebView supports navigator.vibrate)
+      try { navigator.vibrate?.([400, 100, 400, 100, 400]); } catch {}
+
       // Wake lock — keeps screen on (PWA)
       if ('wakeLock' in navigator) {
         navigator.wakeLock.request('screen').catch(() => {});
@@ -172,13 +175,11 @@ export default function GlobalAlerterMonitor() {
         ).catch(() => {});
       }
 
-      // Switch to alerter tab via event (works when TwoWayRadio already mounted)
-      window.dispatchEvent(new CustomEvent('alerter:new-alert'));
+      // Switch to alerter tab via event — delay slightly so TwoWayRadio's listener is registered
+      setTimeout(() => window.dispatchEvent(new CustomEvent('alerter:new-alert')), 150);
 
-      // Navigate to radio/alerter page (PWA only — APK is always on TwoWayRadio)
-      if (!isRadioMode) {
-        navigate('/TwoWayRadio?tab=alerter');
-      }
+      // Navigate to radio/alerter page (tab=alerter handled by TwoWayRadio on mount)
+      navigate('/TwoWayRadio?tab=alerter');
     } else if (!isAlerterSilenced() && !_pagerActiveCheck()) {
       // Existing unacked alerts, not silenced, tone stopped — restart
       startPagerLoop();

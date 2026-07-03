@@ -183,9 +183,10 @@ export default function Incidents() {
 
   return (
     <div ref={containerRef} className="space-y-6" style={{ overscrollBehavior: 'none' }}>
-      <PageHeader 
-        title="Incidents" 
+      <PageHeader
+        title="Incidents"
         subtitle="Report and track incidents and safeguarding concerns"
+        tutorialKey="Incidents"
       >
         <Button onClick={handleAddNew} className="bg-red-600 hover:bg-red-700">
           <Plus className="w-4 h-4 mr-2" />

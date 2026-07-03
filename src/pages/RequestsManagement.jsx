@@ -385,6 +385,7 @@ export default function RequestsManagement() {
       <PageHeader
         title="Requests Management"
         subtitle="Review and approve shift swaps and leave requests"
+        tutorialKey="ApprovalsAndFinancials"
       >
         <div className="flex gap-2 flex-wrap">
           <Badge className="bg-orange-100 text-orange-700">

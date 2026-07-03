@@ -28,9 +28,10 @@ export default function Documents() {
 
   return (
     <div className="space-y-6">
-      <PageHeader 
-        title="Documents" 
+      <PageHeader
+        title="Documents"
         subtitle="Manage personal documents and company resources"
+        tutorialKey="Documents"
       />
 
       <Card className="p-1 bg-gradient-to-br from-white to-slate-50 border-0 shadow-sm hover:shadow-md transition-shadow">

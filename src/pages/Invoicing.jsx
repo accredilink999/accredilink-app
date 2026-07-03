@@ -108,6 +108,7 @@ export default function Invoicing() {
           title="Invoicing & Financials"
           subtitle="Manage invoices, clients, and track payments"
           icon={FileText}
+          tutorialKey="Invoicing"
         />
         <Button
           onClick={() => setActiveTab('settings')}

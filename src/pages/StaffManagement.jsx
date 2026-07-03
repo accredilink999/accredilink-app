@@ -40,6 +40,7 @@ export default function StaffManagement() {
         subtitle="Manage employee profiles, contracts, and employment details"
         icon={Users}
         className="[&_h1]:text-slate-900 [&_svg]:text-blue-600 [&_svg]:fill-blue-600"
+        tutorialKey="StaffManagement"
       />
 
       <Tabs defaultValue="staff" className="w-full">

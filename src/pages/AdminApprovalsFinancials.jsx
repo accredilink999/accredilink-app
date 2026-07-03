@@ -523,10 +523,11 @@ export default function AdminApprovalsFinancials() {
 
   return (
     <div className="space-y-6">
-      <PageHeader 
+      <PageHeader
         title="Approvals & Financials"
         subtitle="Manage all staff leave requests, shift swaps, and expense approvals"
         icon={ClipboardCheck}
+        tutorialKey="ApprovalsAndFinancials"
       />
 
       {/* Stats Overview */}

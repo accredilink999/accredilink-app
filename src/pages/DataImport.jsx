@@ -233,6 +233,7 @@ export default function DataImport() {
       <PageHeader
         title="Data Import"
         subtitle="Import CSV data from Base44 into the app"
+        tutorialKey="DataImport"
       />
 
       {/* Step 1: Select table */}

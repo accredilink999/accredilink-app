@@ -316,6 +316,7 @@ export default function Profile() {
         title="My Profile"
         subtitle="Manage your personal information"
         className="[&_h1]:text-lg [&_h1]:sm:text-2xl [&_h1]:text-slate-900"
+        tutorialKey="Profile"
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 min-w-0">

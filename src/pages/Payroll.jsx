@@ -232,6 +232,7 @@ export default function Payroll() {
           title="My Payslips"
           subtitle="View and download your payslips"
           icon={DollarSign}
+          tutorialKey="Payroll"
         />
         <Tabs defaultValue="payslips">
           <TabsList className="grid w-full max-w-md grid-cols-3">
@@ -259,6 +260,7 @@ export default function Payroll() {
         title="Payroll Management"
         subtitle="Generate payslips with UK PAYE tax and NI calculations"
         icon={DollarSign}
+        tutorialKey="Payroll"
       />
 
       <PayPeriodManager

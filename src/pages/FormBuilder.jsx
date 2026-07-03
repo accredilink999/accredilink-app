@@ -83,10 +83,11 @@ export default function FormBuilder() {
     <div className="space-y-6">
       {view === 'list' && (
         <>
-          <PageHeader 
+          <PageHeader
             title="Form Builder"
             subtitle="Create and manage forms"
             icon={WandSparkles}
+            tutorialKey="FormBuilder"
           />
 
           <div className="flex justify-end">

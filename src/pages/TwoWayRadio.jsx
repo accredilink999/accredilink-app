@@ -147,21 +147,43 @@ function playTone(freqs, loop = false) {
       }
     } catch {}
   }
-  // Use shared context — avoids creating a suspended new context in background tabs
+  // Bop-beep incoming alert — on native APK use preloaded audio file (oscillators require user-gesture to unlock AudioContext, which async Supabase callbacks don't have)
+  if (loop && window.Capacitor?.isNativePlatform?.()) {
+    let active = true;
+    const bopUrl = '/radio-tones/Bop Beep.aac';
+    const step = () => {
+      if (!active) return;
+      let a = null;
+      const pre = _preloaded[bopUrl];
+      if (pre) { pre.currentTime = 0; a = pre; }
+      else { try { a = new Audio(bopUrl); } catch {} }
+      if (!a) return;
+      a.volume = Math.min(vol * 1.5, 1.0);
+      a.play().catch(() => {});
+      a.addEventListener('ended', () => { if (active) setTimeout(step, 300); }, { once: true });
+    };
+    step();
+    return () => { active = false; };
+  }
+  // PWA oscillators — boost gain through a compressor so bop-beep is audible at all speaker volumes
   const ctx = getAudioCtx(); if (!ctx) return () => {};
   let timer = null;
-  const burst = () => freqs.forEach((freq, i) => {
-    const osc = ctx.createOscillator(), gain = ctx.createGain();
-    osc.connect(gain); gain.connect(ctx.destination);
-    osc.frequency.value = freq; osc.type = 'sine';
-    const t = ctx.currentTime + i * 0.11;
-    gain.gain.setValueAtTime(0.85 * vol, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.10);
-    osc.start(t); osc.stop(t + 0.10);
-  });
+  const burst = () => {
+    const comp = ctx.createDynamicsCompressor();
+    comp.connect(ctx.destination);
+    freqs.forEach((freq, i) => {
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.connect(gain); gain.connect(comp);
+      osc.frequency.value = freq; osc.type = 'sine';
+      const t = ctx.currentTime + i * 0.11;
+      gain.gain.setValueAtTime(Math.min(vol * 2.0, 2.0), t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.10);
+      osc.start(t); osc.stop(t + 0.10);
+    });
+  };
   const start = () => { burst(); if (loop) timer = setInterval(burst, 2400); };
   if (ctx.state === 'running') { start(); } else { ctx.resume().then(start).catch(() => {}); }
-  return () => { if (timer) clearInterval(timer); }; // never close shared ctx
+  return () => { if (timer) clearInterval(timer); };
 }
 
 function playAlarm() {
@@ -607,8 +629,9 @@ export default function TwoWayRadio({ onClose } = {}) {
   const isControlDevice = !!userFlags?.is_control_device || urlPreview === 'control';
   // Control devices get full admin-level radio access regardless of their assigned role
   const isSuperAdmin  = user?.role === 'super_admin' || user?.role === 'admin' || isControlDevice;
-  // Alerter tab shown only when alerter_enabled — toggle in Control Room is the single gate
-  const hasAlerter = !!userFlags?.alerter_enabled;
+  // Alerter tab shown when alerter_enabled OR when this is a dedicated radio control device
+  // (mirrors GlobalAlerterMonitor's alerterEnabled logic so the tab always shows when alerts fire)
+  const hasAlerter = !!userFlags?.alerter_enabled || (isControlDevice && isRadioMode);
   const myUid         = user?.id ? toUid(user.id) : null;
   const otherStaff    = staff.filter(s => s.id !== user?.id);
   const staffByUid    = Object.fromEntries(staff.map(s => [toUid(s.id), s]));

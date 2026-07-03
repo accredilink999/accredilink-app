@@ -839,6 +839,7 @@ export default function ComplianceManagement() {
         title="Compliance Management"
         subtitle="Regulatory compliance, document tracking & reporting"
         icon={Lock}
+        tutorialKey="Compliance"
       >
         {/* Framework Toggle */}
         <div className="flex border border-slate-200 rounded-lg p-1 bg-slate-50">

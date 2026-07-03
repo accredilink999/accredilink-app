@@ -30,6 +30,8 @@ import { supabase } from '@/api/supabaseClient';
 import PinLockScreen from '@/components/auth/PinLockScreen';
 import PinSetupModal from '@/components/auth/PinSetupModal';
 import { hasPin, isPinSessionUnlocked, setPinSessionUnlocked, wasPinPromptShown } from '@/utils/pinUtils';
+import PagerInboxPanel from '@/components/PagerInboxPanel';
+import PagerSvg from '@/components/PagerSvg';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -54,6 +56,7 @@ const AppShell = () => {
   const [pinLocked, setPinLocked] = useState(false);
   const [showPinSetup, setShowPinSetup] = useState(false);
   const pinCheckedRef = useRef(false);
+  const [radioPagerOpen, setRadioPagerOpen] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated || !user?.id || pinCheckedRef.current) return;
@@ -267,6 +270,21 @@ const AppShell = () => {
         <GlobalAlerterMonitor />
         <GlobalPagerMonitor />
         <TwoWayRadio />
+        {/* Floating pager/alerter button — shown on radio APK since Layout is not rendered */}
+        <button
+          onClick={() => setRadioPagerOpen(true)}
+          className="fixed bottom-20 right-4 z-[9998] w-12 h-12 rounded-full bg-slate-800 shadow-lg flex items-center justify-center hover:bg-slate-700 active:scale-95 transition-all touch-manipulation overflow-hidden"
+          aria-label="Open Pager"
+        >
+          <PagerSvg className="w-9 h-9" />
+        </button>
+        <PagerInboxPanel
+          open={radioPagerOpen}
+          onOpenChange={setRadioPagerOpen}
+          user={user}
+          incomingAlert={null}
+          onAlertSilenced={() => {}}
+        />
       </>
     );
   }

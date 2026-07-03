@@ -156,7 +156,7 @@ export default function ClinicalDashboard() {
   if (isLoading) {
     return (
       <div className="max-w-6xl mx-auto pb-6">
-        <PageHeader title="Clinical Dashboard" icon={Activity} />
+        <PageHeader title="Clinical Dashboard" icon={Activity} tutorialKey="ClinicalDashboard" />
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 animate-spin text-rose-500" />
         </div>
@@ -166,7 +166,7 @@ export default function ClinicalDashboard() {
 
   return (
     <div className="max-w-6xl mx-auto pb-6">
-      <PageHeader title="Clinical Dashboard" icon={Activity} />
+      <PageHeader title="Clinical Dashboard" icon={Activity} tutorialKey="ClinicalDashboard" />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">

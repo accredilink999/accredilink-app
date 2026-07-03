@@ -278,10 +278,11 @@ Provide helpful, actionable insights and recommendations.`,
 
   return (
     <div className="space-y-6">
-      <PageHeader 
-        title="AI Admin Assistant" 
+      <PageHeader
+        title="AI Admin Assistant"
         subtitle="Get intelligent insights and assistance with administrative tasks"
         icon={Bot}
+        tutorialKey="AIAssistant"
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

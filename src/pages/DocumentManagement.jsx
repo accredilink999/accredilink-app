@@ -86,10 +86,11 @@ export default function DocumentManagement() {
 
   return (
     <div className="space-y-6">
-      <PageHeader 
-        title="Document Management" 
+      <PageHeader
+        title="Document Management"
         subtitle="Manage documents, policies, and administration tools"
         icon={Archive}
+        tutorialKey="Documents"
       >
         <div className="flex gap-2">
           <Button 

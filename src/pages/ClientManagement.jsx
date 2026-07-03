@@ -187,6 +187,7 @@ export default function ClientManagement() {
         subtitle={isAdmin ? "Manage all service users and their care plans" : "View service user information"}
         icon={Heart}
         className="[&_h1]:text-slate-900 [&_svg]:text-teal-600 [&_svg]:fill-teal-600"
+        tutorialKey="ClientManagement"
       >
         {isAdmin && (
           <div className="flex items-center gap-2">

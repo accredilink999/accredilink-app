@@ -614,6 +614,7 @@ export default function ControlRoom() {
         subtitle="Live client map & staff tracking"
         icon={Navigation}
         className="[&_h1]:text-slate-900 [&_svg]:text-slate-700 [&_svg]:fill-slate-700 flex-col sm:flex-row"
+        tutorialKey="ControlRoom"
       >
         <div className="flex flex-wrap items-center gap-2">
           <Link to={createPageUrl('ClientManagement')}>

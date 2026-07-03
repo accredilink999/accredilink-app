@@ -126,9 +126,10 @@ export default function CareLogs() {
 
   return (
     <div className="space-y-6">
-      <PageHeader 
-        title="Care Logs" 
+      <PageHeader
+        title="Care Logs"
         subtitle="Daily visit notes and observations"
+        tutorialKey="CareLogs"
       />
 
       {/* Overdue Alert */}

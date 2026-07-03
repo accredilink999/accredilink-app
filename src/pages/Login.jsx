@@ -7,8 +7,9 @@ export default function Login() {
   const [mode, setMode] = useState(
     typeof window !== 'undefined' && window.location.pathname === '/signup' ? 'signup' : 'signin'
   ) // 'signin' | 'signup' | 'forgot-password'
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const isRadioMode = typeof window !== 'undefined' && localStorage.getItem('carecall_radio_mode') === 'true'
+  const [email, setEmail] = useState(() => isRadioMode ? (localStorage.getItem('radio_saved_email') || '') : '')
+  const [password, setPassword] = useState(() => isRadioMode ? (localStorage.getItem('radio_saved_pwd') || '') : '')
   const [fullName, setFullName] = useState('')
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
@@ -82,17 +83,27 @@ export default function Login() {
   // Skip redirect if biometric is ready (let them use biometric first)
   useEffect(() => {
     if (biometricReady) return; // don't auto-redirect, let them biometric unlock
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.access_token) {
         // Verify the session is actually valid by calling getUser
-        supabase.auth.getUser().then(({ data: { user }, error }) => {
-          if (user && !error) {
-            window.location.replace('/')
-          }
-        })
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (user && !error) { window.location.replace('/'); return; }
+      }
+      // Session expired or missing — on radio APK, try saved credentials for seamless reconnect
+      if (isRadioMode) {
+        const savedEmail = localStorage.getItem('radio_saved_email');
+        const savedPwd   = localStorage.getItem('radio_saved_pwd');
+        if (savedEmail && savedPwd) {
+          setStatus('Reconnecting…');
+          const { data: autoData, error: autoErr } = await supabase.auth.signInWithPassword({ email: savedEmail, password: savedPwd });
+          if (autoData?.session && !autoErr) { window.location.replace('/'); return; }
+          // Saved credentials failed — clear them and let user log in manually
+          try { localStorage.removeItem('radio_saved_pwd'); } catch {}
+          setStatus('');
+        }
       }
     })
-  }, [biometricReady])
+  }, [biometricReady]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSignIn = async (e) => {
     e.preventDefault()
@@ -117,6 +128,10 @@ export default function Login() {
         // Store refresh token for biometric re-login
         if (isBiometricEnabled()) {
           storeBiometricRefreshToken(data.session.refresh_token);
+        }
+        // On radio APK, save credentials for auto-reconnect after session expiry
+        if (isRadioMode) {
+          try { localStorage.setItem('radio_saved_email', email); localStorage.setItem('radio_saved_pwd', password); } catch {}
         }
 
         const { data: profile } = await supabase

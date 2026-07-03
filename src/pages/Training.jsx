@@ -348,11 +348,12 @@ Return ONLY valid JSON (no markdown) with this COMPLETE structure:
 
   return (
     <div className="space-y-6">
-      <PageHeader 
-        title="Training & Development" 
+      <PageHeader
+        title="Training & Development"
         subtitle="Comprehensive LMS for staff compliance and development"
         icon={GraduationCap}
         className="[&_h1]:text-slate-900 [&_svg]:text-cyan-600 [&_svg]:fill-cyan-600"
+        tutorialKey="Training"
       >
         {isAdmin && (
           <div className="flex items-center gap-2">

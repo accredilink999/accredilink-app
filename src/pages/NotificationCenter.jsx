@@ -16,9 +16,10 @@ export default function NotificationCenterPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader 
-        title="Notification Center" 
+      <PageHeader
+        title="Notification Center"
         subtitle="View and manage all your notifications"
+        tutorialKey="NotificationCenter"
       />
       <NotificationCenterComponent userId={user.id} />
     </div>

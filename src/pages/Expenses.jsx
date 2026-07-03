@@ -23,6 +23,7 @@ export default function Expenses() {
       <PageHeader
         title="Expense Management"
         subtitle="Submit and manage mileage, fuel, and expense claims"
+        tutorialKey="Expenses"
       >
         <Receipt className="w-6 h-6 text-teal-600" />
       </PageHeader>

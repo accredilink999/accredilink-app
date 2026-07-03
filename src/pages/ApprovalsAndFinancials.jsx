@@ -277,6 +277,7 @@ export default function ApprovalsAndFinancials() {
       <PageHeader
         title="My Approvals & Financials"
         subtitle="Book leave, track approvals, view expenses and payslips"
+        tutorialKey="ApprovalsAndFinancials"
       />
 
       <Tabs defaultValue="approvals" className="w-full">

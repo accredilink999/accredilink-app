@@ -127,6 +127,7 @@ export default function RotaManagement() {
         subtitle="Schedule shifts and manage calls"
         icon={CalendarDays}
         className="[&_h1]:text-slate-900 [&_svg]:text-orange-500 [&_svg]:fill-orange-500"
+        tutorialKey="RotaManagement"
       />
 
       {/* Controls Bar */}

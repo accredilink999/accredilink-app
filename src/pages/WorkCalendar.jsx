@@ -107,6 +107,7 @@ export default function WorkCalendar() {
         title="Work Calendar"
         subtitle="Schedule and manage team events, meetings, and interviews"
         icon={CalendarDays}
+        tutorialKey="WorkCalendar"
       >
         {isAdmin && (
           <Button

@@ -431,11 +431,12 @@ export default function Messages() {
 
   return (
     <div ref={containerRef} className="space-y-4 sm:space-y-6">
-      <PageHeader 
-        title="Messaging Centre" 
+      <PageHeader
+        title="Messaging Centre"
         subtitle="Manage announcements, alerts, and notifications"
         icon={BellIcon}
         className="[&_h1]:text-red-600 [&_svg]:text-red-600 [&_svg]:fill-red-600"
+        tutorialKey="Messages"
       />
       
       <div className="space-y-2 sm:space-y-3 mb-4 sm:mb-6">
