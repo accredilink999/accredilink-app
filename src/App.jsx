@@ -22,7 +22,7 @@ import GlobalAlerterMonitor from '@/components/GlobalAlerterMonitor';
 import GlobalPagerMonitor from '@/components/GlobalPagerMonitor';
 import HelpNudge from '@/components/HelpNudge';
 import { initOrg, resetOrg } from '@/lib/orgContext';
-import { preWarmAlerterAudio } from '@/lib/alerterAudio';
+import { preWarmAlerterAudio, resumeAlerterCtx } from '@/lib/alerterAudio';
 import SubscriptionGate from '@/components/billing/SubscriptionGate';
 import OrgSetup from '@/pages/OrgSetup';
 import TermsConsentGate from '@/components/TermsConsentGate';
@@ -201,13 +201,14 @@ const AppShell = () => {
     const unlock = () => {
       if (unlocked) return;
       unlocked = true;
-      // Play + immediately pause at near-zero volume — this "activates" the element
-      // so subsequent .play() calls on any Audio element succeed without a gesture
+      // Play + immediately pause at near-zero volume — activates HTML Audio on Android
       try {
         const a = new Audio('/pager.mp3');
         a.volume = 0.001;
         a.play().then(() => a.pause()).catch(() => {});
       } catch {}
+      // Also resume the shared AudioContext — required on Android WebView where it starts suspended
+      resumeAlerterCtx();
     };
     document.addEventListener('click',      unlock, { capture: true, passive: true });
     document.addEventListener('touchstart', unlock, { capture: true, passive: true });

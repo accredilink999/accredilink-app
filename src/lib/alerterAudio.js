@@ -62,3 +62,9 @@ export async function preWarmAlerterAudio() {
     await loadBuffer();
   } catch {}
 }
+
+// Call this inside a user gesture to unlock the AudioContext on Android WebView
+export function resumeAlerterCtx() {
+  const ctx = getCtx();
+  if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {});
+}
