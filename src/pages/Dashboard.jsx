@@ -271,7 +271,8 @@ export default function Dashboard() {
       const myAreaIds = myPerms.map(p => p.rota_area_id).filter(Boolean);
       if (myAreaIds.length === 0) return [];
 
-      const { data, error } = await supabase
+      const orgId = getCurrentOrgId();
+      let q = supabase
         .from('shifts')
         .select('id, date, start_time, end_time, shift_type, rota_area_id, area_id, shift_name')
         .is('staff_id', null)
@@ -279,6 +280,8 @@ export default function Dashboard() {
         .gte('date', today)
         .order('date', { ascending: true })
         .limit(50);
+      if (orgId) q = q.eq('organization_id', orgId);
+      const { data, error } = await q;
       if (error) throw error;
 
       const areaSet = new Set(myAreaIds);
@@ -287,18 +290,37 @@ export default function Dashboard() {
     enabled: !!user?.id,
   });
 
-  // Today's shift calls for this user (for task counts)
+  // Today's shift calls for this user (visits count + task counts)
   const { data: myTodayShiftCalls = [] } = useQuery({
     queryKey: ['myShiftCalls', today, user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      const { data, error } = await supabase
+      const orgId = getCurrentOrgId();
+
+      // Primary: filter by staff_id + date
+      let q = supabase
         .from('shift_calls')
-        .select('id, tasks, service_user_id, service_user_name, call_type, scheduled_time, status')
-        .eq('staff_id', user.id)
-        .eq('call_date', today);
+        .select('id, tasks, service_user_id, service_user_name, call_type, scheduled_time, status, shift_id')
+        .eq('call_date', today)
+        .eq('staff_id', user.id);
+      if (orgId) q = q.eq('organization_id', orgId);
+      const { data, error } = await q;
       if (error) throw error;
-      return data || [];
+      if ((data || []).length > 0) return data;
+
+      // Fallback: find today's shifts then get their calls (handles cases where
+      // shift_calls were created without staff_id populated)
+      const todayShiftRows = await ShiftApi.filter({ date: today, staff_id: user.id });
+      const shiftIds = todayShiftRows.map(s => s.id);
+      if (shiftIds.length === 0) return [];
+      let q2 = supabase
+        .from('shift_calls')
+        .select('id, tasks, service_user_id, service_user_name, call_type, scheduled_time, status, shift_id')
+        .in('shift_id', shiftIds);
+      if (orgId) q2 = q2.eq('organization_id', orgId);
+      const { data: data2, error: error2 } = await q2;
+      if (error2) throw error2;
+      return data2 || [];
     },
     enabled: !!user?.id,
   });
@@ -308,7 +330,8 @@ export default function Dashboard() {
     queryKey: ['nextShift', user?.id, today],
     queryFn: async () => {
       if (!user?.id) return null;
-      const { data, error } = await supabase
+      const orgId = getCurrentOrgId();
+      let q = supabase
         .from('shifts')
         .select('id, date, start_time, end_time, shift_type, shift_name, status, rota_area_id')
         .eq('staff_id', user.id)
@@ -316,8 +339,9 @@ export default function Dashboard() {
         .neq('status', 'completed')
         .order('date', { ascending: true })
         .order('start_time', { ascending: true })
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
+      if (orgId) q = q.eq('organization_id', orgId);
+      const { data, error } = await q.maybeSingle();
       if (error) throw error;
       return data;
     },
@@ -849,7 +873,6 @@ export default function Dashboard() {
             { to: 'Feedback', label: 'Feedback', icon: Star, bg: 'from-amber-400 to-yellow-500' },
             { to: 'AIAssistant', label: 'AI', icon: Bot, bg: 'from-purple-400 to-purple-600' },
             { to: 'Competencies', label: 'Competencies', icon: ClipboardCheck, bg: 'from-violet-400 to-violet-600' },
-            ...(radioEnabled ? [{ to: 'TwoWayRadio', label: 'Radio', icon: Radio, bg: 'from-red-500 to-rose-600' }] : []),
           ].map(section => {
             const Icon = section.icon;
             const content = (
