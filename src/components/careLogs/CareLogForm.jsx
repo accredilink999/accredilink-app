@@ -321,6 +321,14 @@ export default function CareLogForm({ shift, serviceUser, open, onClose, callId,
       if (callId && shift?.paired_shift_id) {
         try {
           await supabase.from('shift_calls').update({ log_required: false }).eq('id', callId);
+          // Also clear log_required on the partner's matching call so they aren't blocked
+          if (serviceUser?.id) {
+            await supabase
+              .from('shift_calls')
+              .update({ log_required: false })
+              .eq('shift_id', shift.paired_shift_id)
+              .eq('service_user_id', serviceUser.id);
+          }
           const pairedShift = await base44.entities.Shift.read(shift.paired_shift_id);
           if (pairedShift?.staff_id && pairedShift.staff_id !== user?.id) {
             base44.functions.invoke('createNotification', {

@@ -1055,7 +1055,7 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
              // Only block once the call has actually been started — if the call is still pending the
              // staff member will fill the log when they arrive, not before visiting other clients first.
              const logRequiredCall = !isAdmin ? callsToDisplay.find(c => {
-               if (c.id === call.id || !c.log_required || !c.clock_in_time) return false;
+               if (c.id === call.id || !c.log_required || !c.clock_in_time || !!c.care_log_id) return false;
                return !careLogs.some(log => log.id === c.care_log_id || log.shift_call_id === c.id);
              }) : null;
              const hasLogRequiredBlock = !!logRequiredCall;
