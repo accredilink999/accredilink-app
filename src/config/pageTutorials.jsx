@@ -405,7 +405,7 @@ const Documents = {
 };
 
 // ─── SETTINGS ────────────────────────────────────────────────────────────────
-const Settings = {
+const SettingsTutorial = {
   title: 'Settings Guide',
   adminContent: (
     <>
@@ -979,7 +979,7 @@ export const PAGE_TUTORIALS = {
   Messages,
   Chat: Messages,
   Documents,
-  Settings,
+  Settings: SettingsTutorial,
   LeaveManagement,
   LeaveRequests: LeaveManagement,
   Payroll,
