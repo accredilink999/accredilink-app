@@ -52,17 +52,11 @@ jobs:
         id: notes
         run: |
           if [ -n "${{ github.event.inputs.release_notes }}" ]; then
-            echo "notes=${{ github.event.inputs.release_notes }}" >> "$GITHUB_OUTPUT"
+            NOTES="${{ github.event.inputs.release_notes }}"
           else
-            # Extract notes from commit message (lines after first line)
-            COMMIT_BODY=$(git log -1 --pretty=%b)
-            if [ -n "$COMMIT_BODY" ]; then
-              echo "notes=$COMMIT_BODY" >> "$GITHUB_OUTPUT"
-            else
-              COMMIT_MSG=$(git log -1 --pretty=%s)
-              echo "notes=$COMMIT_MSG" >> "$GITHUB_OUTPUT"
-            fi
+            NOTES=$(git log -1 --pretty=%s)
           fi
+          echo "notes=${NOTES}" >> "$GITHUB_OUTPUT"
 
       - name: Build web app
         run: npm run build
