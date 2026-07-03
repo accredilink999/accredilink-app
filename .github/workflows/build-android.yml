@@ -19,6 +19,9 @@ on:
       - 'package.json'
       - '.github/workflows/build-android.yml'
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -63,6 +66,9 @@ jobs:
 
       - name: Build web app
         run: npm run build
+        env:
+          VITE_SUPABASE_URL: https://edaifkkkqwgavxkgozwi.supabase.co
+          VITE_SUPABASE_ANON_KEY: sb_publishable_XLzc3szPjmX4ZmBz_wz4tA_-MJf-XBg
 
       - name: Sync Capacitor
         run: npx cap sync android
@@ -76,15 +82,27 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Build debug APK
+      - name: Write local.properties
+        run: echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+
+      - name: Build standard debug APK
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleStandardDebug --no-daemon 2>&1 | tee /tmp/gradle_output.txt
+          exit ${PIPESTATUS[0]}
 
-      - name: Build release APK (unsigned)
-        working-directory: android
-        run: ./gradlew assembleRelease
+      - name: Push error log on failure
+        if: failure()
+        run: |
+          { grep -E "FAILED|Caused by:|error:|^e:|Execution failed" /tmp/gradle_output.txt; echo "===TAIL==="; tail -10 /tmp/gradle_output.txt; } > gradle_error.txt || true
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          git add gradle_error.txt
+          git commit -m "ci: gradle error log [skip ci]"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # Upload APK to Supabase storage
       - name: Upload APK to Supabase storage
@@ -94,7 +112,7 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          APK_PATH="android/app/build/outputs/apk/debug/app-debug.apk"
+          APK_PATH="android/app/build/outputs/apk/standard/debug/app-standard-debug.apk"
           STORAGE_PATH="apk/accredilink-v${VERSION}.apk"
           PUBLIC_URL="${SUPABASE_URL}/storage/v1/object/public/uploads/${STORAGE_PATH}"
           APK_SIZE=$(wc -c < "$APK_PATH")
@@ -139,38 +157,35 @@ jobs:
             --arg notes "${NOTES:-Version ${VERSION}}" \
             '{version: $ver, file_url: $url, filename: $name, filesize: $size, updated_at: $now, notes: $notes}')
 
-          ESCAPED=$(echo "$SETTING_VALUE" | jq -Rs '.')
+          UPSERT_BODY=$(jq -n \
+            --arg key "app_download_android" \
+            --argjson val "$SETTING_VALUE" \
+            '{setting_key: $key, setting_value: $val, organization_id: null}')
 
-          echo "Updating system setting..."
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PATCH \
+          echo "Upserting system setting..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
             -H "Authorization: Bearer ${SUPABASE_KEY}" \
-            -H "apikey: ${SUPABASE_KEY}" \
             -H "Content-Type: application/json" \
-            -H "Prefer: return=representation" \
-            "${SUPABASE_URL}/rest/v1/system_settings?setting_key=eq.app_download_android" \
-            -d "{\"setting_value\": ${ESCAPED}}")
+            -H "Prefer: resolution=merge-duplicates,return=minimal" \
+            "${SUPABASE_URL}/rest/v1/system_settings" \
+            -d "$UPSERT_BODY")
 
           if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
-            echo "✓ System setting updated — users will see update popup"
+            echo "✓ System setting upserted — users will see update popup"
           else
-            echo "✗ Setting update failed (HTTP ${HTTP_CODE})"
+            echo "✗ Setting upsert failed (HTTP ${HTTP_CODE})"
             exit 1
           fi
 
       # Also save as GitHub artifact
-      - name: Upload debug APK artifact
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: accredilink-debug-v${{ steps.version.outputs.version }}
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-
-      - name: Upload release APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: accredilink-release-v${{ steps.version.outputs.version }}
-          path: android/app/build/outputs/apk/release/app-release-unsigned.apk
+          name: accredilink-standard-debug-v${{ steps.version.outputs.version }}
+          path: android/app/build/outputs/apk/standard/debug/app-standard-debug.apk
 
       - name: Summary
+        if: success()
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           echo "## Release v${VERSION}" >> $GITHUB_STEP_SUMMARY
