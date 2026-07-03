@@ -274,7 +274,7 @@ const AppShell = () => {
         {/* Floating pager/alerter button — shown on radio APK since Layout is not rendered */}
         <button
           onClick={() => setRadioPagerOpen(true)}
-          className="fixed bottom-20 right-4 z-[9998] w-12 h-12 rounded-full bg-slate-800 shadow-lg flex items-center justify-center hover:bg-slate-700 active:scale-95 transition-all touch-manipulation overflow-hidden"
+          className="fixed bottom-36 right-4 z-[9998] w-12 h-12 rounded-full bg-slate-800 shadow-lg flex items-center justify-center hover:bg-slate-700 active:scale-95 transition-all touch-manipulation overflow-hidden"
           aria-label="Open Pager"
         >
           <PagerSvg className="w-9 h-9" />
