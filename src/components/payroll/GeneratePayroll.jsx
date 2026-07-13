@@ -34,8 +34,10 @@ function isShiftWorked(shift) {
 
 export default function GeneratePayroll() {
   const queryClient = useQueryClient();
-  const [periodStart, setPeriodStart] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
-  const [periodEnd, setPeriodEnd] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
+  // Default to previous month — payroll run in early July is almost always for June
+  const _prevMonth = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1);
+  const [periodStart, setPeriodStart] = useState(format(startOfMonth(_prevMonth), 'yyyy-MM-dd'));
+  const [periodEnd, setPeriodEnd] = useState(format(endOfMonth(_prevMonth), 'yyyy-MM-dd'));
   const [selectedStaff, setSelectedStaff] = useState([]);
   const [overrides, setOverrides] = useState({});
   const [expandedStaff, setExpandedStaff] = useState({});
