@@ -54,7 +54,11 @@ jobs:
         run: npx cap sync android 2>&1 | tee /tmp/cap_sync_output.txt; exit ${PIPESTATUS[0]}
 
       - name: Write local.properties
-        run: echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+        run: |
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "sdk.dir=$SDK" > android/local.properties
+          echo "ANDROID_HOME=$SDK" >> $GITHUB_ENV
+          echo "Using SDK at: $SDK"
 
       - name: Write google-services.json
         if: ${{ secrets.GOOGLE_SERVICES_JSON != '' }}
@@ -74,6 +78,9 @@ jobs:
 
       - name: Build radio debug APK
         run: |
+          echo "=== local.properties ==="
+          cat android/local.properties
+          echo "=== ANDROID_HOME=$ANDROID_HOME ==="
           cd android
           ./gradlew assembleRadioDebug --no-daemon --stacktrace 2>&1 | tee /tmp/gradle_output.txt
           exit ${PIPESTATUS[0]}
