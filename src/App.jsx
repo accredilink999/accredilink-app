@@ -57,6 +57,15 @@ const AppShell = () => {
   const [showPinSetup, setShowPinSetup] = useState(false);
   const pinCheckedRef = useRef(false);
   const [radioPagerOpen, setRadioPagerOpen] = useState(false);
+  const [radioIncomingAlert, setRadioIncomingAlert] = useState(null);
+
+  // Auto-open pager panel when GlobalPagerMonitor fires an incoming pager message (radio APK only)
+  useEffect(() => {
+    if (localStorage.getItem('carecall_radio_mode') !== 'true') return;
+    const handle = (e) => { setRadioIncomingAlert(e.detail); setRadioPagerOpen(true); };
+    window.addEventListener('alerter:incoming', handle);
+    return () => window.removeEventListener('alerter:incoming', handle);
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated || !user?.id || pinCheckedRef.current) return;
@@ -283,8 +292,8 @@ const AppShell = () => {
           open={radioPagerOpen}
           onOpenChange={setRadioPagerOpen}
           user={user}
-          incomingAlert={null}
-          onAlertSilenced={() => {}}
+          incomingAlert={radioIncomingAlert}
+          onAlertSilenced={() => setRadioIncomingAlert(null)}
         />
       </>
     );
