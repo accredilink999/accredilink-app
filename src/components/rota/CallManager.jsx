@@ -1039,6 +1039,8 @@ export default function CallManager({ shift, calls, isAdmin, isMyShift, sameDayS
              const blockingCall = !isAdmin ? callsToDisplay.find(c => {
                if (c.id === call.id || !c.clock_in_time) return false;
                if (!c.clock_out_time) return true;
+               // Accidental tap-in/out under 30 s — not a real visit, skip care log requirement
+               if (c.clock_out_time && (new Date(c.clock_out_time) - new Date(c.clock_in_time)) < 30000) return false;
                if (careLogs.some(log => log.id === c.care_log_id || log.shift_call_id === c.id)) return false;
                // Partner-completing handoff: partner's matching call has log_required set — don't block
                const partnerC = shift?.paired_shift_id ? getPartnerCall(c) : null;
