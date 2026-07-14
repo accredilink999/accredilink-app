@@ -53,7 +53,7 @@ jobs:
           VITE_APP_MODE: radio
 
       - name: Sync Capacitor
-        run: npx cap sync android
+        run: npx cap sync android 2>&1 | tee /tmp/cap_sync_output.txt; exit ${PIPESTATUS[0]}
 
       - name: Write local.properties
         run: echo "sdk.dir=$ANDROID_HOME" > android/local.properties
@@ -83,7 +83,15 @@ jobs:
       - name: Push error log on failure
         if: failure()
         run: |
-          { grep -E "FAILED|Caused by:|error:|^e:|Execution failed" /tmp/gradle_output.txt; echo "===TAIL==="; tail -10 /tmp/gradle_output.txt; } > gradle_error.txt
+          {
+            echo "=== CAP SYNC OUTPUT ==="
+            cat /tmp/cap_sync_output.txt 2>/dev/null || echo "(no cap sync output)"
+            echo ""
+            echo "=== GRADLE ERRORS ==="
+            grep -E "FAILED|Caused by:|error:|^e:|Execution failed" /tmp/gradle_output.txt 2>/dev/null || echo "(no gradle output)"
+            echo "===TAIL==="
+            tail -20 /tmp/gradle_output.txt 2>/dev/null || echo "(no gradle output)"
+          } > gradle_error.txt
           git config user.email "actions@github.com"
           git config user.name "GitHub Actions"
           git add gradle_error.txt
