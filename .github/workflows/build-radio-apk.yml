@@ -32,9 +32,7 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           accept-android-sdk-licenses: true
-
-      - name: Install SDK packages
-        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+          packages: 'platforms;android-35 build-tools;35.0.0 platform-tools'
 
       - name: Set up Node 20
         uses: actions/setup-node@v4
