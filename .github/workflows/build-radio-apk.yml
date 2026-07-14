@@ -80,20 +80,20 @@ jobs:
 
       - name: Log failure to Supabase
         if: failure()
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
+          ANON_KEY="sb_publishable_XLzc3szPjmX4ZmBz_wz4tA_-MJf-XBg"
+          SUPA_URL="https://edaifkkkqwgavxkgozwi.supabase.co"
           CAP_OUT=$(cat /tmp/cap_sync_output.txt 2>/dev/null || echo "(no cap sync output — failed before cap sync)")
           GRADLE_ERRORS=$(grep -E "FAILED|Caused by:|error:|^e:|Execution failed" /tmp/gradle_output.txt 2>/dev/null || echo "(no gradle output — failed before gradle)")
           GRADLE_TAIL=$(tail -20 /tmp/gradle_output.txt 2>/dev/null || echo "(no gradle output)")
           LOG=$(printf "RADIO APK BUILD FAILURE\nCommit: %s\n\nCAP SYNC:\n%s\n\nGRADLE ERRORS:\n%s\n\nGRADLE TAIL:\n%s" \
             "$GITHUB_SHA" "$CAP_OUT" "$GRADLE_ERRORS" "$GRADLE_TAIL" | head -c 8000)
           curl -s -X POST \
-            -H "Authorization: Bearer ${SUPABASE_KEY}" \
+            -H "Authorization: Bearer ${ANON_KEY}" \
+            -H "apikey: ${ANON_KEY}" \
             -H "Content-Type: application/json" \
-            "${SUPABASE_URL}/rest/v1/system_settings" \
             -H "Prefer: resolution=merge-duplicates,return=minimal" \
+            "${SUPA_URL}/rest/v1/system_settings" \
             -d "{\"setting_key\":\"ci_build_error_radio\",\"setting_value\":{\"log\":$(echo "$LOG" | jq -Rs .),\"sha\":\"$GITHUB_SHA\",\"ts\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"},\"organization_id\":null}" || true
 
       - name: Upload APK artifact
