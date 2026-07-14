@@ -32,7 +32,9 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           accept-android-sdk-licenses: true
-          packages: 'platforms;android-35 build-tools;35.0.0 platform-tools'
+
+      - name: Install SDK packages
+        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0" "platform-tools" || true
 
       - name: Set up Node 20
         uses: actions/setup-node@v4
@@ -85,23 +87,22 @@ jobs:
           ./gradlew assembleRadioDebug --no-daemon --stacktrace 2>&1 | tee /tmp/gradle_output.txt
           exit ${PIPESTATUS[0]}
 
-      - name: Log failure to Supabase
+      - name: Collect failure logs
         if: failure()
         run: |
-          ANON_KEY="sb_publishable_XLzc3szPjmX4ZmBz_wz4tA_-MJf-XBg"
-          SUPA_URL="https://edaifkkkqwgavxkgozwi.supabase.co"
-          CAP_OUT=$(cat /tmp/cap_sync_output.txt 2>/dev/null || echo "(no cap sync output — failed before cap sync)")
-          GRADLE_ERRORS=$(grep -E "FAILED|Caused by:|error:|^e:|Execution failed" /tmp/gradle_output.txt 2>/dev/null || echo "(no gradle output — failed before gradle)")
-          GRADLE_TAIL=$(tail -20 /tmp/gradle_output.txt 2>/dev/null || echo "(no gradle output)")
-          LOG=$(printf "RADIO APK BUILD FAILURE\nCommit: %s\n\nCAP SYNC:\n%s\n\nGRADLE ERRORS:\n%s\n\nGRADLE TAIL:\n%s" \
-            "$GITHUB_SHA" "$CAP_OUT" "$GRADLE_ERRORS" "$GRADLE_TAIL" | head -c 8000)
-          curl -s -X POST \
-            -H "Authorization: Bearer ${ANON_KEY}" \
-            -H "apikey: ${ANON_KEY}" \
-            -H "Content-Type: application/json" \
-            -H "Prefer: resolution=merge-duplicates,return=minimal" \
-            "${SUPA_URL}/rest/v1/system_settings" \
-            -d "{\"setting_key\":\"ci_build_error_radio\",\"setting_value\":{\"log\":$(echo "$LOG" | jq -Rs .),\"sha\":\"$GITHUB_SHA\",\"ts\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"},\"organization_id\":null}" || true
+          mkdir -p /tmp/build-logs
+          cat /tmp/cap_sync_output.txt 2>/dev/null > /tmp/build-logs/cap-sync.txt || echo "(not captured)" > /tmp/build-logs/cap-sync.txt
+          cat /tmp/gradle_output.txt 2>/dev/null > /tmp/build-logs/gradle.txt || echo "(not captured)" > /tmp/build-logs/gradle.txt
+          cat android/local.properties 2>/dev/null > /tmp/build-logs/local-properties.txt || echo "(not found)" > /tmp/build-logs/local-properties.txt
+          echo "ANDROID_HOME=$ANDROID_HOME" >> /tmp/build-logs/local-properties.txt
+
+      - name: Upload failure logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: radio-apk-failure-logs
+          path: /tmp/build-logs/
+          retention-days: 7
 
       - name: Upload APK artifact
         if: success()
