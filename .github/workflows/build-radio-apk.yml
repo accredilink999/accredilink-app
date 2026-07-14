@@ -80,29 +80,23 @@ jobs:
           ./gradlew assembleRadioDebug --no-daemon --stacktrace 2>&1 | tee /tmp/gradle_output.txt
           exit ${PIPESTATUS[0]}
 
-      - name: Push error log on failure
+      - name: Log failure to Supabase
         if: failure()
-        run: |
-          {
-            echo "=== RADIO APK BUILD FAILURE ==="
-            echo "Commit: $GITHUB_SHA"
-            echo ""
-            echo "=== CAP SYNC OUTPUT ==="
-            cat /tmp/cap_sync_output.txt 2>/dev/null || echo "(no cap sync output — failed before cap sync)"
-            echo ""
-            echo "=== GRADLE ERRORS ==="
-            grep -E "FAILED|Caused by:|error:|^e:|Execution failed" /tmp/gradle_output.txt 2>/dev/null || echo "(no gradle output — failed before gradle)"
-            echo "===TAIL==="
-            tail -20 /tmp/gradle_output.txt 2>/dev/null || echo "(no gradle output)"
-          } > gradle_error.txt
-          git config user.email "actions@github.com"
-          git config user.name "GitHub Actions"
-          git pull --rebase origin master || true
-          git add gradle_error.txt
-          git diff --cached --quiet || git commit -m "ci: radio APK error log [skip ci]"
-          git push origin master || true
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          CAP_OUT=$(cat /tmp/cap_sync_output.txt 2>/dev/null || echo "(no cap sync output — failed before cap sync)")
+          GRADLE_ERRORS=$(grep -E "FAILED|Caused by:|error:|^e:|Execution failed" /tmp/gradle_output.txt 2>/dev/null || echo "(no gradle output — failed before gradle)")
+          GRADLE_TAIL=$(tail -20 /tmp/gradle_output.txt 2>/dev/null || echo "(no gradle output)")
+          LOG=$(printf "RADIO APK BUILD FAILURE\nCommit: %s\n\nCAP SYNC:\n%s\n\nGRADLE ERRORS:\n%s\n\nGRADLE TAIL:\n%s" \
+            "$GITHUB_SHA" "$CAP_OUT" "$GRADLE_ERRORS" "$GRADLE_TAIL" | head -c 8000)
+          curl -s -X POST \
+            -H "Authorization: Bearer ${SUPABASE_KEY}" \
+            -H "Content-Type: application/json" \
+            "${SUPABASE_URL}/rest/v1/system_settings" \
+            -H "Prefer: resolution=merge-duplicates,return=minimal" \
+            -d "{\"setting_key\":\"ci_build_error_radio\",\"setting_value\":{\"log\":$(echo "$LOG" | jq -Rs .),\"sha\":\"$GITHUB_SHA\",\"ts\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"},\"organization_id\":null}" || true
 
       - name: Upload APK artifact
         if: success()
